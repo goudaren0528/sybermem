@@ -32,8 +32,8 @@ description: 为新项目或已有代码项目初始化 SyberMem 记录系统，
 
 使用以下模板作为标准版本：
 
-- `.claude/skills/sybermem-init-project/project-files/AGENTS.md`
-- `.claude/skills/sybermem-init-project/project-files/CLAUDE.md`
+- `packages/claude-skills/sybermem-init-project/project-files/AGENTS.md`
+- `packages/claude-skills/sybermem-init-project/project-files/CLAUDE.md`
 
 将项目文件分为四类：
 

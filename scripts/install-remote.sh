@@ -21,7 +21,7 @@ trap 'rm -rf "$TMPDIR"' EXIT
 echo "Downloading from GitHub..."
 curl -sL "$TARBALL_URL" | tar xz -C "$TMPDIR"
 
-SKILLS_SRC="$TMPDIR/$ARCHIVE_PREFIX/.claude/skills"
+SKILLS_SRC="$TMPDIR/$ARCHIVE_PREFIX/packages/claude-skills"
 
 if [ ! -d "$SKILLS_SRC" ]; then
     echo "Error: skills not found in archive"

@@ -25,6 +25,8 @@ If both `.sybermem/` and `ADR/` exist, the system uses `.sybermem/` and warns th
 
 Refreshing global skills alone does not automatically refresh project-local `AGENTS.md` / `CLAUDE.md`, so after upgrading you should run `/sybermem-update` inside each target project.
 
+If an older project still contains project-local copies such as `.claude/skills/sybermem-*`, Claude may load both the local and global copies and show duplicates in the `/` list. If you have adopted the global-install model, you can safely delete those old local copies.
+
 ## Install
 
 ### One-liner (requires public repo)
@@ -49,9 +51,20 @@ git clone https://github.com/goudaren0528/sybermem.git
 cd sybermem; .\scripts\install.ps1
 ```
 
-### Copy into a project
+### Initialize a project
 
-Copy `.claude/skills/` and `CLAUDE.md` (or `AGENTS.md`) to your project root.
+After the global install, open your project and run:
+
+```text
+/sybermem-init-project
+```
+
+This creates or refreshes only:
+- `.sybermem/`
+- `CLAUDE.md`
+- `AGENTS.md`
+
+It does not install another copy of the skills into the project.
 
 See [INSTALL.md](INSTALL.md) for details.
 
@@ -88,32 +101,26 @@ AGENTS.md             # OpenCode instructions (same content)
 
 ## Supported Platforms
 
-| Platform | Skills location | Project instructions |
-|----------|----------------|---------------------|
-| Claude Code | `~/.claude/skills/` or `.claude/skills/` | `CLAUDE.md` |
-| OpenCode | `~/.config/opencode/skills/` or `.claude/skills/` | `AGENTS.md` |
+| Platform | Global skills location | Project-level files |
+|----------|------------------------|---------------------|
+| Claude Code | `~/.claude/skills/` | `CLAUDE.md`, `.sybermem/` |
+| OpenCode | `~/.config/opencode/skills/` | `AGENTS.md`, `.sybermem/` |
 
 ## Repo Structure
 
 ```
-.claude/skills/                     # The skills (what gets installed)
+packages/claude-skills/               # Skill source for distribution inside the repo, not auto-loaded per project
 ├── sybermem-init-project/
-│   ├── SKILL.md
-│   └── project-files/
 ├── sybermem-record/
-│   ├── SKILL.md
-│   └── templates/
 ├── sybermem-summary/
-│   └── SKILL.md
 └── sybermem-update/
-    └── SKILL.md
 
-scripts/                             # Install & update scripts
-├── install-remote.sh / .ps1         # One-liner remote install
-├── install.sh / .ps1                # Local install
-└── update.sh / .ps1                 # Update existing install
+scripts/                              # Install & update scripts
+├── install-remote.sh / .ps1          # One-liner remote install
+├── install.sh / .ps1                 # Local install
+└── update.sh / .ps1                  # Update existing install
 
-docs/zh/                             # Chinese documentation
+docs/zh/                              # Chinese documentation
 ```
 
 ## License

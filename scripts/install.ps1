@@ -3,7 +3,8 @@
 
 $ErrorActionPreference = "Stop"
 $AdrPath = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
-$SkillSource = Join-Path $AdrPath ".claude\skills"
+$SkillSource = Join-Path $AdrPath "packages\claude-skills"
+$LegacyLocalSkills = Join-Path $AdrPath ".claude\skills"
 
 $Targets = @(
     @{ Path = Join-Path $env:USERPROFILE ".claude\skills"; Label = "Claude Code" }
@@ -48,3 +49,12 @@ Write-Host "下一步：进入你的项目目录后执行 /sybermem-update"
 Write-Host "如果你只想初始化或刷新当前项目，可执行 /sybermem-init-project"
 Write-Host ""
 Write-Host "注意：更新全局 Skills 不会自动刷新项目里的 AGENTS.md / CLAUDE.md；请在项目内运行 /sybermem-update 或 /sybermem-init-project"
+
+if ((Test-Path (Join-Path $LegacyLocalSkills "sybermem-init-project")) -or
+    (Test-Path (Join-Path $LegacyLocalSkills "sybermem-record")) -or
+    (Test-Path (Join-Path $LegacyLocalSkills "sybermem-summary")) -or
+    (Test-Path (Join-Path $LegacyLocalSkills "sybermem-update"))) {
+    Write-Host ""
+    Write-Host "迁移提示：当前仓库仍存在旧的项目级 SyberMem skills 副本 (.claude/skills/sybermem-*)。"
+    Write-Host "这些副本会和全局 skills 重复显示；确认已切换到全局安装模式后，可以安全删除它们。"
+}

@@ -1,4 +1,4 @@
-# ADR Index
+# SyberMem Index
 
 This file summarizes all project changes, decisions, requirements, and bug records.
 
@@ -9,6 +9,7 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 <!-- One-line core conclusion per record, AI reads this section at session start for project context -->
 - [requirement-001] Adopted ADR system: four category directories (changes/decisions/requirements/bugs) + INDEX master index + templates + skill automation (2026-05-08)
 - [change-001] Added one-liner remote install scripts (curl/irm) to simplify new user onboarding, no clone needed (2026-05-12)
+- [change-002] Moved SyberMem skill source to packages/claude-skills and removed repo-local runnable skill copies, so global installs no longer duplicate project-loaded skills (2026-05-12)
 <!-- add new conclusions here -->
 
 ---
@@ -18,6 +19,7 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 | Number | Date | Title | Status | Link |
 |--------|------|-------|--------|------|
 | 001 | 2026-05-12 | Add remote install scripts for one-liner installation | implemented | [link](changes/2026-05-12-001-add-remote-install-scripts.md) |
+| 002 | 2026-05-12 | Migrate global skill source to packages directory | implemented | [link](changes/2026-05-12-002-migrate-global-skill-source-to-packages.md) |
 <!-- add new records here -->
 
 ---

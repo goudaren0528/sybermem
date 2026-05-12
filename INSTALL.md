@@ -8,6 +8,8 @@ If both `.sybermem/` and `ADR/` exist, the skills use `.sybermem/` and warn that
 
 Refreshing global skills alone does not automatically refresh project-local `AGENTS.md` / `CLAUDE.md`. After upgrading, open each target project and run `/sybermem-update`.
 
+If an older project still contains project-local copies such as `.claude/skills/sybermem-*`, Claude may load both the local and global copies and show duplicates in the `/` list. Once you have switched to the global-install model, those old project-local copies can be deleted.
+
 ## Option 1: One-liner install (recommended)
 
 No clone needed — downloads directly from GitHub.
@@ -24,17 +26,9 @@ curl -sSL https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/i
 irm https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/install-remote.ps1 | iex
 ```
 
-After install, go to your project and run `/sybermem-update`.
+After install, open your target project and run `/sybermem-init-project`.
 
-## Option 2: Project-level install
-
-Copy files directly into a project, no global install needed.
-
-1. Copy `.claude/skills/` directory to the target project
-2. Copy `CLAUDE.md` (Claude Code) or `AGENTS.md` (OpenCode) to the project root
-3. Run `/sybermem-init-project`
-
-## Option 3: Clone and install
+## Option 2: Clone and install
 
 Clone the repo, then run the local install script.
 

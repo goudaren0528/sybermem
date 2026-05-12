@@ -26,7 +26,7 @@ try {
 
     Expand-Archive -Path $ZipFile -DestinationPath $TmpDir -Force
 
-    $SkillsSrc = Join-Path $TmpDir "$ArchivePrefix\.claude\skills"
+    $SkillsSrc = Join-Path $TmpDir "$ArchivePrefix\packages\claude-skills"
 
     if (-not (Test-Path $SkillsSrc)) {
         throw "Skills not found in archive"
