@@ -47,7 +47,7 @@ description: 在项目中创建 SyberMem 记录（变更、决策、需求、Bug
 
 路径：`.sybermem/{type}/{YYYY-MM-DD}-{NNN}-{标题}.md`
 
-内容模板使用 `.claude/skills/sybermem-record/templates/{type}.md`。
+内容模板使用 `packages/claude-skills/sybermem-record/templates/{type}.md`。
 
 ### Step 5: 更新 INDEX.md 表格
 
