@@ -6,7 +6,13 @@
 
 ## 工作流程
 
-安装 Skills → 在项目中运行 `/init-project` → 完成有意义的工作后运行 `/record`。AI 自动判断记录类型并写入 `ADR/` 目录。每次会话开始时，AI 读取 `ADR/INDEX.md` 中的关键结论，回忆历史工作上下文。
+安装 Skills → 在项目中运行 `/init-project` → 完成有意义的工作后运行 `/record`。AI 自动判断记录类型并写入 `.sybermem/` 目录。每次会话开始时，AI 读取 `.sybermem/INDEX.md` 中的关键结论，回忆历史工作上下文。
+
+## 老用户升级说明
+
+如果你的项目以前使用 `ADR/`，只需要升级 Skills，不需要手动改名。首次运行 `/init-project`、`/record` 或 `/summary` 时，会自动把旧的 `ADR/` 迁移为 `.sybermem/`。
+
+如果 `.sybermem/` 和 `ADR/` 同时存在，系统会优先使用 `.sybermem/`，并警告 `ADR/` 已被忽略。
 
 ## 安装
 
@@ -42,14 +48,14 @@ cd sybermem; .\scripts\install.ps1
 
 | Skill | 功能 |
 |-------|------|
-| `/init-project` | 在项目中创建 `ADR/` 目录结构，扫描现有代码库，生成 `CLAUDE.md` / `AGENTS.md` |
-| `/record` | 从当前会话上下文创建记录，AI 自动判断类型：变更、决策、需求或 Bug |
-| `/summary` | 基于已有记录和 git 历史生成周报或月报 |
+| `/init-project` | 在项目中创建 `.sybermem/` 目录结构，扫描现有代码库，生成 `CLAUDE.md` / `AGENTS.md`，并在首次运行时自动迁移旧 `ADR/` |
+| `/record` | 从当前会话上下文创建记录，AI 自动判断类型：变更、决策、需求或 Bug，并写入 `.sybermem/` |
+| `/summary` | 基于 `.sybermem/` 中已有记录和 git 历史生成周报或月报；旧 `ADR/` 会在首次使用时自动迁移 |
 
 ## 在你的项目中会创建什么
 
 ```
-ADR/
+.sybermem/
 ├── INDEX.md          # 主索引 — AI 在会话开始时读取关键结论
 ├── changes/          # 功能变更
 ├── decisions/        # 技术决策
@@ -60,6 +66,13 @@ ADR/
 CLAUDE.md             # Claude Code 项目指令（工作流规则）
 AGENTS.md             # OpenCode 项目指令（内容相同）
 ```
+
+## 目录解析规则
+
+- `.sybermem/` 是规范目录。
+- 如果 `.sybermem/` 已存在，直接使用。
+- 如果只有 `ADR/`，首次运行 `/init-project`、`/record` 或 `/summary` 时自动重命名为 `.sybermem/`。
+- 如果 `.sybermem/` 和 `ADR/` 同时存在，使用 `.sybermem/`，并提示 `ADR/` 被忽略。
 
 ## 支持平台
 

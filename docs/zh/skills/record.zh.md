@@ -1,11 +1,20 @@
 ---
 name: record
-description: 创建项目记录（变更/决策/需求/Bug），自动判断类型，一个入口完成所有记录
+description: 在项目中创建 SyberMem 记录（变更/决策/需求/Bug），也适用于仍然使用旧 ADR/ 存储的项目。
 ---
 
 # record Skill
 
-统一的记录入口。AI 根据上下文自动判断记录类型，用户无需选择。
+统一的 SyberMem 记录入口。AI 根据上下文自动判断记录类型，用户无需选择。
+
+## 目录解析规则
+
+在读取或写入记录之前，先解析项目数据目录：
+
+1. 如果 `.sybermem/` 已存在，直接使用。
+2. 如果只有 `ADR/`，将 `ADR/` 重命名为 `.sybermem/`，并告知用户旧目录已自动迁移。
+3. 如果 `.sybermem/` 和 `ADR/` 同时存在，使用 `.sybermem/`，警告 `ADR/` 已被忽略，不自动合并。
+4. 如果两者都不存在，提示用户先执行 `/init-project`。
 
 ## 流程
 
@@ -15,17 +24,17 @@ description: 创建项目记录（变更/决策/需求/Bug），自动判断类�
 
 | 信号 | 类型 | 目录 |
 |------|------|------|
-| 新增/修改/删除功能代码 | change | ADR/changes/ |
-| 技术选型、架构设计、多方案权衡 | decision | ADR/decisions/ |
-| 用户提出需求、讨论功能方向 | requirement | ADR/requirements/ |
-| 修复 Bug、排查问题 | bug | ADR/bugs/ |
+| 新增/修改/删除功能代码 | change | `.sybermem/changes/` |
+| 技术选型、架构设计、多方案权衡 | decision | `.sybermem/decisions/` |
+| 用户提出需求、讨论功能方向 | requirement | `.sybermem/requirements/` |
+| 修复 Bug、排查问题 | bug | `.sybermem/bugs/` |
 
 **判断不确定时**，用 AskUserQuestion 让用户选择。
 
 ### Step 2: 获取下一个编号
 
 ```
-检查 ADR/{type}/ 目录 → 找最大编号 → +1
+检查 .sybermem/{type}/ 目录 → 找最大编号 → +1
 空目录 → 001
 格式：001, 002, 003...
 ```
@@ -81,7 +90,7 @@ sections:
   - 最终结论
 ```
 
-**bug**（必填：Bug描述、问题原因、解决方案）：
+**bug**（必填：Bug 描述、问题原因、解决方案）：
 
 ```yaml
 frontmatter:
@@ -91,7 +100,7 @@ frontmatter:
   title: 简要标题
   severity: critical | high | medium | low
 sections:
-  - Bug描述
+  - Bug 描述
   - 问题原因
   - 解决方案
   - 预防措施
@@ -99,34 +108,34 @@ sections:
 
 ### Step 4: 创建文件
 
-路径：`ADR/{type}/{YYYY-MM-DD}-{NNN}-{标题}.md`
+路径：`.sybermem/{type}/{YYYY-MM-DD}-{NNN}-{标题}.md`
 
-使用 `.claude/skills/record/templates/{type}.md` 模板。
+内容模板使用 `.claude/skills/record/templates/{type}.md`。
 
 ### Step 5: 更新 INDEX.md 表格
 
-在 `ADR/INDEX.md` 对应表格的 `<!-- 新记录在此添加 -->` 注释上方插入新行。
+在 `.sybermem/INDEX.md` 对应表格的 `<!-- add new records here -->` 注释上方插入新行。
 
 ### Step 6: 回写关键结论
 
-在 `ADR/INDEX.md` 的 `## 关键结论` 区域，`<!-- 新结论在此添加 -->` 注释上方插入一行：
+在 `.sybermem/INDEX.md` 的 `## Key Conclusions` 区域，`<!-- add new conclusions here -->` 注释上方插入一行：
 
 ```
-- [类型-编号] 一句话核心结论 (日期)
+- [type-number] 一句话核心结论 (日期)
 ```
 
 示例：
 ```
-- [决策-003] 选择 JWT 鉴权而非 Session，支持多端场景 (2026-05-11)
-- [变更-007] 登录流程改为手机号+验证码，去掉密码 (2026-05-11)
-- [Bug-002] 修复并发写入导致的数据丢失，加了行锁 (2026-05-11)
+- [decision-003] 选择 JWT 鉴权而非 Session，以支持多端场景 (2026-05-11)
+- [change-007] 登录流程改为手机号+验证码，并去掉密码 (2026-05-11)
+- [bug-002] 通过增加行锁修复并发写入导致的数据丢失 (2026-05-11)
 ```
 
-要求：结论必须包含**做了什么**和**为什么**，一句话内完成。
+要求：结论必须同时包含**做了什么**和**为什么**，并在一句话内完成。
 
 ## 错误处理
 
-- INDEX.md 不存在 → 提示先初始化项目
+- 目录解析后仍不存在 `.sybermem/INDEX.md` → 提示先初始化项目
 - 编号冲突 → 自动递增
 - 必填字段缺失 → 询问用户补充
 
@@ -134,4 +143,4 @@ sections:
 
 - 简单格式调整、注释修改
 - 配置文件微调（无功能影响）
-- WIP/draft 类工作
+- WIP / draft 类工作
