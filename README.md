@@ -1,42 +1,14 @@
-# ADR Record System
+# SyberMem
 
-A lightweight Architecture Decision Record (ADR) system for Claude Code and OpenCode projects.
+A set of Claude Code / OpenCode skills for tracking project development history. Records changes, decisions, requirements, and bugs as structured files, so AI can recall project context across sessions.
 
-## Features
+## How It Works
 
-- **Unified record entry** — AI auto-detects record type (change/decision/requirement/bug)
-- **Project initialization** — Auto-detects new or existing projects, creates ADR directory structure
-- **Progress reports** — Generate weekly or monthly reports on demand
+Install the skills, run `/init-project` in your project, then use `/record` after completing meaningful work. AI auto-detects the record type and writes a structured file to the `ADR/` directory. At session start, AI reads `ADR/INDEX.md` to recall key conclusions from past work.
 
-## Supported Platforms
+## Install
 
-| Platform | Project-level skills | User-level skills | Project instructions |
-|----------|---------------------|-------------------|---------------------|
-| Claude Code | `.claude/skills/` | `~/.claude/skills/` | `CLAUDE.md` |
-| OpenCode | `.claude/skills/` (compatible) | `~/.config/opencode/skills/` | `AGENTS.md` |
-
-## Project Structure
-
-```
-.claude/skills/                  # Project-level Skills (shared across platforms)
-├── init-project/SKILL.md
-├── record/
-│   ├── SKILL.md
-│   └── templates/
-└── summary/SKILL.md
-
-ADR/                             # Project records (created by /init-project)
-├── INDEX.md
-├── changes/ decisions/ requirements/ bugs/
-└── templates/
-
-CLAUDE.md                        # Claude Code project instructions
-AGENTS.md                        # OpenCode project instructions
-```
-
-## Quick Start
-
-### One-liner install (recommended)
+### One-liner (requires public repo)
 
 ```bash
 # macOS / Linux
@@ -46,32 +18,71 @@ curl -sSL https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/i
 irm https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/install-remote.ps1 | iex
 ```
 
-Then go to your project and run `/init-project`.
+### Clone and install
 
-### Other install options
+```bash
+# macOS / Linux
+git clone https://github.com/goudaren0528/sybermem.git
+cd sybermem && ./scripts/install.sh
 
-See [INSTALL.md](INSTALL.md) for project-level install and clone-based install.
+# Windows (PowerShell)
+git clone https://github.com/goudaren0528/sybermem.git
+cd sybermem; .\scripts\install.ps1
+```
 
-## Available Skills
+### Copy into a project
 
-| Skill | Purpose |
-|-------|---------|
-| `/init-project` | Initialize ADR directory structure, detect project type |
-| `/record` | Create a record, AI auto-detects type |
-| `/summary` | Generate weekly (default) or monthly report |
+Copy `.claude/skills/` and `CLAUDE.md` (or `AGENTS.md`) to your project root.
 
-## Record Types
+See [INSTALL.md](INSTALL.md) for details.
 
-| Type | Directory | Trigger |
-|------|-----------|---------|
-| Feature change | `ADR/changes/` | Add/modify/delete features |
-| Technical decision | `ADR/decisions/` | Tech selection, architecture design |
-| Requirement | `ADR/requirements/` | User requirements, discussion outcomes |
-| Bug fix | `ADR/bugs/` | Fix bugs, troubleshoot issues |
+## Skills
 
-## Chinese Documentation
+| Skill | What it does |
+|-------|-------------|
+| `/init-project` | Create `ADR/` directory structure in a project, scan existing codebase, generate `CLAUDE.md` / `AGENTS.md` |
+| `/record` | Create a record from current session context. AI auto-detects type: change, decision, requirement, or bug |
+| `/summary` | Generate weekly or monthly progress report from existing records and git history |
 
-Chinese versions of all files are available in `docs/zh/` for reference.
+## What gets created in your project
+
+```
+ADR/
+├── INDEX.md          # Master index — AI reads Key Conclusions at session start
+├── changes/          # Feature additions, modifications, deletions
+├── decisions/        # Tech choices, architecture designs
+├── requirements/     # User requirements, discussion outcomes
+├── bugs/             # Bug analysis and fixes
+└── templates/        # Record templates
+
+CLAUDE.md             # Claude Code instructions (workflow rules)
+AGENTS.md             # OpenCode instructions (same content)
+```
+
+## Supported Platforms
+
+| Platform | Skills location | Project instructions |
+|----------|----------------|---------------------|
+| Claude Code | `~/.claude/skills/` or `.claude/skills/` | `CLAUDE.md` |
+| OpenCode | `~/.config/opencode/skills/` or `.claude/skills/` | `AGENTS.md` |
+
+## Repo Structure
+
+```
+.claude/skills/               # The skills (what gets installed)
+├── init-project/SKILL.md
+├── record/
+│   ├── SKILL.md
+│   └── templates/
+└── summary/SKILL.md
+
+scripts/                       # Install & update scripts
+├── install-remote.sh / .ps1   # One-liner remote install
+├── install.sh / .ps1          # Local install
+└── update.sh / .ps1           # Update existing install
+
+docs/zh/                       # Chinese documentation
+```
 
 ## License
 
