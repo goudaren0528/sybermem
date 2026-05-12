@@ -1,5 +1,5 @@
 #!/bin/bash
-# ADR Record System - Remote Install (no clone needed)
+# SyberMem - Remote Install (no clone needed)
 # Usage: curl -sSL https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/install-remote.sh | bash
 
 set -e
@@ -12,7 +12,7 @@ ARCHIVE_PREFIX="sybermem-$BRANCH"
 CLAUDE_SKILLS="$HOME/.claude/skills"
 OPENCODE_SKILLS="$HOME/.config/opencode/skills"
 
-echo "=== ADR Record System - Remote Install ==="
+echo "=== SyberMem Remote Install ==="
 echo ""
 
 TMPDIR=$(mktemp -d)
@@ -32,8 +32,10 @@ install_skills() {
     local target="$1"
     local label="$2"
     mkdir -p "$target"
-    for skill in init-project record summary; do
+    rm -rf "$target/init-project" "$target/record" "$target/summary"
+    for skill in sybermem-init-project sybermem-record sybermem-summary sybermem-update; do
         if [ -d "$SKILLS_SRC/$skill" ]; then
+            rm -rf "$target/$skill"
             cp -r "$SKILLS_SRC/$skill" "$target/"
             echo "  [$label] installed: /$skill"
         fi
@@ -47,8 +49,12 @@ echo ""
 echo "=== Installation Complete ==="
 echo ""
 echo "Available Skills:"
-echo "  /init-project  — Initialize ADR system"
-echo "  /record        — Create a record (auto-detects type)"
-echo "  /summary       — Generate weekly/monthly report"
+echo "  /sybermem-init-project  — Initialize or refresh SyberMem in the current project"
+echo "  /sybermem-record        — Create a record (auto-detects type)"
+echo "  /sybermem-summary       — Generate weekly/monthly reports"
+echo "  /sybermem-update        — Refresh global skills, then re-check the current project"
 echo ""
-echo "Next: run /init-project in your project directory"
+echo "Next: open your project and run /sybermem-update"
+echo "If you only want the local project refresh check, run /sybermem-init-project"
+echo ""
+echo "Note: updating global skills does not automatically refresh project AGENTS.md / CLAUDE.md files"

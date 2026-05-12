@@ -1,11 +1,11 @@
 ---
-name: record
-description: 在项目中创建 SyberMem 记录（变更/决策/需求/Bug），也适用于仍然使用旧 ADR/ 存储的项目。
+name: sybermem-record
+description: 在项目中创建 SyberMem 记录（变更、决策、需求、Bug），也适用于仍然使用旧 ADR 存储的项目。
 ---
 
-# record Skill
+# sybermem-record Skill
 
-统一的 SyberMem 记录入口。AI 根据上下文自动判断记录类型，用户无需选择。
+统一的 SyberMem 记录入口。AI 根据上下文自动判断记录类型。
 
 ## 目录解析规则
 
@@ -14,13 +14,13 @@ description: 在项目中创建 SyberMem 记录（变更/决策/需求/Bug），
 1. 如果 `.sybermem/` 已存在，直接使用。
 2. 如果只有 `ADR/`，将 `ADR/` 重命名为 `.sybermem/`，并告知用户旧目录已自动迁移。
 3. 如果 `.sybermem/` 和 `ADR/` 同时存在，使用 `.sybermem/`，警告 `ADR/` 已被忽略，不自动合并。
-4. 如果两者都不存在，提示用户先执行 `/init-project`。
+4. 如果两者都不存在，提示用户先执行 `/sybermem-init-project`。
 
 ## 流程
 
 ### Step 1: 判断记录类型
 
-根据当前工作上下文自动判断，无需询问用户：
+根据当前工作上下文自动判断：
 
 | 信号 | 类型 | 目录 |
 |------|------|------|
@@ -29,7 +29,7 @@ description: 在项目中创建 SyberMem 记录（变更/决策/需求/Bug），
 | 用户提出需求、讨论功能方向 | requirement | `.sybermem/requirements/` |
 | 修复 Bug、排查问题 | bug | `.sybermem/bugs/` |
 
-**判断不确定时**，用 AskUserQuestion 让用户选择。
+判断不确定时，让用户选择。
 
 ### Step 2: 获取下一个编号
 
@@ -43,74 +43,11 @@ description: 在项目中创建 SyberMem 记录（变更/决策/需求/Bug），
 
 从当前会话上下文中提取，缺少关键信息时才询问用户。
 
-**change**（必填：变更内容、变更原因、影响范围）：
-
-```yaml
-frontmatter:
-  type: change
-  date: YYYY-MM-DD
-  number: NNN
-  title: 简要标题
-  status: implemented | planned | reverted
-sections:
-  - 变更内容
-  - 变更原因
-  - 影响范围
-```
-
-**decision**（必填：背景、考虑的方案、最终决策）：
-
-```yaml
-frontmatter:
-  type: decision
-  date: YYYY-MM-DD
-  number: NNN
-  title: 简要标题
-  status: accepted | deprecated | superseded
-sections:
-  - 背景
-  - 考虑的方案
-  - 最终决策
-  - 影响与后果
-```
-
-**requirement**（必填：需求来源、需求内容、最终结论）：
-
-```yaml
-frontmatter:
-  type: requirement
-  date: YYYY-MM-DD
-  number: NNN
-  title: 简要标题
-  source: 来源
-  priority: high | medium | low
-sections:
-  - 需求来源
-  - 需求内容
-  - 最终结论
-```
-
-**bug**（必填：Bug 描述、问题原因、解决方案）：
-
-```yaml
-frontmatter:
-  type: bug
-  date: YYYY-MM-DD
-  number: NNN
-  title: 简要标题
-  severity: critical | high | medium | low
-sections:
-  - Bug 描述
-  - 问题原因
-  - 解决方案
-  - 预防措施
-```
-
 ### Step 4: 创建文件
 
 路径：`.sybermem/{type}/{YYYY-MM-DD}-{NNN}-{标题}.md`
 
-内容模板使用 `.claude/skills/record/templates/{type}.md`。
+内容模板使用 `.claude/skills/sybermem-record/templates/{type}.md`。
 
 ### Step 5: 更新 INDEX.md 表格
 
@@ -118,24 +55,11 @@ sections:
 
 ### Step 6: 回写关键结论
 
-在 `.sybermem/INDEX.md` 的 `## Key Conclusions` 区域，`<!-- add new conclusions here -->` 注释上方插入一行：
-
-```
-- [type-number] 一句话核心结论 (日期)
-```
-
-示例：
-```
-- [decision-003] 选择 JWT 鉴权而非 Session，以支持多端场景 (2026-05-11)
-- [change-007] 登录流程改为手机号+验证码，并去掉密码 (2026-05-11)
-- [bug-002] 通过增加行锁修复并发写入导致的数据丢失 (2026-05-11)
-```
-
-要求：结论必须同时包含**做了什么**和**为什么**，并在一句话内完成。
+在 `.sybermem/INDEX.md` 的 `## Key Conclusions` 区域插入一行一句话核心结论，必须同时包含“做了什么”和“为什么”。
 
 ## 错误处理
 
-- 目录解析后仍不存在 `.sybermem/INDEX.md` → 提示先初始化项目
+- 目录解析后仍不存在 `.sybermem/INDEX.md` → 提示先执行 `/sybermem-init-project`
 - 编号冲突 → 自动递增
 - 必填字段缺失 → 询问用户补充
 

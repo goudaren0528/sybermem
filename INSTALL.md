@@ -2,9 +2,11 @@
 
 ## Upgrading existing ADR/ projects
 
-If a project already uses `ADR/`, upgrading the skills is enough. Do not rename directories manually. The first run of `/init-project`, `/record`, or `/summary` automatically migrates `ADR/` to `.sybermem/`.
+If a project already uses `ADR/`, do not rename directories manually. The first run of `/sybermem-init-project`, `/sybermem-record`, or `/sybermem-summary` automatically migrates `ADR/` to `.sybermem/`.
 
 If both `.sybermem/` and `ADR/` exist, the skills use `.sybermem/` and warn that the legacy `ADR/` directory was ignored.
+
+Refreshing global skills alone does not automatically refresh project-local `AGENTS.md` / `CLAUDE.md`. After upgrading, open each target project and run `/sybermem-update`.
 
 ## Option 1: One-liner install (recommended)
 
@@ -22,7 +24,7 @@ curl -sSL https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/i
 irm https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/install-remote.ps1 | iex
 ```
 
-After install, go to your project and run `/init-project`.
+After install, go to your project and run `/sybermem-update`.
 
 ## Option 2: Project-level install
 
@@ -30,7 +32,7 @@ Copy files directly into a project, no global install needed.
 
 1. Copy `.claude/skills/` directory to the target project
 2. Copy `CLAUDE.md` (Claude Code) or `AGENTS.md` (OpenCode) to the project root
-3. Run `/init-project`
+3. Run `/sybermem-init-project`
 
 ## Option 3: Clone and install
 
@@ -52,7 +54,9 @@ cd sybermem; .\scripts\install.ps1
 
 ### One-liner update
 
-Re-run the one-liner install command — it overwrites existing skills with the latest version.
+Re-run the one-liner install command — it refreshes the globally installed skills with the latest version.
+
+After the global refresh, open the target project and run `/sybermem-update`.
 
 ### Clone-based update
 
@@ -66,6 +70,8 @@ cd sybermem && git pull && ./scripts/update.sh
 cd sybermem; git pull; .\scripts\update.ps1
 ```
 
+After the script finishes, open the target project and run `/sybermem-update`.
+
 ## Verify Installation
 
-Type `/init-project` in Claude Code or OpenCode. If it prompts to create the `.sybermem/` directory structure, or reports that an existing `ADR/` directory will be auto-migrated, the installation was successful.
+Type `/sybermem-init-project` or `/sybermem-update` in Claude Code or OpenCode. If the project gets the `.sybermem/` directory structure, reports that an existing `ADR/` directory will be auto-migrated, or offers to refresh stale `AGENTS.md` / `CLAUDE.md`, the installation was successful.

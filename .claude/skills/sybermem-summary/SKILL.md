@@ -1,16 +1,16 @@
 ---
-name: summary
-description: Use when generating weekly or monthly SyberMem project summaries, including projects that still have legacy ADR/ storage.
+name: sybermem-summary
+description: Use when generating weekly or monthly SyberMem project summaries, including projects that still have legacy ADR storage.
 ---
 
-# summary Skill
+# sybermem-summary Skill
 
 Generate SyberMem project progress reports. Defaults to a weekly report; pass the `monthly` argument for a monthly report.
 
 ## Usage
 
-- `/summary` — Generate this week's report
-- `/summary monthly` — Generate this month's report
+- `/sybermem-summary` — Generate this week's report
+- `/sybermem-summary monthly` — Generate this month's report
 
 ## Directory Resolution Rules
 
@@ -19,7 +19,7 @@ Resolve the project data directory before collecting report data:
 1. If `.sybermem/` exists, use it.
 2. If only `ADR/` exists, rename `ADR/` to `.sybermem/` and tell the user the legacy directory was auto-migrated.
 3. If both `.sybermem/` and `ADR/` exist, use `.sybermem/`, warn that `ADR/` was ignored, and do not auto-merge them.
-4. If neither exists, prompt the user to run `/init-project` first.
+4. If neither exists, prompt the user to run `/sybermem-init-project` first.
 
 ## Flow
 
@@ -30,7 +30,7 @@ Resolve the project data directory before collecting report data:
 
 ### Step 2: Collect data
 
-Scan record files in `.sybermem/` within the corresponding time range:
+Scan `.sybermem/` records in the corresponding time range:
 
 ```
 .sybermem/changes/      → Feature changes
@@ -43,7 +43,7 @@ Also reference Git log for commit history.
 
 ### Step 3: Generate report
 
-Dynamic output (not persisted), format:
+Output a concise dynamic report:
 
 ```markdown
 # Project Progress Report (YYYY-MM-DD ~ YYYY-MM-DD)
@@ -52,10 +52,10 @@ Dynamic output (not persisted), format:
 - ...
 
 ## Key Decisions
-- .sybermem/decisions/...
+- ...
 
 ## Issues & Fixes
-- .sybermem/bugs/...
+- ...
 
 ## Open Issues
 - ...
@@ -64,17 +64,17 @@ Dynamic output (not persisted), format:
 - ...
 ```
 
-### Step 4: Monthly report additional content
+### Step 4: Monthly report additions
 
-Monthly reports add on top of weekly format:
+Monthly reports also include:
 - Progress summary grouped by week
-- Monthly statistics (record counts, type distribution)
+- Record counts and type distribution
 - Trend observations
 
 ## Design Principles
 
-- **`.sybermem/` is canonical**: Reports summarize records from the canonical project data directory
-- **Legacy compatibility**: Upgrading skills is enough; old `ADR/` is auto-migrated on first use
-- **No persistent storage**: Reports are generated dynamically to avoid file bloat
-- **Data-driven**: Based on actual record files, no speculation
-- **Concise output**: Keep it readable within one screen
+- **`.sybermem/` is canonical**: summarize records from the canonical project data directory
+- **Legacy compatibility**: old `ADR/` is auto-migrated on first use
+- **No persistent storage**: reports are generated dynamically
+- **Data-driven**: base the report on actual records and git history
+- **Concise output**: keep it readable within one screen
