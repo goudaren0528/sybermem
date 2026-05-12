@@ -1,16 +1,25 @@
 ---
 name: summary
-description: Generate project progress report (weekly or monthly), summarize work outcomes
+description: Use when generating weekly or monthly SyberMem project summaries, including projects that still have legacy ADR/ storage.
 ---
 
 # summary Skill
 
-Generate project progress reports. Defaults to weekly report, pass `monthly` argument for monthly report.
+Generate SyberMem project progress reports. Defaults to a weekly report; pass the `monthly` argument for a monthly report.
 
 ## Usage
 
 - `/summary` — Generate this week's report
 - `/summary monthly` — Generate this month's report
+
+## Directory Resolution Rules
+
+Resolve the project data directory before collecting report data:
+
+1. If `.sybermem/` exists, use it.
+2. If only `ADR/` exists, rename `ADR/` to `.sybermem/` and tell the user the legacy directory was auto-migrated.
+3. If both `.sybermem/` and `ADR/` exist, use `.sybermem/`, warn that `ADR/` was ignored, and do not auto-merge them.
+4. If neither exists, prompt the user to run `/init-project` first.
 
 ## Flow
 
@@ -21,13 +30,13 @@ Generate project progress reports. Defaults to weekly report, pass `monthly` arg
 
 ### Step 2: Collect data
 
-Scan record files in ADR/ directory within the corresponding time range:
+Scan record files in `.sybermem/` within the corresponding time range:
 
 ```
-ADR/changes/      → Feature changes
-ADR/decisions/    → Technical decisions
-ADR/requirements/ → Requirement records
-ADR/bugs/         → Bug fixes
+.sybermem/changes/      → Feature changes
+.sybermem/decisions/    → Technical decisions
+.sybermem/requirements/ → Requirement records
+.sybermem/bugs/         → Bug fixes
 ```
 
 Also reference Git log for commit history.
@@ -43,10 +52,10 @@ Dynamic output (not persisted), format:
 - ...
 
 ## Key Decisions
-- ADR/decisions/...
+- .sybermem/decisions/...
 
 ## Issues & Fixes
-- ADR/bugs/...
+- .sybermem/bugs/...
 
 ## Open Issues
 - ...
@@ -64,6 +73,8 @@ Monthly reports add on top of weekly format:
 
 ## Design Principles
 
+- **`.sybermem/` is canonical**: Reports summarize records from the canonical project data directory
+- **Legacy compatibility**: Upgrading skills is enough; old `ADR/` is auto-migrated on first use
 - **No persistent storage**: Reports are generated dynamically to avoid file bloat
 - **Data-driven**: Based on actual record files, no speculation
 - **Concise output**: Keep it readable within one screen

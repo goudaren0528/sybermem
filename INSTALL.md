@@ -1,5 +1,11 @@
 # Installation Guide
 
+## Upgrading existing ADR/ projects
+
+If a project already uses `ADR/`, upgrading the skills is enough. Do not rename directories manually. The first run of `/init-project`, `/record`, or `/summary` automatically migrates `ADR/` to `.sybermem/`.
+
+If both `.sybermem/` and `ADR/` exist, the skills use `.sybermem/` and warn that the legacy `ADR/` directory was ignored.
+
 ## Option 1: One-liner install (recommended)
 
 No clone needed — downloads directly from GitHub.
@@ -62,4 +68,4 @@ cd sybermem; git pull; .\scripts\update.ps1
 
 ## Verify Installation
 
-Type `/init-project` in Claude Code or OpenCode. If it prompts to create the ADR directory structure, the installation was successful.
+Type `/init-project` in Claude Code or OpenCode. If it prompts to create the `.sybermem/` directory structure, or reports that an existing `ADR/` directory will be auto-migrated, the installation was successful.
