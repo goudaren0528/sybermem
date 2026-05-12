@@ -2,21 +2,21 @@
 type: bug
 date: YYYY-MM-DD
 number: XXX
-title: Bug标题
+title: Bug Title
 severity: critical | high | medium | low
 ---
 
-## Bug描述
-Bug的表现和影响。
+## Bug Description
+Bug symptoms and impact.
 
-## 问题原因
-根本原因分析。
+## Root Cause
+Root cause analysis.
 
-## 解决方案
-如何修复的。
+## Solution
+How it was fixed.
 
-## 预防措施
-如何避免类似问题再次发生。
+## Prevention Measures
+How to prevent similar issues from recurring.
 
-## 相关变更
-链接到相关的 change 记录。
+## Related Changes
+Link to related change records.
