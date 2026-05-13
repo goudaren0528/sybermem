@@ -34,6 +34,7 @@ description: 为新项目或已有代码项目初始化 SyberMem 记录系统，
 
 - `packages/claude-skills/sybermem-init-project/project-files/AGENTS.md`
 - `packages/claude-skills/sybermem-init-project/project-files/CLAUDE.md`
+- `packages/claude-skills/sybermem-init-project/project-files/.claude/settings.json`
 
 将项目文件分为四类：
 
@@ -57,7 +58,7 @@ description: 为新项目或已有代码项目初始化 SyberMem 记录系统，
 
 ### Step 3: 创建目录结构
 
-创建 `.sybermem/` 目录结构及 `INDEX.md`。
+创建 `.sybermem/` 目录结构及 `INDEX.md`；在启用默认自动模式时，还需要创建 `.sybermem/hooks/record_change_on_stop.py`。
 
 ### Step 4: 生成 INDEX.md
 
@@ -74,7 +75,11 @@ description: 为新项目或已有代码项目初始化 SyberMem 记录系统，
 ### Step 7: 创建或刷新项目指令文件
 
 - 缺失的 `CLAUDE.md` / `AGENTS.md` 直接创建
+- 缺失的项目级 `.claude/settings.json` 直接按模板创建，用于默认的 SyberMem `auto` / `remind` 模式
+- 缺失的 `.sybermem/hooks/record_change_on_stop.py` 直接按模板创建，作为默认自动 `change` hook helper
+- 默认模板中的自动模式只自动写入基于工作区文件变更的 `change` 记录；`decision` / `requirement` / `bug` 仍由 `/sybermem-record` 处理
 - 用户同意后刷新旧版 SyberMem 管理文件
+- 已存在的 `.claude/settings.json` 若看起来不是 SyberMem 管理模板，则视为自定义配置，不自动覆盖
 - 自定义文件只有在用户明确同意时才替换
 
 ### Step 8: 输出总结

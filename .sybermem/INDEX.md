@@ -10,6 +10,7 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 - [requirement-001] Adopted ADR system: four category directories (changes/decisions/requirements/bugs) + INDEX master index + templates + skill automation (2026-05-08)
 - [change-001] Added one-liner remote install scripts (curl/irm) to simplify new user onboarding, no clone needed (2026-05-12)
 - [change-002] Moved SyberMem skill source to packages/claude-skills and removed repo-local runnable skill copies, so global installs no longer duplicate project-loaded skills (2026-05-12)
+- [change-003] Added a default project-level auto/remind hook template with a runnable stop-hook helper, so new projects can auto-write lightweight change records instead of relying only on reminders (2026-05-13)
 <!-- add new conclusions here -->
 
 ---
@@ -20,6 +21,7 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 |--------|------|-------|--------|------|
 | 001 | 2026-05-12 | Add remote install scripts for one-liner installation | implemented | [link](changes/2026-05-12-001-add-remote-install-scripts.md) |
 | 002 | 2026-05-12 | Migrate global skill source to packages directory | implemented | [link](changes/2026-05-12-002-migrate-global-skill-source-to-packages.md) |
+| 003 | 2026-05-13 | Add auto change hook template | implemented | [link](changes/2026-05-13-003-add-auto-change-hook-template.md) |
 <!-- add new records here -->
 
 ---

@@ -27,6 +27,7 @@ irm https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/install
 ```
 
 After install, open your target project and run `/sybermem-init-project`.
+That step will also create the default project-level `.claude/settings.json` for SyberMem `auto` / `remind` mode and the default `.sybermem/hooks/record_change_on_stop.py` helper for automatic `change` records.
 
 ## Option 2: Clone and install
 

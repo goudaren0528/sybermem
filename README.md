@@ -59,10 +59,12 @@ cd sybermem; .\scripts\install.ps1
 /sybermem-init-project
 ```
 
-这一步只会在项目内创建或刷新：
+这一步会在项目内创建或刷新：
 - `.sybermem/`
+- `.sybermem/hooks/record_change_on_stop.py`（默认自动 change hook helper）
 - `CLAUDE.md`
 - `AGENTS.md`
+- `.claude/settings.json`（默认启用 SyberMem `auto` / `remind` 模式）
 
 不会在项目里再安装一份 skills。
 
@@ -86,10 +88,13 @@ cd sybermem; .\scripts\install.ps1
 ├── decisions/        # 技术决策
 ├── requirements/     # 需求讨论
 ├── bugs/             # Bug 修复
+├── hooks/
+│   └── record_change_on_stop.py   # 默认自动 change hook helper
 └── templates/        # 记录模板
 
 CLAUDE.md             # Claude Code 项目指令（工作流规则）
 AGENTS.md             # OpenCode 项目指令（内容相同）
+.claude/settings.json # 项目级 hook 模式和 Stop hook
 ```
 
 ## 目录解析规则
@@ -103,8 +108,8 @@ AGENTS.md             # OpenCode 项目指令（内容相同）
 
 | 平台 | 全局 Skills 位置 | 项目级文件 |
 |------|------------------|-----------|
-| Claude Code | `~/.claude/skills/` | `CLAUDE.md`、`.sybermem/` |
-| OpenCode | `~/.config/opencode/skills/` | `AGENTS.md`、`.sybermem/` |
+| Claude Code | `~/.claude/skills/` | `CLAUDE.md`、`.claude/settings.json`、`.sybermem/` |
+| OpenCode | `~/.config/opencode/skills/` | `AGENTS.md`、`.claude/settings.json`、`.sybermem/` |
 
 ## 仓库结构
 

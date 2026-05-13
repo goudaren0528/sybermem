@@ -59,10 +59,12 @@ After the global install, open your project and run:
 /sybermem-init-project
 ```
 
-This creates or refreshes only:
+This creates or refreshes:
 - `.sybermem/`
+- `.sybermem/hooks/record_change_on_stop.py` (default auto-change hook helper)
 - `CLAUDE.md`
 - `AGENTS.md`
+- `.claude/settings.json` (with the default SyberMem `auto` / `remind` mode)
 
 It does not install another copy of the skills into the project.
 
@@ -86,10 +88,13 @@ See [INSTALL.md](INSTALL.md) for details.
 ├── decisions/        # Tech choices, architecture designs
 ├── requirements/     # User requirements, discussion outcomes
 ├── bugs/             # Bug analysis and fixes
+├── hooks/
+│   └── record_change_on_stop.py   # Default auto-change hook helper
 └── templates/        # Record templates
 
 CLAUDE.md             # Claude Code instructions (workflow rules)
 AGENTS.md             # OpenCode instructions (same content)
+.claude/settings.json # Project-level hook mode and stop hook
 ```
 
 ## Directory resolution rules
@@ -103,8 +108,8 @@ AGENTS.md             # OpenCode instructions (same content)
 
 | Platform | Global skills location | Project-level files |
 |----------|------------------------|---------------------|
-| Claude Code | `~/.claude/skills/` | `CLAUDE.md`, `.sybermem/` |
-| OpenCode | `~/.config/opencode/skills/` | `AGENTS.md`, `.sybermem/` |
+| Claude Code | `~/.claude/skills/` | `CLAUDE.md`, `.claude/settings.json`, `.sybermem/` |
+| OpenCode | `~/.config/opencode/skills/` | `AGENTS.md`, `.claude/settings.json`, `.sybermem/` |
 
 ## Repo Structure
 
