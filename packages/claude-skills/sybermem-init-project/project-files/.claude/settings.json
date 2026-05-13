@@ -1,0 +1,19 @@
+{
+  "env": {
+    "SYBERMEM_RECORD_MODE": "auto"
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .sybermem/hooks/record_change_on_stop.py",
+            "timeout": 60,
+            "statusMessage": "SyberMem checking whether to record a change..."
+          }
+        ]
+      }
+    ]
+  }
+}
