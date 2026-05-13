@@ -1,4 +1,4 @@
-# ADR Index
+# SyberMem Index
 
 This file summarizes all project changes, decisions, requirements, and bug records.
 
