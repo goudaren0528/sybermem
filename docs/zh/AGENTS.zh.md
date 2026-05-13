@@ -24,8 +24,10 @@
 
 1. **会话启动（强制）**：在回应用户第一条消息之前，必须先读取 `.sybermem/INDEX.md` 的关键结论区，获取项目上下文。不要跳过这一步。
 2. **工作中（主动关联）**：修改代码前，检查关键结论中是否有与当前工作相关的记录。如有，主动告知用户相关的历史决策或背景，再开始工作。遇到架构、选型、历史原因相关问题时，先检索 `.sybermem/` 目录中的详细记录再回答。
-3. **工作后（主动提醒）**：完成功能开发、Bug 修复、技术决策、需求讨论等有意义的工作后，主动询问用户："要创建一条记录吗？我可以执行 /sybermem-record。"不要等用户记得。
-4. 文件命名：`YYYY-MM-DD-NNN-标题.md`
+3. **工作后（auto/remind 模式）**：项目可以在有意义的工作完成后，基于当前工作区文件变更自动创建一条基础的 SyberMem `change` 记录，或者提醒用户进行记录。模式由 `.claude/settings.json` 中的 `SYBERMEM_RECORD_MODE` 控制。
+4. **记录类型范围**：自动模式只会基于工作区文件变更写入 `change` 记录。`decision`、`requirement`、`bug` 仍请使用 `/sybermem-record`。
+5. **模式切换**：支持 `auto` 和 `remind` 两种模式。可通过 `/hooks` 或直接编辑 `.claude/settings.json` 修改。默认 hook helper 位于 `.sybermem/hooks/record_change_on_stop.py`。
+6. 文件命名：`YYYY-MM-DD-NNN-标题.md`
 
 ## 可用 Skills
 

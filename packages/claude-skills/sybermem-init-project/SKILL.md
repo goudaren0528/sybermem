@@ -32,8 +32,10 @@ Resolve the project data directory before doing any other work:
 
 Use these template files from this installed skill as the canonical refresh source:
 
-- `.claude/skills/sybermem-init-project/project-files/AGENTS.md`
-- `.claude/skills/sybermem-init-project/project-files/CLAUDE.md`
+- `packages/claude-skills/sybermem-init-project/project-files/AGENTS.md`
+- `packages/claude-skills/sybermem-init-project/project-files/CLAUDE.md`
+- `packages/claude-skills/sybermem-init-project/project-files/.claude/settings.json`
+- `packages/claude-skills/sybermem-init-project/project-files/.sybermem/hooks/record_change_on_stop.py`
 
 Classify each existing project file as one of:
 
@@ -69,6 +71,8 @@ Only if initialization has not happened yet, check for code files (excluding nod
 ├── decisions/
 ├── requirements/
 ├── bugs/
+├── hooks/
+│   └── record_change_on_stop.py
 └── templates/
     ├── change-template.md
     ├── decision-template.md
@@ -113,7 +117,11 @@ When found, ask the user whether to:
 ### Step 7: Create or refresh project instruction files
 
 - Create missing `CLAUDE.md` / `AGENTS.md` from the template files.
+- Create missing project-level `.claude/settings.json` from the template file when the project does not already define its own hook settings.
+- Create missing `.sybermem/hooks/record_change_on_stop.py` from the template file when automatic mode is being installed.
+- The generated `.claude/settings.json` must set `SYBERMEM_RECORD_MODE` and install the default Stop hook for automatic `change` records only.
 - If the user approved a refresh in Step 1.1, back up and overwrite the stale SyberMem-managed files.
+- Treat an existing `.claude/settings.json` as custom unless it clearly matches the SyberMem-managed template. Do not overwrite custom hook settings automatically.
 - Keep custom files unless the user explicitly approves replacement.
 
 ### Step 8: Output summary
@@ -129,7 +137,8 @@ When found, ask the user whether to:
 - `.sybermem/` directory structure
 - `INDEX.md` (with key conclusions)
 - Template files
-- `CLAUDE.md` / `AGENTS.md`
+- `.sybermem/hooks/record_change_on_stop.py` when auto mode is installed
+- `CLAUDE.md` / `AGENTS.md` / project-level `.claude/settings.json`
 
 **Next steps:**
 - Use `/sybermem-record` after meaningful work

@@ -40,8 +40,9 @@ After the global refresh completes, continue with the same project by applying t
 That second step is responsible for:
 - migrating legacy `ADR/` to `.sybermem/`
 - checking whether local `AGENTS.md` / `CLAUDE.md` are stale
+- creating or refreshing the default project-level `.claude/settings.json` and `.sybermem/hooks/record_change_on_stop.py` when the project uses the SyberMem-managed hook template
 - refreshing stale SyberMem-managed project instructions with backups
-- leaving custom project instructions alone unless the user approves replacement
+- leaving custom project instructions and custom hook settings alone unless the user approves replacement
 
 ## Safety Rules
 

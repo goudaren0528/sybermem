@@ -25,6 +25,8 @@
 
 仅更新全局 skills 不会自动刷新项目里的 `AGENTS.md` / `CLAUDE.md`，所以升级后建议在目标项目里执行 `/sybermem-update`。
 
+如果老项目里仍保留 `.claude/skills/sybermem-*` 这类项目级副本，Claude 可能会同时加载项目级和全局级 skills，导致 `/` 列表重复显示。若你已经采用全局安装模式，可以删除这些旧副本。
+
 ## 安装
 
 ### 一行命令安装（需仓库为 public）
@@ -49,9 +51,22 @@ git clone https://github.com/goudaren0528/sybermem.git
 cd sybermem; .\scripts\install.ps1
 ```
 
-### 直接复制到项目
+### 项目初始化
 
-将 `.claude/skills/` 和 `CLAUDE.md`（或 `AGENTS.md`）复制到项目根目录。
+全局安装完成后，进入你的项目并执行：
+
+```text
+/sybermem-init-project
+```
+
+这一步会在项目内创建或刷新：
+- `.sybermem/`
+- `.sybermem/hooks/record_change_on_stop.py`（默认自动 change hook helper）
+- `CLAUDE.md`
+- `AGENTS.md`
+- `.claude/settings.json`（默认启用 SyberMem `auto` / `remind` 模式）
+
+不会在项目里再安装一份 skills。
 
 详见 [INSTALL.md](INSTALL.md)。
 
@@ -73,10 +88,13 @@ cd sybermem; .\scripts\install.ps1
 ├── decisions/        # 技术决策
 ├── requirements/     # 需求讨论
 ├── bugs/             # Bug 修复
+├── hooks/
+│   └── record_change_on_stop.py   # 默认自动 change hook helper
 └── templates/        # 记录模板
 
 CLAUDE.md             # Claude Code 项目指令（工作流规则）
 AGENTS.md             # OpenCode 项目指令（内容相同）
+.claude/settings.json # 项目级 hook 模式和 Stop hook
 ```
 
 ## 目录解析规则
@@ -88,32 +106,26 @@ AGENTS.md             # OpenCode 项目指令（内容相同）
 
 ## 支持平台
 
-| 平台 | Skills 位置 | 项目指令文件 |
-|------|------------|-------------|
-| Claude Code | `~/.claude/skills/` 或 `.claude/skills/` | `CLAUDE.md` |
-| OpenCode | `~/.config/opencode/skills/` 或 `.claude/skills/` | `AGENTS.md` |
+| 平台 | 全局 Skills 位置 | 项目级文件 |
+|------|------------------|-----------|
+| Claude Code | `~/.claude/skills/` | `CLAUDE.md`、`.claude/settings.json`、`.sybermem/` |
+| OpenCode | `~/.config/opencode/skills/` | `AGENTS.md`、`.claude/settings.json`、`.sybermem/` |
 
 ## 仓库结构
 
 ```
-.claude/skills/                     # Skills（安装的内容）
+packages/claude-skills/               # Skills 源码（仓库内分发源，不参与项目自动加载）
 ├── sybermem-init-project/
-│   ├── SKILL.md
-│   └── project-files/
 ├── sybermem-record/
-│   ├── SKILL.md
-│   └── templates/
 ├── sybermem-summary/
-│   └── SKILL.md
 └── sybermem-update/
-    └── SKILL.md
 
-scripts/                             # 安装和更新脚本
-├── install-remote.sh / .ps1         # 一行命令远程安装
-├── install.sh / .ps1                # 本地安装
-└── update.sh / .ps1                 # 更新已有安装
+scripts/                              # 安装和更新脚本
+├── install-remote.sh / .ps1          # 一行命令远程安装
+├── install.sh / .ps1                 # 本地安装
+└── update.sh / .ps1                  # 更新已有安装
 
-docs/zh/                             # 中文文档备份
+docs/zh/                              # 中文文档备份
 ```
 
 ## License
