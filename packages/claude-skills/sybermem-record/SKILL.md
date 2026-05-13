@@ -53,7 +53,7 @@ Required sections:
 
 Path: `.sybermem/{type}/{YYYY-MM-DD}-{NNN}-{title}.md`
 
-Use `packages/claude-skills/sybermem-record/templates/{type}.md` as the content template.
+Use `templates/{type}.md` as the content template.
 
 ### Step 5: Update INDEX.md table
 

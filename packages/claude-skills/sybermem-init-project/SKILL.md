@@ -32,10 +32,10 @@ Resolve the project data directory before doing any other work:
 
 Use these template files from this installed skill as the canonical refresh source:
 
-- `packages/claude-skills/sybermem-init-project/project-files/AGENTS.md`
-- `packages/claude-skills/sybermem-init-project/project-files/CLAUDE.md`
-- `packages/claude-skills/sybermem-init-project/project-files/.claude/settings.json`
-- `packages/claude-skills/sybermem-init-project/project-files/.sybermem/hooks/record_change_on_stop.py`
+- `project-files/AGENTS.md`
+- `project-files/CLAUDE.md`
+- `project-files/.claude/settings.json`
+- `project-files/.sybermem/hooks/record_change_on_stop.py`
 
 Classify each existing project file as one of:
 
