@@ -16,7 +16,7 @@
 
 - `.sybermem/` 是规范项目数据目录。
 - 如果 `.sybermem/` 已存在，直接使用。
-- 如果只有 `ADR/`，首次运行 `/sybermem-init-project`、`/sybermem-record` 或 `/sybermem-summary` 时会自动重命名为 `.sybermem/`。
+- 如果只有 `ADR/`，首次运行 `/sybermem-init-project`、`/sybermem-record`、`/sybermem-summary` 或 `/sybermem-digest` 时会自动重命名为 `.sybermem/`。
 - 如果 `.sybermem/` 和 `ADR/` 同时存在，使用 `.sybermem/`，并警告 `ADR/` 已被忽略。
 - 用户不需要手动重命名旧的 `ADR/` 目录。
 
