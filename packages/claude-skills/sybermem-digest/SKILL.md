@@ -7,6 +7,8 @@ description: Use when creating a durable phase digest from existing SyberMem rec
 
 Create a durable phase digest in `.sybermem/digests/` so future project understanding does not require re-reading every raw record.
 
+In this skill, the artifact is a phase digest. The required `## Stage Digests` heading in `INDEX.md` is the index section name that lists these phase digests.
+
 ## Directory Resolution Rules
 
 Resolve the project data directory before reading or writing digests:
@@ -22,6 +24,7 @@ Before creating a digest, verify all of the following:
 
 - `.sybermem/digests/` exists
 - `.sybermem/INDEX.md` contains a `## Stage Digests` section
+- `.sybermem/INDEX.md` contains the exact insertion anchor `<!-- add new digest records here -->` within that section
 - `.sybermem/templates/digest-template.md` exists
 
 If any of these are missing, explain that digest support has not been enabled in this project yet and ask the user to run `/sybermem-update`.
@@ -80,6 +83,8 @@ Set:
 - `coverage.from` and `coverage.to` from the earliest and latest source record dates
 - `fingerprint` from the normalized source set
 
+Carry the chosen `status` value through consistently into both the digest frontmatter and the `INDEX.md` row.
+
 ### Step 5: Write the digest file
 
 Path:
@@ -100,7 +105,9 @@ Insert a new row above `<!-- add new digest records here -->` in the `## Stage D
 
 Use this format:
 
-`| NNN | YYYY-MM-DD | Title | completed | X records | [link](digests/file.md) |`
+`| NNN | YYYY-MM-DD | Title | <status> | X records | [link](digests/file.md) |`
+
+Use the same status selected in Step 4.
 
 ### Step 7: Preserve `Key Conclusions` signal quality
 
