@@ -39,7 +39,7 @@ After the global refresh completes, continue with the same project by applying t
 
 That second step is responsible for:
 - migrating legacy `ADR/` to `.sybermem/`
-- checking whether local `AGENTS.md` / `CLAUDE.md` are stale
+- checking whether local `AGENTS.md` / `CLAUDE.md` are stale, including pre-digest SyberMem-managed files that still need the digest-aware guidance refresh
 - enabling digest support by creating `.sybermem/digests/`, creating the digest template, and inserting the `Stage Digests` section when missing
 - creating or refreshing the default project-level `.claude/settings.json` and `.sybermem/hooks/record_change_on_stop.py` when the project uses the SyberMem-managed hook template
 - refreshing stale SyberMem-managed project instructions with backups
