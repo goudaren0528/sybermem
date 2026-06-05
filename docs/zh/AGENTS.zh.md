@@ -26,14 +26,16 @@
 2. **工作中（主动关联）**：修改代码前，检查关键结论中是否有与当前工作相关的记录。如有，主动告知用户相关的历史决策或背景，再开始工作。遇到架构、选型、历史原因相关问题时，先检索 `.sybermem/` 目录中的详细记录再回答。
 3. **工作后（auto/remind 模式）**：项目可以在有意义的工作完成后，基于当前工作区文件变更自动创建一条基础的 SyberMem `change` 记录，或者提醒用户进行记录。模式由 `.claude/settings.json` 中的 `SYBERMEM_RECORD_MODE` 控制。
 4. **记录类型范围**：自动模式只会基于工作区文件变更写入 `change` 记录。`decision`、`requirement`、`bug` 仍请使用 `/sybermem-record`。
-5. **模式切换**：支持 `auto` 和 `remind` 两种模式。可通过 `/hooks` 或直接编辑 `.claude/settings.json` 修改。默认 hook helper 位于 `.sybermem/hooks/record_change_on_stop.py`。
-6. 文件命名：`YYYY-MM-DD-NNN-标题.md`
+5. **Digest 工作流**：`/sybermem-summary` 用于动态的周报/月报视图；当某个有意义的阶段结束，并且你希望在 `.sybermem/digests/` 中留下持久、可索引的阶段总结时，使用 `/sybermem-digest`。
+6. **模式切换**：支持 `auto` 和 `remind` 两种模式。可通过 `/hooks` 或直接编辑 `.claude/settings.json` 修改。默认 hook helper 位于 `.sybermem/hooks/record_change_on_stop.py`。
+7. 文件命名：`YYYY-MM-DD-NNN-标题.md`
 
 ## 可用 Skills
 
 - `/sybermem-record` — 创建记录（自动判断类型）
+- `/sybermem-summary` — 生成动态周报/月报视图
+- `/sybermem-digest` — 基于现有记录创建持久化的阶段 digest
 - `/sybermem-init-project` — 初始化或刷新当前项目的 SyberMem 配置
-- `/sybermem-summary` — 生成周报/月报
 - `/sybermem-update` — 更新全局 Skills 并重新检查当前项目
 
 ## 无需记录
