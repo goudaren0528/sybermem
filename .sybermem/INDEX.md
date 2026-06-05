@@ -15,6 +15,14 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 
 ---
 
+## Stage Digests
+
+| Number | Date | Title | Status | Coverage | Link |
+|--------|------|-------|--------|----------|------|
+<!-- add new digest records here -->
+
+---
+
 ## Feature Changes
 
 | Number | Date | Title | Status | Link |

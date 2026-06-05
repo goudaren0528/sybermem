@@ -39,7 +39,7 @@ description: 为新项目或已有代码项目初始化 SyberMem 记录系统，
 将项目文件分为四类：
 
 - **missing**：文件不存在
-- **fresh**：已经使用 `.sybermem/` 规则，并引用 `/sybermem-init-project`、`/sybermem-record`、`/sybermem-summary`、`/sybermem-update`
+- **fresh**：已经使用 `.sybermem/` 规则，并引用 `/sybermem-init-project`、`/sybermem-record`、`/sybermem-summary`、`/sybermem-digest`、`/sybermem-update`
 - **stale SyberMem-managed**：仍然引用旧 `/init-project`、`/record`、`/summary`，或仍然是旧 ADR 文案
 - **custom**：文件存在，但看起来不是 SyberMem 管理的项目指令
 
@@ -52,17 +52,33 @@ description: 为新项目或已有代码项目初始化 SyberMem 记录系统，
 
 如果项目已经初始化，且只需要刷新项目指令文件，可以跳过扫描代码步骤，直接输出总结。
 
+### Step 1.2: 补齐缺失的 digest 能力
+
+对于已经存在 `.sybermem/INDEX.md` 的项目，还要检查 digest 支持是否齐全：
+
+- `.sybermem/digests/`
+- `.sybermem/templates/digest-template.md`
+- `.sybermem/INDEX.md` 中的 `## Stage Digests` 区段
+
+如果缺少其中任何一项：
+
+- 创建缺失的 `digests/` 目录
+- 从标准模板创建缺失的 `digest-template.md`
+- 在 `INDEX.md` 中插入缺失的 `## Stage Digests` 区段
+
+这个补齐过程必须是幂等的：不要重复插入区段，不要在未确认的情况下覆盖已有的 digest 模板，也不要因为缺少 digest 支持就重新初始化整个项目。
+
 ### Step 2: 判断项目类型
 
 仅在尚未初始化时，检查是否有代码文件（排除 node_modules、.git 等）。
 
 ### Step 3: 创建目录结构
 
-创建 `.sybermem/` 目录结构及 `INDEX.md`；在启用默认自动模式时，还需要创建 `.sybermem/hooks/record_change_on_stop.py`。
+创建 `.sybermem/` 目录结构及 `INDEX.md`；其中 digest 支持包括 `.sybermem/digests/` 和 `.sybermem/templates/digest-template.md`。在启用默认自动模式时，还需要创建 `.sybermem/hooks/record_change_on_stop.py`。
 
 ### Step 4: 生成 INDEX.md
 
-包含关键结论区和四类记录表格。
+包含关键结论区、`## Stage Digests` 区段和四类记录表格。
 
 ### Step 5: 扫描已有代码项目
 
@@ -78,6 +94,7 @@ description: 为新项目或已有代码项目初始化 SyberMem 记录系统，
 - 缺失的项目级 `.claude/settings.json` 直接按模板创建，用于默认的 SyberMem `auto` / `remind` 模式
 - 缺失的 `.sybermem/hooks/record_change_on_stop.py` 直接按模板创建，作为默认自动 `change` hook helper
 - 默认模板中的自动模式只自动写入基于工作区文件变更的 `change` 记录；`decision` / `requirement` / `bug` 仍由 `/sybermem-record` 处理
+- `/sybermem-summary` 用于动态周报/月报；当一个有意义的阶段结束时，使用 `/sybermem-digest` 将可持久保存的阶段总结写入 `.sybermem/digests/`
 - 用户同意后刷新旧版 SyberMem 管理文件
 - 已存在的 `.claude/settings.json` 若看起来不是 SyberMem 管理模板，则视为自定义配置，不自动覆盖
 - 自定义文件只有在用户明确同意时才替换
@@ -87,12 +104,17 @@ description: 为新项目或已有代码项目初始化 SyberMem 记录系统，
 提示下一步使用：
 - `/sybermem-record`
 - `/sybermem-summary`
+- `/sybermem-digest`
 - `/sybermem-update`
+
+并在需要时提醒用户：仅更新全局 skills 并不会自动为当前项目启用 digest 支持；如果要使用 `/sybermem-digest`，应先在该项目中运行 `/sybermem-update`。这一步只会创建缺失的 digest 相关结构，不会悄悄覆盖项目自有文件。
 
 ## 关键原则
 
 - `.sybermem/` 是规范目录
 - 兼容旧项目，旧 `ADR/` 会自动迁移
+- digest 支持通过补齐缺失结构来启用，不静默覆盖项目自有文件
 - 项目指令刷新必须显式确认，并保留备份
 - 已有代码只扫描并给出建议，不自动创建记录
 - 重复执行不应破坏已有 `.sybermem/` 数据或自定义项目指令
+
