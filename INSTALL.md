@@ -2,7 +2,7 @@
 
 ## Upgrading existing ADR/ projects
 
-If a project already uses `ADR/`, do not rename directories manually. The first run of `/sybermem-init-project`, `/sybermem-record`, or `/sybermem-summary` automatically migrates `ADR/` to `.sybermem/`.
+If a project already uses `ADR/`, do not rename directories manually. The first run of `/sybermem-init-project`, `/sybermem-record`, `/sybermem-summary`, or `/sybermem-digest` automatically migrates `ADR/` to `.sybermem/`.
 
 If both `.sybermem/` and `ADR/` exist, the skills use `.sybermem/` and warn that the legacy `ADR/` directory was ignored.
 

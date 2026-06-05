@@ -16,7 +16,7 @@ After completing meaningful work, run `/sybermem-record` to create a record. AI 
 
 - `.sybermem/` is the canonical project data directory.
 - If `.sybermem/` exists, use it.
-- If only `ADR/` exists, first use of `/sybermem-init-project`, `/sybermem-record`, or `/sybermem-summary` renames it to `.sybermem/` automatically.
+- If only `ADR/` exists, first use of `/sybermem-init-project`, `/sybermem-record`, `/sybermem-summary`, or `/sybermem-digest` renames it to `.sybermem/` automatically.
 - If both `.sybermem/` and `ADR/` exist, use `.sybermem/` and warn that `ADR/` was ignored.
 - Users should not manually rename legacy `ADR/` directories.
 

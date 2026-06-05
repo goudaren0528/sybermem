@@ -19,7 +19,7 @@
 
 ## 老用户升级说明
 
-如果你的项目以前使用 `ADR/`，不需要手动改名。首次运行 `/sybermem-init-project`、`/sybermem-record` 或 `/sybermem-summary` 时，会自动把旧的 `ADR/` 迁移为 `.sybermem/`。
+如果你的项目以前使用 `ADR/`，不需要手动改名。首次运行 `/sybermem-init-project`、`/sybermem-record`、`/sybermem-summary` 或 `/sybermem-digest` 时，会自动把旧的 `ADR/` 迁移为 `.sybermem/`。
 
 如果 `.sybermem/` 和 `ADR/` 同时存在，系统会优先使用 `.sybermem/`，并警告 `ADR/` 已被忽略。
 
@@ -63,6 +63,7 @@ cd sybermem; .\scripts\install.ps1
 
 这一步会在项目内创建或刷新：
 - `.sybermem/`
+- `.sybermem/digests/`（阶段 digest 目录）
 - `.sybermem/hooks/record_change_on_stop.py`（默认自动 change hook helper）
 - `CLAUDE.md`
 - `AGENTS.md`
@@ -91,9 +92,10 @@ cd sybermem; .\scripts\install.ps1
 ├── decisions/        # 技术决策
 ├── requirements/     # 需求讨论
 ├── bugs/             # Bug 修复
+├── digests/          # 阶段 digest
 ├── hooks/
 │   └── record_change_on_stop.py   # 默认自动 change hook helper
-└── templates/        # 记录模板
+└── templates/        # 记录模板（含 digest 模板）
 
 CLAUDE.md             # Claude Code 项目指令（工作流规则）
 AGENTS.md             # OpenCode 项目指令（内容相同）
@@ -104,7 +106,7 @@ AGENTS.md             # OpenCode 项目指令（内容相同）
 
 - `.sybermem/` 是规范目录。
 - 如果 `.sybermem/` 已存在，直接使用。
-- 如果只有 `ADR/`，首次运行 `/sybermem-init-project`、`/sybermem-record` 或 `/sybermem-summary` 时自动重命名为 `.sybermem/`。
+- 如果只有 `ADR/`，首次运行 `/sybermem-init-project`、`/sybermem-record`、`/sybermem-summary` 或 `/sybermem-digest` 时自动重命名为 `.sybermem/`。
 - 如果 `.sybermem/` 和 `ADR/` 同时存在，使用 `.sybermem/`，并提示 `ADR/` 被忽略。
 
 ## 支持平台
@@ -118,6 +120,7 @@ AGENTS.md             # OpenCode 项目指令（内容相同）
 
 ```
 packages/claude-skills/               # Skills 源码（仓库内分发源，不参与项目自动加载）
+├── sybermem-digest/
 ├── sybermem-init-project/
 ├── sybermem-record/
 ├── sybermem-summary/

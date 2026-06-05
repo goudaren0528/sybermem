@@ -19,7 +19,7 @@ For an existing project, run `/sybermem-update`:
 
 ## Upgrading from ADR/
 
-If your project already uses `ADR/`, do not rename anything manually. The first run of `/sybermem-init-project`, `/sybermem-record`, or `/sybermem-summary` automatically migrates the old `ADR/` directory to `.sybermem/`.
+If your project already uses `ADR/`, do not rename anything manually. The first run of `/sybermem-init-project`, `/sybermem-record`, `/sybermem-summary`, or `/sybermem-digest` automatically migrates the old `ADR/` directory to `.sybermem/`.
 
 If both `.sybermem/` and `ADR/` exist, the system uses `.sybermem/` and warns that `ADR/` was ignored.
 
@@ -63,6 +63,7 @@ After the global install, open your project and run:
 
 This creates or refreshes:
 - `.sybermem/`
+- `.sybermem/digests/` (phase digest directory)
 - `.sybermem/hooks/record_change_on_stop.py` (default auto-change hook helper)
 - `CLAUDE.md`
 - `AGENTS.md`
@@ -91,9 +92,10 @@ See [INSTALL.md](INSTALL.md) for details.
 ├── decisions/        # Tech choices, architecture designs
 ├── requirements/     # User requirements, discussion outcomes
 ├── bugs/             # Bug analysis and fixes
+├── digests/          # Phase digests
 ├── hooks/
 │   └── record_change_on_stop.py   # Default auto-change hook helper
-└── templates/        # Record templates
+└── templates/        # Record templates, including the digest template
 
 CLAUDE.md             # Claude Code instructions (workflow rules)
 AGENTS.md             # OpenCode instructions (same content)
@@ -104,7 +106,7 @@ AGENTS.md             # OpenCode instructions (same content)
 
 - `.sybermem/` is canonical.
 - If `.sybermem/` already exists, use it.
-- If only `ADR/` exists, the first run of `/sybermem-init-project`, `/sybermem-record`, or `/sybermem-summary` automatically renames it to `.sybermem/`.
+- If only `ADR/` exists, the first run of `/sybermem-init-project`, `/sybermem-record`, `/sybermem-summary`, or `/sybermem-digest` automatically renames it to `.sybermem/`.
 - If both `.sybermem/` and `ADR/` exist, use `.sybermem/` and warn that `ADR/` was ignored.
 
 ## Supported Platforms
@@ -118,6 +120,7 @@ AGENTS.md             # OpenCode instructions (same content)
 
 ```
 packages/claude-skills/               # Skill source for distribution inside the repo, not auto-loaded per project
+├── sybermem-digest/
 ├── sybermem-init-project/
 ├── sybermem-record/
 ├── sybermem-summary/
