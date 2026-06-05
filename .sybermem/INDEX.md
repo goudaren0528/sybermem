@@ -19,6 +19,7 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 
 | Number | Date | Title | Status | Coverage | Link |
 |--------|------|-------|--------|----------|------|
+| 001 | 2026-06-05 | sybermem v1 digest design phase | completed | 3 records | [link](digests/2026-06-05-001-sybermem-v1-digest-design-phase.md) |
 <!-- add new digest records here -->
 
 ---
