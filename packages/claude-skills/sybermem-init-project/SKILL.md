@@ -40,8 +40,8 @@ Use these template files from this installed skill as the canonical refresh sour
 Classify each existing project file as one of:
 
 - **missing** — file does not exist
-- **fresh** — uses `.sybermem/` rules and references `/sybermem-init-project`, `/sybermem-record`, `/sybermem-summary`, and `/sybermem-update`
-- **stale SyberMem-managed** — still references `/init-project`, `/record`, `/summary`, ADR-era wording, or is missing the new SyberMem-prefixed commands
+- **fresh** — uses `.sybermem/` rules and matches the current digest-aware SyberMem-managed guidance, including `/sybermem-init-project`, `/sybermem-record`, `/sybermem-summary`, `/sybermem-digest`, and `/sybermem-update`
+- **stale SyberMem-managed** — still references `/init-project`, `/record`, `/summary`, ADR-era wording, is missing the new SyberMem-prefixed commands, or otherwise matches older SyberMem-managed wording such as a pre-digest file that is missing `/sybermem-digest`
 - **custom** — exists but does not clearly look like a SyberMem-managed instruction file
 
 Refresh rules:
