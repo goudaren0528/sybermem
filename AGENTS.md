@@ -24,14 +24,18 @@ After completing meaningful work, run `/sybermem-record` to create a record. AI 
 
 1. **Session start (mandatory)**: Before responding to the user's first message, you MUST read the Key Conclusions section in `.sybermem/INDEX.md` to get project context. Do not skip this step.
 2. **During work (proactive association)**: Before modifying code, check if any key conclusions relate to the current work. If so, proactively inform the user of relevant historical decisions or context before proceeding. When encountering architecture, technology choice, or historical questions, search `.sybermem/` for detailed records before answering.
-3. **After work (proactive reminder)**: After completing feature development, bug fixes, technical decisions, or requirement discussions, proactively ask the user: "Would you like to create a record? I can run /sybermem-record." Don't wait for the user to remember.
-4. File naming: `YYYY-MM-DD-NNN-title.md`
+3. **After work (auto/remind mode)**: This project may automatically create a basic SyberMem `change` record from current file changes, or remind the user when meaningful work is completed. The mode is controlled by `.claude/settings.json` via `SYBERMEM_RECORD_MODE`.
+4. **Record type scope**: Automatic mode only writes `change` records from workspace file changes. Use `/sybermem-record` for `decision`, `requirement`, and `bug` records.
+5. **Digest workflow**: Use `/sybermem-summary` for dynamic weekly/monthly reporting. Use `/sybermem-digest` when a meaningful phase ends and you want a durable, indexed summary in `.sybermem/digests/`.
+6. **Mode switching**: Supported modes are `auto` and `remind`. Change them through `/hooks` or by editing `.claude/settings.json`. The default hook helper lives at `.sybermem/hooks/record_change_on_stop.py`.
+7. File naming: `YYYY-MM-DD-NNN-title.md`
 
 ## Available Skills
 
 - `/sybermem-record` — Create a record (auto-detects type)
-- `/sybermem-init-project` — Initialize or refresh the SyberMem system in this project
 - `/sybermem-summary` — Generate weekly/monthly reports
+- `/sybermem-digest` — Create a durable phase digest from existing records
+- `/sybermem-init-project` — Initialize or refresh the SyberMem system in this project
 - `/sybermem-update` — Refresh installed SyberMem skills, then re-check this project
 
 ## No Record Needed

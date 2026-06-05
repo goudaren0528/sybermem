@@ -6,7 +6,7 @@ A set of Claude Code / OpenCode skills for tracking project development history.
 
 ## How It Works
 
-Install the skills, run `/sybermem-init-project` in your project, then use `/sybermem-record` after completing meaningful work. AI auto-detects the record type and writes a structured file to the `.sybermem/` directory. At session start, AI reads `.sybermem/INDEX.md` to recall key conclusions from past work.
+Install the skills, run `/sybermem-init-project` in your project, use `/sybermem-record` after meaningful work, use `/sybermem-summary` for dynamic weekly/monthly progress views, and use `/sybermem-digest` when a meaningful phase ends and you want a durable summary stored in `.sybermem/digests/`. At session start, AI reads `.sybermem/INDEX.md` to recall key conclusions from past work.
 
 ## Recommended upgrade path
 
@@ -24,6 +24,8 @@ If your project already uses `ADR/`, do not rename anything manually. The first 
 If both `.sybermem/` and `ADR/` exist, the system uses `.sybermem/` and warns that `ADR/` was ignored.
 
 Refreshing global skills alone does not automatically refresh project-local `AGENTS.md` / `CLAUDE.md`, so after upgrading you should run `/sybermem-update` inside each target project.
+
+Updating global skills does not automatically enable digest support inside every project. To use `/sybermem-digest` in a project, run `/sybermem-update` in that project first. This creates only the missing digest-related structure and does not silently overwrite project-owned files.
 
 If an older project still contains project-local copies such as `.claude/skills/sybermem-*`, Claude may load both the local and global copies and show duplicates in the `/` list. If you have adopted the global-install model, you can safely delete those old local copies.
 
@@ -77,6 +79,7 @@ See [INSTALL.md](INSTALL.md) for details.
 | `/sybermem-init-project` | Create or refresh the `.sybermem/` directory structure in a project, scan an existing codebase, generate or refresh `CLAUDE.md` / `AGENTS.md`, and auto-migrate legacy `ADR/` on first run |
 | `/sybermem-record` | Create a record from current session context. AI auto-detects the type and writes to `.sybermem/` |
 | `/sybermem-summary` | Generate a weekly or monthly progress report from `.sybermem/` records and git history; legacy `ADR/` auto-migrates on first use |
+| `/sybermem-digest` | Create a durable phase digest from existing records, write it to `.sybermem/digests/`, and block duplicate compression of the same source records |
 | `/sybermem-update` | Refresh the globally installed SyberMem skills, then continue with `/sybermem-init-project` in the current project |
 
 ## What gets created in your project
