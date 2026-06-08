@@ -10,6 +10,8 @@ Refreshing global skills alone does not automatically refresh project-local `AGE
 
 Updating global skills does not automatically enable digest support inside every project. To use `/sybermem-digest` in a project, run `/sybermem-update` in that project first. This creates only the missing digest-related structure and does not silently overwrite project-owned files.
 
+Updating global skills once refreshes the shared slash commands, but existing projects still receive stop-hook behavior changes project by project. To give a specific project the refreshed hook/template/instruction behavior, run `/sybermem-update` inside that project.
+
 If the same source records have already been compressed into an existing digest, `/sybermem-digest` must point to the existing digest instead of creating a duplicate.
 
 If an older project still contains project-local copies such as `.claude/skills/sybermem-*`, Claude may load both the local and global copies and show duplicates in the `/` list. Once you have switched to the global-install model, those old project-local copies can be deleted.
