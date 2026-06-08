@@ -33,7 +33,7 @@ install_skills() {
     local label="$2"
     mkdir -p "$target"
     rm -rf "$target/init-project" "$target/record" "$target/summary"
-    for skill in sybermem-init-project sybermem-record sybermem-summary sybermem-digest sybermem-update; do
+    for skill in sybermem-init-project sybermem-record sybermem-summary sybermem-digest sybermem-phase-analyze sybermem-phase-confirm sybermem-update; do
         if [ -d "$SKILLS_SRC/$skill" ]; then
             rm -rf "$target/$skill"
             cp -r "$SKILLS_SRC/$skill" "$target/"
@@ -53,6 +53,8 @@ echo "  /sybermem-init-project  — Initialize or refresh SyberMem in the curren
 echo "  /sybermem-record        — Create a record (auto-detects type)"
 echo "  /sybermem-summary       — Generate weekly/monthly reports"
 echo "  /sybermem-digest        — Create a durable phase digest from existing records"
+echo "  /sybermem-phase-analyze — Build or refresh the persistent phase index from project history"
+echo "  /sybermem-phase-confirm — Confirm or adjust candidate phases in the phase index"
 echo "  /sybermem-update        — Refresh global skills, then re-check the current project"
 echo ""
 echo "Next: open your project and run /sybermem-update"
