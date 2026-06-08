@@ -6,7 +6,7 @@ A set of Claude Code / OpenCode skills for tracking project development history.
 
 ## How It Works
 
-Install the skills, run `/sybermem-init-project` in your project, use `/sybermem-record` after meaningful work, use `/sybermem-summary` for dynamic weekly/monthly progress views, and use `/sybermem-digest` when a meaningful phase ends and you want a durable summary stored in `.sybermem/digests/`. At session start, AI reads `.sybermem/INDEX.md` to recall key conclusions from past work.
+Install the skills, run `/sybermem-init-project` in your project, use `/sybermem-record` after meaningful work, use `/sybermem-summary` for dynamic weekly/monthly progress views, and use `/sybermem-digest` when a meaningful phase ends and you want a durable summary stored in `.sybermem/digests/`. At session start, AI reads `.sybermem/INDEX.md` to recall key conclusions from past work. In `auto` mode, the stop hook still writes a lightweight `change` trail automatically, but it may also emit a non-blocking suggestion that a change is important enough for `/sybermem-record`, or that a recent cluster of work may be ready for `/sybermem-digest`.
 
 ## Recommended upgrade path
 
@@ -28,6 +28,8 @@ Refreshing global skills alone does not automatically refresh project-local `AGE
 Updating global skills does not automatically enable digest support inside every project. To use `/sybermem-digest` in a project, run `/sybermem-update` in that project first. This creates only the missing digest-related structure and does not silently overwrite project-owned files.
 
 If an older project still contains project-local copies such as `.claude/skills/sybermem-*`, Claude may load both the local and global copies and show duplicates in the `/` list. If you have adopted the global-install model, you can safely delete those old local copies.
+
+If you want an existing project to receive the refreshed stop-hook nudge behavior, you still need to enter that project and run `/sybermem-update` there. Global skills update once, but local hook/template/instruction refresh still applies project by project.
 
 ## Install
 
