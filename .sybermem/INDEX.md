@@ -66,5 +66,6 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 - **decisions/**: Record important technical decisions and their rationale
 - **requirements/**: Record discussion processes, requirement sources, and design reasoning
 - **bugs/**: Record bug analysis and fix approaches
+- **analysis/phase-index.md**: Persistent project phase analysis state used to track candidates, confirmed phases, and incremental analysis progress
 
 When adding records, update this index file accordingly.
