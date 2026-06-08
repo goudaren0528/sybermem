@@ -34,6 +34,9 @@ SOFT_SKIP_FILES = {
 NUDGE_STATE_PATH = SYBERMEM_DIR / ".auto-nudge-state.json"
 RECORD_FILE_THRESHOLD = 5
 RECORD_COOLDOWN_KEYS = {"record", "digest"}
+# Bounded recent-window: only the last N same-theme record-writing stops are
+# kept.  Digest cluster detection is based on this window, not lifetime totals.
+THEME_WINDOW_SIZE = 10
 HIGH_SIGNAL_PATTERNS = (
     re.compile(r"^README(?:\..+)?$", re.IGNORECASE),
     re.compile(r"^INSTALL(?:\..+)?$", re.IGNORECASE),
@@ -153,22 +156,45 @@ def detect_high_level_areas(files: list[str]) -> set[str]:
     return matched
 
 
-DIGEST_CLUSTER_THRESHOLD = 2  # min same-theme records accumulated to suggest a digest
+DIGEST_CLUSTER_THRESHOLD = 2  # min same-theme recent stops needed to suggest a digest
 # Present-stop file count that satisfies the signal floor for a digest nudge.
 DIGEST_SIGNAL_FILE_FLOOR = 3
+
+
+# ---------------------------------------------------------------------------
+# Recent-window helpers
+# ---------------------------------------------------------------------------
+
+
+def get_theme_recent_stops(theme_key: str, nudge_state: dict) -> list[str]:
+    """Return the bounded list of ISO dates for same-theme record-writing stops."""
+    windows: dict = nudge_state.get("theme_recent_stops", {})
+    return list(windows.get(theme_key, []))
+
+
+def append_theme_recent_stop(theme_key: str, nudge_state: dict, today: str) -> dict:
+    """Return updated nudge_state with today appended; capped at THEME_WINDOW_SIZE.
+
+    Replaces lifetime-cumulative theme_record_counts so cluster detection is
+    always based on recent activity only.
+    """
+    windows: dict = dict(nudge_state.get("theme_recent_stops", {}))
+    current: list[str] = list(windows.get(theme_key, []))
+    current.append(today)
+    windows[theme_key] = current[-THEME_WINDOW_SIZE:]
+    return {**nudge_state, "theme_recent_stops": windows}
 
 
 def detect_recent_theme_overlap(theme_key: str, nudge_state: dict) -> bool:
     """Return True only when a credible same-theme cluster exists.
 
-    Reads per-theme record counts stored in nudge_state["theme_record_counts"].
-    Only the current theme's count is consulted, so a burst of activity in one
-    area (e.g. "scripts") cannot trigger a digest nudge for an unrelated area
-    (e.g. "skills" or "instructions").  The count must reach
-    DIGEST_CLUSTER_THRESHOLD before a digest nudge fires.
+    Uses the bounded theme_recent_stops list instead of lifetime-cumulative
+    theme_record_counts, so ancient activity does not pollute the signal.  The
+    cluster must reach DIGEST_CLUSTER_THRESHOLD entries within the bounded
+    window before a digest nudge fires.
     """
-    counts: dict = nudge_state.get("theme_record_counts", {})
-    return counts.get(theme_key, 0) >= DIGEST_CLUSTER_THRESHOLD
+    recent = get_theme_recent_stops(theme_key, nudge_state)
+    return len(recent) >= DIGEST_CLUSTER_THRESHOLD
 
 
 def present_stop_qualifies_for_digest(
@@ -192,22 +218,21 @@ def already_nudged_digest_for_theme(theme_key: str, nudge_state: dict) -> bool:
     """Return True when a digest nudge was already emitted for this theme and the
     underlying evidence has not grown meaningfully since then.
 
-    Uses nudge_state["digest_nudged_at_count"] (a dict mapping theme_key to the
-    theme_record_count at the time of the last digest nudge) instead of the
+    Uses nudge_state["digest_nudged_at_window_len"] (a dict mapping theme_key to the
+    window length at the time of the last digest nudge) instead of the
     volatile ``last_nudge_type`` field, so that intervening low-signal stops
     (which would overwrite last_nudge_type to "none") do not reset the cooldown.
 
-    The cooldown is lifted once the theme accumulates at least one new record
-    beyond the count recorded at nudge time, giving the user a fresh prompt
+    The cooldown is lifted once the theme recent window has grown by at least
+    one entry beyond the length recorded at nudge time, giving a fresh prompt
     after genuinely new same-theme activity.
     """
-    nudged_at: dict = nudge_state.get("digest_nudged_at_count", {})
+    nudged_at: dict = nudge_state.get("digest_nudged_at_window_len", {})
     if theme_key not in nudged_at:
         return False
-    counts: dict = nudge_state.get("theme_record_counts", {})
-    current_count = counts.get(theme_key, 0)
-    # Cooldown holds as long as no new records have accumulated since the nudge.
-    return current_count <= nudged_at[theme_key]
+    current_len = len(get_theme_recent_stops(theme_key, nudge_state))
+    # Cooldown holds as long as no new stops have been added since the nudge.
+    return current_len <= nudged_at[theme_key]
 
 
 def next_change_number() -> int:
@@ -350,15 +375,27 @@ def main() -> int:
     # Determine which files go into the trail record (excludes lone soft-skip files).
     files = trail_files(all_files)
 
-    # Load nudge state before classify so theme_record_counts is available.
+    # Load nudge state before classify so theme_recent_stops is available.
     nudge_state = load_nudge_state()
     # Use all_files for signal detection even when trail is suppressed.
     followup_hint, theme_key, nudge_message = classify_followup(all_files, nudge_state)
 
     if not files:
         # Only soft-skip files changed — emit nudge if warranted, but skip record.
+        # Persist nudge cooldown/theme state so the same nudge cannot repeat on
+        # the next stop without new activity.  No theme_recent_stops entry is
+        # added here because no auto-record was written.
         if nudge_message:
             print(nudge_message)
+        digest_nudged_at: dict = dict(nudge_state.get("digest_nudged_at_window_len", {}))
+        if followup_hint == "digest":
+            digest_nudged_at[theme_key] = len(get_theme_recent_stops(theme_key, nudge_state))
+        save_nudge_state({
+            **nudge_state,
+            "last_theme": theme_key,
+            "last_nudge_type": followup_hint if followup_hint in RECORD_COOLDOWN_KEYS else "none",
+            "digest_nudged_at_window_len": digest_nudged_at,
+        })
         return 0
 
     fingerprint = json.dumps(files, ensure_ascii=False)
@@ -375,20 +412,20 @@ def main() -> int:
     update_index(record_date, number, slug.replace("-", " "), slug)
     save_state({"last_fingerprint": fingerprint, "last_record": record_path.name})
 
-    # Increment the per-theme record count so digest thresholds are theme-accurate.
-    theme_counts: dict = dict(nudge_state.get("theme_record_counts", {}))
-    theme_counts[theme_key] = theme_counts.get(theme_key, 0) + 1
+    # Append this stop to the bounded recent-window for the current theme so
+    # digest cluster detection is based on recent activity, not lifetime totals.
+    nudge_state = append_theme_recent_stop(theme_key, nudge_state, record_date)
+
     # Persist digest nudge memory durably so intervening quiet stops cannot erase it.
-    digest_nudged_at: dict = dict(nudge_state.get("digest_nudged_at_count", {}))
+    digest_nudged_at = dict(nudge_state.get("digest_nudged_at_window_len", {}))
     if followup_hint == "digest":
-        digest_nudged_at[theme_key] = theme_counts[theme_key]
+        digest_nudged_at[theme_key] = len(get_theme_recent_stops(theme_key, nudge_state))
     save_nudge_state({
         **nudge_state,
         "last_theme": theme_key,
         "last_nudge_type": followup_hint if followup_hint in RECORD_COOLDOWN_KEYS else "none",
         "last_record": record_path.name,
-        "theme_record_counts": theme_counts,
-        "digest_nudged_at_count": digest_nudged_at,
+        "digest_nudged_at_window_len": digest_nudged_at,
     })
     if nudge_message:
         print(nudge_message)
