@@ -34,6 +34,7 @@ Read current:
 
 ### Step 2: Ask the user which candidate to act on when needed
 
+<<<<<<< HEAD
 Read and operate on candidate/phase blocks using the shared canonical shapes:
 
 ```md
@@ -59,6 +60,8 @@ Read and operate on candidate/phase blocks using the shared canonical shapes:
 - notes: <optional short note>
 ```
 
+=======
+>>>>>>> 596a58d (feat: add phase analysis layer skills)
 Support these explicit actions:
 - confirm candidate as phase
 - rename candidate or phase
@@ -67,11 +70,17 @@ Support these explicit actions:
 
 ### Step 3: Update the file conservatively
 
+<<<<<<< HEAD
 - move confirmed candidates into `## Confirmed Phases` using the canonical confirmed phase block
 - keep confirmation date visible
 - remove or rewrite candidate entries as needed
 - preserve `candidate-phase-<NNN>` and `phase-<NNN>` ID formats for stable references
 - set `source_candidate_id` when a candidate is confirmed
+=======
+- move confirmed candidates into `## Confirmed Phases`
+- keep confirmation date visible
+- remove or rewrite candidate entries as needed
+>>>>>>> 596a58d (feat: add phase analysis layer skills)
 - update coverage mappings to match the confirmed phase
 
 Do not auto-create digests.
