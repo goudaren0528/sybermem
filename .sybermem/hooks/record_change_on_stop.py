@@ -33,7 +33,6 @@ SOFT_SKIP_FILES = {
 
 NUDGE_STATE_PATH = SYBERMEM_DIR / ".auto-nudge-state.json"
 RECORD_FILE_THRESHOLD = 5
-RECENT_RECORD_SCAN_LIMIT = 12
 RECORD_COOLDOWN_KEYS = {"record", "digest"}
 HIGH_SIGNAL_PATTERNS = (
     re.compile(r"^README(?:\..+)?$", re.IGNORECASE),
@@ -154,47 +153,20 @@ def detect_high_level_areas(files: list[str]) -> set[str]:
     return matched
 
 
-def load_recent_record_paths() -> list[str]:
-    recent: list[str] = []
-    for folder in (CHANGES_DIR, SYBERMEM_DIR / "decisions", SYBERMEM_DIR / "requirements", SYBERMEM_DIR / "bugs"):
-        if not folder.exists():
-            continue
-        items = sorted(folder.glob("*.md"), key=lambda p: p.name, reverse=True)
-        for item in items[:RECENT_RECORD_SCAN_LIMIT]:
-            recent.append(str(item.relative_to(SYBERMEM_DIR)).replace("\\", "/"))
-    return recent[:RECENT_RECORD_SCAN_LIMIT]
+DIGEST_CLUSTER_THRESHOLD = 2  # min same-theme records accumulated to suggest a digest
 
 
-DIGEST_CLUSTER_THRESHOLD = 2  # min same-area changes/ records to suggest a digest
+def detect_recent_theme_overlap(theme_key: str, nudge_state: dict) -> bool:
+    """Return True only when a credible same-theme cluster exists.
 
-
-def _count_changes_records(recent_records: list[str]) -> int:
-    """Count how many of the recent records live in changes/."""
-    return sum(1 for r in recent_records if r.startswith("changes/"))
-
-
-def detect_recent_theme_overlap(files: list[str], recent_records: list[str]) -> bool:
-    """Return True only when a credible same-theme cluster exists in recent records.
-
-    A single changes/ record is not enough — we require at least
-    DIGEST_CLUSTER_THRESHOLD records in the changes/ folder to avoid
-    triggering digest nudges after every routine commit.  The docs area
-    retains its requirements/ signal but also now needs a cluster.
+    Reads per-theme record counts stored in nudge_state["theme_record_counts"].
+    Only the current theme's count is consulted, so a burst of activity in one
+    area (e.g. "scripts") cannot trigger a digest nudge for an unrelated area
+    (e.g. "skills" or "instructions").  The count must reach
+    DIGEST_CLUSTER_THRESHOLD before a digest nudge fires.
     """
-    areas = detect_high_level_areas(files)
-    if not areas:
-        return False
-    changes_count = _count_changes_records(recent_records)
-    requirements_count = sum(1 for r in recent_records if r.startswith("requirements/"))
-    if "skills" in areas and changes_count >= DIGEST_CLUSTER_THRESHOLD:
-        return True
-    if "scripts" in areas and changes_count >= DIGEST_CLUSTER_THRESHOLD:
-        return True
-    if "docs" in areas and requirements_count >= DIGEST_CLUSTER_THRESHOLD:
-        return True
-    if "instructions" in areas and changes_count >= DIGEST_CLUSTER_THRESHOLD:
-        return True
-    return False
+    counts: dict = nudge_state.get("theme_record_counts", {})
+    return counts.get(theme_key, 0) >= DIGEST_CLUSTER_THRESHOLD
 
 
 def next_change_number() -> int:
@@ -219,17 +191,20 @@ def make_title(files: list[str]) -> str:
     return slugify("-".join(names))
 
 
-def classify_followup(files: list[str], recent_records: list[str], nudge_state: dict) -> tuple[str, str | None, str | None]:
+def classify_followup(files: list[str], nudge_state: dict) -> tuple[str, str | None, str | None]:
     file_count = len(files)
     high_signal_hits = [file for file in files if matches_high_signal(file)]
     areas = detect_high_level_areas(files)
-    recent_overlap = detect_recent_theme_overlap(files, recent_records)
     theme_key = slugify("-".join(sorted(areas)) or "misc")
+    recent_overlap = detect_recent_theme_overlap(theme_key, nudge_state)
 
     last_type = nudge_state.get("last_nudge_type")
     last_theme = nudge_state.get("last_theme")
 
-    if recent_overlap and last_type != "digest":
+    # Digest cooldown is theme-scoped: a digest nudge for one area does not
+    # suppress nudges for a different area.
+    already_digested_this_theme = last_type == "digest" and last_theme == theme_key
+    if recent_overlap and not already_digested_this_theme:
         return "digest", theme_key, "SyberMem note: recent records around this area may now be enough for a /sybermem-digest if this phase has reached a stable stopping point."
 
     cross_area = len(areas) >= 2
@@ -334,10 +309,10 @@ def main() -> int:
     # Determine which files go into the trail record (excludes lone soft-skip files).
     files = trail_files(all_files)
 
-    # Use all_files for signal detection even when trail is suppressed.
-    recent_records = load_recent_record_paths()
+    # Load nudge state before classify so theme_record_counts is available.
     nudge_state = load_nudge_state()
-    followup_hint, theme_key, nudge_message = classify_followup(all_files, recent_records, nudge_state)
+    # Use all_files for signal detection even when trail is suppressed.
+    followup_hint, theme_key, nudge_message = classify_followup(all_files, nudge_state)
 
     if not files:
         # Only soft-skip files changed — emit nudge if warranted, but skip record.
@@ -358,10 +333,16 @@ def main() -> int:
     record_path.write_text(render_record(record_date, number, slug.replace("-", " "), files, author, followup_hint), encoding="utf-8")
     update_index(record_date, number, slug.replace("-", " "), slug)
     save_state({"last_fingerprint": fingerprint, "last_record": record_path.name})
+
+    # Increment the per-theme record count so digest thresholds are theme-accurate.
+    theme_counts: dict = dict(nudge_state.get("theme_record_counts", {}))
+    theme_counts[theme_key] = theme_counts.get(theme_key, 0) + 1
     save_nudge_state({
+        **nudge_state,
         "last_theme": theme_key,
         "last_nudge_type": followup_hint if followup_hint in RECORD_COOLDOWN_KEYS else "none",
         "last_record": record_path.name,
+        "theme_record_counts": theme_counts,
     })
     if nudge_message:
         print(nudge_message)
