@@ -11,7 +11,7 @@
 <!-- use canonical candidate blocks: ### Candidate: <title> + candidate_id/status/covered_records/rationale/proposed_at -->
 
 ## Confirmed Phases
-<!-- use canonical confirmed blocks: ### Phase: <title> + phase_id/source_candidate_id/status/covered_records/confirmed_at/notes -->
+<!-- when confirming the first phase, replace this comment with canonical confirmed blocks: ### Phase: <title> + phase_id/source_candidate_id/status/covered_records/confirmed_at/notes -->
 
 ## Coverage Map
-<!-- add coverage mappings here -->
+<!-- keep exactly one Coverage Map section; replace this comment with mapping lines like `- change-001 -> phase-001` when records are assigned -->

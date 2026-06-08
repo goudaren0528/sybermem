@@ -67,11 +67,17 @@ Support these explicit actions:
 
 ### Step 3: Update the file conservatively
 
+Use an in-place section-edit pattern:
+- edit only the content inside the existing `## Phase Candidates`, `## Confirmed Phases`, and `## Coverage Map` sections
+- never add a second `## Coverage Map` heading during confirmation
+- when confirming the first phase, replace the placeholder comment under `## Confirmed Phases` with the canonical confirmed phase block instead of leaving the comment behind
+
+Then apply the confirmation update:
 - move confirmed candidates into `## Confirmed Phases` using the canonical confirmed phase block
 - keep confirmation date visible
 - remove or rewrite candidate entries as needed
 - preserve `candidate-phase-<NNN>` and `phase-<NNN>` ID formats for stable references
 - set `source_candidate_id` when a candidate is confirmed
-- update coverage mappings to match the confirmed phase
+- update coverage mappings to match the confirmed phase by replacing the placeholder comment or editing existing mapping lines in place
 
 Do not auto-create digests.
