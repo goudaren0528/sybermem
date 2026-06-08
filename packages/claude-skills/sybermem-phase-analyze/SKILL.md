@@ -47,7 +47,6 @@ Use lightweight heuristics across the relevant record set:
 - title/topic similarity
 - sequential implementation relationship
 
-<<<<<<< HEAD
 Use this canonical Markdown block shape for every candidate entry:
 
 ```md
@@ -67,19 +66,11 @@ On re-analysis, refresh the `## Phase Candidates` section instead of appending b
 - update or replace older candidate blocks when they describe the same record cluster
 - remove stale superseded candidate proposals that no longer match the latest analysis
 - keep materially distinct candidate proposals only when they represent separate plausible groupings
-=======
-Output phase candidates that include:
-- candidate id
-- title
-- covered records
-- short rationale
->>>>>>> 596a58d (feat: add phase analysis layer skills)
 
 Do not auto-confirm candidates.
 
 ### Step 4: Update confirmed phases and coverage map conservatively
 
-<<<<<<< HEAD
 Use this canonical Markdown block shape for every confirmed phase entry:
 
 ```md
@@ -96,8 +87,6 @@ Use this canonical Markdown block shape for every confirmed phase entry:
 
 Confirmed phase IDs use the stable `phase-<NNN>` format. `source_candidate_id` should point back to the candidate that was confirmed when that lineage is known.
 
-=======
->>>>>>> 596a58d (feat: add phase analysis layer skills)
 - keep existing confirmed phases unchanged unless the user explicitly revisits them
 - avoid silently removing coverage mappings
 - add new unassigned records to the coverage map when no phase match is clear
