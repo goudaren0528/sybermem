@@ -21,7 +21,12 @@ SKIP_PREFIXES = (
     ".claude/",
     "node_modules/",
 )
-SKIP_FILES = {
+# Hard-skip: never included in changed-file lists or trail records.
+SKIP_FILES: set[str] = set()
+# Soft-skip: included for high-signal detection, but excluded from the
+# auto-record trail when they are the *only* files changed (to avoid
+# self-referential noise from lone meta-file edits).
+SOFT_SKIP_FILES = {
     "CLAUDE.md",
     "AGENTS.md",
 }
@@ -68,6 +73,7 @@ def should_auto_record() -> bool:
 
 
 def list_changed_files() -> list[str]:
+    """Return all changed files for signal detection (includes soft-skip files)."""
     files: list[str] = []
     outputs = [
         run_git("diff", "--name-only"),
@@ -89,6 +95,19 @@ def list_changed_files() -> list[str]:
         if item not in seen:
             seen.append(item)
     return seen
+
+
+def trail_files(files: list[str]) -> list[str]:
+    """Return the subset of files to include in an auto-record trail entry.
+
+    Soft-skip files (CLAUDE.md, AGENTS.md) are excluded when they are the
+    *only* files present, to avoid self-referential noise from lone meta-file
+    edits.  When mixed with substantive changes they are included normally.
+    """
+    non_soft = [f for f in files if f not in SOFT_SKIP_FILES]
+    if non_soft:
+        return files  # substantive changes present — include everything
+    return []  # only soft-skip files — suppress the auto-record entirely
 
 
 def load_state() -> dict:
@@ -146,18 +165,34 @@ def load_recent_record_paths() -> list[str]:
     return recent[:RECENT_RECORD_SCAN_LIMIT]
 
 
+DIGEST_CLUSTER_THRESHOLD = 2  # min same-area changes/ records to suggest a digest
+
+
+def _count_changes_records(recent_records: list[str]) -> int:
+    """Count how many of the recent records live in changes/."""
+    return sum(1 for r in recent_records if r.startswith("changes/"))
+
+
 def detect_recent_theme_overlap(files: list[str], recent_records: list[str]) -> bool:
+    """Return True only when a credible same-theme cluster exists in recent records.
+
+    A single changes/ record is not enough — we require at least
+    DIGEST_CLUSTER_THRESHOLD records in the changes/ folder to avoid
+    triggering digest nudges after every routine commit.  The docs area
+    retains its requirements/ signal but also now needs a cluster.
+    """
     areas = detect_high_level_areas(files)
     if not areas:
         return False
-    joined = "\n".join(recent_records)
-    if "skills" in areas and "changes/" in joined:
+    changes_count = _count_changes_records(recent_records)
+    requirements_count = sum(1 for r in recent_records if r.startswith("requirements/"))
+    if "skills" in areas and changes_count >= DIGEST_CLUSTER_THRESHOLD:
         return True
-    if "scripts" in areas and "changes/" in joined:
+    if "scripts" in areas and changes_count >= DIGEST_CLUSTER_THRESHOLD:
         return True
-    if "docs" in areas and "requirements/" in joined:
+    if "docs" in areas and requirements_count >= DIGEST_CLUSTER_THRESHOLD:
         return True
-    if "instructions" in areas and "changes/" in joined:
+    if "instructions" in areas and changes_count >= DIGEST_CLUSTER_THRESHOLD:
         return True
     return False
 
@@ -195,15 +230,15 @@ def classify_followup(files: list[str], recent_records: list[str], nudge_state: 
     last_theme = nudge_state.get("last_theme")
 
     if recent_overlap and last_type != "digest":
-        return "suggest-digest", theme_key, "SyberMem note: recent records around this area may now be enough for a /sybermem-digest if this phase has reached a stable stopping point."
+        return "digest", theme_key, "SyberMem note: recent records around this area may now be enough for a /sybermem-digest if this phase has reached a stable stopping point."
 
     cross_area = len(areas) >= 2
     strong_signal = bool(high_signal_hits)
     large_change = file_count >= RECORD_FILE_THRESHOLD
     if (strong_signal or cross_area or large_change) and not (last_type == "record" and last_theme == theme_key):
-        return "suggest-record", theme_key, "SyberMem note: this change looks important enough for a manual /sybermem-record so the reason and impact are preserved more clearly."
+        return "record", theme_key, "SyberMem note: this change looks important enough for a manual /sybermem-record so the reason and impact are preserved more clearly."
 
-    return "trail-only", theme_key, None
+    return "none", theme_key, None
 
 
 def render_related_files(files: list[str]) -> str:
@@ -292,18 +327,28 @@ def main() -> int:
     if not INDEX_PATH.exists() or not CHANGES_DIR.exists():
         return 0
 
-    files = list_changed_files()
+    all_files = list_changed_files()
+    if not all_files:
+        return 0
+
+    # Determine which files go into the trail record (excludes lone soft-skip files).
+    files = trail_files(all_files)
+
+    # Use all_files for signal detection even when trail is suppressed.
+    recent_records = load_recent_record_paths()
+    nudge_state = load_nudge_state()
+    followup_hint, theme_key, nudge_message = classify_followup(all_files, recent_records, nudge_state)
+
     if not files:
+        # Only soft-skip files changed — emit nudge if warranted, but skip record.
+        if nudge_message:
+            print(nudge_message)
         return 0
 
     fingerprint = json.dumps(files, ensure_ascii=False)
     state = load_state()
     if state.get("last_fingerprint") == fingerprint:
         return 0
-
-    recent_records = load_recent_record_paths()
-    nudge_state = load_nudge_state()
-    followup_hint, theme_key, nudge_message = classify_followup(files, recent_records, nudge_state)
 
     record_date = date.today().isoformat()
     number = next_change_id()
@@ -313,10 +358,9 @@ def main() -> int:
     record_path.write_text(render_record(record_date, number, slug.replace("-", " "), files, author, followup_hint), encoding="utf-8")
     update_index(record_date, number, slug.replace("-", " "), slug)
     save_state({"last_fingerprint": fingerprint, "last_record": record_path.name})
-    nudge_type_key = followup_hint.removeprefix("suggest-") if followup_hint.startswith("suggest-") else followup_hint
     save_nudge_state({
         "last_theme": theme_key,
-        "last_nudge_type": nudge_type_key if nudge_type_key in RECORD_COOLDOWN_KEYS else "trail-only",
+        "last_nudge_type": followup_hint if followup_hint in RECORD_COOLDOWN_KEYS else "none",
         "last_record": record_path.name,
     })
     if nudge_message:
