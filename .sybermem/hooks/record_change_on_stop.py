@@ -154,6 +154,8 @@ def detect_high_level_areas(files: list[str]) -> set[str]:
 
 
 DIGEST_CLUSTER_THRESHOLD = 2  # min same-theme records accumulated to suggest a digest
+# Present-stop file count that satisfies the signal floor for a digest nudge.
+DIGEST_SIGNAL_FILE_FLOOR = 3
 
 
 def detect_recent_theme_overlap(theme_key: str, nudge_state: dict) -> bool:
@@ -167,6 +169,45 @@ def detect_recent_theme_overlap(theme_key: str, nudge_state: dict) -> bool:
     """
     counts: dict = nudge_state.get("theme_record_counts", {})
     return counts.get(theme_key, 0) >= DIGEST_CLUSTER_THRESHOLD
+
+
+def present_stop_qualifies_for_digest(
+    files: list[str],
+    high_signal_hits: list[str],
+    areas: set[str],
+) -> bool:
+    """Return True when the *current* stop has enough signal to warrant a digest nudge.
+
+    Prevents over-triggering on tiny low-signal stops once a theme's accumulated
+    count has crossed DIGEST_CLUSTER_THRESHOLD.  Any one of the following is
+    sufficient:
+    - strong signal: at least one high-signal file is present
+    - cross-area: the current stop touches two or more high-level areas
+    - moderate file count: the current stop changes at least DIGEST_SIGNAL_FILE_FLOOR files
+    """
+    return bool(high_signal_hits) or len(areas) >= 2 or len(files) >= DIGEST_SIGNAL_FILE_FLOOR
+
+
+def already_nudged_digest_for_theme(theme_key: str, nudge_state: dict) -> bool:
+    """Return True when a digest nudge was already emitted for this theme and the
+    underlying evidence has not grown meaningfully since then.
+
+    Uses nudge_state["digest_nudged_at_count"] (a dict mapping theme_key to the
+    theme_record_count at the time of the last digest nudge) instead of the
+    volatile ``last_nudge_type`` field, so that intervening low-signal stops
+    (which would overwrite last_nudge_type to "none") do not reset the cooldown.
+
+    The cooldown is lifted once the theme accumulates at least one new record
+    beyond the count recorded at nudge time, giving the user a fresh prompt
+    after genuinely new same-theme activity.
+    """
+    nudged_at: dict = nudge_state.get("digest_nudged_at_count", {})
+    if theme_key not in nudged_at:
+        return False
+    counts: dict = nudge_state.get("theme_record_counts", {})
+    current_count = counts.get(theme_key, 0)
+    # Cooldown holds as long as no new records have accumulated since the nudge.
+    return current_count <= nudged_at[theme_key]
 
 
 def next_change_number() -> int:
@@ -198,14 +239,14 @@ def classify_followup(files: list[str], nudge_state: dict) -> tuple[str, str | N
     theme_key = slugify("-".join(sorted(areas)) or "misc")
     recent_overlap = detect_recent_theme_overlap(theme_key, nudge_state)
 
+    # Digest cooldown: theme-aware, survives intervening non-digest stops.
+    if (recent_overlap
+            and present_stop_qualifies_for_digest(files, high_signal_hits, areas)
+            and not already_nudged_digest_for_theme(theme_key, nudge_state)):
+        return "digest", theme_key, "SyberMem note: recent records around this area may now be enough for a /sybermem-digest if this phase has reached a stable stopping point."
+
     last_type = nudge_state.get("last_nudge_type")
     last_theme = nudge_state.get("last_theme")
-
-    # Digest cooldown is theme-scoped: a digest nudge for one area does not
-    # suppress nudges for a different area.
-    already_digested_this_theme = last_type == "digest" and last_theme == theme_key
-    if recent_overlap and not already_digested_this_theme:
-        return "digest", theme_key, "SyberMem note: recent records around this area may now be enough for a /sybermem-digest if this phase has reached a stable stopping point."
 
     cross_area = len(areas) >= 2
     strong_signal = bool(high_signal_hits)
@@ -337,12 +378,17 @@ def main() -> int:
     # Increment the per-theme record count so digest thresholds are theme-accurate.
     theme_counts: dict = dict(nudge_state.get("theme_record_counts", {}))
     theme_counts[theme_key] = theme_counts.get(theme_key, 0) + 1
+    # Persist digest nudge memory durably so intervening quiet stops cannot erase it.
+    digest_nudged_at: dict = dict(nudge_state.get("digest_nudged_at_count", {}))
+    if followup_hint == "digest":
+        digest_nudged_at[theme_key] = theme_counts[theme_key]
     save_nudge_state({
         **nudge_state,
         "last_theme": theme_key,
         "last_nudge_type": followup_hint if followup_hint in RECORD_COOLDOWN_KEYS else "none",
         "last_record": record_path.name,
         "theme_record_counts": theme_counts,
+        "digest_nudged_at_count": digest_nudged_at,
     })
     if nudge_message:
         print(nudge_message)
