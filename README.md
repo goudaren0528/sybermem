@@ -19,7 +19,7 @@
 
 ## 老用户升级说明
 
-如果你的项目以前使用 `ADR/`，不需要手动改名。首次运行 `/sybermem-init-project`、`/sybermem-record`、`/sybermem-summary` 或 `/sybermem-digest` 时，会自动把旧的 `ADR/` 迁移为 `.sybermem/`。
+如果你的项目以前使用 `ADR/`，不需要手动改名。首次运行 `/sybermem-init-project`、`/sybermem-record`、`/sybermem-summary`、`/sybermem-digest`、`/sybermem-phase-analyze` 或 `/sybermem-phase-confirm` 时，会自动把旧的 `ADR/` 迁移为 `.sybermem/`。
 
 如果 `.sybermem/` 和 `ADR/` 同时存在，系统会优先使用 `.sybermem/`，并警告 `ADR/` 已被忽略。
 
@@ -108,7 +108,7 @@ AGENTS.md             # OpenCode 项目指令（内容相同）
 
 - `.sybermem/` 是规范目录。
 - 如果 `.sybermem/` 已存在，直接使用。
-- 如果只有 `ADR/`，首次运行 `/sybermem-init-project`、`/sybermem-record`、`/sybermem-summary` 或 `/sybermem-digest` 时自动重命名为 `.sybermem/`。
+- 如果只有 `ADR/`，首次运行 `/sybermem-init-project`、`/sybermem-record`、`/sybermem-summary`、`/sybermem-digest`、`/sybermem-phase-analyze` 或 `/sybermem-phase-confirm` 时自动重命名为 `.sybermem/`。
 - 如果 `.sybermem/` 和 `ADR/` 同时存在，使用 `.sybermem/`，并提示 `ADR/` 被忽略。
 
 ## 支持平台
@@ -124,6 +124,8 @@ AGENTS.md             # OpenCode 项目指令（内容相同）
 packages/claude-skills/               # Skills 源码（仓库内分发源，不参与项目自动加载）
 ├── sybermem-digest/
 ├── sybermem-init-project/
+├── sybermem-phase-analyze/
+├── sybermem-phase-confirm/
 ├── sybermem-record/
 ├── sybermem-summary/
 └── sybermem-update/
