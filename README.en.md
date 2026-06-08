@@ -6,7 +6,7 @@ A set of Claude Code / OpenCode skills for tracking project development history.
 
 ## How It Works
 
-Install the skills, run `/sybermem-init-project` in your project, use `/sybermem-record` after meaningful work, use `/sybermem-summary` for dynamic weekly/monthly progress views, and use `/sybermem-digest` when a meaningful phase ends and you want a durable summary stored in `.sybermem/digests/`. At session start, AI reads `.sybermem/INDEX.md` to recall key conclusions from past work. In `auto` mode, the stop hook still writes a lightweight `change` trail automatically, but it may also emit a non-blocking suggestion that a change is important enough for `/sybermem-record`, or that a recent cluster of work may be ready for `/sybermem-digest`.
+Install the skills, run `/sybermem-init-project` in your project, use `/sybermem-record` after meaningful work, use `/sybermem-phase-analyze` to build or refresh `.sybermem/analysis/phase-index.md` from project history, use `/sybermem-phase-confirm` to confirm or adjust candidate phases, use `/sybermem-summary` for dynamic weekly/monthly progress views, and use `/sybermem-digest` when a meaningful phase ends and you want a durable summary stored in `.sybermem/digests/`. The phase index is a persistent project analysis artifact, not a final digest. At session start, AI reads `.sybermem/INDEX.md` to recall key conclusions from past work. In `auto` mode, the stop hook still writes a lightweight `change` trail automatically, but it may also emit a non-blocking suggestion that a change is important enough for `/sybermem-record`, or that a recent cluster of work may be ready for `/sybermem-digest`.
 
 ## Recommended upgrade path
 
@@ -26,6 +26,8 @@ If both `.sybermem/` and `ADR/` exist, the system uses `.sybermem/` and warns th
 Refreshing global skills alone does not automatically refresh project-local `AGENTS.md` / `CLAUDE.md`, so after upgrading you should run `/sybermem-update` inside each target project.
 
 Updating global skills does not automatically enable digest support inside every project. To use `/sybermem-digest` in a project, run `/sybermem-update` in that project first. This creates only the missing digest-related structure and does not silently overwrite project-owned files.
+
+Existing projects also receive `.sybermem/analysis/phase-index.md` project by project through `/sybermem-update`.
 
 If an older project still contains project-local copies such as `.claude/skills/sybermem-*`, Claude may load both the local and global copies and show duplicates in the `/` list. If you have adopted the global-install model, you can safely delete those old local copies.
 
@@ -66,6 +68,7 @@ After the global install, open your project and run:
 This creates or refreshes:
 - `.sybermem/`
 - `.sybermem/digests/` (phase digest directory)
+- `.sybermem/analysis/phase-index.md` (persistent phase analysis artifact)
 - `.sybermem/hooks/record_change_on_stop.py` (default auto-change hook helper)
 - `CLAUDE.md`
 - `AGENTS.md`
@@ -83,6 +86,8 @@ See [INSTALL.md](INSTALL.md) for details.
 | `/sybermem-record` | Create a record from current session context. AI auto-detects the type and writes to `.sybermem/` |
 | `/sybermem-summary` | Generate a weekly or monthly progress report from `.sybermem/` records and git history; legacy `ADR/` auto-migrates on first use |
 | `/sybermem-digest` | Create a durable phase digest from existing records, write it to `.sybermem/digests/`, and block duplicate compression of the same source records |
+| `/sybermem-phase-analyze` | Build or refresh `.sybermem/analysis/phase-index.md` from full project history as a persistent phase analysis artifact |
+| `/sybermem-phase-confirm` | Confirm, rename, or adjust candidate phases in `phase-index.md` so the project phase structure becomes explicit |
 | `/sybermem-update` | Refresh the globally installed SyberMem skills, then continue with `/sybermem-init-project` in the current project |
 
 ## What gets created in your project
@@ -95,6 +100,8 @@ See [INSTALL.md](INSTALL.md) for details.
 ├── requirements/     # User requirements, discussion outcomes
 ├── bugs/             # Bug analysis and fixes
 ├── digests/          # Phase digests
+├── analysis/
+│   └── phase-index.md            # Persistent project analysis artifact for candidate phases, confirmed phases, and analysis progress; not a final digest
 ├── hooks/
 │   └── record_change_on_stop.py   # Default auto-change hook helper
 └── templates/        # Record templates, including the digest template
