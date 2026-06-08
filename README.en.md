@@ -19,7 +19,7 @@ For an existing project, run `/sybermem-update`:
 
 ## Upgrading from ADR/
 
-If your project already uses `ADR/`, do not rename anything manually. The first run of `/sybermem-init-project`, `/sybermem-record`, `/sybermem-summary`, or `/sybermem-digest` automatically migrates the old `ADR/` directory to `.sybermem/`.
+If your project already uses `ADR/`, do not rename anything manually. The first run of `/sybermem-init-project`, `/sybermem-record`, `/sybermem-summary`, `/sybermem-digest`, `/sybermem-phase-analyze`, or `/sybermem-phase-confirm` automatically migrates the old `ADR/` directory to `.sybermem/`.
 
 If both `.sybermem/` and `ADR/` exist, the system uses `.sybermem/` and warns that `ADR/` was ignored.
 
@@ -108,7 +108,7 @@ AGENTS.md             # OpenCode instructions (same content)
 
 - `.sybermem/` is canonical.
 - If `.sybermem/` already exists, use it.
-- If only `ADR/` exists, the first run of `/sybermem-init-project`, `/sybermem-record`, `/sybermem-summary`, or `/sybermem-digest` automatically renames it to `.sybermem/`.
+- If only `ADR/` exists, the first run of `/sybermem-init-project`, `/sybermem-record`, `/sybermem-summary`, `/sybermem-digest`, `/sybermem-phase-analyze`, or `/sybermem-phase-confirm` automatically renames it to `.sybermem/`.
 - If both `.sybermem/` and `ADR/` exist, use `.sybermem/` and warn that `ADR/` was ignored.
 
 ## Supported Platforms
@@ -124,6 +124,8 @@ AGENTS.md             # OpenCode instructions (same content)
 packages/claude-skills/               # Skill source for distribution inside the repo, not auto-loaded per project
 ├── sybermem-digest/
 ├── sybermem-init-project/
+├── sybermem-phase-analyze/
+├── sybermem-phase-confirm/
 ├── sybermem-record/
 ├── sybermem-summary/
 └── sybermem-update/
