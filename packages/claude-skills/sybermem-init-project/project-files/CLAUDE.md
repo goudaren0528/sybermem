@@ -16,7 +16,7 @@ After completing meaningful work, run `/sybermem-record` to create a record. AI 
 
 - `.sybermem/` is the canonical project data directory.
 - If `.sybermem/` exists, use it.
-- If only `ADR/` exists, first use of `/sybermem-init-project`, `/sybermem-record`, or `/sybermem-summary` renames it to `.sybermem/` automatically.
+- If only `ADR/` exists, first use of `/sybermem-init-project`, `/sybermem-record`, `/sybermem-summary`, `/sybermem-digest`, `/sybermem-phase-analyze`, or `/sybermem-phase-confirm` renames it to `.sybermem/` automatically.
 - If both `.sybermem/` and `ADR/` exist, use `.sybermem/` and warn that `ADR/` was ignored.
 - Users should not manually rename legacy `ADR/` directories.
 
@@ -28,14 +28,17 @@ After completing meaningful work, run `/sybermem-record` to create a record. AI 
 4. **Record type scope**: Automatic mode only writes `change` records from workspace file changes. Use `/sybermem-record` for `decision`, `requirement`, and `bug` records.
 5. **Upgrade nudges**: In `auto` mode, the stop hook may also emit a non-blocking suggestion that a change looks important enough for `/sybermem-record`, or that a recent cluster of work may be ready for `/sybermem-digest`. These nudges are hints only and do not block exit.
 6. **Digest workflow**: Use `/sybermem-summary` for dynamic weekly/monthly reporting. Use `/sybermem-digest` when a meaningful phase ends and you want a durable, indexed summary in `.sybermem/digests/`.
-7. **Mode switching**: Supported modes are `auto` and `remind`. Change them through `/hooks` or by editing `.claude/settings.json`. The default hook helper lives at `.sybermem/hooks/record_change_on_stop.py`.
-8. File naming: `YYYY-MM-DD-NNN-title.md`
+7. **Phase analysis workflow**: Use `/sybermem-phase-analyze` to refresh `.sybermem/analysis/phase-index.md` from the full project history. Use `/sybermem-phase-confirm` to explicitly confirm or adjust candidate phases before treating them as canonical.
+8. **Mode switching**: Supported modes are `auto` and `remind`. Change them through `/hooks` or by editing `.claude/settings.json`. The default hook helper lives at `.sybermem/hooks/record_change_on_stop.py`.
+9. File naming: `YYYY-MM-DD-NNN-title.md`
 
 ## Available Skills
 
 - `/sybermem-record` — Create a record (auto-detects type)
 - `/sybermem-summary` — Generate weekly/monthly reports
 - `/sybermem-digest` — Create a durable phase digest from existing records
+- `/sybermem-phase-analyze` — Build or refresh the persistent phase index from full project records
+- `/sybermem-phase-confirm` — Explicitly confirm, rename, adjust, or reject candidate phases
 - `/sybermem-init-project` — Initialize or refresh the SyberMem system in this project
 - `/sybermem-update` — Refresh installed SyberMem skills, then re-check this project
 
