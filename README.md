@@ -6,7 +6,7 @@
 
 ## 工作流程
 
-安装 Skills → 在项目中运行 `/sybermem-init-project` → 完成有意义的工作后运行 `/sybermem-record` → 使用 `/sybermem-summary` 查看动态周报/月报 → 在一个有意义的阶段结束时使用 `/sybermem-digest`，将持久化阶段总结写入 `.sybermem/digests/`。每次会话开始时，AI 读取 `.sybermem/INDEX.md` 中的关键结论，回忆历史工作上下文。
+安装 Skills → 在项目中运行 `/sybermem-init-project` → 完成有意义的工作后运行 `/sybermem-record` → 使用 `/sybermem-summary` 查看动态周报/月报 → 在一个有意义的阶段结束时使用 `/sybermem-digest`，将持久化阶段总结写入 `.sybermem/digests/`。每次会话开始时，AI 读取 `.sybermem/INDEX.md` 中的关键结论，回忆历史工作上下文。在 `auto` 模式下，stop hook 仍会自动写入轻量 `change` trail，但在检测到高价值变化模式时，也可能非阻塞地提示你补 `/sybermem-record` 或后续 `/sybermem-digest`。
 
 ## 推荐升级方式
 
@@ -28,6 +28,8 @@
 仅更新全局 skills 并不会自动为每个项目启用 digest 支持。若要在某个项目中使用 `/sybermem-digest`，请先在该项目里运行 `/sybermem-update`。这一步只会创建缺失的 digest 相关结构，不会悄悄覆盖项目自有文件。
 
 如果老项目里仍保留 `.claude/skills/sybermem-*` 这类项目级副本，Claude 可能会同时加载项目级和全局级 skills，导致 `/` 列表重复显示。若你已经采用全局安装模式，可以删除这些旧副本。
+
+如果你希望已有项目也拿到新的 stop hook 提示行为，仍然需要进入那个项目再运行一次 `/sybermem-update`。全局 skills 更新一次即可，但项目本地的 hook/template/说明刷新仍然是按项目生效。
 
 ## 安装
 

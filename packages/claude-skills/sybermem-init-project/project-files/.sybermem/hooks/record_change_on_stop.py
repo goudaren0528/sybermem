@@ -21,10 +21,37 @@ SKIP_PREFIXES = (
     ".claude/",
     "node_modules/",
 )
-SKIP_FILES = {
+# Hard-skip: never included in changed-file lists or trail records.
+SKIP_FILES: set[str] = set()
+# Soft-skip: included for high-signal detection, but excluded from the
+# auto-record trail when they are the *only* files changed (to avoid
+# self-referential noise from lone meta-file edits).
+SOFT_SKIP_FILES = {
     "CLAUDE.md",
     "AGENTS.md",
 }
+
+NUDGE_STATE_PATH = SYBERMEM_DIR / ".auto-nudge-state.json"
+RECORD_FILE_THRESHOLD = 5
+RECORD_COOLDOWN_KEYS = {"record", "digest"}
+HIGH_SIGNAL_PATTERNS = (
+    re.compile(r"^README(?:\..+)?$", re.IGNORECASE),
+    re.compile(r"^INSTALL(?:\..+)?$", re.IGNORECASE),
+    re.compile(r"^CLAUDE\.md$", re.IGNORECASE),
+    re.compile(r"^AGENTS\.md$", re.IGNORECASE),
+    re.compile(r"^packages/claude-skills/.+/SKILL\.md$", re.IGNORECASE),
+    re.compile(r"^\.sybermem/hooks/", re.IGNORECASE),
+    re.compile(r"^scripts/install", re.IGNORECASE),
+    re.compile(r"^scripts/update", re.IGNORECASE),
+    re.compile(r"^docs/superpowers/specs/", re.IGNORECASE),
+)
+HIGH_LEVEL_AREAS = (
+    ("skills", re.compile(r"^packages/claude-skills/", re.IGNORECASE)),
+    ("scripts", re.compile(r"^scripts/", re.IGNORECASE)),
+    ("docs", re.compile(r"^(docs/|README|INSTALL)", re.IGNORECASE)),
+    ("instructions", re.compile(r"^(CLAUDE\.md|AGENTS\.md)$", re.IGNORECASE)),
+    ("sybermem", re.compile(r"^\.sybermem/", re.IGNORECASE)),
+)
 
 
 def run_git(*args: str) -> str:
@@ -45,6 +72,7 @@ def should_auto_record() -> bool:
 
 
 def list_changed_files() -> list[str]:
+    """Return all changed files for signal detection (includes soft-skip files)."""
     files: list[str] = []
     outputs = [
         run_git("diff", "--name-only"),
@@ -68,6 +96,19 @@ def list_changed_files() -> list[str]:
     return seen
 
 
+def trail_files(files: list[str]) -> list[str]:
+    """Return the subset of files to include in an auto-record trail entry.
+
+    Soft-skip files (CLAUDE.md, AGENTS.md) are excluded when they are the
+    *only* files present, to avoid self-referential noise from lone meta-file
+    edits.  When mixed with substantive changes they are included normally.
+    """
+    non_soft = [f for f in files if f not in SOFT_SKIP_FILES]
+    if non_soft:
+        return files  # substantive changes present — include everything
+    return []  # only soft-skip files — suppress the auto-record entirely
+
+
 def load_state() -> dict:
     if not STATE_PATH.exists():
         return {}
@@ -81,9 +122,51 @@ def save_state(state: dict) -> None:
     STATE_PATH.write_text(json.dumps(state, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
+def load_nudge_state() -> dict:
+    if not NUDGE_STATE_PATH.exists():
+        return {}
+    try:
+        return json.loads(NUDGE_STATE_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def save_nudge_state(state: dict) -> None:
+    NUDGE_STATE_PATH.write_text(json.dumps(state, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
 def slugify(text: str) -> str:
     slug = re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
     return slug or "workspace-change"
+
+
+def matches_high_signal(file_path: str) -> bool:
+    return any(pattern.search(file_path) for pattern in HIGH_SIGNAL_PATTERNS)
+
+
+def detect_high_level_areas(files: list[str]) -> set[str]:
+    matched: set[str] = set()
+    for file_path in files:
+        for name, pattern in HIGH_LEVEL_AREAS:
+            if pattern.search(file_path):
+                matched.add(name)
+    return matched
+
+
+DIGEST_CLUSTER_THRESHOLD = 2  # min same-theme records accumulated to suggest a digest
+
+
+def detect_recent_theme_overlap(theme_key: str, nudge_state: dict) -> bool:
+    """Return True only when a credible same-theme cluster exists.
+
+    Reads per-theme record counts stored in nudge_state["theme_record_counts"].
+    Only the current theme's count is consulted, so a burst of activity in one
+    area (e.g. "scripts") cannot trigger a digest nudge for an unrelated area
+    (e.g. "skills" or "instructions").  The count must reach
+    DIGEST_CLUSTER_THRESHOLD before a digest nudge fires.
+    """
+    counts: dict = nudge_state.get("theme_record_counts", {})
+    return counts.get(theme_key, 0) >= DIGEST_CLUSTER_THRESHOLD
 
 
 def next_change_number() -> int:
@@ -106,6 +189,31 @@ def make_title(files: list[str]) -> str:
     if len(files) > MAX_FILES_IN_TITLE:
         names.append("and-more")
     return slugify("-".join(names))
+
+
+def classify_followup(files: list[str], nudge_state: dict) -> tuple[str, str | None, str | None]:
+    file_count = len(files)
+    high_signal_hits = [file for file in files if matches_high_signal(file)]
+    areas = detect_high_level_areas(files)
+    theme_key = slugify("-".join(sorted(areas)) or "misc")
+    recent_overlap = detect_recent_theme_overlap(theme_key, nudge_state)
+
+    last_type = nudge_state.get("last_nudge_type")
+    last_theme = nudge_state.get("last_theme")
+
+    # Digest cooldown is theme-scoped: a digest nudge for one area does not
+    # suppress nudges for a different area.
+    already_digested_this_theme = last_type == "digest" and last_theme == theme_key
+    if recent_overlap and not already_digested_this_theme:
+        return "digest", theme_key, "SyberMem note: recent records around this area may now be enough for a /sybermem-digest if this phase has reached a stable stopping point."
+
+    cross_area = len(areas) >= 2
+    strong_signal = bool(high_signal_hits)
+    large_change = file_count >= RECORD_FILE_THRESHOLD
+    if (strong_signal or cross_area or large_change) and not (last_type == "record" and last_theme == theme_key):
+        return "record", theme_key, "SyberMem note: this change looks important enough for a manual /sybermem-record so the reason and impact are preserved more clearly."
+
+    return "none", theme_key, None
 
 
 def render_related_files(files: list[str]) -> str:
@@ -136,11 +244,14 @@ def render_test_verification() -> str:
     return "Auto-generated from git workspace status; no extra verification was captured by the stop hook."
 
 
-def render_notes() -> str:
-    return "Automatic mode only writes basic `change` records. Use `/sybermem-record` for decisions, requirements, bugs, or richer summaries."
+def render_notes(followup_hint: str) -> str:
+    return "\n".join([
+        "Automatic mode only writes basic `change` records. Use `/sybermem-record` for decisions, requirements, bugs, or richer summaries.",
+        f"followup_hint: {followup_hint}",
+    ])
 
 
-def render_record(record_date: str, number: str, title: str, files: list[str], author: str) -> str:
+def render_record(record_date: str, number: str, title: str, files: list[str], author: str, followup_hint: str) -> str:
     return f"""---
 type: change
 date: {record_date}
@@ -167,7 +278,7 @@ related_files: {render_related_files(files)}
 {render_test_verification()}
 
 ## Notes
-{render_notes()}
+{render_notes(followup_hint)}
 """
 
 
@@ -191,8 +302,22 @@ def main() -> int:
     if not INDEX_PATH.exists() or not CHANGES_DIR.exists():
         return 0
 
-    files = list_changed_files()
+    all_files = list_changed_files()
+    if not all_files:
+        return 0
+
+    # Determine which files go into the trail record (excludes lone soft-skip files).
+    files = trail_files(all_files)
+
+    # Load nudge state before classify so theme_record_counts is available.
+    nudge_state = load_nudge_state()
+    # Use all_files for signal detection even when trail is suppressed.
+    followup_hint, theme_key, nudge_message = classify_followup(all_files, nudge_state)
+
     if not files:
+        # Only soft-skip files changed — emit nudge if warranted, but skip record.
+        if nudge_message:
+            print(nudge_message)
         return 0
 
     fingerprint = json.dumps(files, ensure_ascii=False)
@@ -205,9 +330,22 @@ def main() -> int:
     slug = make_title(files)
     author = run_git("config", "user.name") or "Claude"
     record_path = CHANGES_DIR / f"{record_date}-{number}-{slug}.md"
-    record_path.write_text(render_record(record_date, number, slug.replace("-", " "), files, author), encoding="utf-8")
+    record_path.write_text(render_record(record_date, number, slug.replace("-", " "), files, author, followup_hint), encoding="utf-8")
     update_index(record_date, number, slug.replace("-", " "), slug)
     save_state({"last_fingerprint": fingerprint, "last_record": record_path.name})
+
+    # Increment the per-theme record count so digest thresholds are theme-accurate.
+    theme_counts: dict = dict(nudge_state.get("theme_record_counts", {}))
+    theme_counts[theme_key] = theme_counts.get(theme_key, 0) + 1
+    save_nudge_state({
+        **nudge_state,
+        "last_theme": theme_key,
+        "last_nudge_type": followup_hint if followup_hint in RECORD_COOLDOWN_KEYS else "none",
+        "last_record": record_path.name,
+        "theme_record_counts": theme_counts,
+    })
+    if nudge_message:
+        print(nudge_message)
     return 0
 
 
