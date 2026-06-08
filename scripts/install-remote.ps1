@@ -42,7 +42,7 @@ try {
                 Remove-Item -Path $legacyPath -Recurse -Force -Confirm:$false
             }
         }
-        foreach ($skill in @("sybermem-init-project", "sybermem-record", "sybermem-summary", "sybermem-update")) {
+        foreach ($skill in @("sybermem-init-project", "sybermem-record", "sybermem-summary", "sybermem-digest", "sybermem-update")) {
             $src = Join-Path $SkillsSrc $skill
             $dst = Join-Path $target.Path $skill
             if (Test-Path $src) {
@@ -65,6 +65,7 @@ Write-Host "Available Skills:"
 Write-Host "  /sybermem-init-project  — Initialize or refresh SyberMem in the current project"
 Write-Host "  /sybermem-record        — Create a record (auto-detects type)"
 Write-Host "  /sybermem-summary       — Generate weekly/monthly reports"
+Write-Host "  /sybermem-digest        — Create a durable phase digest from existing records"
 Write-Host "  /sybermem-update        — Refresh global skills, then re-check the current project"
 Write-Host ""
 Write-Host "Next: open your project and run /sybermem-update"

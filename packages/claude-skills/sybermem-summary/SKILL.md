@@ -78,3 +78,4 @@ Monthly reports also include:
 - **No persistent storage**: reports are generated dynamically
 - **Data-driven**: base the report on actual records and git history
 - **Concise output**: keep it readable within one screen
+- **Use the right layer**: `/sybermem-summary` is for dynamic recent-progress views; use `/sybermem-digest` when you need a durable, indexed phase summary

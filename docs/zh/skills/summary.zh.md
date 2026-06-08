@@ -49,3 +49,4 @@ description: 生成 SyberMem 项目周报或月报，也适用于仍然使用旧
 - 报告动态生成，避免文件膨胀
 - 基于实际记录和 Git 历史
 - 输出保持精简
+- 分层使用：`/sybermem-summary` 用于动态的近期进展视图；当你需要可持久保存、可索引的阶段总结时，请使用 `/sybermem-digest`

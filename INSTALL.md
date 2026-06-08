@@ -2,11 +2,15 @@
 
 ## Upgrading existing ADR/ projects
 
-If a project already uses `ADR/`, do not rename directories manually. The first run of `/sybermem-init-project`, `/sybermem-record`, or `/sybermem-summary` automatically migrates `ADR/` to `.sybermem/`.
+If a project already uses `ADR/`, do not rename directories manually. The first run of `/sybermem-init-project`, `/sybermem-record`, `/sybermem-summary`, or `/sybermem-digest` automatically migrates `ADR/` to `.sybermem/`.
 
 If both `.sybermem/` and `ADR/` exist, the skills use `.sybermem/` and warn that the legacy `ADR/` directory was ignored.
 
 Refreshing global skills alone does not automatically refresh project-local `AGENTS.md` / `CLAUDE.md`. After upgrading, open each target project and run `/sybermem-update`.
+
+Updating global skills does not automatically enable digest support inside every project. To use `/sybermem-digest` in a project, run `/sybermem-update` in that project first. This creates only the missing digest-related structure and does not silently overwrite project-owned files.
+
+If the same source records have already been compressed into an existing digest, `/sybermem-digest` must point to the existing digest instead of creating a duplicate.
 
 If an older project still contains project-local copies such as `.claude/skills/sybermem-*`, Claude may load both the local and global copies and show duplicates in the `/` list. Once you have switched to the global-install model, those old project-local copies can be deleted.
 

@@ -16,7 +16,7 @@ install_skills() {
     local label="$2"
     mkdir -p "$target"
     rm -rf "$target/init-project" "$target/record" "$target/summary"
-    for skill in sybermem-init-project sybermem-record sybermem-summary sybermem-update; do
+    for skill in sybermem-init-project sybermem-record sybermem-summary sybermem-digest sybermem-update; do
         if [ -d "$SKILL_SOURCE/$skill" ]; then
             rm -rf "$target/$skill"
             cp -r "$SKILL_SOURCE/$skill" "$target/"
@@ -34,7 +34,8 @@ echo ""
 echo "可用 Skills："
 echo "  /sybermem-init-project  — 初始化或刷新当前项目的 SyberMem 配置"
 echo "  /sybermem-record        — 创建记录（自动判断类型）"
-echo "  /sybermem-summary       — 生成周报/月报"
+echo "  /sybermem-summary       — 基于现有记录生成周报/月报"
+echo "  /sybermem-digest        — 基于现有记录沉淀阶段摘要"
 echo "  /sybermem-update        — 更新全局 Skills 并重新检查当前项目"
 echo ""
 echo "下一步：进入你的项目目录后执行 /sybermem-update"
