@@ -11,7 +11,16 @@
 <!-- use canonical candidate blocks: ### Candidate: <title> + candidate_id/status/covered_records/rationale/proposed_at -->
 
 ## Confirmed Phases
-<!-- use canonical confirmed blocks: ### Phase: <title> + phase_id/source_candidate_id/status/covered_records/confirmed_at/notes -->
+### Phase: Global skill distribution and project refresh
+- phase_id: phase-001
+- source_candidate_id: candidate-phase-001
+- status: confirmed
+- covered_records:
+  - change-002
+  - change-005
+- confirmed_at: 2026-06-09
+- notes: Confirmed from the initial packaging-and-refresh candidate during the Task 5 smoke test.
 
 ## Coverage Map
-<!-- add coverage mappings here -->
+- change-002 -> phase-001
+- change-005 -> phase-001
