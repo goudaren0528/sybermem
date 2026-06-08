@@ -6,7 +6,7 @@ A set of Claude Code / OpenCode skills for tracking project development history.
 
 ## How It Works
 
-Install the skills, run `/sybermem-init-project` in your project, then use `/sybermem-record` after completing meaningful work. AI auto-detects the record type and writes a structured file to the `.sybermem/` directory. At session start, AI reads `.sybermem/INDEX.md` to recall key conclusions from past work.
+Install the skills, run `/sybermem-init-project` in your project, use `/sybermem-record` after meaningful work, use `/sybermem-summary` for dynamic weekly/monthly progress views, and use `/sybermem-digest` when a meaningful phase ends and you want a durable summary stored in `.sybermem/digests/`. At session start, AI reads `.sybermem/INDEX.md` to recall key conclusions from past work.
 
 ## Recommended upgrade path
 
@@ -19,11 +19,13 @@ For an existing project, run `/sybermem-update`:
 
 ## Upgrading from ADR/
 
-If your project already uses `ADR/`, do not rename anything manually. The first run of `/sybermem-init-project`, `/sybermem-record`, or `/sybermem-summary` automatically migrates the old `ADR/` directory to `.sybermem/`.
+If your project already uses `ADR/`, do not rename anything manually. The first run of `/sybermem-init-project`, `/sybermem-record`, `/sybermem-summary`, or `/sybermem-digest` automatically migrates the old `ADR/` directory to `.sybermem/`.
 
 If both `.sybermem/` and `ADR/` exist, the system uses `.sybermem/` and warns that `ADR/` was ignored.
 
 Refreshing global skills alone does not automatically refresh project-local `AGENTS.md` / `CLAUDE.md`, so after upgrading you should run `/sybermem-update` inside each target project.
+
+Updating global skills does not automatically enable digest support inside every project. To use `/sybermem-digest` in a project, run `/sybermem-update` in that project first. This creates only the missing digest-related structure and does not silently overwrite project-owned files.
 
 If an older project still contains project-local copies such as `.claude/skills/sybermem-*`, Claude may load both the local and global copies and show duplicates in the `/` list. If you have adopted the global-install model, you can safely delete those old local copies.
 
@@ -61,6 +63,7 @@ After the global install, open your project and run:
 
 This creates or refreshes:
 - `.sybermem/`
+- `.sybermem/digests/` (phase digest directory)
 - `.sybermem/hooks/record_change_on_stop.py` (default auto-change hook helper)
 - `CLAUDE.md`
 - `AGENTS.md`
@@ -77,6 +80,7 @@ See [INSTALL.md](INSTALL.md) for details.
 | `/sybermem-init-project` | Create or refresh the `.sybermem/` directory structure in a project, scan an existing codebase, generate or refresh `CLAUDE.md` / `AGENTS.md`, and auto-migrate legacy `ADR/` on first run |
 | `/sybermem-record` | Create a record from current session context. AI auto-detects the type and writes to `.sybermem/` |
 | `/sybermem-summary` | Generate a weekly or monthly progress report from `.sybermem/` records and git history; legacy `ADR/` auto-migrates on first use |
+| `/sybermem-digest` | Create a durable phase digest from existing records, write it to `.sybermem/digests/`, and block duplicate compression of the same source records |
 | `/sybermem-update` | Refresh the globally installed SyberMem skills, then continue with `/sybermem-init-project` in the current project |
 
 ## What gets created in your project
@@ -88,9 +92,10 @@ See [INSTALL.md](INSTALL.md) for details.
 ├── decisions/        # Tech choices, architecture designs
 ├── requirements/     # User requirements, discussion outcomes
 ├── bugs/             # Bug analysis and fixes
+├── digests/          # Phase digests
 ├── hooks/
 │   └── record_change_on_stop.py   # Default auto-change hook helper
-└── templates/        # Record templates
+└── templates/        # Record templates, including the digest template
 
 CLAUDE.md             # Claude Code instructions (workflow rules)
 AGENTS.md             # OpenCode instructions (same content)
@@ -101,7 +106,7 @@ AGENTS.md             # OpenCode instructions (same content)
 
 - `.sybermem/` is canonical.
 - If `.sybermem/` already exists, use it.
-- If only `ADR/` exists, the first run of `/sybermem-init-project`, `/sybermem-record`, or `/sybermem-summary` automatically renames it to `.sybermem/`.
+- If only `ADR/` exists, the first run of `/sybermem-init-project`, `/sybermem-record`, `/sybermem-summary`, or `/sybermem-digest` automatically renames it to `.sybermem/`.
 - If both `.sybermem/` and `ADR/` exist, use `.sybermem/` and warn that `ADR/` was ignored.
 
 ## Supported Platforms
@@ -115,6 +120,7 @@ AGENTS.md             # OpenCode instructions (same content)
 
 ```
 packages/claude-skills/               # Skill source for distribution inside the repo, not auto-loaded per project
+├── sybermem-digest/
 ├── sybermem-init-project/
 ├── sybermem-record/
 ├── sybermem-summary/

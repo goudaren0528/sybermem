@@ -40,8 +40,8 @@ Use these template files from this installed skill as the canonical refresh sour
 Classify each existing project file as one of:
 
 - **missing** — file does not exist
-- **fresh** — uses `.sybermem/` rules and references `/sybermem-init-project`, `/sybermem-record`, `/sybermem-summary`, and `/sybermem-update`
-- **stale SyberMem-managed** — still references `/init-project`, `/record`, `/summary`, ADR-era wording, or is missing the new SyberMem-prefixed commands
+- **fresh** — uses `.sybermem/` rules and matches the current digest-aware SyberMem-managed guidance, including `/sybermem-init-project`, `/sybermem-record`, `/sybermem-summary`, `/sybermem-digest`, and `/sybermem-update`
+- **stale SyberMem-managed** — still references `/init-project`, `/record`, `/summary`, ADR-era wording, is missing the new SyberMem-prefixed commands, or otherwise matches older SyberMem-managed wording such as a pre-digest file that is missing `/sybermem-digest`
 - **custom** — exists but does not clearly look like a SyberMem-managed instruction file
 
 Refresh rules:
@@ -52,6 +52,21 @@ Refresh rules:
 4. **custom** → do not overwrite automatically. Explain why it appears custom and ask before replacing it.
 
 If the project was already initialized and only instruction files needed refresh, you may skip the codebase scan and go directly to the summary.
+
+### Step 1.2: Enable digest capability if missing
+
+For projects that already have `.sybermem/INDEX.md`, check whether digest support is present:
+
+- `.sybermem/digests/`
+- `.sybermem/templates/digest-template.md`
+- `## Stage Digests` section in `.sybermem/INDEX.md`
+
+If any are missing:
+- create the missing `digests/` directory
+- create the missing `digest-template.md` from `project-files/.sybermem/templates/digest-template.md`
+- insert the missing `## Stage Digests` section into `INDEX.md`
+
+Do this idempotently. Never duplicate the section, never overwrite an existing digest template without asking, and never treat the absence of digest support as a reason to reinitialize the whole project.
 
 ### Step 2: Determine project type
 
@@ -71,19 +86,22 @@ Only if initialization has not happened yet, check for code files (excluding nod
 ├── decisions/
 ├── requirements/
 ├── bugs/
+├── digests/
 ├── hooks/
 │   └── record_change_on_stop.py
 └── templates/
     ├── change-template.md
     ├── decision-template.md
     ├── requirement-template.md
-    └── bug-template.md
+    ├── bug-template.md
+    └── digest-template.md
 ```
 
 ### Step 4: Generate INDEX.md
 
 Use the standard format, including:
 - `## Key Conclusions` section + `<!-- add new conclusions here -->` placeholder
+- `## Stage Digests` section + `<!-- add new digest records here -->` placeholder
 - 4 type tables + `<!-- add new records here -->` placeholder
 
 ### Step 5: Scan and analyze existing codebases
@@ -136,7 +154,9 @@ When found, ask the user whether to:
 **Created or updated:**
 - `.sybermem/` directory structure
 - `INDEX.md` (with key conclusions)
+- `INDEX.md` digest navigation when missing
 - Template files
+- `.sybermem/digests/` and digest template when digest support is enabled
 - `.sybermem/hooks/record_change_on_stop.py` when auto mode is installed
 - `CLAUDE.md` / `AGENTS.md` / project-level `.claude/settings.json`
 
