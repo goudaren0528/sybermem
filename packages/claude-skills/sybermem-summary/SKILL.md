@@ -7,6 +7,11 @@ description: Use when generating weekly or monthly SyberMem project summaries, i
 
 Generate SyberMem project current-state summaries. When `.sybermem/analysis/phase-index.md` exists and contains confirmed phases, default to the most recently active confirmed phase. Fall back to weekly/monthly time-window reporting only when confirmed phase structure is unavailable.
 
+## Core Invariants
+
+- **Summary is a dynamic current-state panel, not a durable conclusion artifact.**
+- **When confirmed phase structure exists, summary must prefer it over ad hoc grouping.**
+
 ## Usage
 
 - `/sybermem-summary` — Show the current-state panel for the most recently active confirmed phase
