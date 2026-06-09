@@ -136,6 +136,26 @@ Only add one if the digest introduces a truly global project conclusion.
 - Exact duplicate source set → refuse and point to the existing digest
 - Partial overlap without explicit confirmation → stop after warning
 
+## Red Flags — STOP and Re-check
+
+If you catch yourself doing any of these, STOP:
+
+- Creating a digest without listing explicit source records
+- Treating a candidate phase as canonical without explicit user confirmation
+- Generating a second digest for the exact same source set
+- Skipping the overlap warning when source records partially overlap with an existing digest
+- Writing a digest that reads like a current-state summary instead of a durable conclusion
+
+**All of these mean: go back to Step 2 and re-verify source coverage and phase status.**
+
+## Terminal State
+
+This skill is complete when:
+- the digest file is written to `.sybermem/digests/`
+- the `INDEX.md` Stage Digests table has a new row
+- the source records are explicitly listed in the digest
+- the user has been shown the digest path and coverage
+
 ## When NOT to Create a Digest
 
 - The work is still in progress and not phase-bounded
