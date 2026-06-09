@@ -15,9 +15,9 @@ After completing meaningful work, run `/sybermem-record` to create a record. AI 
 ## Directory Resolution
 
 - `.sybermem/` is the canonical project data directory.
-- If `.sybermem/` exists, use it.
-- If only `ADR/` exists, first use of `/sybermem-init-project`, `/sybermem-record`, `/sybermem-summary`, `/sybermem-digest`, `/sybermem-phase-analyze`, or `/sybermem-phase-confirm` renames it to `.sybermem/` automatically.
-- If both `.sybermem/` and `ADR/` exist, use `.sybermem/` and warn that `ADR/` was ignored.
+- SyberMem automatically resolves the project root by walking up from the current working directory to find the nearest ancestor containing both `.sybermem/` and `.claude/settings.json`. This means you can work in any subdirectory and SyberMem will still find the correct project root.
+- If only `ADR/` exists at the resolved root, first use of any SyberMem command renames it to `.sybermem/` automatically.
+- If both `.sybermem/` and `ADR/` exist, `.sybermem/` is used and `ADR/` is ignored.
 - Users should not manually rename legacy `ADR/` directories.
 
 ## Workflow
