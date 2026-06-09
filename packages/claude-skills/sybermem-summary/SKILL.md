@@ -5,12 +5,13 @@ description: Use when generating weekly or monthly SyberMem project summaries, i
 
 # sybermem-summary Skill
 
-Generate SyberMem project progress reports. Defaults to a weekly report; pass the `monthly` argument for a monthly report.
+Generate SyberMem project current-state summaries. When `.sybermem/analysis/phase-index.md` exists and contains confirmed phases, default to the most recently active confirmed phase. Fall back to weekly/monthly time-window reporting only when confirmed phase structure is unavailable.
 
 ## Usage
 
-- `/sybermem-summary` — Generate this week's report
-- `/sybermem-summary monthly` — Generate this month's report
+- `/sybermem-summary` — Show the current-state panel for the most recently active confirmed phase
+- `/sybermem-summary weekly` — Force the weekly fallback report
+- `/sybermem-summary monthly` — Force the monthly fallback report
 
 ## Directory Resolution Rules
 
@@ -29,38 +30,36 @@ After resolving the project root, apply legacy directory checks against the reso
 
 ## Flow
 
-### Step 1: Determine report scope
+### Step 1: Determine summary mode
 
-- No argument or `weekly` → This week (last 7 days)
-- `monthly` → This month (last 30 days)
+- If `.sybermem/analysis/phase-index.md` exists and contains at least one confirmed phase → use the most recently active confirmed phase as the default summary target
+- If the user explicitly passes `weekly` → force the weekly fallback mode
+- If the user explicitly passes `monthly` → force the monthly fallback mode
+- If no confirmed phase structure exists → fall back to weekly mode
 
 ### Step 2: Collect data
 
-Scan `.sybermem/` records in the corresponding time range:
+If using phase-aware mode:
+- read `.sybermem/analysis/phase-index.md`
+- identify the most recently active confirmed phase
+- collect the raw records covered by that phase
+- inspect only recent raw records as supporting detail when needed
 
-```
-.sybermem/changes/      → Feature changes
-.sybermem/decisions/    → Technical decisions
-.sybermem/requirements/ → Requirement records
-.sybermem/bugs/         → Bug fixes
-```
+If using fallback time-window mode:
+- scan `.sybermem/` records in the requested time range
+- also reference git log for commit history
 
-Also reference Git log for commit history.
+### Step 3: Generate summary
 
-### Step 3: Generate report
-
-Output a concise dynamic report:
+In phase-aware mode, output this dynamic current-state panel:
 
 ```markdown
-# Project Progress Report (YYYY-MM-DD ~ YYYY-MM-DD)
+# Phase Summary: <phase title>
 
-## Key Achievements
+## Current Phase
 - ...
 
-## Key Decisions
-- ...
-
-## Issues & Fixes
+## Status
 - ...
 
 ## Open Issues
@@ -68,21 +67,20 @@ Output a concise dynamic report:
 
 ## Next Steps
 - ...
+
+## Recent Changes
+- ...
 ```
 
-### Step 4: Monthly report additions
-
-Monthly reports also include:
-- Progress summary grouped by week
-- Record counts and type distribution
-- Trend observations
+In fallback weekly/monthly mode, keep the current time-window report shape.
 
 ## Design Principles
 
 - **`.sybermem/` is canonical**: summarize records from the canonical project data directory
 - **Legacy compatibility**: old `ADR/` is auto-migrated on first use
-- **No persistent storage**: reports are generated dynamically
-- **Data-driven**: base the report on actual records and git history
+- **No persistent storage**: summaries are generated dynamically
+- **Prefer confirmed phase structure**: when `.sybermem/analysis/phase-index.md` contains confirmed phases, use that structure before ad hoc record grouping
+- **Current-state only**: `/sybermem-summary` answers “what is the current state of the most relevant confirmed phase?”
+- **Not a digest**: `/sybermem-summary` is a dynamic status panel; use `/sybermem-digest` for a durable phase conclusion artifact
 - **Concise output**: keep it readable within one screen
-- **Use the right layer**: `/sybermem-summary` is for dynamic recent-progress views; use `/sybermem-digest` when you need a durable, indexed phase summary
-- **Analysis-aware future**: when `.sybermem/analysis/phase-index.md` exists, future summary behavior should prefer the project’s confirmed phase structure when available over ad hoc record grouping
+- **Data-driven**: base the output on actual records and git history when needed for supporting detail only.
