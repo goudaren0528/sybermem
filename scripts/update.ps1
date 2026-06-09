@@ -4,6 +4,9 @@
 $ErrorActionPreference = "Stop"
 $AdrPath = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 $SkillSource = Join-Path $AdrPath "packages\claude-skills"
+$LauncherDir = Join-Path $env:USERPROFILE ".claude\sybermem"
+$LauncherPath = Join-Path $LauncherDir "launch_record_change_on_stop.py"
+$LauncherSource = Join-Path $AdrPath "scripts\global-stop-hook-launcher.py"
 $LegacyLocalSkills = Join-Path $AdrPath ".claude\skills"
 
 $Targets = @(
@@ -36,6 +39,12 @@ foreach ($target in $Targets) {
     }
 }
 
+if (-not (Test-Path $LauncherDir)) {
+    New-Item -ItemType Directory -Path $LauncherDir -Force | Out-Null
+}
+Copy-Item -Path $LauncherSource -Destination $LauncherPath -Force
+Write-Host "  [Global] 已安装 stop hook launcher: $LauncherPath"
+
 Write-Host ""
 Write-Host "=== 更新完成 ==="
 Write-Host ""
@@ -52,6 +61,7 @@ Write-Host "下一步：进入你的项目目录后执行 /sybermem-update"
 Write-Host "如果你只想检查项目本地文档是否需要刷新，可执行 /sybermem-init-project"
 Write-Host ""
 Write-Host "注意：更新全局 Skills 不会自动刷新项目里的 AGENTS.md / CLAUDE.md；请在项目内运行 /sybermem-update 或 /sybermem-init-project"
+Write-Host "注意：stop hook 的子目录兼容现在由全局 launcher 提供：~/.claude/sybermem/launch_record_change_on_stop.py"
 
 if ((Test-Path (Join-Path $LegacyLocalSkills "sybermem-init-project")) -or
     (Test-Path (Join-Path $LegacyLocalSkills "sybermem-record")) -or

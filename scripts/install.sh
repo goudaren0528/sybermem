@@ -7,6 +7,9 @@ ADR_PATH="$(cd "$(dirname "$0")/.." && pwd)"
 SKILL_SOURCE="$ADR_PATH/packages/claude-skills"
 CLAUDE_SKILLS="$HOME/.claude/skills"
 OPENCODE_SKILLS="$HOME/.config/opencode/skills"
+LAUNCHER_DIR="$HOME/.claude/sybermem"
+LAUNCHER_PATH="$LAUNCHER_DIR/launch_record_change_on_stop.py"
+LAUNCHER_SOURCE="$ADR_PATH/scripts/global-stop-hook-launcher.py"
 LEGACY_LOCAL_SKILLS="$ADR_PATH/.claude/skills"
 
 echo "=== SyberMem 安装 ==="
@@ -28,6 +31,11 @@ install_skills() {
 install_skills "$CLAUDE_SKILLS" "Claude Code"
 install_skills "$OPENCODE_SKILLS" "OpenCode"
 
+mkdir -p "$LAUNCHER_DIR"
+cp "$LAUNCHER_SOURCE" "$LAUNCHER_PATH"
+chmod +x "$LAUNCHER_PATH"
+echo "  [Global] 已安装 stop hook launcher: $LAUNCHER_PATH"
+
 echo ""
 echo "=== 安装完成 ==="
 echo ""
@@ -44,6 +52,7 @@ echo "下一步：进入你的项目目录后执行 /sybermem-update"
 echo "如果你只想初始化或刷新当前项目，可执行 /sybermem-init-project"
 echo ""
 echo "注意：更新全局 Skills 不会自动刷新项目里的 AGENTS.md / CLAUDE.md；请在项目内运行 /sybermem-update 或 /sybermem-init-project"
+echo "注意：stop hook 的子目录兼容现在由全局 launcher 提供：~/.claude/sybermem/launch_record_change_on_stop.py"
 
 if [ -d "$LEGACY_LOCAL_SKILLS/sybermem-init-project" ] || [ -d "$LEGACY_LOCAL_SKILLS/sybermem-record" ] || [ -d "$LEGACY_LOCAL_SKILLS/sybermem-summary" ] || [ -d "$LEGACY_LOCAL_SKILLS/sybermem-update" ]; then
     echo ""
