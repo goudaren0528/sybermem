@@ -52,12 +52,14 @@ Use these template files from this installed skill as the canonical refresh sour
 - `project-files/.claude/settings.json`
 - `project-files/.sybermem/hooks/record_change_on_stop.py`
 
-Classify each existing project file as one of:
+Before classifying any project file, you MUST verify whether it exists on disk using a file-system tool. Do not infer file presence from `.claude/settings.json`, previous tool output, or conversation context.
 
-- **missing** — file does not exist
-- **fresh** — uses `.sybermem/` rules and matches the current digest-aware SyberMem-managed guidance, including `/sybermem-init-project`, `/sybermem-record`, `/sybermem-summary`, `/sybermem-digest`, and `/sybermem-update`
-- **stale SyberMem-managed** — still references `/init-project`, `/record`, `/summary`, ADR-era wording, is missing the new SyberMem-prefixed commands, or otherwise matches older SyberMem-managed wording such as a pre-digest file that is missing `/sybermem-digest`
-- **custom** — exists but does not clearly look like a SyberMem-managed instruction file
+Classify each project file as one of:
+
+- **missing** — file does not exist on disk (verified by filesystem check)
+- **fresh** — file exists on disk and matches the current SyberMem-managed behavior set for this release
+- **stale SyberMem-managed** — file exists on disk and is recognizably SyberMem-managed, but is missing newly required behavior or wording for this release
+- **custom** — file exists on disk but no longer clearly behaves like a SyberMem-managed file
 
 Refresh rules:
 
