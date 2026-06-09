@@ -121,6 +121,8 @@ Use the same status selected in Step 4.
 Do not add a new line to `## Key Conclusions` by default.
 Only add one if the digest introduces a truly global project conclusion.
 
+- `/sybermem-digest` is the durable phase conclusion artifact. If the user wants the current state of an active confirmed phase, prefer `/sybermem-summary` instead.
+
 ## Error Handling
 
 - Missing digest capability structure → ask user to run `/sybermem-update`

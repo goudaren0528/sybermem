@@ -27,10 +27,11 @@ After completing meaningful work, run `/sybermem-record` to create a record. AI 
 3. **After work (auto/remind mode)**: This project may automatically create a basic SyberMem `change` record from current file changes, or remind the user when meaningful work is completed. The mode is controlled by `.claude/settings.json` via `SYBERMEM_RECORD_MODE`.
 4. **Record type scope**: Automatic mode only writes `change` records from workspace file changes. Use `/sybermem-record` for `decision`, `requirement`, and `bug` records.
 5. **Upgrade nudges**: In `auto` mode, the stop hook may also emit a non-blocking suggestion that a change looks important enough for `/sybermem-record`, or that a recent cluster of work may be ready for `/sybermem-digest`. These nudges are hints only and do not block exit.
-6. **Digest workflow**: Use `/sybermem-summary` for dynamic weekly/monthly reporting. Use `/sybermem-digest` when a meaningful phase ends and you want a durable, indexed summary in `.sybermem/digests/`.
-7. **Phase analysis workflow**: Use `/sybermem-phase-analyze` to refresh `.sybermem/analysis/phase-index.md` from the full project history. Use `/sybermem-phase-confirm` to explicitly confirm or adjust candidate phases before treating them as canonical.
-8. **Mode switching**: Supported modes are `auto` and `remind`. Change them through `/hooks` or by editing `.claude/settings.json`. The default hook helper lives at `.sybermem/hooks/record_change_on_stop.py`.
-9. File naming: `YYYY-MM-DD-NNN-title.md`
+6. **Summary workflow**: Use `/sybermem-summary` to see the current-state panel for the most recently active confirmed phase when phase analysis exists, or a weekly/monthly fallback report when it does not.
+7. **Digest workflow**: Use `/sybermem-digest` when a meaningful phase has stabilized and you want a durable phase conclusion artifact.
+8. **Phase analysis workflow**: Use `/sybermem-phase-analyze` to refresh `.sybermem/analysis/phase-index.md` from the full project history. Use `/sybermem-phase-confirm` to explicitly confirm or adjust candidate phases before treating them as canonical.
+9. **Mode switching**: Supported modes are `auto` and `remind`. Change them through `/hooks` or by editing `.claude/settings.json`. The default hook helper lives at `.sybermem/hooks/record_change_on_stop.py`.
+10. File naming: `YYYY-MM-DD-NNN-title.md`
 
 ## Available Skills
 
