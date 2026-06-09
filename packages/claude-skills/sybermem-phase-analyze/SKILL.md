@@ -118,3 +118,10 @@ Write back:
 - Candidate phases must be lightweight grouping proposals, not final digests.
 - If the system is uncertain, prefer narrower candidate proposals over broad confident ones.
 - The phase index should make it possible for `/sybermem-summary` to distinguish confirmed phases from candidates and identify the most recently active confirmed phase.
+
+## Terminal State
+
+This skill is complete when:
+- `.sybermem/analysis/phase-index.md` has been updated with refreshed candidates and analysis progress
+- no candidate has been auto-confirmed
+- the user has been told what candidates were proposed or updated

@@ -80,6 +80,14 @@ The conclusion must include both **what changed** and **why**.
 - Number conflict → auto-increment
 - Required field missing → ask the user to provide it
 
+## Terminal State
+
+This skill is complete when:
+- the record file is created
+- the correct INDEX.md table row is inserted
+- the Key Conclusion line is updated
+- the user has been told the record path
+
 ## When NOT to Record
 
 - Simple formatting adjustments or comment edits

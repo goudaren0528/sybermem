@@ -75,6 +75,25 @@ Before declaring an upgrade complete, verify for the current project:
 - whether stale SyberMem-managed files will be backed up before replacement
 - whether custom files will be preserved unless the user explicitly approves replacement
 
+## Red Flags — STOP and Re-check
+
+If you catch yourself doing any of these, STOP:
+
+- Declaring the upgrade complete without running the managed-file propagation check
+- Skipping the `/sybermem-init-project` follow-up step after updating global skills
+- Leaving the old direct-hook command in `.claude/settings.json` when the launcher should have replaced it
+- Claiming a behavior change is shipped when project-local files have not been created or refreshed
+
+**All of these mean: go back to Step 2 and re-run the init-project flow.**
+
+## Terminal State
+
+This skill is complete when:
+- global skills have been refreshed
+- the `/sybermem-init-project` follow-up has run on the current project
+- all managed files are classified, created, refreshed, or preserved as appropriate
+- the user has been told what was updated
+
 ## Safety Rules
 
 - Do not silently overwrite custom project instruction files.

@@ -87,5 +87,11 @@ In fallback weekly/monthly mode, keep the current time-window report shape.
 - **Prefer confirmed phase structure**: when `.sybermem/analysis/phase-index.md` contains confirmed phases, use that structure before ad hoc record grouping
 - **Current-state only**: `/sybermem-summary` answers “what is the current state of the most relevant confirmed phase?”
 - **Not a digest**: `/sybermem-summary` is a dynamic status panel; use `/sybermem-digest` for a durable phase conclusion artifact
+
+## Terminal State
+
+This skill is complete when:
+- the dynamic current-state panel (or fallback time-window report) has been output to the user
+- no file has been written (summary is non-persistent)
 - **Concise output**: keep it readable within one screen
 - **Data-driven**: base the output on actual records and git history when needed for supporting detail only.
