@@ -60,10 +60,22 @@ That second step is responsible for:
 - checking whether local `AGENTS.md` / `CLAUDE.md` are stale, including pre-digest SyberMem-managed files that still need the digest-aware guidance refresh
 - enabling digest support by creating `.sybermem/digests/`, creating the digest template, and inserting the `Stage Digests` section when missing
 - creating or refreshing the default project-level `.claude/settings.json` and `.sybermem/hooks/record_change_on_stop.py` when the project uses the SyberMem-managed hook template
+- ensuring the global stop hook launcher exists at `~/.claude/sybermem/launch_record_change_on_stop.py`
 - enabling the root-resolving stop-hook launcher by creating `.sybermem/hooks/launch_record_change_on_stop.py` when missing
-- auto-migrating the SyberMem-managed Stop hook command from `record_change_on_stop.py` to `launch_record_change_on_stop.py`
+- auto-migrating existing projects from old relative Stop hook commands to the global absolute launcher command
+- applying that migration even when `.claude/settings.json` is otherwise custom, as long as the old Stop hook command is recognizably SyberMem-managed
 - refreshing stale SyberMem-managed project instructions with backups
 - leaving custom project instructions and custom hook settings alone unless the user approves replacement
+
+Every new managed behavior introduced by SyberMem must explicitly say whether `/sybermem-update` changes any project-local files at all. If it does, name the exact files that are created, refreshed, or migrated. If it does not, say that the behavior is classification-only or otherwise has no project-local file action.
+
+### Managed-file propagation check
+
+Before declaring an upgrade complete, verify for the current project:
+- which local files need the new behavior
+- whether each file is missing, fresh, stale SyberMem-managed, or custom
+- whether stale SyberMem-managed files will be backed up before replacement
+- whether custom files will be preserved unless the user explicitly approves replacement
 
 Every new managed behavior introduced by SyberMem must explicitly say whether `/sybermem-update` changes any project-local files at all. If it does, name the exact files that are created, refreshed, or migrated. If it does not, say that the behavior is classification-only or otherwise has no project-local file action.
 
@@ -100,3 +112,4 @@ This skill is complete when:
 - Do not skip the `/sybermem-init-project` follow-up step.
 - If the update command fails, stop and report the failure instead of pretending the project was refreshed.
 - Do not silently enable digest support by overwriting user-owned files; only create missing digest capability structure.
+- Do not rewrite unrelated custom settings; only surgically replace recognized old SyberMem Stop hook commands.
