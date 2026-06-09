@@ -37,12 +37,14 @@ Use these template files from this installed skill as the canonical refresh sour
 - `project-files/.claude/settings.json`
 - `project-files/.sybermem/hooks/record_change_on_stop.py`
 
-Classify each existing project file as one of:
+**MANDATORY: Before classifying any file, you MUST verify its existence using a file-system tool (Read, Glob, or equivalent). Do NOT infer existence from settings.json references, prior conversation context, or any other indirect evidence. If the tool confirms the file does not exist, classify it as `missing` regardless of what other signals suggest.**
 
-- **missing** — file does not exist
-- **fresh** — uses `.sybermem/` rules and matches the current digest-aware SyberMem-managed guidance, including `/sybermem-init-project`, `/sybermem-record`, `/sybermem-summary`, `/sybermem-digest`, and `/sybermem-update`
-- **stale SyberMem-managed** — still references `/init-project`, `/record`, `/summary`, ADR-era wording, is missing the new SyberMem-prefixed commands, or otherwise matches older SyberMem-managed wording such as a pre-digest file that is missing `/sybermem-digest`
-- **custom** — exists but does not clearly look like a SyberMem-managed instruction file
+Classify each project file as one of:
+
+- **missing** — file does not exist on disk (verified by file-system tool)
+- **fresh** — file exists on disk AND uses `.sybermem/` rules AND matches the current analysis-aware SyberMem-managed guidance, including `/sybermem-init-project`, `/sybermem-record`, `/sybermem-summary`, `/sybermem-digest`, `/sybermem-phase-analyze`, `/sybermem-phase-confirm`, and `/sybermem-update`
+- **stale SyberMem-managed** — file exists on disk BUT still references `/init-project`, `/record`, `/summary`, ADR-era wording, is missing the new SyberMem-prefixed commands, or otherwise matches older SyberMem-managed wording such as a pre-digest or pre-analysis file
+- **custom** — file exists on disk BUT does not clearly look like a SyberMem-managed instruction file
 
 Refresh rules:
 
