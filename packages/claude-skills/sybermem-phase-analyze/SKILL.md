@@ -9,10 +9,17 @@ Analyze the project's full `.sybermem/` record history, update `.sybermem/analys
 
 ## Directory Resolution Rules
 
-1. If `.sybermem/` exists, use it.
-2. If only `ADR/` exists, rename it to `.sybermem/` and tell the user migration was performed.
-3. If both `.sybermem/` and `ADR/` exist, use `.sybermem/` and warn that `ADR/` was ignored.
-4. If neither exists, prompt the user to run `/sybermem-init-project` first.
+### Step 0: Resolve project root
+
+Before any other operation, walk up from the current working directory to find the nearest ancestor directory (including cwd itself) that contains **both** `.sybermem/` **and** `.claude/settings.json`.
+
+- If found: use that directory as the project root for all subsequent steps. Inform the user if the resolved root differs from cwd: "Using SyberMem project root at `<resolved-path>`".
+- If not found (reached git repository root or filesystem root without a match): prompt the user to run `/sybermem-init-project`.
+
+After resolving the project root, apply legacy directory checks against the resolved root:
+1. If the resolved root has `.sybermem/`, use it.
+2. If the resolved root has only `ADR/`, rename `ADR/` to `.sybermem/` and tell the user the legacy directory was auto-migrated.
+3. If the resolved root has both `.sybermem/` and `ADR/`, use `.sybermem/`, warn that `ADR/` was ignored.
 
 ## Preconditions
 
