@@ -7,6 +7,8 @@ $Repo = "goudaren0528/sybermem"
 $Branch = "main"
 $ZipUrl = "https://github.com/$Repo/archive/$Branch.zip"
 $ArchivePrefix = "sybermem-$Branch"
+$LauncherDir = Join-Path $env:USERPROFILE ".claude\sybermem"
+$LauncherPath = Join-Path $LauncherDir "launch_record_change_on_stop.py"
 
 $Targets = @(
     @{ Path = Join-Path $env:USERPROFILE ".claude\skills"; Label = "Claude Code" }
@@ -27,6 +29,7 @@ try {
     Expand-Archive -Path $ZipFile -DestinationPath $TmpDir -Force
 
     $SkillsSrc = Join-Path $TmpDir "$ArchivePrefix\packages\claude-skills"
+    $LauncherSource = Join-Path $TmpDir "$ArchivePrefix\scripts\global-stop-hook-launcher.py"
 
     if (-not (Test-Path $SkillsSrc)) {
         throw "Skills not found in archive"
@@ -54,6 +57,12 @@ try {
             }
         }
     }
+
+    if (-not (Test-Path $LauncherDir)) {
+        New-Item -ItemType Directory -Path $LauncherDir -Force | Out-Null
+    }
+    Copy-Item -Path $LauncherSource -Destination $LauncherPath -Force
+    Write-Host "  [Global] installed stop hook launcher: $LauncherPath"
 } finally {
     Remove-Item -Path $TmpDir -Recurse -Force -ErrorAction SilentlyContinue
 }
@@ -74,3 +83,4 @@ Write-Host "Next: open your project and run /sybermem-update"
 Write-Host "If you only want the local project refresh check, run /sybermem-init-project"
 Write-Host ""
 Write-Host "Note: updating global skills does not automatically refresh project AGENTS.md / CLAUDE.md files"
+Write-Host "Stop hook subdirectory compatibility is now provided by the global launcher at ~/.claude/sybermem/launch_record_change_on_stop.py"

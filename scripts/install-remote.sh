@@ -11,6 +11,8 @@ ARCHIVE_PREFIX="sybermem-$BRANCH"
 
 CLAUDE_SKILLS="$HOME/.claude/skills"
 OPENCODE_SKILLS="$HOME/.config/opencode/skills"
+LAUNCHER_DIR="$HOME/.claude/sybermem"
+LAUNCHER_PATH="$LAUNCHER_DIR/launch_record_change_on_stop.py"
 
 echo "=== SyberMem Remote Install ==="
 echo ""
@@ -22,6 +24,7 @@ echo "Downloading from GitHub..."
 curl -sL "$TARBALL_URL" | tar xz -C "$TMPDIR"
 
 SKILLS_SRC="$TMPDIR/$ARCHIVE_PREFIX/packages/claude-skills"
+LAUNCHER_SOURCE="$TMPDIR/$ARCHIVE_PREFIX/scripts/global-stop-hook-launcher.py"
 
 if [ ! -d "$SKILLS_SRC" ]; then
     echo "Error: skills not found in archive"
@@ -45,6 +48,11 @@ install_skills() {
 install_skills "$CLAUDE_SKILLS" "Claude Code"
 install_skills "$OPENCODE_SKILLS" "OpenCode"
 
+mkdir -p "$LAUNCHER_DIR"
+cp "$LAUNCHER_SOURCE" "$LAUNCHER_PATH"
+chmod +x "$LAUNCHER_PATH"
+echo "  [Global] installed stop hook launcher: $LAUNCHER_PATH"
+
 echo ""
 echo "=== Installation Complete ==="
 echo ""
@@ -61,3 +69,4 @@ echo "Next: open your project and run /sybermem-update"
 echo "If you only want the local project refresh check, run /sybermem-init-project"
 echo ""
 echo "Note: updating global skills does not automatically refresh project AGENTS.md / CLAUDE.md files"
+echo "Stop hook subdirectory compatibility is now provided by the global launcher at ~/.claude/sybermem/launch_record_change_on_stop.py"
