@@ -31,7 +31,10 @@ After completing meaningful work, run `/sybermem-record` to create a record. AI 
 7. **Digest workflow**: Use `/sybermem-digest` when a meaningful phase has stabilized and you want a durable phase conclusion artifact.
 8. **Phase analysis workflow**: Use `/sybermem-phase-analyze` to refresh `.sybermem/analysis/phase-index.md` from the full project history. Use `/sybermem-phase-confirm` to explicitly confirm or adjust candidate phases before treating them as canonical.
 9. **Mode switching**: Supported modes are `auto` and `remind`. Change them through `/hooks` or by editing `.claude/settings.json`. The default hook helper lives at `.sybermem/hooks/record_change_on_stop.py`.
-10. File naming: `YYYY-MM-DD-NNN-title.md`
+10. **Managed-file updates**: `/sybermem-update` can refresh missing or stale SyberMem-managed files in this project, but it must not silently overwrite custom local files.
+11. File naming: `YYYY-MM-DD-NNN-title.md`
+
+SyberMem commands rely on real project files and durable markdown structure. If a command behavior changes in a new release, the project usually needs `/sybermem-update` to receive the refreshed managed files locally.
 
 ## Available Skills
 

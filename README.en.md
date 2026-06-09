@@ -37,6 +37,10 @@ If you want an existing project to receive the refreshed stop-hook nudge behavio
 
 If you previously encountered stop hook errors (file not found) when working in a subdirectory, running `/sybermem-update` fixes the issue. The updated hook automatically walks up to find the nearest ancestor with both `.sybermem/` and `.claude/settings.json` as the project root.
 
+Many SyberMem behavior changes do not live only in the globally installed skill definitions. They also depend on project-local managed files such as `CLAUDE.md`, `AGENTS.md`, `.claude/settings.json`, and hook templates. For existing projects, you usually need to run `/sybermem-update` once after upgrading so the project actually receives the new local behavior.
+
+`/sybermem-update` should create missing managed files, refresh stale SyberMem-managed files, and preserve custom local files without silently overwriting them.
+
 ## Install
 
 ### One-liner (requires public repo)
