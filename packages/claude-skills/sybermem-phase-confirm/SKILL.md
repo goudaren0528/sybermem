@@ -94,3 +94,11 @@ Then apply the confirmation update:
 Confirmed phases are the canonical phase objects that future `/sybermem-summary` and `/sybermem-digest` should prefer over candidate proposals.
 
 Do not auto-create digests.
+
+## Terminal State
+
+This skill is complete when:
+- the user's requested confirmation/rename/adjustment/rejection has been applied to `phase-index.md`
+- the coverage map has been updated to reflect the new phase structure
+- no digest has been auto-created
+- the user has been told what changed
