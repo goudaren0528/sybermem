@@ -7,6 +7,11 @@ description: Use when building or incrementally refreshing the project phase ind
 
 Analyze the project's full `.sybermem/` record history, update `.sybermem/analysis/phase-index.md`, and propose candidate phases without auto-confirming them.
 
+## Core Invariants
+
+- **Phase analysis proposes structure; it does not canonize it.**
+- **No re-analysis may append contradictory duplicate candidates blindly.**
+
 ## Directory Resolution Rules
 
 ### Step 0: Resolve project root

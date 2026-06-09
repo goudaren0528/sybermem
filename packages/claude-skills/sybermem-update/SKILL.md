@@ -7,6 +7,10 @@ description: Use when refreshing installed SyberMem skills in an existing projec
 
 Refresh the installed SyberMem skills, then re-check the current project with `/sybermem-init-project`.
 
+## Core Invariant
+
+- **No behavior change is complete unless `/sybermem-update` can carry an existing managed project to that behavior in operational terms: by re-running the project check, classifying each relevant local managed file, and then creating, refreshing, or migrating only the files that actually need a project-local change. If the new behavior is classification-only or otherwise requires no project-local file change, the update flow must say so explicitly.**
+
 ## When to Use
 
 - You upgraded SyberMem and want the current project to pick up the newest behavior
@@ -58,6 +62,16 @@ That second step is responsible for:
 - creating or refreshing the default project-level `.claude/settings.json` and `.sybermem/hooks/record_change_on_stop.py` when the project uses the SyberMem-managed hook template
 - refreshing stale SyberMem-managed project instructions with backups
 - leaving custom project instructions and custom hook settings alone unless the user approves replacement
+
+Every new managed behavior introduced by SyberMem must explicitly say whether `/sybermem-update` changes any project-local files at all. If it does, name the exact files that are created, refreshed, or migrated. If it does not, say that the behavior is classification-only or otherwise has no project-local file action.
+
+### Managed-file propagation check
+
+Before declaring an upgrade complete, verify for the current project:
+- which local files need the new behavior
+- whether each file is missing, fresh, stale SyberMem-managed, or custom
+- whether stale SyberMem-managed files will be backed up before replacement
+- whether custom files will be preserved unless the user explicitly approves replacement
 
 ## Safety Rules
 
