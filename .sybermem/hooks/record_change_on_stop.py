@@ -9,7 +9,12 @@ from datetime import date
 from pathlib import Path
 
 def resolve_sybermem_root() -> Path:
-    """Walk up from cwd to find the nearest directory with both .sybermem/ and .claude/settings.json.
+    """Walk up from cwd to find the nearest SyberMem project root.
+
+    A directory is considered a SyberMem root if it contains .sybermem/ and
+    at least one of:
+      - .claude/settings.json  (normal project checkout)
+      - .sybermem/INDEX.md     (worktree or checkout where settings.json is untracked)
 
     Stops at the git repository root or filesystem root, whichever comes first.
     Returns the resolved project root, or falls back to cwd if no SyberMem root is found.
@@ -29,7 +34,8 @@ def resolve_sybermem_root() -> Path:
     while True:
         has_sybermem = (current / ".sybermem").is_dir()
         has_settings = (current / ".claude" / "settings.json").is_file()
-        if has_sybermem and has_settings:
+        has_index = (current / ".sybermem" / "INDEX.md").is_file()
+        if has_sybermem and (has_settings or has_index):
             return current
         # Stop at git root boundary
         if git_root and current == git_root:
