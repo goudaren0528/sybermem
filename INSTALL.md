@@ -83,7 +83,7 @@ When phase analysis is available, `/sybermem-summary` is no longer just a weekly
 
 For existing projects, upgrading the global skills is only half of the rollout. If a behavior change depends on project-local managed files, you must run `/sybermem-update` in that project so the managed files can be created or refreshed safely.
 
-For existing projects, `/sybermem-update` now not only refreshes the hook logic but also rewrites the managed Stop hook command to use `.sybermem/hooks/launch_record_change_on_stop.py`. This is what fixes stop-hook file-not-found errors when Claude is working from a subdirectory.
+For existing projects, `/sybermem-update` now performs a Stop hook command migration to the global launcher path. This is the repair step that fixes file-not-found hook failures when Claude is working from a subdirectory.
 
 ## Verify Installation
 
