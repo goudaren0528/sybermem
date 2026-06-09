@@ -7,6 +7,10 @@ description: Use when explicitly confirming, renaming, adjusting, or rejecting c
 
 Promote a candidate phase into a confirmed phase, or explicitly adjust/reject candidate phases in `.sybermem/analysis/phase-index.md`.
 
+## Core Invariant
+
+- **Only explicit confirmation may turn a candidate phase into a canonical phase.**
+
 ## Directory Resolution Rules
 
 ### Step 0: Resolve project root

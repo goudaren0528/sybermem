@@ -7,6 +7,10 @@ description: Use when creating SyberMem project records for changes, decisions, 
 
 Unified SyberMem record entry point. AI auto-detects the record type from context.
 
+## Core Invariant
+
+- **No record is complete until the file is created, the correct table row is inserted, and the Key Conclusion is updated.**
+
 ## Directory Resolution Rules
 
 ### Step 0: Resolve project root

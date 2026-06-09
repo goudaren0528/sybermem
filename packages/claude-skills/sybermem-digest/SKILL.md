@@ -9,6 +9,11 @@ Create a durable phase digest in `.sybermem/digests/` so future project understa
 
 In this skill, the artifact is a phase digest. The required `## Stage Digests` heading in `INDEX.md` is the index section name that lists these phase digests.
 
+## Core Invariants
+
+- **No digest without explicit source coverage.**
+- **No candidate phase is canonical until explicitly confirmed.**
+
 ## Directory Resolution Rules
 
 ### Step 0: Resolve project root
