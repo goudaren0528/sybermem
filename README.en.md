@@ -33,6 +33,8 @@ If an older project still contains project-local copies such as `.claude/skills/
 
 If you want an existing project to receive the refreshed stop-hook nudge behavior, you still need to enter that project and run `/sybermem-update` there. Global skills update once, but local hook/template/instruction refresh still applies project by project.
 
+If you previously encountered stop hook errors (file not found) when working in a subdirectory, running `/sybermem-update` fixes the issue. The updated hook automatically walks up to find the nearest ancestor with both `.sybermem/` and `.claude/settings.json` as the project root.
+
 ## Install
 
 ### One-liner (requires public repo)

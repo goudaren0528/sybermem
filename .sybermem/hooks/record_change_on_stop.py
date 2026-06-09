@@ -8,7 +8,50 @@ import subprocess
 from datetime import date
 from pathlib import Path
 
-ROOT = Path.cwd()
+def resolve_sybermem_root() -> Path:
+    """Walk up from cwd to find the nearest SyberMem project root.
+
+    A directory is considered a SyberMem root if it contains .sybermem/ and
+    at least one of:
+      - .claude/settings.json  (normal project checkout)
+      - .sybermem/INDEX.md     (worktree or checkout where settings.json is untracked)
+
+    Stops at the git repository root or filesystem root, whichever comes first.
+    Returns the resolved project root, or falls back to cwd if no SyberMem root is found.
+    """
+    current = Path.cwd().resolve()
+    git_root = None
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            capture_output=True, text=True, check=False,
+        )
+        if result.returncode == 0:
+            git_root = Path(result.stdout.strip()).resolve()
+    except Exception:
+        pass
+
+    while True:
+        has_sybermem = (current / ".sybermem").is_dir()
+        has_settings = (current / ".claude" / "settings.json").is_file()
+        has_index = (current / ".sybermem" / "INDEX.md").is_file()
+        if has_sybermem and (has_settings or has_index):
+            return current
+        # Stop at git root boundary
+        if git_root and current == git_root:
+            break
+        # Stop at filesystem root
+        parent = current.parent
+        if parent == current:
+            break
+        current = parent
+
+    # Fallback: no SyberMem root found, return cwd so the hook exits gracefully
+    return Path.cwd()
+
+
+ROOT = resolve_sybermem_root()
+GIT_CWD = Path.cwd()
 SYBERMEM_DIR = ROOT / ".sybermem"
 INDEX_PATH = SYBERMEM_DIR / "INDEX.md"
 CHANGES_DIR = SYBERMEM_DIR / "changes"
@@ -60,7 +103,7 @@ HIGH_LEVEL_AREAS = (
 def run_git(*args: str) -> str:
     result = subprocess.run(
         ["git", *args],
-        cwd=ROOT,
+        cwd=GIT_CWD,
         capture_output=True,
         text=True,
         check=False,
