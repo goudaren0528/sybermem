@@ -11,6 +11,7 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 - [change-001] Added one-liner remote install scripts (curl/irm) to simplify new user onboarding, no clone needed (2026-05-12)
 - [change-002] Moved SyberMem skill source to packages/claude-skills and removed repo-local runnable skill copies, so global installs no longer duplicate project-loaded skills (2026-05-12)
 - [change-003] Added a default project-level auto/remind hook template with a runnable stop-hook helper, so new projects can auto-write lightweight change records instead of relying only on reminders (2026-05-13)
+- [bug-001] Fixed init-project misclassifying missing hook files as "custom/kept" by requiring mandatory file-system verification before classification; also identified the deeper need for project-root resolution from subdirectories (2026-06-09)
 <!-- add new conclusions here -->
 
 ---
@@ -56,6 +57,7 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 
 | Number | Date | Title | Severity | Link |
 |--------|------|-------|----------|------|
+| 001 | 2026-06-09 | init-project misclassifies missing hook file as custom/kept | medium | [link](bugs/2026-06-09-001-init-project-misclassifies-missing-hook-file.md) |
 <!-- add new records here -->
 
 ---
