@@ -33,6 +33,8 @@
 
 如果你希望已有项目也拿到新的 stop hook 提示行为，仍然需要进入那个项目再运行一次 `/sybermem-update`。全局 skills 更新一次即可，但项目本地的 hook/template/说明刷新仍然是按项目生效。
 
+如果你之前在子目录中遇到 stop hook 报错（文件找不到），运行 `/sybermem-update` 后该问题会自动修复。更新后的 hook 会自动向上查找包含 `.sybermem/` 和 `.claude/settings.json` 的最近祖先目录作为项目根。
+
 ## 安装
 
 ### 一行命令安装（需仓库为 public）
