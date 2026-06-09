@@ -23,7 +23,7 @@ foreach ($target in $Targets) {
             Remove-Item -Path $legacyPath -Recurse -Force -Confirm:$false
         }
     }
-    foreach ($skill in @("sybermem-init-project", "sybermem-record", "sybermem-summary", "sybermem-digest", "sybermem-update")) {
+    foreach ($skill in @("sybermem-init-project", "sybermem-record", "sybermem-summary", "sybermem-digest", "sybermem-phase-analyze", "sybermem-phase-confirm", "sybermem-update")) {
         $src = Join-Path $SkillSource $skill
         $dst = Join-Path $target.Path $skill
         if (Test-Path $src) {
@@ -44,6 +44,8 @@ Write-Host "  /sybermem-init-project  — 初始化或刷新当前项目的 Sybe
 Write-Host "  /sybermem-record        — 创建记录（自动判断类型）"
 Write-Host "  /sybermem-summary       — 基于现有记录生成周报/月报"
 Write-Host "  /sybermem-digest        — 基于现有记录沉淀阶段摘要"
+Write-Host "  /sybermem-phase-analyze — 从项目历史构建或刷新持久化阶段索引"
+Write-Host "  /sybermem-phase-confirm — 确认或调整阶段索引中的候选阶段"
 Write-Host "  /sybermem-update        — 更新全局 Skills 并重新检查当前项目"
 Write-Host ""
 Write-Host "下一步：进入你的项目目录后执行 /sybermem-update"

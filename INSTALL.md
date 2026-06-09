@@ -2,7 +2,7 @@
 
 ## Upgrading existing ADR/ projects
 
-If a project already uses `ADR/`, do not rename directories manually. The first run of `/sybermem-init-project`, `/sybermem-record`, `/sybermem-summary`, or `/sybermem-digest` automatically migrates `ADR/` to `.sybermem/`.
+If a project already uses `ADR/`, do not rename directories manually. The first run of `/sybermem-init-project`, `/sybermem-record`, `/sybermem-summary`, `/sybermem-digest`, `/sybermem-phase-analyze`, or `/sybermem-phase-confirm` automatically migrates `ADR/` to `.sybermem/`.
 
 If both `.sybermem/` and `ADR/` exist, the skills use `.sybermem/` and warn that the legacy `ADR/` directory was ignored.
 
@@ -11,6 +11,8 @@ Refreshing global skills alone does not automatically refresh project-local `AGE
 Updating global skills does not automatically enable digest support inside every project. To use `/sybermem-digest` in a project, run `/sybermem-update` in that project first. This creates only the missing digest-related structure and does not silently overwrite project-owned files.
 
 Updating global skills once refreshes the shared slash commands, but existing projects still receive stop-hook behavior changes project by project. To give a specific project the refreshed hook/template/instruction behavior, run `/sybermem-update` inside that project.
+
+Existing projects also receive `.sybermem/analysis/phase-index.md` project by project through `/sybermem-update`.
 
 If the same source records have already been compressed into an existing digest, `/sybermem-digest` must point to the existing digest instead of creating a duplicate.
 

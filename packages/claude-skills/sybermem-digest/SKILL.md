@@ -31,6 +31,8 @@ If any of these are missing, explain that digest support has not been enabled in
 
 ## Flow
 
+- If `.sybermem/analysis/phase-index.md` exists, prefer a confirmed phase as the digest source. If only a candidate phase exists, ask the user to confirm or adjust it first instead of silently treating it as canonical.
+
 ### Step 1: Identify the phase scope
 
 Use current session context and existing `.sybermem/` records to determine whether there is a meaningful completed or clearly bounded phase to compress.
