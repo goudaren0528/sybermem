@@ -187,6 +187,26 @@ When found, ask the user whether to:
 - Use `/sybermem-update` later to refresh global skills and re-check this project
 ```
 
+## Red Flags — STOP and Re-check
+
+If you catch yourself doing any of these, STOP:
+
+- Classifying a file as `fresh` or `custom` without first verifying it exists on disk with a filesystem tool
+- Creating `.sybermem/` in a subdirectory when a parent SyberMem root already exists
+- Reporting "kept local version" for a file that does not actually exist
+- Skipping the launcher file creation because "the hook file already exists"
+- Treating a pre-digest or pre-analysis managed file as `fresh` when it is missing newly required behavior
+
+**All of these mean: go back to Step 1.1, re-verify with filesystem tools, and re-classify.**
+
+## Terminal State
+
+This skill is complete when:
+- the project root is resolved and all managed files are classified
+- missing files are created, stale files are refreshed (with backup), and custom files are preserved
+- the output summary has been shown to the user
+- the user knows which commands are available next
+
 ## Key Principles
 
 - **`.sybermem/` is canonical**: New writes always go to `.sybermem/`
