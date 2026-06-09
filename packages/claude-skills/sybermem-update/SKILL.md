@@ -60,6 +60,8 @@ That second step is responsible for:
 - checking whether local `AGENTS.md` / `CLAUDE.md` are stale, including pre-digest SyberMem-managed files that still need the digest-aware guidance refresh
 - enabling digest support by creating `.sybermem/digests/`, creating the digest template, and inserting the `Stage Digests` section when missing
 - creating or refreshing the default project-level `.claude/settings.json` and `.sybermem/hooks/record_change_on_stop.py` when the project uses the SyberMem-managed hook template
+- enabling the root-resolving stop-hook launcher by creating `.sybermem/hooks/launch_record_change_on_stop.py` when missing
+- auto-migrating the SyberMem-managed Stop hook command from `record_change_on_stop.py` to `launch_record_change_on_stop.py`
 - refreshing stale SyberMem-managed project instructions with backups
 - leaving custom project instructions and custom hook settings alone unless the user approves replacement
 

@@ -154,6 +154,8 @@ When found, ask the user whether to:
 - Create missing `CLAUDE.md` / `AGENTS.md` from the template files.
 - Create missing project-level `.claude/settings.json` from the template file when the project does not already define its own hook settings.
 - Create missing `.sybermem/hooks/record_change_on_stop.py` from the template file when automatic mode is being installed.
+- Create missing `.sybermem/hooks/launch_record_change_on_stop.py` from the template file.
+- If the project uses the SyberMem-managed Stop hook entry, rewrite `.claude/settings.json` to call `python .sybermem/hooks/launch_record_change_on_stop.py` instead of the old direct hook path.
 - The generated `.claude/settings.json` must set `SYBERMEM_RECORD_MODE` and install the default Stop hook for automatic `change` records only.
 - If the user approved a refresh in Step 1.1, back up and overwrite the stale SyberMem-managed files.
 - Treat an existing `.claude/settings.json` as custom unless it clearly matches the SyberMem-managed template. Do not overwrite custom hook settings automatically.
@@ -175,6 +177,8 @@ When found, ask the user whether to:
 - Template files
 - `.sybermem/digests/` and digest template when digest support is enabled
 - `.sybermem/hooks/record_change_on_stop.py` when auto mode is installed
+- `.sybermem/hooks/launch_record_change_on_stop.py` when root-resolving launcher support is installed
+- managed Stop hook command updated to the launcher form when needed
 - `CLAUDE.md` / `AGENTS.md` / project-level `.claude/settings.json`
 
 **Next steps:**

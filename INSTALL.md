@@ -83,6 +83,8 @@ When phase analysis is available, `/sybermem-summary` is no longer just a weekly
 
 For existing projects, upgrading the global skills is only half of the rollout. If a behavior change depends on project-local managed files, you must run `/sybermem-update` in that project so the managed files can be created or refreshed safely.
 
+For existing projects, `/sybermem-update` now not only refreshes the hook logic but also rewrites the managed Stop hook command to use `.sybermem/hooks/launch_record_change_on_stop.py`. This is what fixes stop-hook file-not-found errors when Claude is working from a subdirectory.
+
 ## Verify Installation
 
 Type `/sybermem-init-project` or `/sybermem-update` in Claude Code or OpenCode. If the project gets the `.sybermem/` directory structure, reports that an existing `ADR/` directory will be auto-migrated, or offers to refresh stale `AGENTS.md` / `CLAUDE.md`, the installation was successful.
