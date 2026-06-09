@@ -11,12 +11,17 @@ In this skill, the artifact is a phase digest. The required `## Stage Digests` h
 
 ## Directory Resolution Rules
 
-Resolve the project data directory before reading or writing digests:
+### Step 0: Resolve project root
 
-1. If `.sybermem/` exists, use it.
-2. If only `ADR/` exists, rename `ADR/` to `.sybermem/` and tell the user the legacy directory was auto-migrated.
-3. If both `.sybermem/` and `ADR/` exist, use `.sybermem/`, warn that `ADR/` was ignored, and do not auto-merge them.
-4. If neither exists, prompt the user to run `/sybermem-init-project` first.
+Before any other operation, walk up from the current working directory to find the nearest ancestor directory (including cwd itself) that contains **both** `.sybermem/` **and** `.claude/settings.json`.
+
+- If found: use that directory as the project root for all subsequent steps. Inform the user if the resolved root differs from cwd: "Using SyberMem project root at `<resolved-path>`".
+- If not found (reached git repository root or filesystem root without a match): prompt the user to run `/sybermem-init-project`.
+
+After resolving the project root, apply legacy directory checks against the resolved root:
+1. If the resolved root has `.sybermem/`, use it.
+2. If the resolved root has only `ADR/`, rename `ADR/` to `.sybermem/` and tell the user the legacy directory was auto-migrated.
+3. If the resolved root has both `.sybermem/` and `ADR/`, use `.sybermem/`, warn that `ADR/` was ignored.
 
 ## Preconditions
 
