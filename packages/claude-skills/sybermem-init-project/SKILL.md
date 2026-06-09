@@ -13,11 +13,26 @@ Run `/sybermem-init-project` in the target project directory.
 
 ## Directory Resolution Rules
 
-Resolve the project data directory before doing any other work:
+### Step 0: Resolve project root (with anti-nesting guard)
 
-1. If `.sybermem/` exists, use it.
-2. If only `ADR/` exists, rename `ADR/` to `.sybermem/` and tell the user the legacy directory was auto-migrated.
-3. If both `.sybermem/` and `ADR/` exist, use `.sybermem/`, warn that `ADR/` was ignored, and do not auto-merge them.
+Before any other operation, walk up from the current working directory to find the nearest ancestor directory (including cwd itself) that contains **both** `.sybermem/` **and** `.claude/settings.json`.
+
+**If a parent SyberMem root is found above cwd:**
+- Do NOT create a new `.sybermem/` in the current subdirectory.
+- Inform the user: "A SyberMem project root already exists at `<parent-path>`. Operating on that root instead."
+- Ask whether they want to operate on the parent root (default) or create a separate nested project (rare).
+- Only create a nested `.sybermem/` if the user explicitly confirms.
+
+**If no SyberMem root is found:**
+- Treat the current directory as the new project root and proceed with initialization.
+
+**If cwd itself is the SyberMem root:**
+- Proceed normally (this is the common case for existing projects).
+
+After resolving the project root, apply legacy directory checks:
+1. If the resolved root has `.sybermem/`, use it.
+2. If the resolved root has only `ADR/`, rename `ADR/` to `.sybermem/` and tell the user the legacy directory was auto-migrated.
+3. If the resolved root has both `.sybermem/` and `ADR/`, use `.sybermem/`, warn that `ADR/` was ignored.
 4. If neither exists, create `.sybermem/`.
 
 ## Flow
