@@ -87,4 +87,6 @@ Then apply the confirmation update:
 - set `source_candidate_id` when a candidate is confirmed
 - update coverage mappings to match the confirmed phase by replacing the placeholder comment or editing existing mapping lines in place
 
+Confirmed phases are the canonical phase objects that future `/sybermem-summary` and `/sybermem-digest` should prefer over candidate proposals.
+
 Do not auto-create digests.

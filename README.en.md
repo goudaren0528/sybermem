@@ -6,7 +6,9 @@ A set of Claude Code / OpenCode skills for tracking project development history.
 
 ## How It Works
 
-Install the skills, run `/sybermem-init-project` in your project, use `/sybermem-record` after meaningful work, use `/sybermem-phase-analyze` to build or refresh `.sybermem/analysis/phase-index.md` from project history, use `/sybermem-phase-confirm` to confirm or adjust candidate phases, use `/sybermem-summary` for dynamic weekly/monthly progress views, and use `/sybermem-digest` when a meaningful phase ends and you want a durable summary stored in `.sybermem/digests/`. The phase index is a persistent project analysis artifact, not a final digest. At session start, AI reads `.sybermem/INDEX.md` to recall key conclusions from past work. In `auto` mode, the stop hook still writes a lightweight `change` trail automatically, but it may also emit a non-blocking suggestion that a change is important enough for `/sybermem-record`, or that a recent cluster of work may be ready for `/sybermem-digest`.
+Install the skills, run `/sybermem-init-project` in your project, use `/sybermem-record` after meaningful work, use `/sybermem-phase-analyze` to build or refresh `.sybermem/analysis/phase-index.md` from project history, use `/sybermem-phase-confirm` to confirm or adjust candidate phases, use `/sybermem-summary` to view the current-state panel for the most recently active confirmed phase (falling back to the weekly/monthly dynamic report if the analysis layer does not exist yet), and use `/sybermem-digest` when a meaningful phase ends and you want a durable summary stored in `.sybermem/digests/`. The phase index is a persistent project analysis artifact, not a final digest. At session start, AI reads `.sybermem/INDEX.md` to recall key conclusions from past work. In `auto` mode, the stop hook still writes a lightweight `change` trail automatically, but it may also emit a non-blocking suggestion that a change is important enough for `/sybermem-record`, or that a recent cluster of work may be ready for `/sybermem-digest`.
+
+`/sybermem-summary` answers “what is the current state of this phase?”, while `/sybermem-digest` records “what did this phase ultimately conclude?”
 
 ## Recommended upgrade path
 
@@ -86,7 +88,7 @@ See [INSTALL.md](INSTALL.md) for details.
 |-------|-------------|
 | `/sybermem-init-project` | Create or refresh the `.sybermem/` directory structure in a project, scan an existing codebase, generate or refresh `CLAUDE.md` / `AGENTS.md`, and auto-migrate legacy `ADR/` on first run |
 | `/sybermem-record` | Create a record from current session context. AI auto-detects the type and writes to `.sybermem/` |
-| `/sybermem-summary` | Generate a weekly or monthly progress report from `.sybermem/` records and git history; legacy `ADR/` auto-migrates on first use |
+| `/sybermem-summary` | Dynamically view the current-state panel for the most recently active confirmed phase; fall back to weekly/monthly reporting when the analysis layer is unavailable |
 | `/sybermem-digest` | Create a durable phase digest from existing records, write it to `.sybermem/digests/`, and block duplicate compression of the same source records |
 | `/sybermem-phase-analyze` | Build or refresh `.sybermem/analysis/phase-index.md` from full project history as a persistent phase analysis artifact |
 | `/sybermem-phase-confirm` | Confirm, rename, or adjust candidate phases in `phase-index.md` so the project phase structure becomes explicit |

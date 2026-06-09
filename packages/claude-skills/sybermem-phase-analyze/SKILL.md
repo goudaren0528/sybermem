@@ -105,9 +105,11 @@ Write back:
 - last analyzed record boundary
 - optional git boundary
 - whether unprocessed new records remain
+- enough current-state metadata for future summary to identify the most recently active confirmed phase
 
 ## Output Rules
 
 - The phase index must remain human-readable Markdown.
 - Candidate phases must be lightweight grouping proposals, not final digests.
 - If the system is uncertain, prefer narrower candidate proposals over broad confident ones.
+- The phase index should make it possible for `/sybermem-summary` to distinguish confirmed phases from candidates and identify the most recently active confirmed phase.

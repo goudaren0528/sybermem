@@ -6,7 +6,9 @@
 
 ## 工作流程
 
-安装 Skills → 在项目中运行 `/sybermem-init-project` → 完成有意义的工作后运行 `/sybermem-record` → 使用 `/sybermem-phase-analyze` 从项目历史构建或刷新 `.sybermem/analysis/phase-index.md` → 使用 `/sybermem-phase-confirm` 确认或调整候选阶段 → 使用 `/sybermem-summary` 查看动态周报/月报 → 在一个有意义的阶段结束时使用 `/sybermem-digest`，将持久化阶段总结写入 `.sybermem/digests/`。`phase-index.md` 是持久化的项目分析产物，不是最终 digest。每次会话开始时，AI 读取 `.sybermem/INDEX.md` 中的关键结论，回忆历史工作上下文。在 `auto` 模式下，stop hook 仍会自动写入轻量 `change` trail，但在检测到高价值变化模式时，也可能非阻塞地提示你补 `/sybermem-record` 或后续 `/sybermem-digest`。
+安装 Skills → 在项目中运行 `/sybermem-init-project` → 完成有意义的工作后运行 `/sybermem-record` → 使用 `/sybermem-phase-analyze` 从项目历史构建或刷新 `.sybermem/analysis/phase-index.md` → 使用 `/sybermem-phase-confirm` 确认或调整候选阶段 → 使用 `/sybermem-summary` 查看最近活跃 confirmed phase 的当前状态面板（若 analysis layer 不存在，则回退到 weekly/monthly 动态报表）→ 在一个有意义的阶段结束时使用 `/sybermem-digest`，将持久化阶段总结写入 `.sybermem/digests/`。`phase-index.md` 是持久化的项目分析产物，不是最终 digest。每次会话开始时，AI 读取 `.sybermem/INDEX.md` 中的关键结论，回忆历史工作上下文。在 `auto` 模式下，stop hook 仍会自动写入轻量 `change` trail，但在检测到高价值变化模式时，也可能非阻塞地提示你补 `/sybermem-record` 或后续 `/sybermem-digest`。
+
+`/sybermem-summary` 看“现在这个阶段状态如何”，而 `/sybermem-digest` 记录“这个阶段最终沉淀了什么”。
 
 ## 推荐升级方式
 
@@ -86,7 +88,7 @@ cd sybermem; .\scripts\install.ps1
 |-------|------|
 | `/sybermem-init-project` | 在项目中创建或刷新 `.sybermem/` 目录结构，扫描现有代码库，生成或刷新 `CLAUDE.md` / `AGENTS.md`，并在首次运行时自动迁移旧 `ADR/` |
 | `/sybermem-record` | 从当前会话上下文创建记录，AI 自动判断类型：变更、决策、需求或 Bug，并写入 `.sybermem/` |
-| `/sybermem-summary` | 基于 `.sybermem/` 中已有记录和 git 历史生成周报或月报；旧 `ADR/` 会在首次使用时自动迁移 |
+| `/sybermem-summary` | 动态查看最近活跃 confirmed phase 的当前状态面板；若 analysis layer 不存在，则回退到周报/月报 |
 | `/sybermem-digest` | 从已有记录创建可持久保存的阶段摘要，将其写入 `.sybermem/digests/`，并阻止对同一批源记录重复压缩 |
 | `/sybermem-phase-analyze` | 从完整项目历史构建或刷新 `.sybermem/analysis/phase-index.md`，生成可持续维护的阶段分析索引 |
 | `/sybermem-phase-confirm` | 确认、重命名或调整 `phase-index.md` 中的候选阶段，使阶段结构变为明确的项目分析结果 |
