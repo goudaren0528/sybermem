@@ -8,7 +8,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .sybermem/hooks/launch_record_change_on_stop.py",
+            "command": "python C:/Users/69046/.claude/sybermem/launch_record_change_on_stop.py",
             "timeout": 60,
             "statusMessage": "SyberMem checking whether to record a change..."
           }
