@@ -37,7 +37,9 @@
 
 如果你之前在子目录中遇到 stop hook 报错（文件找不到），运行 `/sybermem-update` 后该问题会自动修复。更新后的 hook 会自动向上查找包含 `.sybermem/` 和 `.claude/settings.json` 的最近祖先目录作为项目根。
 
-Stop hook 的子目录修复现在通过项目内 launcher 完成。更新后的项目会使用 `.sybermem/hooks/launch_record_change_on_stop.py` 先定位真正项目根，再调用根目录下的 `record_change_on_stop.py`，因此不再依赖当前工作目录正好就是项目根。
+现在 stop hook 的子目录修复通过全局 launcher 实现。更新后的项目会把 Stop hook command 自动迁移为全局绝对路径 `python C:/Users/69046/.claude/sybermem/launch_record_change_on_stop.py`。这样即使 Claude 的当前工作目录在项目子目录中，launcher 也能先找到真正项目根，再调用项目内的 `record_change_on_stop.py`。
+
+已有项目运行 `/sybermem-update` 后，应自动完成这次 command 迁移；即使 `.claude/settings.json` 是 custom，只要里面仍然是可识别的旧 SyberMem Stop hook command，也会只替换这一行。
 
 SyberMem 的很多行为变化并不只存在于全局 skill 本身，还依赖项目内的 managed files（例如 `CLAUDE.md`、`AGENTS.md`、`.claude/settings.json`、hook 模板等）。因此，已有项目在升级后通常还需要运行一次 `/sybermem-update`，才能真正拿到新的本地行为。
 
