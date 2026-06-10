@@ -7,6 +7,13 @@ description: Use when initializing SyberMem project records for a new or existin
 
 Initialize or refresh the SyberMem project record system in the current project. `.sybermem/` is the canonical project data directory.
 
+## Core Invariants
+
+- **No file classification without file-system verification.**
+- **No nested `.sybermem/` without explicit user approval.**
+- **No stale SyberMem-managed file may remain classified as fresh if it is missing newly required managed behavior.**
+- **No protocol update should rewrite more than the bounded `using-sybermem` block when the markers already exist.**
+
 ## Usage
 
 Run `/sybermem-init-project` in the target project directory.
@@ -67,6 +74,15 @@ Refresh rules:
 2. **fresh** → leave it unchanged.
 3. **stale SyberMem-managed** → ask the user whether to refresh it. Before overwriting, create a same-directory backup such as `AGENTS.md.backup` or `CLAUDE.md.backup`, then replace it with the current template.
 4. **custom** → do not overwrite automatically. Explain why it appears custom and ask before replacing it.
+
+### Protocol-block handling
+
+For `CLAUDE.md` and `AGENTS.md`, treat the `using-sybermem` session-entry protocol as a marker-bounded managed block.
+
+- If the file already contains `SYBERMEM_SESSION_PROTOCOL:START` and `SYBERMEM_SESSION_PROTOCOL:END`, refresh only the contents inside that block.
+- If the file is still recognizably SyberMem-managed but does not yet contain the block, insert it near the top of the file.
+- If the file is custom and does not contain the block, do not auto-insert it; explain the option and ask first.
+- If the file is custom but already contains the markers, refresh only the block and leave the rest of the file unchanged.
 
 If the project was already initialized and only instruction files needed refresh, you may skip the codebase scan and go directly to the summary.
 
@@ -181,6 +197,7 @@ When found, ask the user whether to:
 - `.sybermem/hooks/record_change_on_stop.py` when auto mode is installed
 - `.sybermem/hooks/launch_record_change_on_stop.py` when root-resolving launcher support is installed
 - managed Stop hook command updated to the launcher form when needed
+- `using-sybermem` session protocol block inserted or refreshed in `CLAUDE.md` / `AGENTS.md` when applicable
 - `CLAUDE.md` / `AGENTS.md` / project-level `.claude/settings.json`
 
 **Next steps:**

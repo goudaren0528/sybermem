@@ -1,5 +1,21 @@
 # SyberMem Project Record System
 
+<!-- SYBERMEM_SESSION_PROTOCOL:START -->
+## SyberMem Session Protocol
+
+Before any SyberMem workflow proceeds in this session:
+
+1. Resolve the project root first.
+2. Read `.sybermem/INDEX.md` `## Key Conclusions`.
+3. If `.sybermem/analysis/phase-index.md` exists, treat it as the current structural source of truth for phase-aware workflows.
+4. If `/sybermem-summary` is requested and no phase index exists, run `/sybermem-phase-analyze` first.
+5. If `/sybermem-digest` is requested without explicit source records and no phase index exists, run `/sybermem-phase-analyze` first.
+6. Do not treat candidate phases as canonical until they are explicitly confirmed.
+7. If important work is happening and a lightweight trail is not enough, prefer `/sybermem-record`.
+
+This protocol block establishes entry rules only. It does not replace the concrete SyberMem commands.
+<!-- SYBERMEM_SESSION_PROTOCOL:END -->
+
 ## Core Rule
 
 After completing meaningful work, run `/sybermem-record` to create a record. AI auto-detects the type.
