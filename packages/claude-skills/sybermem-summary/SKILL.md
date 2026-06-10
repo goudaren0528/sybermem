@@ -37,10 +37,11 @@ After resolving the project root, apply legacy directory checks against the reso
 
 ### Step 1: Determine summary mode
 
+- If `.sybermem/analysis/phase-index.md` does not exist → automatically trigger `/sybermem-phase-analyze` first to generate it, then continue
 - If `.sybermem/analysis/phase-index.md` exists and contains at least one confirmed phase → use the most recently active confirmed phase as the default summary target
 - If the user explicitly passes `weekly` → force the weekly fallback mode
 - If the user explicitly passes `monthly` → force the monthly fallback mode
-- If no confirmed phase structure exists → fall back to weekly mode
+- If no confirmed phase structure exists after analysis → fall back to weekly mode
 
 ### Step 2: Collect data
 
