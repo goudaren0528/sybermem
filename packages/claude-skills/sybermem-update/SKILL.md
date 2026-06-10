@@ -64,6 +64,7 @@ That second step is responsible for:
 - enabling the root-resolving stop-hook launcher by creating `.sybermem/hooks/launch_record_change_on_stop.py` when missing
 - auto-migrating existing projects from old relative Stop hook commands to the global absolute launcher command
 - applying that migration even when `.claude/settings.json` is otherwise custom, as long as the old Stop hook command is recognizably SyberMem-managed
+- inserting or refreshing the marker-bounded `using-sybermem` session-entry protocol block in managed instruction files
 - refreshing stale SyberMem-managed project instructions with backups
 - leaving custom project instructions and custom hook settings alone unless the user approves replacement
 
@@ -76,16 +77,8 @@ Before declaring an upgrade complete, verify for the current project:
 - whether each file is missing, fresh, stale SyberMem-managed, or custom
 - whether stale SyberMem-managed files will be backed up before replacement
 - whether custom files will be preserved unless the user explicitly approves replacement
-
-Every new managed behavior introduced by SyberMem must explicitly say whether `/sybermem-update` changes any project-local files at all. If it does, name the exact files that are created, refreshed, or migrated. If it does not, say that the behavior is classification-only or otherwise has no project-local file action.
-
-### Managed-file propagation check
-
-Before declaring an upgrade complete, verify for the current project:
-- which local files need the new behavior
-- whether each file is missing, fresh, stale SyberMem-managed, or custom
-- whether stale SyberMem-managed files will be backed up before replacement
-- whether custom files will be preserved unless the user explicitly approves replacement
+- whether the `using-sybermem` protocol block was inserted or refreshed non-destructively when applicable
+- whether recognized old SyberMem Stop hook commands were surgically replaced with the global launcher path when present in otherwise custom settings files.
 
 ## Red Flags — STOP and Re-check
 
@@ -113,3 +106,4 @@ This skill is complete when:
 - If the update command fails, stop and report the failure instead of pretending the project was refreshed.
 - Do not silently enable digest support by overwriting user-owned files; only create missing digest capability structure.
 - Do not rewrite unrelated custom settings; only surgically replace recognized old SyberMem Stop hook commands.
+- Do not rewrite the rest of `CLAUDE.md` / `AGENTS.md` when the `using-sybermem` markers already exist; only refresh the bounded protocol block.
