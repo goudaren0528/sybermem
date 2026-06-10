@@ -45,6 +45,8 @@ Many SyberMem behavior changes do not live only in the globally installed skill 
 
 `/sybermem-update` should create missing managed files, refresh stale SyberMem-managed files, and preserve custom local files without silently overwriting them.
 
+SyberMem now uses a `using-sybermem` protocol block near the top of `CLAUDE.md` / `AGENTS.md` to establish session-entry rules. When an existing project runs `/sybermem-update`, managed instruction files should receive that block automatically; custom files should not be overwritten wholesale by default.
+
 ## Install
 
 ### One-liner (requires public repo)

@@ -45,6 +45,8 @@ SyberMem 的很多行为变化并不只存在于全局 skill 本身，还依赖�
 
 `/sybermem-update` 会补齐缺失的 managed files、刷新 stale 的 SyberMem-managed 文件，并保留 custom 本地文件不被悄悄覆盖。
 
+SyberMem 现在会通过 `CLAUDE.md` / `AGENTS.md` 顶部的 `using-sybermem` 协议块来建立会话入口规则。已有项目运行 `/sybermem-update` 时，如果这些文件仍然属于 SyberMem-managed 范围，就会自动插入或刷新这个协议块；若文件已经是 custom，则默认不会整体覆盖。
+
 ## 安装
 
 ### 一行命令安装（需仓库为 public）
