@@ -84,6 +84,8 @@ For `CLAUDE.md` and `AGENTS.md`, treat the `using-sybermem` session-entry protoc
 - If the file is custom and does not contain the block, do not auto-insert it; explain the option and ask first.
 - If the file is custom but already contains the markers, refresh only the block and leave the rest of the file unchanged.
 
+This protocol block is the automatic entrypoint. The separately installed `/using-sybermem` skill is the visible manual entrypoint.
+
 If the project was already initialized and only instruction files needed refresh, you may skip the codebase scan and go directly to the summary.
 
 ### Step 1.2: Enable digest capability if missing
