@@ -103,6 +103,19 @@ If any are missing:
 
 Do this idempotently. Never duplicate the section, never overwrite an existing digest template without asking, and never treat the absence of digest support as a reason to reinitialize the whole project.
 
+### Step 1.3: Enable analysis capability if missing
+
+For projects that already have `.sybermem/INDEX.md`, check whether analysis support is present:
+
+- `.sybermem/analysis/` directory
+- `.sybermem/analysis/phase-index.md`
+
+If any are missing:
+- create the missing `analysis/` directory
+- create the missing `phase-index.md` from `project-files/.sybermem/analysis/phase-index.md`
+
+Do this idempotently. Never overwrite an existing phase-index without asking.
+
 ### Step 2: Determine project type
 
 Only if initialization has not happened yet, check for code files (excluding node_modules, .git, etc.):
