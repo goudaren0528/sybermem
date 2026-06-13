@@ -19,7 +19,7 @@ install_skills() {
     local label="$2"
     mkdir -p "$target"
     rm -rf "$target/init-project" "$target/record" "$target/summary"
-    for skill in sybermem-init-project sybermem-record sybermem-summary sybermem-digest sybermem-phase-analyze sybermem-phase-confirm sybermem-update; do
+    for skill in sybermem-init-project sybermem-record sybermem-summary sybermem-digest sybermem-phase-analyze sybermem-phase-confirm using-sybermem sybermem-update; do
         if [ -d "$SKILL_SOURCE/$skill" ]; then
             rm -rf "$target/$skill"
             cp -r "$SKILL_SOURCE/$skill" "$target/"
@@ -46,6 +46,7 @@ echo "  /sybermem-summary       — 基于现有记录生成周报/月报"
 echo "  /sybermem-digest        — 基于现有记录沉淀阶段摘要"
 echo "  /sybermem-phase-analyze — 从项目历史构建或刷新持久化阶段索引"
 echo "  /sybermem-phase-confirm — 确认或调整阶段索引中的候选阶段"
+echo "  /using-sybermem         — 显示当前 SyberMem 状态和建议的下一步命令"
 echo "  /sybermem-update        — 更新全局 Skills 并重新检查当前项目"
 echo ""
 echo "下一步：进入你的项目目录后执行 /sybermem-update"

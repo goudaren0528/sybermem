@@ -47,6 +47,8 @@ SyberMem 的很多行为变化并不只存在于全局 skill 本身，还依赖�
 
 SyberMem 现在会通过 `CLAUDE.md` / `AGENTS.md` 顶部的 `using-sybermem` 协议块来建立会话入口规则。已有项目运行 `/sybermem-update` 时，如果这些文件仍然属于 SyberMem-managed 范围，就会自动插入或刷新这个协议块；若文件已经是 custom，则默认不会整体覆盖。
 
+`using-sybermem` 现在是双入口：顶部协议块会自动在会话开始时生效，而 `/using-sybermem` 则是用户可见的诊断入口。手动运行它时，系统会显示当前项目的 SyberMem 状态、summary/digest/analyze/record 的路由结果，以及建议下一步执行的命令。
+
 ## 安装
 
 ### 一行命令安装（需仓库为 public）
