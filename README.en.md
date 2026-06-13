@@ -47,6 +47,8 @@ Many SyberMem behavior changes do not live only in the globally installed skill 
 
 SyberMem now uses a `using-sybermem` protocol block near the top of `CLAUDE.md` / `AGENTS.md` to establish session-entry rules. When an existing project runs `/sybermem-update`, managed instruction files should receive that block automatically; custom files should not be overwritten wholesale by default.
 
+`using-sybermem` is now a dual-entry protocol: the bounded block at the top of `CLAUDE.md` / `AGENTS.md` applies automatically at session start, while `/using-sybermem` is the visible diagnostic entrypoint. When run manually, it reports the current SyberMem state, the routing behavior for summary/digest/analyze/record, and the recommended next command.
+
 ## Install
 
 ### One-liner (requires public repo)
