@@ -29,11 +29,10 @@ After resolving the project root, apply legacy directory checks against the reso
 ## Preconditions
 
 Before analysis, verify all of the following:
-- `.sybermem/analysis/phase-index.md` exists
 - `.sybermem/INDEX.md` exists
 - at least one raw record exists in `changes/`, `decisions/`, `requirements/`, or `bugs/`
 
-If the phase index is missing, ask the user to run `/sybermem-update`.
+If `.sybermem/analysis/phase-index.md` does not exist, create it from the starter template (create the `analysis/` directory first if needed). The starter template should contain empty `## Analysis Progress`, `## Phase Candidates`, `## Confirmed Phases`, and `## Coverage Map` sections with `status: not_yet_analyzed`. This is the normal first-run path — do not ask the user to run `/sybermem-update` just because the phase index has never been created.
 
 ## Flow
 
