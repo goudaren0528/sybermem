@@ -65,8 +65,11 @@ That second step is responsible for:
 - auto-migrating existing projects from old relative Stop hook commands to the global absolute launcher command
 - applying that migration even when `.claude/settings.json` is otherwise custom, as long as the old Stop hook command is recognizably SyberMem-managed
 - inserting or refreshing the marker-bounded `using-sybermem` session-entry protocol block in managed instruction files
+- ensuring existing projects receive both the marker-bounded `using-sybermem` protocol block and the visible `/using-sybermem` skill after upgrade
 - refreshing stale SyberMem-managed project instructions with backups
 - leaving custom project instructions and custom hook settings alone unless the user approves replacement
+
+The protocol block gives automatic session-entry guidance; the visible `/using-sybermem` skill gives a manual diagnostic entrypoint.
 
 Every new managed behavior introduced by SyberMem must explicitly say whether `/sybermem-update` changes any project-local files at all. If it does, name the exact files that are created, refreshed, or migrated. If it does not, say that the behavior is classification-only or otherwise has no project-local file action.
 
