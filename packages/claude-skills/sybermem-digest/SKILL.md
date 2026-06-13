@@ -12,7 +12,7 @@ In this skill, the artifact is a phase digest. The required `## Stage Digests` h
 ## Core Invariants
 
 - **No digest without explicit source coverage.**
-- **No candidate phase is canonical until explicitly confirmed.**
+- **No candidate phase is used as a digest source until it has been confirmed (confirmation may be automatic).**
 
 ## Directory Resolution Rules
 
@@ -47,7 +47,7 @@ If any of these are missing, explain that digest support has not been enabled in
 - If no explicit source records are specified:
   - If `.sybermem/analysis/phase-index.md` does not exist → automatically trigger `/sybermem-phase-analyze` first to generate it, then continue
   - If `.sybermem/analysis/phase-index.md` exists and contains confirmed phases → prefer a confirmed phase as the digest source
-  - If only candidate phases exist → ask the user to confirm or adjust first via `/sybermem-phase-confirm` instead of silently treating candidates as canonical
+  - If only candidate phases exist → auto-confirm all candidates as phases, then use a confirmed phase as the digest source
 
 ### Step 1: Identify the phase scope
 
@@ -147,7 +147,7 @@ Only add one if the digest introduces a truly global project conclusion.
 If you catch yourself doing any of these, STOP:
 
 - Creating a digest without listing explicit source records
-- Treating a candidate phase as canonical without explicit user confirmation
+- Using a candidate phase as a digest source without first confirming it (auto-confirmation counts)
 - Generating a second digest for the exact same source set
 - Skipping the overlap warning when source records partially overlap with an existing digest
 - Writing a digest that reads like a current-state summary instead of a durable conclusion
