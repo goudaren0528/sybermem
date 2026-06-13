@@ -46,14 +46,20 @@ If any of these are missing, explain that digest support has not been enabled in
 - If the user or current session context has already specified explicit source records → use them directly, skip phase-index dependency
 - If no explicit source records are specified:
   - If `.sybermem/analysis/phase-index.md` does not exist → automatically trigger `/sybermem-phase-analyze` first to generate it, then continue
-  - If `.sybermem/analysis/phase-index.md` exists and contains confirmed phases → prefer a confirmed phase as the digest source
-  - If only candidate phases exist → auto-confirm all candidates as phases, then use a confirmed phase as the digest source
+  - If `.sybermem/analysis/phase-index.md` exists and contains confirmed phases → digest **all** confirmed phases that do not already have a digest (see batch mode below)
+  - If only candidate phases exist → auto-confirm all candidates as phases, then digest all of them in batch
+
+### Batch mode (default when no explicit source records)
+
+When multiple confirmed phases exist and no explicit source records were provided, create a digest for **each** confirmed phase that does not already have an existing digest with the same source coverage. Process them in chronological order by phase coverage dates. Skip any phase whose raw source records are incomplete or missing.
+
+For each phase, run Steps 1–7 independently. This is the normal batch path — do not stop after the first phase and ask the user which one to digest next.
 
 ### Step 1: Identify the phase scope
 
 Use current session context, explicit source records, or the resolved phase-index to determine whether there is a meaningful completed or clearly bounded phase to compress.
 
-If there is no meaningful phase boundary or fewer than 2 relevant source records, refuse to create a digest and explain why.
+If there is no meaningful phase boundary or fewer than 2 relevant source records for a given phase, skip that phase (in batch mode) or refuse and explain why (in single-phase mode).
 
 ### Step 2: Select source records
 
