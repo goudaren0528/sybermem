@@ -16,6 +16,8 @@ Before any SyberMem workflow proceeds in this session:
 This protocol block establishes entry rules only. It does not replace the concrete SyberMem commands.
 <!-- SYBERMEM_SESSION_PROTOCOL:END -->
 
+The `using-sybermem` protocol block above loads automatically at session start. You can also run `/using-sybermem` manually when you want to inspect the current SyberMem state and get a recommended next command.
+
 ## Core Rule
 
 After completing meaningful work, run `/sybermem-record` to create a record. AI auto-detects the type.
@@ -61,6 +63,7 @@ SyberMem commands rely on real project files and durable markdown structure. If 
 - `/sybermem-phase-confirm` — Explicitly confirm, rename, adjust, or reject candidate phases
 - `/sybermem-init-project` — Initialize or refresh the SyberMem system in this project
 - `/sybermem-update` — Refresh installed SyberMem skills, then re-check this project
+- `/using-sybermem` — Show current SyberMem status and the recommended next command
 
 ## No Record Needed
 
