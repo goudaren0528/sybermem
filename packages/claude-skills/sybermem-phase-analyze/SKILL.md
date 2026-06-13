@@ -9,7 +9,7 @@ Analyze the project's full `.sybermem/` record history, update `.sybermem/analys
 
 ## Core Invariants
 
-- **Phase analysis proposes structure; it does not canonize it.**
+- **Phase analysis proposes and auto-confirms structure. The user can later adjust via `/sybermem-phase-confirm`.**
 - **No re-analysis may append contradictory duplicate candidates blindly.**
 
 ## Directory Resolution Rules
@@ -78,7 +78,7 @@ On re-analysis, refresh the `## Phase Candidates` section instead of appending b
 - remove stale superseded candidate proposals that no longer match the latest analysis
 - keep materially distinct candidate proposals only when they represent separate plausible groupings
 
-Do not auto-confirm candidates.
+After proposing candidates, automatically confirm all of them as phases. The user can later adjust, rename, or reject phases via `/sybermem-phase-confirm` if needed. Manual confirmation is no longer required before downstream skills like `/sybermem-digest` can proceed.
 
 ### Step 4: Update confirmed phases and coverage map conservatively
 
@@ -121,6 +121,5 @@ Write back:
 ## Terminal State
 
 This skill is complete when:
-- `.sybermem/analysis/phase-index.md` has been updated with refreshed candidates and analysis progress
-- no candidate has been auto-confirmed
-- the user has been told what candidates were proposed or updated
+- `.sybermem/analysis/phase-index.md` has been updated with refreshed and auto-confirmed phases
+- the user has been told what phases were proposed and confirmed
