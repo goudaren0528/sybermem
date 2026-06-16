@@ -11,6 +11,12 @@ Refresh the installed SyberMem skills, then re-check the current project with `/
 
 - **No behavior change is complete unless `/sybermem-update` can carry an existing managed project to that behavior in operational terms: by re-running the project check, classifying each relevant local managed file, and then creating, refreshing, or migrating only the files that actually need a project-local change. If the new behavior is classification-only or otherwise requires no project-local file change, the update flow must say so explicitly.**
 
+<HARD-GATE>
+Do NOT declare the upgrade complete without running the managed-file propagation check.
+Do NOT skip the `/sybermem-init-project` follow-up step after updating global skills.
+Do NOT leave the old direct-hook command in `.claude/settings.json` when the launcher should have replaced it.
+</HARD-GATE>
+
 ## When to Use
 
 - You upgraded SyberMem and want the current project to pick up the newest behavior

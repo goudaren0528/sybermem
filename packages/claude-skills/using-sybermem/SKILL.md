@@ -11,6 +11,12 @@ description: Use when you want a visible SyberMem entrypoint that diagnoses the 
 
 - **`using-sybermem` reports and routes; it does not silently perform downstream business actions.**
 
+<HARD-GATE>
+Do NOT auto-run `phase-analyze`, `record`, `summary`, or `digest` without telling the user.
+Do NOT treat candidate phases as canonical.
+Do NOT ignore the resolved root and answer from the wrong directory context.
+</HARD-GATE>
+
 ## Directory Resolution Rules
 
 ### Step 0: Resolve project root

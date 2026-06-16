@@ -11,6 +11,11 @@ Promote a candidate phase into a confirmed phase, or explicitly adjust/reject ca
 
 - **Only explicit confirmation may turn a candidate phase into a canonical phase.**
 
+<HARD-GATE>
+Do NOT auto-create digests during confirmation. Confirmation only updates the phase index.
+Do NOT add a second `## Coverage Map` heading. Edit only within existing sections.
+</HARD-GATE>
+
 ## Directory Resolution Rules
 
 ### Step 0: Resolve project root

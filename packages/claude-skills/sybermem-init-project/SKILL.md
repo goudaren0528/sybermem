@@ -14,6 +14,12 @@ Initialize or refresh the SyberMem project record system in the current project.
 - **No stale SyberMem-managed file may remain classified as fresh if it is missing newly required managed behavior.**
 - **No protocol update should rewrite more than the bounded `using-sybermem` block when the markers already exist.**
 
+<HARD-GATE>
+Do NOT classify any file without first verifying its existence on disk with a file-system tool (Read, Glob, or equivalent). Do NOT infer existence from settings.json references, previous tool output, or conversation context. If the tool confirms the file does not exist, classify it as `missing` regardless of what other signals suggest.
+
+Do NOT create `.sybermem/` in a subdirectory when a parent SyberMem root already exists above cwd. Inform the user and ask before creating a nested project.
+</HARD-GATE>
+
 ## Usage
 
 Run `/sybermem-init-project` in the target project directory.

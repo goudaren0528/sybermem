@@ -14,6 +14,15 @@ In this skill, the artifact is a phase digest. The required `## Stage Digests` h
 - **No digest without explicit source coverage.**
 - **No candidate phase is used as a digest source until it has been confirmed (confirmation may be automatic).**
 
+<HARD-GATE>
+Do NOT create a digest file unless ALL of the following are true:
+1. An explicit `source_records` list has been built from real `.sybermem/` record files
+2. The source set has been normalized and compared against existing digests (no exact duplicates, partial overlaps warned)
+3. The phase is confirmed (auto-confirmation counts) or explicit source records were provided by the user
+
+If any of these is false, STOP. Do not write the digest file.
+</HARD-GATE>
+
 ## Directory Resolution Rules
 
 ### Step 0: Resolve project root
@@ -41,104 +50,32 @@ If any of these are missing, explain that digest support has not been enabled in
 
 ## Flow
 
-### Step 0.5: Determine digest input mode
+You MUST complete these steps in order:
 
-- If the user or current session context has already specified explicit source records → use them directly, skip phase-index dependency
-- If no explicit source records are specified:
-  - If `.sybermem/analysis/phase-index.md` does not exist → automatically trigger `/sybermem-phase-analyze` first to generate it, then continue
-  - If `.sybermem/analysis/phase-index.md` exists and contains confirmed phases → digest **all** confirmed phases that do not already have a digest (see batch mode below)
-  - If only candidate phases exist → auto-confirm all candidates as phases, then digest all of them in batch
+1. **Resolve project root** — apply Step 0 directory resolution rules above
+2. **Verify preconditions** — `.sybermem/digests/` exists, `INDEX.md` has `## Stage Digests` with `<!-- add new digest records here -->`, `.sybermem/templates/digest-template.md` exists. If any missing, ask user to run `/sybermem-update`.
+3. **Determine digest input mode**:
+   - If explicit source records specified → use them directly, skip phase-index dependency
+   - If no explicit source records:
+     - If `.sybermem/analysis/phase-index.md` does not exist → REQUIRED: run `/sybermem-phase-analyze` first, then continue
+     - If phase-index exists with confirmed phases → digest **all** confirmed phases without existing digests (batch mode)
+     - If only candidate phases → auto-confirm all, then digest all in batch
 
 ### Batch mode (default when no explicit source records)
 
 When multiple confirmed phases exist and no explicit source records were provided, create a digest for **each** confirmed phase that does not already have an existing digest with the same source coverage. Process them in chronological order by phase coverage dates. Skip any phase whose raw source records are incomplete or missing.
 
-For each phase, run Steps 1–7 independently. This is the normal batch path — do not stop after the first phase and ask the user which one to digest next.
+For each phase, run Steps 4–10 independently. This is the normal batch path — do not stop after the first phase and ask the user which one to digest next.
 
-### Step 1: Identify the phase scope
-
-Use current session context, explicit source records, or the resolved phase-index to determine whether there is a meaningful completed or clearly bounded phase to compress.
-
-If there is no meaningful phase boundary or fewer than 2 relevant source records for a given phase, skip that phase (in batch mode) or refuse and explain why (in single-phase mode).
-
-### Step 2: Select source records
-
-Build an explicit `source_records` list from existing `.sybermem/changes/`, `decisions/`, `requirements/`, and `bugs/` records.
-
-The digest must not be created unless the source set is explicit enough to:
-- list coverage
-- compare against existing digests
-- guide future drill-down reading
-
-### Step 3: Normalize and compare coverage
-
-Normalize the `source_records` list by:
-- converting to project-relative paths
-- sorting ascending
-- removing duplicates
-
-Then compare the normalized list against existing digest files in `.sybermem/digests/`.
-
-#### Exact duplicate rule
-
-If an existing digest has the exact same normalized source set:
-- do not create a new digest
-- return the existing digest path
-- tell the user this phase is already compressed
-
-#### Partial overlap rule
-
-If an existing digest overlaps partially with the proposed source set:
-- show the overlapping records
-- warn that a partial coverage overlap exists
-- recommend extending the existing digest instead of creating a sibling overlap
-- only continue if the user explicitly confirms they want a broader enclosing digest
-
-### Step 4: Generate metadata
-
-Set:
-- `type: digest`
-- `kind: phase`
-- `date: YYYY-MM-DD`
-- `number: NNN` within `.sybermem/digests/`
-- `title: <phase title>`
-- `status: completed` by default unless the user explicitly wants `active`
-- `source_records: [...]`
-- `coverage.from` and `coverage.to` from the earliest and latest source record dates
-- `fingerprint` from the normalized source set
-
-Carry the chosen `status` value through consistently into both the digest frontmatter and the `INDEX.md` row.
-
-### Step 5: Write the digest file
-
-Path:
-
-`.sybermem/digests/{YYYY-MM-DD}-{NNN}-{title}.md`
-
-Use `.sybermem/templates/digest-template.md` and fill in:
-- Phase Scope
-- Core Conclusions
-- Key Decisions and Changes
-- Current State
-- Recommended Next Reads
-- Source Coverage
-
-### Step 6: Update `INDEX.md`
-
-Insert a new row above `<!-- add new digest records here -->` in the `## Stage Digests` table.
-
-Use this format:
-
-`| NNN | YYYY-MM-DD | Title | <status> | X records | [link](digests/file.md) |`
-
-Use the same status selected in Step 4.
-
-### Step 7: Preserve `Key Conclusions` signal quality
-
-Do not add a new line to `## Key Conclusions` by default.
-Only add one if the digest introduces a truly global project conclusion.
-
-- `/sybermem-digest` is the durable phase conclusion artifact. If the user wants the current state of an active confirmed phase, prefer `/sybermem-summary` instead.
+4. **Identify the phase scope** — use current session context, explicit source records, or the resolved phase-index. If fewer than 2 relevant source records for a given phase, skip that phase (batch) or refuse (single-phase).
+5. **Select source records** — build an explicit `source_records` list from existing `.sybermem/changes/`, `decisions/`, `requirements/`, and `bugs/` records.
+6. **Normalize and compare coverage** — normalize source list (project-relative paths, sorted, deduplicated). Compare against existing digests:
+   - **Exact duplicate** → do not create, return existing digest path
+   - **Partial overlap** → warn, recommend extending existing digest, only continue if user confirms
+7. **Generate metadata** — set `type: digest`, `kind: phase`, `date`, `number`, `title`, `status: completed` (default), `source_records`, `coverage.from/to`, `fingerprint`
+8. **Write the digest file** — path: `.sybermem/digests/{YYYY-MM-DD}-{NNN}-{title}.md`. Use `.sybermem/templates/digest-template.md`.
+9. **Update INDEX.md** — insert row above `<!-- add new digest records here -->` in `## Stage Digests` table: `| NNN | YYYY-MM-DD | Title | <status> | X records | [link](digests/file.md) |`
+10. **Preserve Key Conclusions signal quality** — do not add to `## Key Conclusions` by default. Only add if the digest introduces a truly global project conclusion.
 
 ## Error Handling
 

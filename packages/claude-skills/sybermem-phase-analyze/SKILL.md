@@ -12,6 +12,17 @@ Analyze the project's full `.sybermem/` record history, update `.sybermem/analys
 - **Phase analysis proposes and auto-confirms structure. The user can later adjust via `/sybermem-phase-confirm`.**
 - **No re-analysis may append contradictory duplicate candidates blindly.**
 
+<HARD-GATE>
+Do NOT declare analysis complete unless ALL of the following are true:
+1. `.sybermem/analysis/phase-index.md` has been read and its current state extracted
+2. All `.sybermem/` records have been scanned and grouped into candidate phases
+3. All candidates have been auto-confirmed into confirmed phases with canonical block shapes
+4. The coverage map has been updated to reflect all record-to-phase mappings
+5. Analysis progress metadata has been written back (last_analysis_at, boundaries, pending status)
+
+If any of these is false, the analysis is incomplete. Go back and finish it.
+</HARD-GATE>
+
 ## Directory Resolution Rules
 
 ### Step 0: Resolve project root
@@ -36,27 +47,13 @@ If `.sybermem/analysis/phase-index.md` does not exist, create it from the starte
 
 ## Flow
 
-### Step 1: Read current phase index
+You MUST complete these steps in order:
 
-Read `.sybermem/analysis/phase-index.md` and extract:
-- current analysis progress
-- existing phase candidates
-- existing confirmed phases
-- current coverage map
-
-### Step 2: Determine analysis scope
-
-Default to the full `.sybermem/` record set plus relevant git history context.
-
-If the phase index already has a usable boundary, determine which records were added since the last analyzed record boundary.
-
-### Step 3: Build or refresh candidate groups
-
-Use lightweight heuristics across the relevant record set:
-- time proximity
-- file/path proximity
-- title/topic similarity
-- sequential implementation relationship
+1. **Resolve project root** — apply Step 0 directory resolution rules above
+2. **Verify preconditions** — `.sybermem/INDEX.md` exists, at least one raw record exists. If `.sybermem/analysis/phase-index.md` does not exist, create it from the starter template with `status: not_yet_analyzed`.
+3. **Read current phase index** — extract analysis progress, existing phase candidates, existing confirmed phases, current coverage map
+4. **Determine analysis scope** — default to full `.sybermem/` record set plus relevant git history context. If phase index has a usable boundary, determine which records were added since the last analyzed record boundary.
+5. **Build or refresh candidate groups** — use lightweight heuristics: time proximity, file/path proximity, title/topic similarity, sequential implementation relationship.
 
 Use this canonical Markdown block shape for every candidate entry:
 
@@ -80,9 +77,7 @@ On re-analysis, refresh the `## Phase Candidates` section instead of appending b
 
 After proposing candidates, automatically confirm all of them as phases. The user can later adjust, rename, or reject phases via `/sybermem-phase-confirm` if needed. Manual confirmation is no longer required before downstream skills like `/sybermem-digest` can proceed.
 
-### Step 4: Update confirmed phases and coverage map conservatively
-
-Use this canonical Markdown block shape for every confirmed phase entry:
+6. **Update confirmed phases and coverage map conservatively** — use this canonical Markdown block shape for every confirmed phase entry:
 
 ```md
 ### Phase: <phase_title>
@@ -102,14 +97,7 @@ Confirmed phase IDs use the stable `phase-<NNN>` format. `source_candidate_id` s
 - avoid silently removing coverage mappings
 - add new unassigned records to the coverage map when no phase match is clear
 
-### Step 5: Update analysis progress
-
-Write back:
-- last analysis time
-- last analyzed record boundary
-- optional git boundary
-- whether unprocessed new records remain
-- enough current-state metadata for future summary to identify the most recently active confirmed phase
+7. **Update analysis progress** — write back: last analysis time, last analyzed record boundary, optional git boundary, whether unprocessed new records remain, enough current-state metadata for future summary to identify the most recently active confirmed phase
 
 ## Output Rules
 

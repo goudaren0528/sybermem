@@ -11,6 +11,15 @@ Unified SyberMem record entry point. AI auto-detects the record type from contex
 
 - **No record is complete until the file is created, the correct table row is inserted, and the Key Conclusion is updated.**
 
+<HARD-GATE>
+Do NOT claim a record is complete unless ALL three actions have been executed and verified:
+1. The record file exists on disk at the correct path
+2. The INDEX.md table row has been inserted above the correct `<!-- add new records here -->` marker
+3. The Key Conclusion line has been inserted above `<!-- add new conclusions here -->`
+
+If any of these three is missing, the record is incomplete. Go back and finish it.
+</HARD-GATE>
+
 ## Directory Resolution Rules
 
 ### Step 0: Resolve project root
@@ -27,9 +36,10 @@ After resolving the project root, apply legacy directory checks against the reso
 
 ## Flow
 
-### Step 1: Determine record type
+You MUST complete these steps in order:
 
-Auto-detect from current work context:
+1. **Resolve project root** — apply Step 0 directory resolution rules above
+2. **Determine record type** — auto-detect from current work context:
 
 | Signal | Type | Directory |
 |--------|------|-----------|
@@ -40,17 +50,8 @@ Auto-detect from current work context:
 
 When uncertain, ask the user to choose.
 
-### Step 2: Get next number
-
-```
-Check .sybermem/{type}/ directory → find max number → +1
-Empty directory → 001
-Format: 001, 002, 003...
-```
-
-### Step 3: Collect information
-
-Extract from the current session. Only ask the user when key information is missing.
+3. **Get next number** — check `.sybermem/{type}/` directory, find max number, +1. Empty directory → 001. Format: 001, 002, 003...
+4. **Collect information** — extract from the current session. Only ask the user when key information is missing.
 
 Required sections:
 - **change**: change content, reason, impact scope
@@ -58,21 +59,9 @@ Required sections:
 - **requirement**: source, content, conclusion
 - **bug**: description, root cause, solution
 
-### Step 4: Create file
-
-Path: `.sybermem/{type}/{YYYY-MM-DD}-{NNN}-{title}.md`
-
-Use `templates/{type}.md` as the content template.
-
-### Step 5: Update INDEX.md table
-
-Insert a new row above the `<!-- add new records here -->` comment in the corresponding table in `.sybermem/INDEX.md`.
-
-### Step 6: Write back key conclusion
-
-Insert a one-line core conclusion above the `<!-- add new conclusions here -->` comment in `.sybermem/INDEX.md` `## Key Conclusions`.
-
-The conclusion must include both **what changed** and **why**.
+5. **Create file** — path: `.sybermem/{type}/{YYYY-MM-DD}-{NNN}-{title}.md`. Use `templates/{type}.md` as the content template.
+6. **Update INDEX.md table** — insert a new row above the `<!-- add new records here -->` comment in the corresponding table.
+7. **Write back key conclusion** — insert a one-line core conclusion above `<!-- add new conclusions here -->` in `## Key Conclusions`. Must include both **what changed** and **why**.
 
 ## Error Handling
 
