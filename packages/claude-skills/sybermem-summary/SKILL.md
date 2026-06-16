@@ -12,6 +12,11 @@ Generate SyberMem project current-state summaries. When `.sybermem/analysis/phas
 - **Summary is a dynamic current-state panel, not a durable conclusion artifact.**
 - **When confirmed phase structure exists, summary must prefer it over ad hoc grouping.**
 
+<HARD-GATE>
+Do NOT write any file to disk. Summary is non-persistent output only.
+Do NOT treat a summary as a digest. If the user wants a durable conclusion, redirect to `/sybermem-digest`.
+</HARD-GATE>
+
 ## Usage
 
 - `/sybermem-summary` — Show the current-state panel for the most recently active confirmed phase
@@ -35,29 +40,19 @@ After resolving the project root, apply legacy directory checks against the reso
 
 ## Flow
 
-### Step 1: Determine summary mode
+You MUST complete these steps in order:
 
-- If `.sybermem/analysis/phase-index.md` does not exist → automatically trigger `/sybermem-phase-analyze` first to generate it, then continue
-- If `.sybermem/analysis/phase-index.md` exists and contains at least one confirmed phase → use the most recently active confirmed phase as the default summary target
-- If the user explicitly passes `weekly` → force the weekly fallback mode
-- If the user explicitly passes `monthly` → force the monthly fallback mode
-- If no confirmed phase structure exists after analysis → fall back to weekly mode
-
-### Step 2: Collect data
-
-If using phase-aware mode:
-- read `.sybermem/analysis/phase-index.md`
-- identify the most recently active confirmed phase
-- collect the raw records covered by that phase
-- inspect only recent raw records as supporting detail when needed
-
-If using fallback time-window mode:
-- scan `.sybermem/` records in the requested time range
-- also reference git log for commit history
-
-### Step 3: Generate summary
-
-In phase-aware mode, output this dynamic current-state panel:
+1. **Resolve project root** — apply Step 0 directory resolution rules above
+2. **Determine summary mode**:
+   - If `.sybermem/analysis/phase-index.md` does not exist → REQUIRED: run `/sybermem-phase-analyze` first, then continue
+   - If phase-index exists with at least one confirmed phase → use the most recently active confirmed phase as the default summary target
+   - If user explicitly passes `weekly` → force weekly fallback mode
+   - If user explicitly passes `monthly` → force monthly fallback mode
+   - If no confirmed phase structure exists after analysis → fall back to weekly mode
+3. **Collect data**:
+   - Phase-aware mode: read phase-index, identify most recently active confirmed phase, collect covered raw records, inspect recent raw records as supporting detail
+   - Fallback time-window mode: scan `.sybermem/` records in the requested time range, reference git log for commit history
+4. **Generate summary** — output this dynamic current-state panel (phase-aware mode):
 
 ```markdown
 # Phase Summary: <phase title>
