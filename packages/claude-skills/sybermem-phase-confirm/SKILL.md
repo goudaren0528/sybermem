@@ -5,6 +5,8 @@ description: Use when explicitly confirming, renaming, adjusting, or rejecting c
 
 # sybermem-phase-confirm Skill
 
+**Announce at start:** "I'm using the sybermem-phase-confirm skill to update the phase index."
+
 Promote a candidate phase into a confirmed phase, or explicitly adjust/reject candidate phases in `.sybermem/analysis/phase-index.md`.
 
 ## Core Invariant
@@ -16,19 +18,9 @@ Do NOT auto-create digests during confirmation. Confirmation only updates the ph
 Do NOT add a second `## Coverage Map` heading. Edit only within existing sections.
 </HARD-GATE>
 
-## Directory Resolution Rules
+## Directory Resolution
 
-### Step 0: Resolve project root
-
-Before any other operation, walk up from the current working directory to find the nearest ancestor directory (including cwd itself) that contains **both** `.sybermem/` **and** `.claude/settings.json`.
-
-- If found: use that directory as the project root for all subsequent steps. Inform the user if the resolved root differs from cwd: "Using SyberMem project root at `<resolved-path>`".
-- If not found (reached git repository root or filesystem root without a match): prompt the user to run `/sybermem-init-project`.
-
-After resolving the project root, apply legacy directory checks against the resolved root:
-1. If the resolved root has `.sybermem/`, use it.
-2. If the resolved root has only `ADR/`, rename `ADR/` to `.sybermem/` and tell the user the legacy directory was auto-migrated.
-3. If the resolved root has both `.sybermem/` and `ADR/`, use `.sybermem/`, warn that `ADR/` was ignored.
+Resolve project root by walking up from cwd to find `.sybermem/` + `.claude/settings.json`. Auto-migrate `ADR/` if found. Full rules in the session protocol block in AGENTS.md/CLAUDE.md.
 
 ## Preconditions
 
@@ -99,6 +91,16 @@ Then apply the confirmation update:
 Confirmed phases are the canonical phase objects that future `/sybermem-summary` and `/sybermem-digest` should prefer over candidate proposals.
 
 Do not auto-create digests.
+
+## Red Flags — STOP and Re-check
+
+If you catch yourself doing any of these, STOP:
+- Auto-creating a digest during the confirmation flow
+- Adding a second `## Coverage Map` heading instead of editing within the existing one
+- Removing an existing confirmed phase without the user explicitly requesting it
+- Confirming a candidate without setting `source_candidate_id` to trace lineage
+
+**All of these mean: go back to the relevant step and re-verify.**
 
 ## Terminal State
 

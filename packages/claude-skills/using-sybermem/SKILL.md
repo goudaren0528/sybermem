@@ -5,6 +5,8 @@ description: Use when you want a visible SyberMem entrypoint that diagnoses the 
 
 # using-sybermem Skill
 
+**Announce at start:** "I'm using the using-sybermem skill to diagnose the current SyberMem state."
+
 `using-sybermem` is the visible advisory entrypoint for the SyberMem system. It does not replace concrete skills like `record`, `summary`, `digest`, or `phase-analyze`. It reports the current project's SyberMem state and tells the user what the correct next command is.
 
 ## Core Invariant
@@ -17,25 +19,21 @@ Do NOT treat candidate phases as canonical.
 Do NOT ignore the resolved root and answer from the wrong directory context.
 </HARD-GATE>
 
-## Directory Resolution Rules
+## Directory Resolution
 
-### Step 0: Resolve project root
-
-Before any other operation, walk up from the current working directory to find the nearest ancestor directory (including cwd itself) that contains **both** `.sybermem/` **and** `.claude/settings.json`.
-
-- If found: use that directory as the project root for all subsequent steps. Inform the user if the resolved root differs from cwd.
-- If not found (reached git repository root or filesystem root without a match): prompt the user to run `/sybermem-init-project`.
-
-After resolving the project root, apply legacy directory checks against the resolved root:
-1. If the resolved root has `.sybermem/`, use it.
-2. If the resolved root has only `ADR/`, rename `ADR/` to `.sybermem/` and tell the user the legacy directory was auto-migrated.
-3. If the resolved root has both `.sybermem/` and `ADR/`, use `.sybermem/`, warn that `ADR/` was ignored.
+Resolve project root by walking up from cwd to find `.sybermem/` + `.claude/settings.json`. Auto-migrate `ADR/` if found. Full rules in the session protocol block in AGENTS.md/CLAUDE.md.
 
 ## Flow
 
-### Step 1: Report current SyberMem state
+### Step 1: Health check and report current SyberMem state
 
-At minimum, report:
+First, run these diagnostic checks and flag any failures:
+- `.claude/settings.json` exists (if missing: root resolution will fail for all skills, stop hook will not trigger)
+- `.sybermem/INDEX.md` contains all expected anchor comments (`<!-- add new records here -->`, `<!-- add new conclusions here -->`, `<!-- add new digest records here -->`)
+- `.sybermem/analysis/phase-index.md` has `status:` field that is not `not_yet_analyzed` (if stale: phase-aware workflows will not work)
+- `.sybermem/hooks/record_change_on_stop.py` exists (if missing: auto-record mode is broken)
+
+Then report:
 - resolved project root
 - whether `.sybermem/INDEX.md` exists
 - whether `.sybermem/digests/` exists

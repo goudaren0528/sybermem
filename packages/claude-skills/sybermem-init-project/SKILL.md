@@ -5,6 +5,8 @@ description: Use when initializing SyberMem project records for a new or existin
 
 # sybermem-init-project Skill
 
+**Announce at start:** "I'm using the sybermem-init-project skill to initialize or refresh the SyberMem system in this project."
+
 Initialize or refresh the SyberMem project record system in the current project. `.sybermem/` is the canonical project data directory.
 
 ## Core Invariants

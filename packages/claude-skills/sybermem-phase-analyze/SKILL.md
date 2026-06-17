@@ -5,6 +5,8 @@ description: Use when building or incrementally refreshing the project phase ind
 
 # sybermem-phase-analyze Skill
 
+**Announce at start:** "I'm using the sybermem-phase-analyze skill to build or refresh the project phase index."
+
 Analyze the project's full `.sybermem/` record history, update `.sybermem/analysis/phase-index.md`, and propose candidate phases without auto-confirming them.
 
 ## Core Invariants
@@ -23,19 +25,9 @@ Do NOT declare analysis complete unless ALL of the following are true:
 If any of these is false, the analysis is incomplete. Go back and finish it.
 </HARD-GATE>
 
-## Directory Resolution Rules
+## Directory Resolution
 
-### Step 0: Resolve project root
-
-Before any other operation, walk up from the current working directory to find the nearest ancestor directory (including cwd itself) that contains **both** `.sybermem/` **and** `.claude/settings.json`.
-
-- If found: use that directory as the project root for all subsequent steps. Inform the user if the resolved root differs from cwd: "Using SyberMem project root at `<resolved-path>`".
-- If not found (reached git repository root or filesystem root without a match): prompt the user to run `/sybermem-init-project`.
-
-After resolving the project root, apply legacy directory checks against the resolved root:
-1. If the resolved root has `.sybermem/`, use it.
-2. If the resolved root has only `ADR/`, rename `ADR/` to `.sybermem/` and tell the user the legacy directory was auto-migrated.
-3. If the resolved root has both `.sybermem/` and `ADR/`, use `.sybermem/`, warn that `ADR/` was ignored.
+Resolve project root by walking up from cwd to find `.sybermem/` + `.claude/settings.json`. Auto-migrate `ADR/` if found. Full rules in the session protocol block in AGENTS.md/CLAUDE.md.
 
 ## Preconditions
 
@@ -105,6 +97,25 @@ Confirmed phase IDs use the stable `phase-<NNN>` format. `source_candidate_id` s
 - Candidate phases must be lightweight grouping proposals, not final digests.
 - If the system is uncertain, prefer narrower candidate proposals over broad confident ones.
 - The phase index should make it possible for `/sybermem-summary` to distinguish confirmed phases from candidates and identify the most recently active confirmed phase.
+
+## Verification
+
+After updating phase-index.md, verify:
+1. **No orphaned records:** Every record in `.sybermem/` appears in at least one phase's `covered_records` or in the unassigned section of the coverage map.
+2. **No duplicate coverage:** No single record appears in two different confirmed phases.
+3. **Block shape compliance:** Every confirmed phase uses the canonical `### Phase:` block shape with all required fields.
+4. **Stale candidate cleanup:** No candidate blocks remain that describe the same cluster as a confirmed phase.
+
+## Red Flags — STOP and Re-check
+
+If you catch yourself doing any of these, STOP:
+- Appending new candidate blocks without checking if they duplicate existing ones
+- Leaving stale candidates that overlap with confirmed phases
+- Silently removing existing confirmed phases or coverage mappings
+- Declaring analysis complete without writing back analysis progress metadata
+- Confirming phases with empty `covered_records` lists when records actually exist
+
+**All of these mean: go back to the relevant step and re-verify.**
 
 ## Terminal State
 
