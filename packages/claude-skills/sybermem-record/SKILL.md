@@ -53,7 +53,8 @@ Required sections:
 
 5. **Create file** — path: `.sybermem/{type}/{YYYY-MM-DD}-{NNN}-{title}.md`. Use `templates/{type}.md` as the content template.
 6. **Update INDEX.md table** — insert a new row above the `<!-- add new records here -->` comment in the corresponding table.
-7. **Write back key conclusion** — insert a one-line core conclusion above `<!-- add new conclusions here -->` in `## Key Conclusions`. Must include both **what changed** and **why**.
+7. **Write back key conclusion** — insert a one-line core conclusion above `<!-- add new conclusions here -->` in `## Key Conclusions`. Format: `- [type-NNN] #topic1 #topic2 — description (date)`. Must include both **what changed** and **why**. Choose 1-3 topic tags from existing tags in the `## Topic Index` section, or create new ones if needed.
+8. **Update Topic Index** — if the `## Topic Index` section exists in INDEX.md, add the new record ID to each relevant topic line. If a topic doesn't exist yet, add a new line for it.
 
 ## Error Handling
 
@@ -74,7 +75,8 @@ This skill is complete when:
 After completing Steps 5-7, verify:
 1. **File path check:** Does the record file path match `.sybermem/{type}/{YYYY-MM-DD}-{NNN}-{title}.md`?
 2. **INDEX row check:** Is the new row in the correct type table (not a different table)?
-3. **Key Conclusion quality:** Does the conclusion line contain both *what changed* AND *why*? If only "what", rewrite it.
+3. **Key Conclusion quality:** Does the conclusion line contain both *what changed* AND *why*? Does it include `#topic` tags? If missing, add them.
+4a. **Topic Index updated:** Are the record's topics reflected in the `## Topic Index` section?
 4. **Number uniqueness:** Is the NNN unique within its directory?
 
 ## Red Flags — STOP and Re-check

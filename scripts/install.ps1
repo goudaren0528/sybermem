@@ -7,6 +7,8 @@ $SkillSource = Join-Path $AdrPath "packages\claude-skills"
 $LauncherDir = Join-Path $env:USERPROFILE ".claude\sybermem"
 $LauncherPath = Join-Path $LauncherDir "launch_record_change_on_stop.py"
 $LauncherSource = Join-Path $AdrPath "scripts\global-stop-hook-launcher.py"
+$PluginSource = Join-Path $AdrPath "packages\opencode-plugin\sybermem.ts"
+$OpenCodePluginDir = Join-Path $env:USERPROFILE ".config\opencode\plugins"
 $LegacyLocalSkills = Join-Path $AdrPath ".claude\skills"
 
 $Targets = @(
@@ -39,11 +41,23 @@ foreach ($target in $Targets) {
     }
 }
 
-if (-not (Test-Path $LauncherDir)) {
-    New-Item -ItemType Directory -Path $LauncherDir -Force | Out-Null
+# Claude Code: install global stop hook launcher
+if (Test-Path (Join-Path $env:USERPROFILE ".claude")) {
+    if (-not (Test-Path $LauncherDir)) {
+        New-Item -ItemType Directory -Path $LauncherDir -Force | Out-Null
+    }
+    Copy-Item -Path $LauncherSource -Destination $LauncherPath -Force
+    Write-Host "  [Claude Code] 已安装 stop hook launcher: $LauncherPath"
 }
-Copy-Item -Path $LauncherSource -Destination $LauncherPath -Force
-Write-Host "  [Global] 已安装 stop hook launcher: $LauncherPath"
+
+# OpenCode: install plugin
+if (Test-Path (Join-Path $env:USERPROFILE ".config\opencode")) {
+    if (-not (Test-Path $OpenCodePluginDir)) {
+        New-Item -ItemType Directory -Path $OpenCodePluginDir -Force | Out-Null
+    }
+    Copy-Item -Path $PluginSource -Destination (Join-Path $OpenCodePluginDir "sybermem.ts") -Force
+    Write-Host "  [OpenCode] 已安装 plugin: $OpenCodePluginDir\sybermem.ts"
+}
 
 Write-Host ""
 Write-Host "=== 安装完成 ==="

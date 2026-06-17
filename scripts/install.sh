@@ -10,6 +10,8 @@ OPENCODE_SKILLS="$HOME/.config/opencode/skills"
 LAUNCHER_DIR="$HOME/.claude/sybermem"
 LAUNCHER_PATH="$LAUNCHER_DIR/launch_record_change_on_stop.py"
 LAUNCHER_SOURCE="$ADR_PATH/scripts/global-stop-hook-launcher.py"
+PLUGIN_SOURCE="$ADR_PATH/packages/opencode-plugin/sybermem.ts"
+OPENCODE_PLUGIN_DIR="$HOME/.config/opencode/plugins"
 LEGACY_LOCAL_SKILLS="$ADR_PATH/.claude/skills"
 
 echo "=== SyberMem 安装 ==="
@@ -31,10 +33,20 @@ install_skills() {
 install_skills "$CLAUDE_SKILLS" "Claude Code"
 install_skills "$OPENCODE_SKILLS" "OpenCode"
 
-mkdir -p "$LAUNCHER_DIR"
-cp "$LAUNCHER_SOURCE" "$LAUNCHER_PATH"
-chmod +x "$LAUNCHER_PATH"
-echo "  [Global] 已安装 stop hook launcher: $LAUNCHER_PATH"
+# Claude Code: install global stop hook launcher
+if [ -d "$HOME/.claude" ]; then
+    mkdir -p "$LAUNCHER_DIR"
+    cp "$LAUNCHER_SOURCE" "$LAUNCHER_PATH"
+    chmod +x "$LAUNCHER_PATH"
+    echo "  [Claude Code] 已安装 stop hook launcher: $LAUNCHER_PATH"
+fi
+
+# OpenCode: install plugin
+if [ -d "$HOME/.config/opencode" ]; then
+    mkdir -p "$OPENCODE_PLUGIN_DIR"
+    cp "$PLUGIN_SOURCE" "$OPENCODE_PLUGIN_DIR/sybermem.ts"
+    echo "  [OpenCode] 已安装 plugin: $OPENCODE_PLUGIN_DIR/sybermem.ts"
+fi
 
 echo ""
 echo "=== 安装完成 ==="

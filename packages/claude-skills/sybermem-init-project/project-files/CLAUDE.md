@@ -1,5 +1,8 @@
 # SyberMem Project Record System
 
+<!-- This file defers to AGENTS.md as the single source of truth for SyberMem instructions. -->
+<!-- Claude Code reads CLAUDE.md; OpenCode reads AGENTS.md. Both get the same rules. -->
+
 <!-- SYBERMEM_SESSION_PROTOCOL:START -->
 ## SyberMem Session Protocol
 
