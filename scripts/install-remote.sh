@@ -13,6 +13,7 @@ CLAUDE_SKILLS="$HOME/.claude/skills"
 OPENCODE_SKILLS="$HOME/.config/opencode/skills"
 LAUNCHER_DIR="$HOME/.claude/sybermem"
 LAUNCHER_PATH="$LAUNCHER_DIR/launch_record_change_on_stop.py"
+OPENCODE_PLUGIN_DIR="$HOME/.config/opencode/plugins"
 
 echo "=== SyberMem Remote Install ==="
 echo ""
@@ -25,6 +26,7 @@ curl -sL "$TARBALL_URL" | tar xz -C "$TMPDIR"
 
 SKILLS_SRC="$TMPDIR/$ARCHIVE_PREFIX/packages/claude-skills"
 LAUNCHER_SOURCE="$TMPDIR/$ARCHIVE_PREFIX/scripts/global-stop-hook-launcher.py"
+PLUGIN_SOURCE="$TMPDIR/$ARCHIVE_PREFIX/packages/opencode-plugin/sybermem.ts"
 
 if [ ! -d "$SKILLS_SRC" ]; then
     echo "Error: skills not found in archive"
@@ -48,10 +50,22 @@ install_skills() {
 install_skills "$CLAUDE_SKILLS" "Claude Code"
 install_skills "$OPENCODE_SKILLS" "OpenCode"
 
-mkdir -p "$LAUNCHER_DIR"
-cp "$LAUNCHER_SOURCE" "$LAUNCHER_PATH"
-chmod +x "$LAUNCHER_PATH"
-echo "  [Global] installed stop hook launcher: $LAUNCHER_PATH"
+# Claude Code: install global stop hook launcher
+if [ -d "$HOME/.claude" ]; then
+    mkdir -p "$LAUNCHER_DIR"
+    cp "$LAUNCHER_SOURCE" "$LAUNCHER_PATH"
+    chmod +x "$LAUNCHER_PATH"
+    echo "  [Claude Code] installed stop hook launcher: $LAUNCHER_PATH"
+fi
+
+# OpenCode: install plugin
+if [ -d "$HOME/.config/opencode" ]; then
+    mkdir -p "$OPENCODE_PLUGIN_DIR"
+    if [ -f "$PLUGIN_SOURCE" ]; then
+        cp "$PLUGIN_SOURCE" "$OPENCODE_PLUGIN_DIR/sybermem.ts"
+        echo "  [OpenCode] installed plugin: $OPENCODE_PLUGIN_DIR/sybermem.ts"
+    fi
+fi
 
 echo ""
 echo "=== Installation Complete ==="

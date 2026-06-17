@@ -9,6 +9,7 @@ $ZipUrl = "https://github.com/$Repo/archive/$Branch.zip"
 $ArchivePrefix = "sybermem-$Branch"
 $LauncherDir = Join-Path $env:USERPROFILE ".claude\sybermem"
 $LauncherPath = Join-Path $LauncherDir "launch_record_change_on_stop.py"
+$OpenCodePluginDir = Join-Path $env:USERPROFILE ".config\opencode\plugins"
 
 $Targets = @(
     @{ Path = Join-Path $env:USERPROFILE ".claude\skills"; Label = "Claude Code" }
@@ -30,6 +31,7 @@ try {
 
     $SkillsSrc = Join-Path $TmpDir "$ArchivePrefix\packages\claude-skills"
     $LauncherSource = Join-Path $TmpDir "$ArchivePrefix\scripts\global-stop-hook-launcher.py"
+    $PluginSource = Join-Path $TmpDir "$ArchivePrefix\packages\opencode-plugin\sybermem.ts"
 
     if (-not (Test-Path $SkillsSrc)) {
         throw "Skills not found in archive"
@@ -58,11 +60,25 @@ try {
         }
     }
 
-    if (-not (Test-Path $LauncherDir)) {
-        New-Item -ItemType Directory -Path $LauncherDir -Force | Out-Null
+    # Claude Code: install global stop hook launcher
+    if (Test-Path (Join-Path $env:USERPROFILE ".claude")) {
+        if (-not (Test-Path $LauncherDir)) {
+            New-Item -ItemType Directory -Path $LauncherDir -Force | Out-Null
+        }
+        Copy-Item -Path $LauncherSource -Destination $LauncherPath -Force
+        Write-Host "  [Claude Code] installed stop hook launcher: $LauncherPath"
     }
-    Copy-Item -Path $LauncherSource -Destination $LauncherPath -Force
-    Write-Host "  [Global] installed stop hook launcher: $LauncherPath"
+
+    # OpenCode: install plugin
+    if (Test-Path (Join-Path $env:USERPROFILE ".config\opencode")) {
+        if (-not (Test-Path $OpenCodePluginDir)) {
+            New-Item -ItemType Directory -Path $OpenCodePluginDir -Force | Out-Null
+        }
+        if (Test-Path $PluginSource) {
+            Copy-Item -Path $PluginSource -Destination (Join-Path $OpenCodePluginDir "sybermem.ts") -Force
+            Write-Host "  [OpenCode] installed plugin: $OpenCodePluginDir\sybermem.ts"
+        }
+    }
 } finally {
     Remove-Item -Path $TmpDir -Recurse -Force -ErrorAction SilentlyContinue
 }

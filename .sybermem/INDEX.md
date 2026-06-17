@@ -6,15 +6,15 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 
 ## Key Conclusions
 
-<!-- One-line core conclusion per record, AI reads this section at session start for project context -->
-- [requirement-001] Adopted ADR system: four category directories (changes/decisions/requirements/bugs) + INDEX master index + templates + skill automation (2026-05-08)
-- [change-001] Added one-liner remote install scripts (curl/irm) to simplify new user onboarding, no clone needed (2026-05-12)
-- [change-002] Moved SyberMem skill source to packages/claude-skills and removed repo-local runnable skill copies, so global installs no longer duplicate project-loaded skills (2026-05-12)
-- [change-003] Added a default project-level auto/remind hook template with a runnable stop-hook helper, so new projects can auto-write lightweight change records instead of relying only on reminders (2026-05-13)
-- [bug-001] Fixed init-project misclassifying missing hook files as "custom/kept" by requiring mandatory file-system verification before classification; also identified the deeper need for project-root resolution from subdirectories (2026-06-09)
-- [change-005] Refreshed project instruction files to auto/remind mode wording and added project-level settings + stop-hook helper for automatic lightweight change recording (2026-05-13)
-- [requirement-002] Identified the need for a persistent phase summary/compression layer (phase digest) to prevent project understanding cost from growing linearly with record count (2026-06-05)
-- [change-006] Repaired missing .claude/settings.json (root cause of stop hook failure), fixed INDEX.md omissions, refreshed phase index with 6 confirmed phases, and upgraded all 8 SyberMem skills with HARD-GATE + numbered checklist patterns inspired by Superpower design (2026-06-16)
+<!-- One-line core conclusion per record. Format: [id] #topic1 #topic2 — description (date) -->
+- [requirement-001] #architecture #foundation — Adopted ADR system: four category directories + INDEX master index + templates + skill automation (2026-05-08)
+- [change-001] #distribution #install — Added one-liner remote install scripts (curl/irm) to simplify new user onboarding, no clone needed (2026-05-12)
+- [change-002] #distribution #skills — Moved SyberMem skill source to packages/claude-skills; eliminates duplicate skill loading from global installs (2026-05-12)
+- [change-003] #hooks #automation — Added default project-level auto/remind hook template with stop-hook helper for lightweight change records (2026-05-13)
+- [bug-001] #hooks #init — Fixed init-project misclassifying missing hook files; exposed need for project-root resolution from subdirectories (2026-06-09)
+- [change-005] #init #hooks — Refreshed project instruction files to auto/remind mode and added project-level settings + stop-hook helper (2026-05-13)
+- [requirement-002] #digest #compression — Identified need for persistent phase summary/compression layer to prevent understanding cost from growing linearly with records (2026-06-05)
+- [change-006] #skills #framework — Repaired missing .claude/settings.json, fixed INDEX.md omissions, refreshed phase index, upgraded all 8 skills with HARD-GATE + numbered checklist (2026-06-16)
 <!-- add new conclusions here -->
 
 ---
@@ -77,3 +77,20 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 - **analysis/phase-index.md**: Persistent project phase analysis state used to track candidates, confirmed phases, and incremental analysis progress
 
 When adding records, update this index file accordingly.
+
+---
+
+## Topic Index
+
+<!-- Auto-maintained: maps topic tags to record IDs for fast lookup -->
+- architecture: requirement-001
+- automation: change-003
+- compression: requirement-002
+- digest: requirement-002
+- distribution: change-001, change-002
+- framework: change-006
+- hooks: change-003, change-005, bug-001
+- init: change-005, bug-001
+- install: change-001
+- foundation: requirement-001
+- skills: change-002, change-006
