@@ -5,6 +5,8 @@ description: Use when creating SyberMem project records for changes, decisions, 
 
 # sybermem-record Skill
 
+**Announce at start:** "I'm using the sybermem-record skill to create a project record."
+
 Unified SyberMem record entry point. AI auto-detects the record type from context.
 
 ## Core Invariant
@@ -20,19 +22,9 @@ Do NOT claim a record is complete unless ALL three actions have been executed an
 If any of these three is missing, the record is incomplete. Go back and finish it.
 </HARD-GATE>
 
-## Directory Resolution Rules
+## Directory Resolution
 
-### Step 0: Resolve project root
-
-Before any other operation, walk up from the current working directory to find the nearest ancestor directory (including cwd itself) that contains **both** `.sybermem/` **and** `.claude/settings.json`.
-
-- If found: use that directory as the project root for all subsequent steps. Inform the user if the resolved root differs from cwd: "Using SyberMem project root at `<resolved-path>`".
-- If not found (reached git repository root or filesystem root without a match): prompt the user to run `/sybermem-init-project`.
-
-After resolving the project root, apply legacy directory checks against the resolved root:
-1. If the resolved root has `.sybermem/`, use it.
-2. If the resolved root has only `ADR/`, rename `ADR/` to `.sybermem/` and tell the user the legacy directory was auto-migrated.
-3. If the resolved root has both `.sybermem/` and `ADR/`, use `.sybermem/`, warn that `ADR/` was ignored.
+Resolve project root by walking up from cwd to find `.sybermem/` + `.claude/settings.json`. Auto-migrate `ADR/` if found. Full rules in the session protocol block in AGENTS.md/CLAUDE.md.
 
 ## Flow
 
@@ -76,6 +68,25 @@ This skill is complete when:
 - the correct INDEX.md table row is inserted
 - the Key Conclusion line is updated
 - the user has been told the record path
+
+## Verification
+
+After completing Steps 5-7, verify:
+1. **File path check:** Does the record file path match `.sybermem/{type}/{YYYY-MM-DD}-{NNN}-{title}.md`?
+2. **INDEX row check:** Is the new row in the correct type table (not a different table)?
+3. **Key Conclusion quality:** Does the conclusion line contain both *what changed* AND *why*? If only "what", rewrite it.
+4. **Number uniqueness:** Is the NNN unique within its directory?
+
+## Red Flags — STOP and Re-check
+
+If you catch yourself doing any of these, STOP:
+- Inserting a table row without first creating the record file
+- Writing a Key Conclusion that only says "what" without "why"
+- Creating a record for formatting-only or comment-only changes
+- Using number 001 without checking the directory for existing records
+- Auto-detecting type as "change" when the context clearly describes a decision or requirement
+
+**All of these mean: go back to the relevant step and re-verify.**
 
 ## When NOT to Record
 

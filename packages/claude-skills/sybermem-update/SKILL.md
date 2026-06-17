@@ -5,6 +5,8 @@ description: Use when refreshing installed SyberMem skills in an existing projec
 
 # sybermem-update Skill
 
+**Announce at start:** "I'm using the sybermem-update skill to refresh global skills and re-check this project."
+
 Refresh the installed SyberMem skills, then re-check the current project with `/sybermem-init-project`.
 
 ## Core Invariant
@@ -23,19 +25,9 @@ Do NOT leave the old direct-hook command in `.claude/settings.json` when the lau
 - The project still answers with old `ADR/` or generic `/init-project` wording
 - You want one maintenance command instead of updating globally and then running project init separately
 
-## Directory Resolution Rules
+## Directory Resolution
 
-### Step 0: Resolve project root
-
-Before any other operation, walk up from the current working directory to find the nearest ancestor directory (including cwd itself) that contains **both** `.sybermem/` **and** `.claude/settings.json`.
-
-- If found: use that directory as the project root for all subsequent steps. Inform the user if the resolved root differs from cwd: "Using SyberMem project root at `<resolved-path>`".
-- If not found (reached git repository root or filesystem root without a match): prompt the user to run `/sybermem-init-project`.
-
-After resolving the project root, apply legacy directory checks against the resolved root:
-1. If the resolved root has `.sybermem/`, use it.
-2. If the resolved root has only `ADR/`, rename `ADR/` to `.sybermem/` and tell the user the legacy directory was auto-migrated.
-3. If the resolved root has both `.sybermem/` and `ADR/`, use `.sybermem/`, warn that `ADR/` was ignored.
+Resolve project root by walking up from cwd to find `.sybermem/` + `.claude/settings.json`. Auto-migrate `ADR/` if found. Full rules in the session protocol block in AGENTS.md/CLAUDE.md.
 
 ## Flow
 
@@ -59,7 +51,7 @@ The remote install path is also the update path for globally installed skills.
 
 ### Step 2: Run `/sybermem-init-project` in the current project
 
-After the global refresh completes, continue with the same project by applying the `/sybermem-init-project` flow.
+**REQUIRED SUB-SKILL:** After the global refresh completes, run `/sybermem-init-project` in the current project.
 
 That second step is responsible for:
 - migrating legacy `ADR/` to `.sybermem/`

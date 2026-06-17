@@ -6,7 +6,7 @@
 Before any SyberMem workflow proceeds in this session:
 
 1. Resolve the project root first.
-2. Read `.sybermem/INDEX.md` `## Key Conclusions`.
+2. Read `.sybermem/INDEX.md` `## Key Conclusions`. Then tell the user: "Loaded N key conclusions from SyberMem." If any conclusions are relevant to the current work context, list them.
 3. If `.sybermem/analysis/phase-index.md` exists, treat it as the current structural source of truth for phase-aware workflows.
 4. If `/sybermem-summary` is requested and no phase index exists, run `/sybermem-phase-analyze` first.
 5. If `/sybermem-digest` is requested without explicit source records and no phase index exists, run `/sybermem-phase-analyze` first.
