@@ -74,7 +74,8 @@ SOFT_SKIP_FILES = {
     "AGENTS.md",
 }
 
-NUDGE_STATE_PATH = SYBERMEM_DIR / ".auto-nudge-state.json"
+NUDGE_STATE_PATH = SYBERMEM_DIR / ".nudge-state.json"
+LEGACY_NUDGE_STATE_PATH = SYBERMEM_DIR / ".auto-nudge-state.json"
 RECORD_FILE_THRESHOLD = 5
 RECORD_COOLDOWN_KEYS = {"record", "digest"}
 # Bounded recent-window: only the last N same-theme record-writing stops are
@@ -169,12 +170,22 @@ def save_state(state: dict) -> None:
 
 
 def load_nudge_state() -> dict:
-    if not NUDGE_STATE_PATH.exists():
-        return {}
-    try:
-        return json.loads(NUDGE_STATE_PATH.read_text(encoding="utf-8"))
-    except Exception:
-        return {}
+    """Load unified nudge state, migrating from legacy files if needed."""
+    if NUDGE_STATE_PATH.exists():
+        try:
+            return json.loads(NUDGE_STATE_PATH.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    # Migrate from legacy .auto-nudge-state.json if it exists
+    if LEGACY_NUDGE_STATE_PATH.exists():
+        try:
+            data = json.loads(LEGACY_NUDGE_STATE_PATH.read_text(encoding="utf-8"))
+            # Save to new path; leave legacy file on disk (cleaned by /sybermem-update)
+            save_nudge_state(data)
+            return data
+        except Exception:
+            pass
+    return {}
 
 
 def save_nudge_state(state: dict) -> None:
@@ -199,8 +210,66 @@ def detect_high_level_areas(files: list[str]) -> set[str]:
     return matched
 
 
+COMMIT_GAP_THRESHOLD = 10
+
+
+def count_commits_since_last_record() -> int:
+    """Count commits since the most recent record file date across all record directories."""
+    latest_date: str = ""
+    for subdir in ("changes", "decisions", "requirements", "bugs"):
+        record_dir = SYBERMEM_DIR / subdir
+        if not record_dir.is_dir():
+            continue
+        for path in record_dir.glob("*.md"):
+            match = re.match(r"(\d{4}-\d{2}-\d{2})-", path.name)
+            if match and match.group(1) > latest_date:
+                latest_date = match.group(1)
+    if not latest_date:
+        return 0
+    count_str = run_git("rev-list", "--count", f"--since={latest_date}", "HEAD")
+    try:
+        return int(count_str)
+    except (ValueError, TypeError):
+        return 0
+
+
 DIGEST_CLUSTER_THRESHOLD = 2
 DIGEST_SIGNAL_FILE_FLOOR = 3
+
+
+AUTO_TRAIL_DEDUP_WINDOW = 3
+AUTO_TRAIL_OVERLAP_THRESHOLD = 0.8
+
+
+def overlaps_recent_auto_trails(files: list[str]) -> bool:
+    """Check if the current file set overlaps >80% with any of the last 3 auto trails."""
+    if not CHANGES_DIR.is_dir():
+        return False
+    trails = sorted(CHANGES_DIR.glob("*.md"), key=lambda p: p.name, reverse=True)
+    current_set = set(files)
+    checked = 0
+    for trail_path in trails:
+        if checked >= AUTO_TRAIL_DEDUP_WINDOW:
+            break
+        try:
+            content = trail_path.read_text(encoding="utf-8")
+        except Exception:
+            continue
+        # Only check auto-generated trails (they have the "Auto-generated" marker)
+        if "Auto-generated from workspace changes" not in content:
+            continue
+        checked += 1
+        # Extract related_files from frontmatter
+        fm_match = re.search(r"^related_files:\s*(.+)$", content, re.MULTILINE)
+        if not fm_match:
+            continue
+        trail_files = {f.strip() for f in fm_match.group(1).split(",")}
+        if not trail_files or not current_set:
+            continue
+        overlap = len(current_set & trail_files) / max(len(current_set), len(trail_files))
+        if overlap >= AUTO_TRAIL_OVERLAP_THRESHOLD:
+            return True
+    return False
 
 
 def get_theme_recent_stops(theme_key: str, nudge_state: dict) -> list[str]:
@@ -310,8 +379,10 @@ def classify_followup(files: list[str], nudge_state: dict) -> tuple[str, str | N
     cross_area = len(areas) >= 2
     strong_signal = bool(high_signal_hits)
     large_change = file_count >= RECORD_FILE_THRESHOLD
-    if (strong_signal or cross_area or large_change) and not (last_type == "record" and last_theme == theme_key):
-        return "record", theme_key, "SyberMem note: this change looks important enough for a manual /sybermem-record so the reason and impact are preserved more clearly."
+    commit_gap = count_commits_since_last_record() >= COMMIT_GAP_THRESHOLD
+    if (strong_signal or cross_area or large_change or commit_gap) and not (last_type == "record" and last_theme == theme_key):
+        gap_note = f" ({count_commits_since_last_record()} commits since last record)" if commit_gap else ""
+        return "record", theme_key, f"SyberMem note: this change looks important enough for a manual /sybermem-record so the reason and impact are preserved more clearly.{gap_note}"
 
     return "none", theme_key, None
 
@@ -413,6 +484,12 @@ def main() -> int:
     if not files:
         updated_nudge_state = {
             **nudge_state,
+            "last_nudge": {
+                "platform": "claude-code",
+                "type": followup_hint if followup_hint in RECORD_COOLDOWN_KEYS else "none",
+                "theme": theme_key,
+                "date": date.today().isoformat(),
+            },
             "last_theme": theme_key,
             "last_nudge_type": followup_hint if followup_hint in RECORD_COOLDOWN_KEYS else "none",
         }
@@ -430,6 +507,13 @@ def main() -> int:
     if state.get("last_fingerprint") == fingerprint:
         return 0
 
+    # Auto-trail dedup: skip if >80% overlap with recent auto trails
+    if overlaps_recent_auto_trails(files):
+        save_state({"last_fingerprint": fingerprint, "last_record": state.get("last_record", "")})
+        if nudge_message:
+            print(nudge_message)
+        return 0
+
     record_date = date.today().isoformat()
     number = next_change_id()
     slug = make_title(files)
@@ -443,6 +527,12 @@ def main() -> int:
     nudge_state = append_theme_recent_stop(theme_key, nudge_state, today)
     updated_nudge_state = {
         **nudge_state,
+        "last_nudge": {
+            "platform": "claude-code",
+            "type": followup_hint if followup_hint in RECORD_COOLDOWN_KEYS else "none",
+            "theme": theme_key,
+            "date": date.today().isoformat(),
+        },
         "last_theme": theme_key,
         "last_nudge_type": followup_hint if followup_hint in RECORD_COOLDOWN_KEYS else "none",
         "last_record": record_path.name,
