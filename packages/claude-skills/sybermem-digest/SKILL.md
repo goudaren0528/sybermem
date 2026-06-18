@@ -102,3 +102,12 @@ This skill is complete when:
 - The work is still in progress and not phase-bounded
 - The source material is too small to be worth compressing
 - The proposed digest would only repeat an existing digest with the same source records
+
+## Integration
+
+**Required sub-skills:**
+- **sybermem-phase-analyze** — Required when phase index is missing
+
+**Related skills:**
+- **sybermem-phase-confirm** — Confirm phases before digesting them
+- **sybermem-update** — Run first if project is missing digest capability

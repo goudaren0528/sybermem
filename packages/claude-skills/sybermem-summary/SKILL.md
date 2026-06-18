@@ -92,3 +92,11 @@ This skill is complete when:
 - no file has been written (summary is non-persistent)
 - **Concise output**: keep it readable within one screen
 - **Data-driven**: base the output on actual records and git history when needed for supporting detail only.
+
+## Integration
+
+**Required sub-skills:**
+- **sybermem-phase-analyze** — Required when phase index is missing
+
+**Related skills:**
+- **sybermem-digest** — Redirect here when user wants a durable conclusion (not a status panel)

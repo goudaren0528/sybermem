@@ -93,6 +93,14 @@ If you catch yourself doing any of these, STOP:
 
 **All of these mean: go back to Step 2 and re-run the init-project flow.**
 
+## Common Rationalizations
+
+| Excuse | Reality |
+|--------|---------|
+| "Global skills updated, so the project is updated too" | Project-local files (hooks, settings.json, CLAUDE.md) don't update automatically. Run init-project. |
+| "The init-project step is redundant, nothing changed" | New features may add new managed files. The fast-path check handles this in seconds. |
+| "I already ran update last week" | Skills may have been updated since then. Each update is idempotent and fast with the health check. |
+
 ## Terminal State
 
 This skill is complete when:
@@ -109,3 +117,12 @@ This skill is complete when:
 - Do not silently enable digest support by overwriting user-owned files; only create missing digest capability structure.
 - Do not rewrite unrelated custom settings; only surgically replace recognized old SyberMem Stop hook commands.
 - Do not rewrite the rest of `CLAUDE.md` / `AGENTS.md` when the `using-sybermem` markers already exist; only refresh the bounded protocol block.
+
+## Integration
+
+**Required sub-skills:**
+- **sybermem-init-project** — Called in Step 2 for project-level managed-file propagation
+
+**Related skills:**
+- **sybermem-record** — Available after update
+- **sybermem-summary** — Available after update
