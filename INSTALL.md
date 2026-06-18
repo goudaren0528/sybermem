@@ -18,17 +18,39 @@ If the same source records have already been compressed into an existing digest,
 
 If an older project still contains project-local copies such as `.claude/skills/sybermem-*`, Claude may load both the local and global copies and show duplicates in the `/` list. Once you have switched to the global-install model, those old project-local copies can be deleted.
 
-## Option 1: One-liner install (recommended)
+## Install
+
+### Claude Code 插件安装（推荐）
+
+Plugin install is the preferred future path for Claude Code because it can load both the plugin metadata and the hook lifecycle directly.
+
+#### Local development / testing
+
+```bash
+claude --plugin-dir .
+```
+
+This loads the current repository as a Claude Code plugin using `.claude-plugin/`, `hooks/`, and the synced top-level `skills/` tree.
+
+#### Future install path
+
+The repository already includes `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json` so it can evolve toward marketplace-based installation. Until that path is finalized, use `claude --plugin-dir .` for local validation.
+
+### Claude Code / OpenCode 脚本安装（兼容模式）
+
+Script install remains supported as the compatibility path. These commands keep the existing behavior of copying skills into the user-level directories.
+
+#### One-liner install
 
 No clone needed — downloads directly from GitHub.
 
-### macOS / Linux
+##### macOS / Linux
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/install-remote.sh | bash
 ```
 
-### Windows (PowerShell)
+##### Windows (PowerShell)
 
 ```powershell
 irm https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/install-remote.ps1 | iex
@@ -37,7 +59,7 @@ irm https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/install
 After install, open your target project and run `/sybermem-init-project`.
 That step will also create the default project-level `.claude/settings.json` for SyberMem `auto` / `remind` mode and the default `.sybermem/hooks/record_change_on_stop.py` helper for automatic `change` records.
 
-## Option 2: Clone and install
+#### Clone and install
 
 Clone the repo, then run the local install script.
 
@@ -52,6 +74,12 @@ cd sybermem && ./scripts/install.sh
 git clone https://github.com/goudaren0528/sybermem.git
 cd sybermem; .\scripts\install.ps1
 ```
+
+### OpenCode
+
+For OpenCode plugin installation and lifecycle details, see [`.opencode/INSTALL.md`](.opencode/INSTALL.md).
+
+Project initialization still uses `/sybermem-init-project` after the global install or plugin setup.
 
 ## Update
 

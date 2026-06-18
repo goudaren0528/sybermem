@@ -4,9 +4,19 @@
 
 一套 Claude Code / OpenCode 的 Skills 插件，用于追踪项目开发历史。将变更、决策、需求、Bug 记录为结构化文件，让 AI 在不同会话之间保持项目上下文记忆。
 
+## 安装方式
+
+| 模式 | 适用平台 | 推荐度 | 说明 |
+|---|---|---|---|
+| 插件安装 | Claude Code | 推荐 | 通过插件加载 hooks 和 skills |
+| 脚本安装 | Claude Code / OpenCode | 兼容保留 | 复制 skills 到用户目录 |
+| OpenCode 插件 | OpenCode | 推荐 | 提供 session.created / idle / compacting 生命周期 |
+
+SyberMem 后续会优先以 Claude Code 插件安装作为首选路径；脚本安装会继续保留，作为兼容模式与跨平台兜底方式。
+
 ## 工作流程
 
-安装 Skills → 在项目中运行 `/sybermem-init-project` → 完成有意义的工作后运行 `/sybermem-record` → 使用 `/sybermem-phase-analyze` 从项目历史构建或刷新 `.sybermem/analysis/phase-index.md` → 使用 `/sybermem-phase-confirm` 确认或调整候选阶段 → 使用 `/sybermem-summary` 查看最近活跃 confirmed phase 的当前状态面板（若 analysis layer 不存在，则回退到 weekly/monthly 动态报表）→ 在一个有意义的阶段结束时使用 `/sybermem-digest`，将持久化阶段总结写入 `.sybermem/digests/`。`phase-index.md` 是持久化的项目分析产物，不是最终 digest。每次会话开始时，AI 读取 `.sybermem/INDEX.md` 中的关键结论，回忆历史工作上下文。在 `auto` 模式下，stop hook 仍会自动写入轻量 `change` trail，但在检测到高价值变化模式时，也可能非阻塞地提示你补 `/sybermem-record` 或后续 `/sybermem-digest`。
+安装 SyberMem → 在项目中运行 `/sybermem-init-project` → 完成有意义的工作后运行 `/sybermem-record` → 使用 `/sybermem-phase-analyze` 从项目历史构建或刷新 `.sybermem/analysis/phase-index.md` → 使用 `/sybermem-phase-confirm` 确认或调整候选阶段 → 使用 `/sybermem-summary` 查看最近活跃 confirmed phase 的当前状态面板（若 analysis layer 不存在，则回退到 weekly/monthly 动态报表）→ 在一个有意义的阶段结束时使用 `/sybermem-digest`，将持久化阶段总结写入 `.sybermem/digests/`。`phase-index.md` 是持久化的项目分析产物，不是最终 digest。每次会话开始时，AI 读取 `.sybermem/INDEX.md` 中的关键结论，回忆历史工作上下文。在 `auto` 模式下，stop hook 仍会自动写入轻量 `change` trail，但在检测到高价值变化模式时，也可能非阻塞地提示你补 `/sybermem-record` 或后续 `/sybermem-digest`。
 
 `/sybermem-summary` 看”现在这个阶段状态如何”，而 `/sybermem-digest` 记录”这个阶段最终沉淀了什么”。
 
@@ -64,7 +74,27 @@ SyberMem 现在会通过 `CLAUDE.md` / `AGENTS.md` 顶部的 `using-sybermem` �
 
 ## 安装
 
-### 一行命令安装（需仓库为 public）
+### Claude Code 插件安装（推荐）
+
+适用于希望通过插件统一加载 hooks 与 skills 的 Claude Code 用户。这是 SyberMem 面向未来的首选安装路径。
+
+#### 本地开发 / 测试
+
+```bash
+claude --plugin-dir .
+```
+
+这会从当前仓库目录加载 `.claude-plugin/`，适合本地联调 marketplace 元数据、hooks 与 skills 打包内容。
+
+#### 未来的正式安装路径
+
+未来会优先通过 Claude Code marketplace / 插件安装路径分发。当前仓库已经包含 `.claude-plugin/marketplace.json` 与 `.claude-plugin/plugin.json`，便于本地验证和后续接入。
+
+### Claude Code / OpenCode 脚本安装（兼容保留）
+
+以下命令保留为 direct/script install 方式，适合兼容旧环境、无插件场景，或需要将 skills 直接复制到用户目录时使用。
+
+#### 一行命令安装（需仓库为 public）
 
 ```bash
 # macOS / Linux
@@ -74,7 +104,7 @@ curl -sSL https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/i
 irm https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/install-remote.ps1 | iex
 ```
 
-### 克隆安装
+#### 克隆安装
 
 ```bash
 # macOS / Linux
@@ -86,9 +116,13 @@ git clone https://github.com/goudaren0528/sybermem.git
 cd sybermem; .\scripts\install.ps1
 ```
 
+### OpenCode 安装
+
+OpenCode 推荐使用其插件路径来获得 `session.created` / `session.idle` / `experimental.session.compacting` 生命周期能力。安装说明见 [`.opencode/INSTALL.md`](.opencode/INSTALL.md)。
+
 ### 项目初始化
 
-全局安装完成后，进入你的项目并执行：
+完成全局安装或插件接入后，进入你的项目并执行：
 
 ```text
 /sybermem-init-project
@@ -150,14 +184,17 @@ AGENTS.md             # OpenCode 项目指令（内容相同）
 
 ## 支持平台
 
-| 平台 | 全局 Skills 位置 | 项目级文件 |
-|------|------------------|-----------|
-| Claude Code | `~/.claude/skills/` | `CLAUDE.md`、`.claude/settings.json`、`.sybermem/` |
-| OpenCode | `~/.config/opencode/skills/` | `AGENTS.md`、`.claude/settings.json`、`.sybermem/` |
+| 平台 | 安装形态 | 项目级文件 |
+|------|----------|-----------|
+| Claude Code | 插件安装（推荐）或脚本安装（兼容） | `CLAUDE.md`、`.claude/settings.json`、`.sybermem/` |
+| OpenCode | OpenCode 插件（推荐）或脚本安装（兼容） | `AGENTS.md`、`.claude/settings.json`、`.sybermem/` |
 
 ## 仓库结构
 
 ```
+.claude-plugin/                       # Claude Code 插件元数据与 marketplace 清单
+hooks/                                # Claude Code 插件 hook 声明与 delegator
+skills/                               # Plugin-facing skills tree
 packages/claude-skills/               # Skills 源码（仓库内分发源，不参与项目自动加载）
 ├── sybermem-digest/
 ├── sybermem-init-project/
@@ -167,10 +204,11 @@ packages/claude-skills/               # Skills 源码（仓库内分发源，不
 ├── sybermem-summary/
 └── sybermem-update/
 
-scripts/                              # 安装和更新脚本
+scripts/                              # 安装、更新与打包校验脚本
 ├── install-remote.sh / .ps1          # 一行命令远程安装
-├── install.sh / .ps1                 # 本地安装
-└── update.sh / .ps1                  # 更新已有安装
+├── install.sh / .ps1                 # 本地脚本安装
+├── update.sh / .ps1                  # 更新已有安装
+└── check-plugin-package.py           # 插件分发内容完整性校验（可选）
 
 docs/zh/                              # 中文文档备份
 ```
