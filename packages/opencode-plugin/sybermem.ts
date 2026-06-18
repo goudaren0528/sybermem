@@ -229,21 +229,26 @@ async function countCommitsSinceLastRecord(
   $: any,
   root: string
 ): Promise<number> {
-  const changesDir = join(root, ".sybermem", "changes")
-  if (!existsSync(changesDir)) return 0
+  const recordDirs = ["changes", "decisions", "requirements", "bugs"]
   try {
-    // Find the most recent record file by date prefix
     const { readdirSync } = await import("fs")
-    const files = readdirSync(changesDir)
-      .filter((f: string) => f.endsWith(".md"))
-      .sort()
-    if (files.length === 0) return 0
-    const lastFile = files[files.length - 1]
-    const dateMatch = lastFile.match(/^(\d{4}-\d{2}-\d{2})/)
-    if (!dateMatch) return 0
+    let latestDate = ""
+    for (const subdir of recordDirs) {
+      const dir = join(root, ".sybermem", subdir)
+      if (!existsSync(dir)) continue
+      const files = readdirSync(dir)
+        .filter((f: string) => f.endsWith(".md"))
+        .sort()
+      if (files.length === 0) continue
+      const lastFile = files[files.length - 1]
+      const dateMatch = lastFile.match(/^(\d{4}-\d{2}-\d{2})/)
+      if (dateMatch && dateMatch[1] > latestDate) {
+        latestDate = dateMatch[1]
+      }
+    }
+    if (!latestDate) return 0
 
-    const since = dateMatch[1]
-    const log = await $`git log --oneline --since=${since}`.cwd(root).text()
+    const log = await $`git log --oneline --since=${latestDate}`.cwd(root).text()
     return log.split("\n").filter((l: string) => l.trim()).length
   } catch {
     return 0
@@ -293,6 +298,7 @@ export const SyberMemPlugin: Plugin = async ({ $, directory }) => {
 
         if (shouldNudge) {
           saveNudgeState(root, {
+            ...state,
             lastFingerprint: fingerprint,
             lastNudgeCommitCount: commitsSince,
             last_nudge: {
@@ -310,7 +316,7 @@ export const SyberMemPlugin: Plugin = async ({ $, directory }) => {
           }
         }
 
-        saveNudgeState(root, { lastFingerprint: fingerprint })
+        saveNudgeState(root, { ...state, lastFingerprint: fingerprint })
       }
     },
 
