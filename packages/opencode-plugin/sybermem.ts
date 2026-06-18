@@ -171,7 +171,7 @@ function trailFiles(files: string[]): string[] {
 }
 
 // ---------------------------------------------------------------------------
-// Nudge state (persisted in .sybermem/.opencode-nudge-state.json)
+// Nudge state (persisted in .sybermem/.nudge-state.json)
 // ---------------------------------------------------------------------------
 
 interface NudgeState {
