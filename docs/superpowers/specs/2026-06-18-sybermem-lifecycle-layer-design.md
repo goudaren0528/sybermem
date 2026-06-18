@@ -82,6 +82,8 @@ SyberMem Lifecycle Layer
 
 匹配器：`startup`、`resume`、`clear`、`compact`
 
+> **实现时验证：** Claude Code SessionStart hook 是否支持 matchers 字段以及 `compact` matcher。如果不支持 matchers 细分，hook 默认在所有 session start 场景触发即可满足 startup / resume / clear；compact 恢复记忆则降级为 CLAUDE.md 协议。
+
 行为：
 
 1. Resolve project root（复用已有 `resolve_sybermem_root()` 逻辑）
@@ -299,7 +301,7 @@ if !has_phase_coverage && git_ahead_of_boundary:
 
 Claude Code 没有 `session.compacting` plugin API。降级策略：
 
-1. `SessionStart` hook 的 `compact` matcher：compact 后重新注入 startup context，等价于 compaction 后恢复记忆。
+1. `SessionStart` hook 的 `compact` matcher（**需验证是否支持**）：compact 后重新注入 startup context，等价于 compaction 后恢复记忆。如果 SessionStart hook 不区分 compact 场景，默认行为已经覆盖——每次 session resume 都会重新注入。
 2. `CLAUDE.md` 协议继续要求摘要后优先读取 Key Conclusions。
 
 两者叠加，在 compact 场景下也能恢复项目记忆。
