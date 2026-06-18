@@ -7,6 +7,8 @@ $SkillSource = Join-Path $AdrPath "packages\claude-skills"
 $LauncherDir = Join-Path $env:USERPROFILE ".claude\sybermem"
 $LauncherPath = Join-Path $LauncherDir "launch_record_change_on_stop.py"
 $LauncherSource = Join-Path $AdrPath "scripts\global-stop-hook-launcher.py"
+$SessionLauncherSource = Join-Path $AdrPath "scripts\global-session-start-launcher.py"
+$SessionLauncherPath = Join-Path $LauncherDir "launch_session_start_context.py"
 $PluginSource = Join-Path $AdrPath "packages\opencode-plugin\sybermem.ts"
 $OpenCodePluginDir = Join-Path $env:USERPROFILE ".config\opencode\plugins"
 $LegacyLocalSkills = Join-Path $AdrPath ".claude\skills"
@@ -48,6 +50,8 @@ if (Test-Path (Join-Path $env:USERPROFILE ".claude")) {
     }
     Copy-Item -Path $LauncherSource -Destination $LauncherPath -Force
     Write-Host "  [Claude Code] 已安装 stop hook launcher: $LauncherPath"
+    Copy-Item -Path $SessionLauncherSource -Destination $SessionLauncherPath -Force
+    Write-Host "  [Claude Code] 已安装 session start launcher: $SessionLauncherPath"
 }
 
 # OpenCode: install plugin

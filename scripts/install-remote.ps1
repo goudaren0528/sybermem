@@ -9,6 +9,7 @@ $ZipUrl = "https://github.com/$Repo/archive/$Branch.zip"
 $ArchivePrefix = "sybermem-$Branch"
 $LauncherDir = Join-Path $env:USERPROFILE ".claude\sybermem"
 $LauncherPath = Join-Path $LauncherDir "launch_record_change_on_stop.py"
+$SessionLauncherPath = Join-Path $LauncherDir "launch_session_start_context.py"
 $OpenCodePluginDir = Join-Path $env:USERPROFILE ".config\opencode\plugins"
 
 $Targets = @(
@@ -31,6 +32,7 @@ try {
 
     $SkillsSrc = Join-Path $TmpDir "$ArchivePrefix\packages\claude-skills"
     $LauncherSource = Join-Path $TmpDir "$ArchivePrefix\scripts\global-stop-hook-launcher.py"
+    $SessionLauncherSource = Join-Path $TmpDir "$ArchivePrefix\scripts\global-session-start-launcher.py"
     $PluginSource = Join-Path $TmpDir "$ArchivePrefix\packages\opencode-plugin\sybermem.ts"
 
     if (-not (Test-Path $SkillsSrc)) {
@@ -67,6 +69,10 @@ try {
         }
         Copy-Item -Path $LauncherSource -Destination $LauncherPath -Force
         Write-Host "  [Claude Code] installed stop hook launcher: $LauncherPath"
+        if (Test-Path $SessionLauncherSource) {
+            Copy-Item -Path $SessionLauncherSource -Destination $SessionLauncherPath -Force
+            Write-Host "  [Claude Code] installed session start launcher: $SessionLauncherPath"
+        }
     }
 
     # OpenCode: install plugin

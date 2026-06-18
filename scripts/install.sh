@@ -10,6 +10,8 @@ OPENCODE_SKILLS="$HOME/.config/opencode/skills"
 LAUNCHER_DIR="$HOME/.claude/sybermem"
 LAUNCHER_PATH="$LAUNCHER_DIR/launch_record_change_on_stop.py"
 LAUNCHER_SOURCE="$ADR_PATH/scripts/global-stop-hook-launcher.py"
+SESSION_LAUNCHER_SOURCE="$ADR_PATH/scripts/global-session-start-launcher.py"
+SESSION_LAUNCHER_PATH="$LAUNCHER_DIR/launch_session_start_context.py"
 PLUGIN_SOURCE="$ADR_PATH/packages/opencode-plugin/sybermem.ts"
 OPENCODE_PLUGIN_DIR="$HOME/.config/opencode/plugins"
 LEGACY_LOCAL_SKILLS="$ADR_PATH/.claude/skills"
@@ -39,6 +41,9 @@ if [ -d "$HOME/.claude" ]; then
     cp "$LAUNCHER_SOURCE" "$LAUNCHER_PATH"
     chmod +x "$LAUNCHER_PATH"
     echo "  [Claude Code] 已安装 stop hook launcher: $LAUNCHER_PATH"
+    cp "$SESSION_LAUNCHER_SOURCE" "$SESSION_LAUNCHER_PATH"
+    chmod +x "$SESSION_LAUNCHER_PATH"
+    echo "  [Claude Code] 已安装 session start launcher: $SESSION_LAUNCHER_PATH"
 fi
 
 # OpenCode: install plugin
