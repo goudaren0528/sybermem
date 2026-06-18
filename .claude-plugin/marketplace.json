@@ -1,0 +1,14 @@
+{
+  "name": "sybermem-dev",
+  "description": "Development marketplace for SyberMem",
+  "owner": { "name": "goudaren0528" },
+  "plugins": [
+    {
+      "name": "sybermem",
+      "description": "Project memory and decision tracking system for Claude Code and OpenCode",
+      "version": "0.1.0",
+      "source": "../",
+      "author": { "name": "goudaren0528" }
+    }
+  ]
+}

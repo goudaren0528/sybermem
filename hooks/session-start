@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+json_escape() {
+  python -c 'import json, sys; print(json.dumps(sys.stdin.read()))'
+}
+
+emit_context() {
+  local message="$1"
+  local escaped
+  escaped=$(printf '%s' "$message" | json_escape)
+  printf '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":%s}}\n' "$escaped"
+}
+
+resolve_project_root() {
+  local dir="${CLAUDE_PROJECT_DIR:-$(pwd)}"
+
+  if [ -f "$dir" ]; then
+    dir="$(dirname "$dir")"
+  fi
+
+  while [ "$dir" != "/" ] && [ -n "$dir" ]; do
+    if [ -d "$dir/.sybermem" ] && { [ -f "$dir/.claude/settings.json" ] || [ -f "$dir/.sybermem/INDEX.md" ]; }; then
+      printf '%s\n' "$dir"
+      return 0
+    fi
+    dir="$(dirname "$dir")"
+  done
+
+  return 1
+}
+
+if ! root="$(resolve_project_root)"; then
+  emit_context "SyberMem plugin is installed, but this project is not initialized. Run /sybermem-init-project to set up project memory."
+  exit 0
+fi
+
+script="$root/.sybermem/hooks/session_start_context.py"
+if [ -f "$script" ]; then
+  exec python "$script"
+fi
+
+emit_context "SyberMem project found at $root, but .sybermem/hooks/session_start_context.py is missing. Run /sybermem-update to refresh project-managed hook files."
