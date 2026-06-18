@@ -52,6 +52,43 @@ After resolving the project root, apply legacy directory checks:
 
 ## Flow
 
+### Step 0.5: Fast-path health check (existing projects only)
+
+If `.sybermem/hooks/check_project_health.py` exists at the resolved project root, run it first:
+
+```bash
+python .sybermem/hooks/check_project_health.py
+```
+
+Parse the JSON output and branch:
+
+**If `overall == "fresh"`:**
+- Output: "SyberMem project is up to date. No changes needed."
+- Skip all subsequent steps. Skill is complete.
+
+**If `overall == "needs_update"`:**
+- Process only the `actions_needed` list. Each action specifies its update method:
+  - `"create ..."` → create the file from the init-project template
+  - `"insert ..."` → non-destructive partial update (see Non-Destructive Update Rules below)
+  - `"replace ..."` → full replacement (only for SyberMem-owned files like hooks and templates)
+  - `"add ..."` → surgical JSON patch (only for settings.json hook entries)
+- After processing all actions, output a summary of what was changed and skip remaining steps.
+
+**If `overall == "not_initialized"` or the script does not exist:**
+- Proceed with the full initialization flow starting at Step 1.
+
+### Non-Destructive Update Rules
+
+**These rules apply to ALL update operations, whether triggered by fast-path or full flow.**
+
+| File | Allowed Update | Forbidden |
+|---|---|---|
+| `CLAUDE.md` / `AGENTS.md` | Insert or refresh the bounded `SYBERMEM_SESSION_PROTOCOL:START`/`END` block only. If the block exists, replace only its contents. If it does not exist, insert the complete block at the top of the file. All content outside the block markers is preserved verbatim. | Overwriting the entire file when it contains user content outside the protocol block. |
+| `.claude/settings.json` | Read with `json.load`, add/update only SyberMem-owned keys (`env.SYBERMEM_RECORD_MODE`, `hooks.SessionStart`, `hooks.Stop`), write back with `json.dump`. All other keys, env vars, and hooks are preserved. | Overwriting the entire file from template. |
+| `.sybermem/INDEX.md` | Insert missing sections (`## Stage Digests`, `## Topic Index`) at the appropriate position. All existing Key Conclusions, record tables, and user data are preserved. | Regenerating the entire file from template. |
+| `.sybermem/hooks/*.py` | Full replacement from template — these are SyberMem-owned executables with no user content. | — |
+| `.sybermem/templates/*.md` | Full replacement from template — these are SyberMem-owned templates. | — |
+
 ### Step 1: Resolve existing state
 
 - Apply the directory resolution rules above.
@@ -66,6 +103,7 @@ Use these template files from this installed skill as the canonical refresh sour
 - `project-files/CLAUDE.md`
 - `project-files/.claude/settings.json`
 - `project-files/.sybermem/hooks/record_change_on_stop.py`
+- `project-files/.sybermem/hooks/check_project_health.py`
 
 **MANDATORY: Before classifying any file, you MUST verify its existence using a file-system tool (Read, Glob, or equivalent). Do NOT infer existence from settings.json references, previous tool output, or conversation context. If the tool confirms the file does not exist, classify it as `missing` regardless of what other signals suggest.**
 
@@ -195,6 +233,7 @@ When found, ask the user whether to:
 - Create missing `.sybermem/hooks/record_change_on_stop.py` from the template file when automatic mode is being installed.
 - Ensure the global launcher `~/.claude/sybermem/launch_record_change_on_stop.py` exists; if not, instruct the user to refresh global skills first or run `/sybermem-update`.
 - Create missing `.sybermem/hooks/session_start_context.py` from the template file when startup context injection is being installed.
+- Create missing `.sybermem/hooks/check_project_health.py` from the template file to enable fast-path updates on subsequent runs.
 - Ensure the global session start launcher `~/.claude/sybermem/launch_session_start_context.py` exists; if not, instruct the user to refresh global skills first or run `/sybermem-update`.
 - Create missing `.sybermem/hooks/launch_record_change_on_stop.py` from the template file.
 - If the project uses the SyberMem-managed Stop hook entry, rewrite `.claude/settings.json` to call the global absolute launcher path instead of any project-local relative hook path.
@@ -223,6 +262,7 @@ When found, ask the user whether to:
 - `.sybermem/hooks/launch_record_change_on_stop.py` when root-resolving launcher support is installed
 - managed Stop hook command updated to the launcher form when needed
 - `.sybermem/hooks/session_start_context.py` when startup context injection is installed
+- `.sybermem/hooks/check_project_health.py` for fast-path update detection
 - managed SessionStart hook command updated to the launcher form when needed
 - `using-sybermem` session protocol block inserted or refreshed in `CLAUDE.md` / `AGENTS.md` when applicable
 - `CLAUDE.md` / `AGENTS.md` / project-level `.claude/settings.json`
