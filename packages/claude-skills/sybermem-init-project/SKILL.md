@@ -54,7 +54,9 @@ After resolving the project root, apply legacy directory checks:
 
 ### Step 0.5: Fast-path health check (existing projects only)
 
-If `.sybermem/hooks/check_project_health.py` exists at the resolved project root, run it first:
+**First, update the health check script itself.** Copy `project-files/.sybermem/hooks/check_project_health.py` from the installed skill template to the project's `.sybermem/hooks/check_project_health.py`, replacing the existing file unconditionally. This is safe because the script is SyberMem-owned and contains no user content. This ensures the health check always knows about the latest managed-file requirements, even when the project was initialized with an older version of SyberMem.
+
+Then run it:
 
 ```bash
 python .sybermem/hooks/check_project_health.py
