@@ -3,6 +3,18 @@
     "SYBERMEM_RECORD_MODE": "auto"
   },
   "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python C:/Users/69046/.claude/sybermem/launch_session_start_context.py",
+            "timeout": 15,
+            "statusMessage": "SyberMem loading project memory..."
+          }
+        ]
+      }
+    ],
     "Stop": [
       {
         "hooks": [
