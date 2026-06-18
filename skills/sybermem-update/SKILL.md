@@ -1,0 +1,128 @@
+---
+name: sybermem-update
+description: Use when refreshing installed SyberMem skills in an existing project, especially after upgrading SyberMem or when local project instructions may be stale.
+---
+
+# sybermem-update Skill
+
+**Announce at start:** "I'm using the sybermem-update skill to refresh global skills and re-check this project."
+
+Refresh the installed SyberMem skills, then re-check the current project with `/sybermem-init-project`.
+
+## Core Invariant
+
+- **No behavior change is complete unless `/sybermem-update` can carry an existing managed project to that behavior in operational terms: by re-running the project check, classifying each relevant local managed file, and then creating, refreshing, or migrating only the files that actually need a project-local change. If the new behavior is classification-only or otherwise requires no project-local file change, the update flow must say so explicitly.**
+
+<HARD-GATE>
+Do NOT declare the upgrade complete without running the managed-file propagation check.
+Do NOT skip the `/sybermem-init-project` follow-up step after updating global skills.
+Do NOT leave the old direct-hook command in `.claude/settings.json` when the launcher should have replaced it.
+</HARD-GATE>
+
+## When to Use
+
+- You upgraded SyberMem and want the current project to pick up the newest behavior
+- The project still answers with old `ADR/` or generic `/init-project` wording
+- You want one maintenance command instead of updating globally and then running project init separately
+
+## Directory Resolution
+
+Resolve project root by walking up from cwd to find `.sybermem/` + `.claude/settings.json`. Auto-migrate `ADR/` if found. Full rules in the session protocol block in AGENTS.md/CLAUDE.md.
+
+## Flow
+
+### Step 1: Explain the update command before running it
+
+Tell the user which command you are about to run.
+
+Choose the update path in this order:
+
+1. **Local clone available**
+   - If the current working directory is the SyberMem repo and contains the install/update scripts, use the local update script.
+   - Bash shell: `./scripts/update.sh`
+   - PowerShell shell: `./scripts/update.ps1`
+
+2. **Any other project**
+   - Use the remote install script to refresh the globally installed skills.
+   - Bash shell: `curl -sSL https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/install-remote.sh | bash`
+   - PowerShell shell: `irm https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/install-remote.ps1 | iex`
+
+The remote install path is also the update path for globally installed skills.
+
+### Step 2: Run `/sybermem-init-project` in the current project
+
+**REQUIRED SUB-SKILL:** After the global refresh completes, run `/sybermem-init-project` in the current project.
+
+That second step is responsible for:
+- migrating legacy `ADR/` to `.sybermem/`
+- checking whether local `AGENTS.md` / `CLAUDE.md` are stale, including pre-digest SyberMem-managed files that still need the digest-aware guidance refresh
+- enabling digest support by creating `.sybermem/digests/`, creating the digest template, and inserting the `Stage Digests` section when missing
+- enabling analysis support by creating `.sybermem/analysis/` and `.sybermem/analysis/phase-index.md` from the starter template when missing
+- creating or refreshing the default project-level `.claude/settings.json` and `.sybermem/hooks/record_change_on_stop.py` when the project uses the SyberMem-managed hook template
+- ensuring the global stop hook launcher exists at `~/.claude/sybermem/launch_record_change_on_stop.py`
+- enabling the root-resolving stop-hook launcher by creating `.sybermem/hooks/launch_record_change_on_stop.py` when missing
+- auto-migrating existing projects from old relative Stop hook commands to the global absolute launcher command
+- applying that migration even when `.claude/settings.json` is otherwise custom, as long as the old Stop hook command is recognizably SyberMem-managed
+- inserting or refreshing the marker-bounded `using-sybermem` session-entry protocol block in managed instruction files
+- ensuring existing projects receive both the marker-bounded `using-sybermem` protocol block and the visible `/using-sybermem` skill after upgrade
+- refreshing stale SyberMem-managed project instructions with backups
+- leaving custom project instructions and custom hook settings alone unless the user approves replacement
+
+The protocol block gives automatic session-entry guidance; the visible `/using-sybermem` skill gives a manual diagnostic entrypoint.
+
+Every new managed behavior introduced by SyberMem must explicitly say whether `/sybermem-update` changes any project-local files at all. If it does, name the exact files that are created, refreshed, or migrated. If it does not, say that the behavior is classification-only or otherwise has no project-local file action.
+
+### Managed-file propagation check
+
+Before declaring an upgrade complete, verify for the current project:
+- which local files need the new behavior
+- whether each file is missing, fresh, stale SyberMem-managed, or custom
+- whether stale SyberMem-managed files will be backed up before replacement
+- whether custom files will be preserved unless the user explicitly approves replacement
+- whether the `using-sybermem` protocol block was inserted or refreshed non-destructively when applicable
+- whether recognized old SyberMem Stop hook commands were surgically replaced with the global launcher path when present in otherwise custom settings files.
+
+## Red Flags — STOP and Re-check
+
+If you catch yourself doing any of these, STOP:
+
+- Declaring the upgrade complete without running the managed-file propagation check
+- Skipping the `/sybermem-init-project` follow-up step after updating global skills
+- Leaving the old direct-hook command in `.claude/settings.json` when the launcher should have replaced it
+- Claiming a behavior change is shipped when project-local files have not been created or refreshed
+
+**All of these mean: go back to Step 2 and re-run the init-project flow.**
+
+## Common Rationalizations
+
+| Excuse | Reality |
+|--------|---------|
+| "Global skills updated, so the project is updated too" | Project-local files (hooks, settings.json, CLAUDE.md) don't update automatically. Run init-project. |
+| "The init-project step is redundant, nothing changed" | New features may add new managed files. The fast-path check handles this in seconds. |
+| "I already ran update last week" | Skills may have been updated since then. Each update is idempotent and fast with the health check. |
+
+## Terminal State
+
+This skill is complete when:
+- global skills have been refreshed
+- the `/sybermem-init-project` follow-up has run on the current project
+- all managed files are classified, created, refreshed, or preserved as appropriate
+- the user has been told what was updated
+
+## Safety Rules
+
+- Do not silently overwrite custom project instruction files.
+- Do not skip the `/sybermem-init-project` follow-up step.
+- If the update command fails, stop and report the failure instead of pretending the project was refreshed.
+- Do not silently enable digest support by overwriting user-owned files; only create missing digest capability structure.
+- Do not rewrite unrelated custom settings; only surgically replace recognized old SyberMem Stop hook commands.
+- Do not rewrite the rest of `CLAUDE.md` / `AGENTS.md` when the `using-sybermem` markers already exist; only refresh the bounded protocol block.
+
+## Integration
+
+**Required sub-skills:**
+- **sybermem-init-project** — Called in Step 2 for project-level managed-file propagation
+
+**Related skills:**
+- **sybermem-record** — Available after update
+- **sybermem-summary** — Available after update
