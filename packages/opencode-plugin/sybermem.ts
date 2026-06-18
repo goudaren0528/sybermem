@@ -88,6 +88,46 @@ function getActivePhase(root: string): string | null {
 }
 
 // ---------------------------------------------------------------------------
+// Stale phase-index detection
+// ---------------------------------------------------------------------------
+
+interface StaleSignal {
+  stale: boolean
+  commitsAhead: number
+  boundary?: string
+  head?: string
+}
+
+async function detectStaleSignal(
+  $: any,
+  root: string
+): Promise<StaleSignal> {
+  const phasePath = join(root, ".sybermem", "analysis", "phase-index.md")
+  if (!existsSync(phasePath)) return { stale: false, commitsAhead: 0 }
+  const content = readFileSync(phasePath, "utf-8")
+  const boundaryMatch = content.match(/^- last_git_boundary:\s*(\S+)/m)
+  if (!boundaryMatch) return { stale: false, commitsAhead: 0 }
+  const boundary = boundaryMatch[1]
+
+  try {
+    const head = (await $`git rev-parse HEAD`.cwd(root).text()).trim()
+    if (head === boundary) return { stale: false, commitsAhead: 0 }
+    const countStr = (
+      await $`git rev-list --count ${boundary}..HEAD`.cwd(root).text()
+    ).trim()
+    const count = parseInt(countStr, 10) || 0
+    return {
+      stale: count >= 3,
+      commitsAhead: count,
+      boundary,
+      head: head.substring(0, 7),
+    }
+  } catch {
+    return { stale: false, commitsAhead: 0 }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Git change detection (lightweight, no Python dependency)
 // ---------------------------------------------------------------------------
 
@@ -137,20 +177,47 @@ function trailFiles(files: string[]): string[] {
 interface NudgeState {
   lastFingerprint?: string
   lastNudgeCommitCount?: number
+  last_nudge?: {
+    platform: string
+    type: string
+    theme: string
+    date: string
+  }
+  // Cross-platform fields (shared with Python Stop hook)
+  theme_recent_stops?: Record<string, string[]>
+  digest_nudged_at_window_len?: Record<string, number>
+  last_theme?: string
+  last_nudge_type?: string
 }
 
+const NUDGE_STATE_FILE = ".nudge-state.json"
+const LEGACY_NUDGE_STATE_FILE = ".opencode-nudge-state.json"
+
 function loadNudgeState(root: string): NudgeState {
-  const p = join(root, ".sybermem", ".opencode-nudge-state.json")
-  if (!existsSync(p)) return {}
-  try {
-    return JSON.parse(readFileSync(p, "utf-8"))
-  } catch {
-    return {}
+  const p = join(root, ".sybermem", NUDGE_STATE_FILE)
+  if (existsSync(p)) {
+    try {
+      return JSON.parse(readFileSync(p, "utf-8"))
+    } catch {
+      // fall through to legacy
+    }
   }
+  // Migrate from legacy file if it exists
+  const legacy = join(root, ".sybermem", LEGACY_NUDGE_STATE_FILE)
+  if (existsSync(legacy)) {
+    try {
+      const data = JSON.parse(readFileSync(legacy, "utf-8"))
+      saveNudgeState(root, data)
+      return data
+    } catch {
+      // fall through
+    }
+  }
+  return {}
 }
 
 function saveNudgeState(root: string, state: NudgeState) {
-  const p = join(root, ".sybermem", ".opencode-nudge-state.json")
+  const p = join(root, ".sybermem", NUDGE_STATE_FILE)
   writeFileSync(p, JSON.stringify(state, null, 2) + "\n", "utf-8")
 }
 
@@ -196,9 +263,13 @@ export const SyberMemPlugin: Plugin = async ({ $, directory }) => {
       if (event.type === "session.created" && root) {
         const parsed = parseIndex(root)
         if (parsed && parsed.conclusions.length > 0) {
+          const stale = await detectStaleSignal($, root)
+          const staleNote = stale.stale
+            ? ` (phase-index ${stale.commitsAhead} commits behind)`
+            : ""
           return {
             "tui.toast.show": {
-              message: `SyberMem: loaded ${parsed.conclusions.length} key conclusions`,
+              message: `SyberMem: loaded ${parsed.conclusions.length} key conclusions${staleNote}`,
               level: "info",
             },
           }
@@ -221,7 +292,16 @@ export const SyberMemPlugin: Plugin = async ({ $, directory }) => {
         const shouldNudge = trail.length >= 5 || commitsSince >= 10
 
         if (shouldNudge) {
-          saveNudgeState(root, { lastFingerprint: fingerprint, lastNudgeCommitCount: commitsSince })
+          saveNudgeState(root, {
+            lastFingerprint: fingerprint,
+            lastNudgeCommitCount: commitsSince,
+            last_nudge: {
+              platform: "opencode",
+              type: "record",
+              theme: "idle-detect",
+              date: new Date().toISOString().split("T")[0],
+            },
+          })
           return {
             "tui.toast.show": {
               message: `SyberMem: ${trail.length} files changed${commitsSince >= 10 ? `, ${commitsSince} commits since last record` : ""}. Consider /sybermem-record`,
@@ -242,6 +322,7 @@ export const SyberMemPlugin: Plugin = async ({ $, directory }) => {
       if (!parsed || parsed.conclusions.length === 0) return
 
       const activePhase = getActivePhase(root)
+      const stale = await detectStaleSignal($, root)
 
       let context = "## SyberMem Project Memory\n\n"
       context += "### Key Conclusions\n"
@@ -251,6 +332,10 @@ export const SyberMemPlugin: Plugin = async ({ $, directory }) => {
 
       if (activePhase) {
         context += `\n### Active Phase: ${activePhase}\n`
+      }
+
+      if (stale.stale) {
+        context += `\n### Stale Signal\nPhase-index last git boundary: ${stale.boundary}, current HEAD: ${stale.head} (${stale.commitsAhead} commits ahead).\n`
       }
 
       if (Object.keys(parsed.topicIndex).length > 0) {
@@ -267,6 +352,11 @@ export const SyberMemPlugin: Plugin = async ({ $, directory }) => {
         "- /sybermem-summary — view current phase status\n"
       context +=
         "- /sybermem-digest — create durable phase digest\n"
+
+      // Enforce 3000-char limit to avoid compaction noise
+      if (context.length > 3000) {
+        context = context.substring(0, 2997) + "..."
+      }
 
       output.context.push(context)
     },
