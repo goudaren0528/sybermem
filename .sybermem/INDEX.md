@@ -15,6 +15,8 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 - [change-005] #init #hooks — Refreshed project instruction files to auto/remind mode and added project-level settings + stop-hook helper (2026-05-13)
 - [requirement-002] #digest #compression — Identified need for persistent phase summary/compression layer to prevent understanding cost from growing linearly with records (2026-06-05)
 - [change-006] #skills #framework — Repaired missing .claude/settings.json, fixed INDEX.md omissions, refreshed phase index, upgraded all 8 skills with HARD-GATE + numbered checklist (2026-06-16)
+- [change-007] Auto-recorded workspace file changes at session stop so the project keeps a lightweight change trail without manual recording (2026-06-18)
+- [change-008] #distribution #hooks #automation — Added Claude Code plugin metadata and lifecycle hook delegators so SyberMem can install as a plugin without breaking existing project-managed hook files (2026-06-18)
 <!-- add new conclusions here -->
 
 ---
@@ -37,6 +39,8 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 | 003 | 2026-05-13 | Add auto change hook template | implemented | [link](changes/2026-05-13-003-add-auto-change-hook-template.md) |
 | 005 | 2026-05-13 | Refresh project instructions and add auto record hook files | implemented | [link](changes/2026-05-13-005-refresh-project-instructions-and-add-auto-record-hook-files.md) |
 | 006 | 2026-06-16 | SyberMem framework hardening and project repair | implemented | [link](changes/2026-06-16-006-sybermem-framework-hardening-and-project-repair.md) |
+| 007 | 2026-06-18 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-06-18-007-marketplace-plugin-hooks-and-more.md) |
+| 008 | 2026-06-18 | Add Claude Code plugin skeleton | implemented | [link](changes/2026-06-18-008-add-claude-code-plugin-skeleton.md) |
 <!-- add new records here -->
 
 ---
@@ -84,12 +88,12 @@ When adding records, update this index file accordingly.
 
 <!-- Auto-maintained: maps topic tags to record IDs for fast lookup -->
 - architecture: requirement-001
-- automation: change-003
+- automation: change-003, change-008
 - compression: requirement-002
 - digest: requirement-002
-- distribution: change-001, change-002
+- distribution: change-001, change-002, change-008
 - framework: change-006
-- hooks: change-003, change-005, bug-001
+- hooks: change-003, change-005, bug-001, change-008
 - init: change-005, bug-001
 - install: change-001
 - foundation: requirement-001

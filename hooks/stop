@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+resolve_project_root() {
+  local dir="${CLAUDE_PROJECT_DIR:-$(pwd)}"
+
+  if [ -f "$dir" ]; then
+    dir="$(dirname "$dir")"
+  fi
+
+  while [ "$dir" != "/" ] && [ -n "$dir" ]; do
+    if [ -d "$dir/.sybermem" ] && { [ -f "$dir/.claude/settings.json" ] || [ -f "$dir/.sybermem/INDEX.md" ]; }; then
+      printf '%s\n' "$dir"
+      return 0
+    fi
+    dir="$(dirname "$dir")"
+  done
+
+  return 1
+}
+
+if ! root="$(resolve_project_root)"; then
+  exit 0
+fi
+
+script="$root/.sybermem/hooks/record_change_on_stop.py"
+if [ ! -f "$script" ]; then
+  exit 0
+fi
+
+exec python "$script"
