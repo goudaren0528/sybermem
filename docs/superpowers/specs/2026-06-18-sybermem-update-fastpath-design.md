@@ -123,7 +123,52 @@
 - `"needs_update"` — 任何文件是 `missing` 或 `stale`
 - `"not_initialized"` — `.sybermem/INDEX.md` 不存在
 
-### 2.3 init-project fast-path
+### 2.3 非破坏性更新规则
+
+**核心约束：更新不能破坏用户原有文件内容。**
+
+用户的 `CLAUDE.md`、`AGENTS.md`、`.claude/settings.json` 可能包含与 SyberMem 无关的自定义内容。更新操作必须只修改 SyberMem 拥有的部分，保留其他所有内容。
+
+#### 按文件类型的安全更新策略
+
+| 文件 | 更新方式 | 禁止 |
+|---|---|---|
+| `CLAUDE.md` / `AGENTS.md` | **只操作 protocol block**：找到 `SYBERMEM_SESSION_PROTOCOL:START` 和 `END` 标记，替换标记之间的内容；如果标记不存在，在文件顶部插入整个 block。文件其余内容原样保留。 | 整体覆盖文件 |
+| `.claude/settings.json` | **只操作 SyberMem 拥有的字段**：`env.SYBERMEM_RECORD_MODE`、`hooks.SessionStart`（SyberMem 的那个 entry）、`hooks.Stop`（SyberMem 的那个 entry）。其他 env 变量、其他 hooks、其他顶层字段全部保留。 | 整体覆盖文件 |
+| `.sybermem/INDEX.md` | **只插入缺失的 section**（如 `## Stage Digests`、`## Topic Index`）。已有的 Key Conclusions、记录表、用户数据原样保留。 | 重新生成整个文件 |
+| `.sybermem/hooks/*.py` | **可以整体替换**——这些是 SyberMem 完全拥有的执行文件，不含用户自定义内容。 | — |
+| `.sybermem/templates/*.md` | **可以整体替换**——模板文件是 SyberMem 拥有的。 | — |
+
+#### check_project_health.py 报告增强
+
+脚本对 `CLAUDE.md` 和 `AGENTS.md` 额外报告 `"is_sybermem_only"` 字段：
+
+```json
+"CLAUDE.md": {
+  "status": "stale",
+  "has_protocol_block": false,
+  "is_sybermem_only": false
+}
+```
+
+`is_sybermem_only` 判定：文件内容去掉 protocol block 后，剩余部分是否和 SyberMem 模板完全匹配。
+- `true` → 整体刷新安全（该文件是纯 SyberMem managed）
+- `false` → 只能操作 protocol block，不能整体覆盖
+
+#### actions_needed 精确描述更新方式
+
+```json
+"actions_needed": [
+  "insert protocol block into CLAUDE.md (preserve existing content)",
+  "insert protocol block into AGENTS.md (preserve existing content)",
+  "add SessionStart hook entry to .claude/settings.json (preserve other hooks)",
+  "create .sybermem/hooks/session_start_context.py from template"
+]
+```
+
+每条 action 都明确标注是 "insert"（部分更新）还是 "create"（新建）还是 "replace"（整体替换，仅限 SyberMem 完全拥有的文件）。
+
+### 2.4 init-project fast-path
 
 在 init-project SKILL.md 的 Step 1 开头加一个 fast-path：
 
@@ -148,7 +193,7 @@ Step 0.5: Run check_project_health.py
   → 走完整的现有流程（兼容旧项目）。
 ```
 
-### 2.4 sybermem-update 流程简化
+### 2.5 sybermem-update 流程简化
 
 更新后的 `/sybermem-update` 流程：
 
@@ -198,18 +243,49 @@ Step 2: 运行 /sybermem-init-project
 
 ### 3.3 actions_needed 生成
 
-脚本根据 status 自动推导需要的操作：
+脚本根据 status 自动推导需要的操作，action 文本明确标注更新方式：
 
 ```python
 actions = []
+
+# SyberMem 完全拥有的文件：可以 create/replace
 if files["session_start_context"]["status"] == "missing":
     actions.append("create .sybermem/hooks/session_start_context.py from template")
-if files["settings_json"]["status"] == "stale" and not files["settings_json"]["has_session_start_hook"]:
-    actions.append("add SessionStart hook entry to .claude/settings.json")
-# ... etc
+if files["record_change_on_stop"]["status"] == "stale":
+    actions.append("replace .sybermem/hooks/record_change_on_stop.py from template")
+
+# 用户可能有自定义内容的文件：只能 insert/patch
+if not files["claude_md"].get("has_protocol_block"):
+    actions.append("insert protocol block into CLAUDE.md (preserve existing content)")
+if not files["agents_md"].get("has_protocol_block"):
+    actions.append("insert protocol block into AGENTS.md (preserve existing content)")
+if files["settings_json"]["status"] == "stale":
+    if not files["settings_json"]["has_session_start_hook"]:
+        actions.append("add SessionStart hook entry to .claude/settings.json (preserve other hooks)")
+    if not files["settings_json"]["has_stop_hook"]:
+        actions.append("add Stop hook entry to .claude/settings.json (preserve other hooks)")
 ```
 
-### 3.4 退出码
+### 3.4 settings.json 外科手术式更新
+
+模型在处理 `add ... hook entry to .claude/settings.json` 时，必须：
+
+1. `json.load` 读取现有内容
+2. 只在 `hooks` 对象下添加/替换 SyberMem 的 entry
+3. 保留其他所有字段和 hooks
+4. `json.dump` 写回
+
+```python
+# 模型执行示意（不是脚本，是模型的操作指导）
+import json
+settings = json.load(open(".claude/settings.json"))
+settings.setdefault("hooks", {})
+settings["hooks"]["SessionStart"] = [{"hooks": [{"type": "command", ...}]}]
+# 不动 settings 里的其他内容
+json.dump(settings, open(".claude/settings.json", "w"), indent=2)
+```
+
+### 3.5 退出码
 
 - `0` — 总是成功退出（即使 needs_update）
 - JSON 输出到 stdout
