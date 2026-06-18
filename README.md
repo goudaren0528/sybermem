@@ -8,7 +8,20 @@
 
 安装 Skills → 在项目中运行 `/sybermem-init-project` → 完成有意义的工作后运行 `/sybermem-record` → 使用 `/sybermem-phase-analyze` 从项目历史构建或刷新 `.sybermem/analysis/phase-index.md` → 使用 `/sybermem-phase-confirm` 确认或调整候选阶段 → 使用 `/sybermem-summary` 查看最近活跃 confirmed phase 的当前状态面板（若 analysis layer 不存在，则回退到 weekly/monthly 动态报表）→ 在一个有意义的阶段结束时使用 `/sybermem-digest`，将持久化阶段总结写入 `.sybermem/digests/`。`phase-index.md` 是持久化的项目分析产物，不是最终 digest。每次会话开始时，AI 读取 `.sybermem/INDEX.md` 中的关键结论，回忆历史工作上下文。在 `auto` 模式下，stop hook 仍会自动写入轻量 `change` trail，但在检测到高价值变化模式时，也可能非阻塞地提示你补 `/sybermem-record` 或后续 `/sybermem-digest`。
 
-`/sybermem-summary` 看“现在这个阶段状态如何”，而 `/sybermem-digest` 记录“这个阶段最终沉淀了什么”。
+`/sybermem-summary` 看”现在这个阶段状态如何”，而 `/sybermem-digest` 记录”这个阶段最终沉淀了什么”。
+
+## 生命周期层（Lifecycle Layer）
+
+SyberMem 嵌入 Claude Code / OpenCode 的会话生命周期，让项目记忆无感地跟随工作流：
+
+| 生命周期 | Claude Code | OpenCode |
+|---|---|---|
+| 会话开始 | `SessionStart` hook 自动注入 Key Conclusions、Topic Index、phase 状态 | `session.created` toast 通知 |
+| 工作中 | 模型根据 Topic Index 关联历史记录 | 同上 |
+| 压缩前 | `SessionStart` compact 后重新注入 | `session.compacting` 注入 Key Conclusions + phase |
+| 会话结束 | `Stop` hook 写轻量 change trail + nudge | `session.idle` 检测变更 + toast |
+
+两个平台共享 `.sybermem/.nudge-state.json`，交替使用时不重复提示。
 
 ## 推荐升级方式
 
@@ -119,7 +132,8 @@ cd sybermem; .\scripts\install.ps1
 ├── analysis/
 │   └── phase-index.md            # 持久化项目分析产物，用于记录候选阶段、已确认阶段和分析进度，不是最终 digest
 ├── hooks/
-│   └── record_change_on_stop.py   # 默认自动 change hook helper
+│   ├── record_change_on_stop.py   # 默认自动 change hook helper
+│   └── session_start_context.py   # SessionStart 上下文注入脚本
 └── templates/        # 记录模板（含 digest 模板）
 
 CLAUDE.md             # Claude Code 项目指令（工作流规则）
