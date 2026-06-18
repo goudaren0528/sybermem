@@ -13,6 +13,7 @@ CLAUDE_SKILLS="$HOME/.claude/skills"
 OPENCODE_SKILLS="$HOME/.config/opencode/skills"
 LAUNCHER_DIR="$HOME/.claude/sybermem"
 LAUNCHER_PATH="$LAUNCHER_DIR/launch_record_change_on_stop.py"
+SESSION_LAUNCHER_PATH="$LAUNCHER_DIR/launch_session_start_context.py"
 OPENCODE_PLUGIN_DIR="$HOME/.config/opencode/plugins"
 
 echo "=== SyberMem Remote Install ==="
@@ -26,6 +27,7 @@ curl -sL "$TARBALL_URL" | tar xz -C "$TMPDIR"
 
 SKILLS_SRC="$TMPDIR/$ARCHIVE_PREFIX/packages/claude-skills"
 LAUNCHER_SOURCE="$TMPDIR/$ARCHIVE_PREFIX/scripts/global-stop-hook-launcher.py"
+SESSION_LAUNCHER_SOURCE="$TMPDIR/$ARCHIVE_PREFIX/scripts/global-session-start-launcher.py"
 PLUGIN_SOURCE="$TMPDIR/$ARCHIVE_PREFIX/packages/opencode-plugin/sybermem.ts"
 
 if [ ! -d "$SKILLS_SRC" ]; then
@@ -56,6 +58,11 @@ if [ -d "$HOME/.claude" ]; then
     cp "$LAUNCHER_SOURCE" "$LAUNCHER_PATH"
     chmod +x "$LAUNCHER_PATH"
     echo "  [Claude Code] installed stop hook launcher: $LAUNCHER_PATH"
+    if [ -f "$SESSION_LAUNCHER_SOURCE" ]; then
+        cp "$SESSION_LAUNCHER_SOURCE" "$SESSION_LAUNCHER_PATH"
+        chmod +x "$SESSION_LAUNCHER_PATH"
+        echo "  [Claude Code] installed session start launcher: $SESSION_LAUNCHER_PATH"
+    fi
 fi
 
 # OpenCode: install plugin
