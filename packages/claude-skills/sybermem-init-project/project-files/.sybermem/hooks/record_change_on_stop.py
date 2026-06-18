@@ -74,11 +74,12 @@ SOFT_SKIP_FILES = {
     "AGENTS.md",
 }
 
-NUDGE_STATE_PATH = SYBERMEM_DIR / ".auto-nudge-state.json"
+NUDGE_STATE_PATH = SYBERMEM_DIR / ".nudge-state.json"
+LEGACY_NUDGE_STATE_PATH = SYBERMEM_DIR / ".auto-nudge-state.json"
 RECORD_FILE_THRESHOLD = 5
 RECORD_COOLDOWN_KEYS = {"record", "digest"}
 # Bounded recent-window: only the last N same-theme record-writing stops are
-# kept.  Digest cluster detection is based on this window, not lifetime totals.
+# kept. Digest cluster detection is based on this window, not lifetime totals.
 THEME_WINDOW_SIZE = 10
 HIGH_SIGNAL_PATTERNS = (
     re.compile(r"^README(?:\..+)?$", re.IGNORECASE),
@@ -147,12 +148,12 @@ def trail_files(files: list[str]) -> list[str]:
 
     Soft-skip files (CLAUDE.md, AGENTS.md) are excluded when they are the
     *only* files present, to avoid self-referential noise from lone meta-file
-    edits.  When mixed with substantive changes they are included normally.
+    edits. When mixed with substantive changes they are included normally.
     """
     non_soft = [f for f in files if f not in SOFT_SKIP_FILES]
     if non_soft:
-        return files  # substantive changes present — include everything
-    return []  # only soft-skip files — suppress the auto-record entirely
+        return files
+    return []
 
 
 def load_state() -> dict:
@@ -169,12 +170,22 @@ def save_state(state: dict) -> None:
 
 
 def load_nudge_state() -> dict:
-    if not NUDGE_STATE_PATH.exists():
-        return {}
-    try:
-        return json.loads(NUDGE_STATE_PATH.read_text(encoding="utf-8"))
-    except Exception:
-        return {}
+    """Load unified nudge state, migrating from legacy files if needed."""
+    if NUDGE_STATE_PATH.exists():
+        try:
+            return json.loads(NUDGE_STATE_PATH.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    # Migrate from legacy .auto-nudge-state.json if it exists
+    if LEGACY_NUDGE_STATE_PATH.exists():
+        try:
+            data = json.loads(LEGACY_NUDGE_STATE_PATH.read_text(encoding="utf-8"))
+            # Save to new path; leave legacy file on disk (cleaned by /sybermem-update)
+            save_nudge_state(data)
+            return data
+        except Exception:
+            pass
+    return {}
 
 
 def save_nudge_state(state: dict) -> None:
@@ -199,14 +210,66 @@ def detect_high_level_areas(files: list[str]) -> set[str]:
     return matched
 
 
-DIGEST_CLUSTER_THRESHOLD = 2  # min same-theme recent stops needed to suggest a digest
-# Present-stop file count that satisfies the signal floor for a digest nudge.
+COMMIT_GAP_THRESHOLD = 10
+
+
+def count_commits_since_last_record() -> int:
+    """Count commits since the most recent record file date across all record directories."""
+    latest_date: str = ""
+    for subdir in ("changes", "decisions", "requirements", "bugs"):
+        record_dir = SYBERMEM_DIR / subdir
+        if not record_dir.is_dir():
+            continue
+        for path in record_dir.glob("*.md"):
+            match = re.match(r"(\d{4}-\d{2}-\d{2})-", path.name)
+            if match and match.group(1) > latest_date:
+                latest_date = match.group(1)
+    if not latest_date:
+        return 0
+    count_str = run_git("rev-list", "--count", f"--since={latest_date}", "HEAD")
+    try:
+        return int(count_str)
+    except (ValueError, TypeError):
+        return 0
+
+
+DIGEST_CLUSTER_THRESHOLD = 2
 DIGEST_SIGNAL_FILE_FLOOR = 3
 
 
-# ---------------------------------------------------------------------------
-# Recent-window helpers
-# ---------------------------------------------------------------------------
+AUTO_TRAIL_DEDUP_WINDOW = 3
+AUTO_TRAIL_OVERLAP_THRESHOLD = 0.8
+
+
+def overlaps_recent_auto_trails(files: list[str]) -> bool:
+    """Check if the current file set overlaps >80% with any of the last 3 auto trails."""
+    if not CHANGES_DIR.is_dir():
+        return False
+    trails = sorted(CHANGES_DIR.glob("*.md"), key=lambda p: p.name, reverse=True)
+    current_set = set(files)
+    checked = 0
+    for trail_path in trails:
+        if checked >= AUTO_TRAIL_DEDUP_WINDOW:
+            break
+        try:
+            content = trail_path.read_text(encoding="utf-8")
+        except Exception:
+            continue
+        # Only check auto-generated trails (they have the "Auto-generated" marker)
+        if "Auto-generated from workspace changes" not in content:
+            continue
+        checked += 1
+        # Extract related_files from frontmatter
+        fm_match = re.search(r"^related_files:\s*(.+)$", content, re.MULTILINE)
+        if not fm_match:
+            continue
+        trail_files = {f.strip() for f in fm_match.group(1).split(",")}
+        if not trail_files or not current_set:
+            continue
+        overlap = len(current_set & trail_files) / max(len(current_set), len(trail_files))
+        if overlap >= AUTO_TRAIL_OVERLAP_THRESHOLD:
+            return True
+    return False
 
 
 def get_theme_recent_stops(theme_key: str, nudge_state: dict) -> list[str]:
@@ -232,7 +295,7 @@ def detect_recent_theme_overlap(theme_key: str, nudge_state: dict) -> bool:
     """Return True only when a credible same-theme cluster exists.
 
     Uses the bounded theme_recent_stops list instead of lifetime-cumulative
-    theme_record_counts, so ancient activity does not pollute the signal.  The
+    theme_record_counts, so ancient activity does not pollute the signal. The
     cluster must reach DIGEST_CLUSTER_THRESHOLD entries within the bounded
     window before a digest nudge fires.
     """
@@ -248,7 +311,7 @@ def present_stop_qualifies_for_digest(
     """Return True when the *current* stop has enough signal to warrant a digest nudge.
 
     Prevents over-triggering on tiny low-signal stops once a theme's accumulated
-    count has crossed DIGEST_CLUSTER_THRESHOLD.  Any one of the following is
+    count has crossed DIGEST_CLUSTER_THRESHOLD. Any one of the following is
     sufficient:
     - strong signal: at least one high-signal file is present
     - cross-area: the current stop touches two or more high-level areas
@@ -263,7 +326,7 @@ def already_nudged_digest_for_theme(theme_key: str, nudge_state: dict) -> bool:
 
     Uses nudge_state["digest_nudged_at_window_len"] (a dict mapping theme_key to the
     window length at the time of the last digest nudge) instead of the
-    volatile ``last_nudge_type`` field, so that intervening low-signal stops
+    volatile `last_nudge_type` field, so that intervening low-signal stops
     (which would overwrite last_nudge_type to "none") do not reset the cooldown.
 
     The cooldown is lifted once the theme recent window has grown by at least
@@ -274,7 +337,6 @@ def already_nudged_digest_for_theme(theme_key: str, nudge_state: dict) -> bool:
     if theme_key not in nudged_at:
         return False
     current_len = len(get_theme_recent_stops(theme_key, nudge_state))
-    # Cooldown holds as long as no new stops have been added since the nudge.
     return current_len <= nudged_at[theme_key]
 
 
@@ -307,20 +369,20 @@ def classify_followup(files: list[str], nudge_state: dict) -> tuple[str, str | N
     theme_key = slugify("-".join(sorted(areas)) or "misc")
     recent_overlap = detect_recent_theme_overlap(theme_key, nudge_state)
 
-    # Digest cooldown: theme-aware, survives intervening non-digest stops.
-    if (recent_overlap
-            and present_stop_qualifies_for_digest(files, high_signal_hits, areas)
-            and not already_nudged_digest_for_theme(theme_key, nudge_state)):
-        return "digest", theme_key, "SyberMem note: recent records around this area may now be enough for a /sybermem-digest if this phase has reached a stable stopping point."
-
     last_type = nudge_state.get("last_nudge_type")
     last_theme = nudge_state.get("last_theme")
+
+    already_digested_this_theme = already_nudged_digest_for_theme(theme_key, nudge_state)
+    if recent_overlap and present_stop_qualifies_for_digest(files, high_signal_hits, areas) and not already_digested_this_theme:
+        return "digest", theme_key, "SyberMem note: recent records around this area may now be enough for a /sybermem-digest if this phase has reached a stable stopping point."
 
     cross_area = len(areas) >= 2
     strong_signal = bool(high_signal_hits)
     large_change = file_count >= RECORD_FILE_THRESHOLD
-    if (strong_signal or cross_area or large_change) and not (last_type == "record" and last_theme == theme_key):
-        return "record", theme_key, "SyberMem note: this change looks important enough for a manual /sybermem-record so the reason and impact are preserved more clearly."
+    commit_gap = count_commits_since_last_record() >= COMMIT_GAP_THRESHOLD
+    if (strong_signal or cross_area or large_change or commit_gap) and not (last_type == "record" and last_theme == theme_key):
+        gap_note = f" ({count_commits_since_last_record()} commits since last record)" if commit_gap else ""
+        return "record", theme_key, f"SyberMem note: this change looks important enough for a manual /sybermem-record so the reason and impact are preserved more clearly.{gap_note}"
 
     return "none", theme_key, None
 
@@ -415,35 +477,41 @@ def main() -> int:
     if not all_files:
         return 0
 
-    # Determine which files go into the trail record (excludes lone soft-skip files).
     files = trail_files(all_files)
-
-    # Load nudge state before classify so theme_recent_stops is available.
     nudge_state = load_nudge_state()
-    # Use all_files for signal detection even when trail is suppressed.
     followup_hint, theme_key, nudge_message = classify_followup(all_files, nudge_state)
 
     if not files:
-        # Only soft-skip files changed — emit nudge if warranted, but skip record.
-        # Persist nudge cooldown/theme state so the same nudge cannot repeat on
-        # the next stop without new activity.  No theme_recent_stops entry is
-        # added here because no auto-record was written.
-        if nudge_message:
-            print(nudge_message)
-        digest_nudged_at: dict = dict(nudge_state.get("digest_nudged_at_window_len", {}))
-        if followup_hint == "digest":
-            digest_nudged_at[theme_key] = len(get_theme_recent_stops(theme_key, nudge_state))
-        save_nudge_state({
+        updated_nudge_state = {
             **nudge_state,
+            "last_nudge": {
+                "platform": "claude-code",
+                "type": followup_hint if followup_hint in RECORD_COOLDOWN_KEYS else "none",
+                "theme": theme_key,
+                "date": date.today().isoformat(),
+            },
             "last_theme": theme_key,
             "last_nudge_type": followup_hint if followup_hint in RECORD_COOLDOWN_KEYS else "none",
-            "digest_nudged_at_window_len": digest_nudged_at,
-        })
+        }
+        if followup_hint == "digest":
+            digest_nudged_at: dict = dict(nudge_state.get("digest_nudged_at_window_len", {}))
+            digest_nudged_at[theme_key] = len(get_theme_recent_stops(theme_key, nudge_state))
+            updated_nudge_state["digest_nudged_at_window_len"] = digest_nudged_at
+        save_nudge_state(updated_nudge_state)
+        if nudge_message:
+            print(nudge_message)
         return 0
 
     fingerprint = json.dumps(files, ensure_ascii=False)
     state = load_state()
     if state.get("last_fingerprint") == fingerprint:
+        return 0
+
+    # Auto-trail dedup: skip if >80% overlap with recent auto trails
+    if overlaps_recent_auto_trails(files):
+        save_state({"last_fingerprint": fingerprint, "last_record": state.get("last_record", "")})
+        if nudge_message:
+            print(nudge_message)
         return 0
 
     record_date = date.today().isoformat()
@@ -455,21 +523,25 @@ def main() -> int:
     update_index(record_date, number, slug.replace("-", " "), slug)
     save_state({"last_fingerprint": fingerprint, "last_record": record_path.name})
 
-    # Append this stop to the bounded recent-window for the current theme so
-    # digest cluster detection is based on recent activity, not lifetime totals.
-    nudge_state = append_theme_recent_stop(theme_key, nudge_state, record_date)
-
-    # Persist digest nudge memory durably so intervening quiet stops cannot erase it.
-    digest_nudged_at = dict(nudge_state.get("digest_nudged_at_window_len", {}))
-    if followup_hint == "digest":
-        digest_nudged_at[theme_key] = len(get_theme_recent_stops(theme_key, nudge_state))
-    save_nudge_state({
+    today = record_date
+    nudge_state = append_theme_recent_stop(theme_key, nudge_state, today)
+    updated_nudge_state = {
         **nudge_state,
+        "last_nudge": {
+            "platform": "claude-code",
+            "type": followup_hint if followup_hint in RECORD_COOLDOWN_KEYS else "none",
+            "theme": theme_key,
+            "date": date.today().isoformat(),
+        },
         "last_theme": theme_key,
         "last_nudge_type": followup_hint if followup_hint in RECORD_COOLDOWN_KEYS else "none",
         "last_record": record_path.name,
-        "digest_nudged_at_window_len": digest_nudged_at,
-    })
+    }
+    if followup_hint == "digest":
+        digest_nudged_at: dict = dict(nudge_state.get("digest_nudged_at_window_len", {}))
+        digest_nudged_at[theme_key] = len(get_theme_recent_stops(theme_key, nudge_state))
+        updated_nudge_state["digest_nudged_at_window_len"] = digest_nudged_at
+    save_nudge_state(updated_nudge_state)
     if nudge_message:
         print(nudge_message)
     return 0
