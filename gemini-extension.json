@@ -1,0 +1,14 @@
+{
+  "name": "sybermem",
+  "description": "Project memory and decision tracking",
+  "version": "0.1.0",
+  "author": "goudaren0528",
+  "homepage": "https://github.com/goudaren0528/sybermem",
+  "repository": "https://github.com/goudaren0528/sybermem",
+  "license": "MIT",
+  "metadata": {
+    "system": "SyberMem",
+    "category": "project-memory",
+    "entry": "GEMINI.md"
+  }
+}
