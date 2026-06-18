@@ -90,8 +90,23 @@ If you catch yourself doing any of these, STOP:
 
 **All of these mean: go back to the relevant step and re-verify.**
 
+## Common Rationalizations
+
+| Excuse | Reality |
+|--------|---------|
+| "This is just a small change, not worth recording" | Small changes accumulate into history gaps. Key Conclusions are built from every record. |
+| "The auto trail already captured it" | Auto trail only has file lists. No reason, impact, or verification. High-signal changes need manual records. |
+| "I'll record it later" | Context evaporates across sessions. Record now while the reasoning is fresh. |
+| "This is a decision, but I'll just record it as a change" | Decisions have options, trade-offs, and rationale that the change template doesn't capture. Use the right type. |
+
 ## When NOT to Record
 
 - Simple formatting adjustments or comment edits
 - Config tweaks with no functional impact
 - WIP or draft work
+
+## Integration
+
+**Related skills:**
+- **sybermem-phase-analyze** — Run to refresh the phase index after creating records
+- **sybermem-digest** — Use when a phase has enough records for a durable summary

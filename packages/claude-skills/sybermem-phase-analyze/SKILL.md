@@ -122,3 +122,9 @@ If you catch yourself doing any of these, STOP:
 This skill is complete when:
 - `.sybermem/analysis/phase-index.md` has been updated with refreshed and auto-confirmed phases
 - the user has been told what phases were proposed and confirmed
+
+## Integration
+
+**Related skills:**
+- **sybermem-phase-confirm** — Downstream: confirm or adjust candidate phases after analysis
+- **sybermem-digest** — Downstream: create durable phase digests from confirmed phases

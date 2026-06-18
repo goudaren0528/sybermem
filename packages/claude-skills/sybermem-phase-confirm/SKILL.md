@@ -109,3 +109,10 @@ This skill is complete when:
 - the coverage map has been updated to reflect the new phase structure
 - no digest has been auto-created
 - the user has been told what changed
+
+## Integration
+
+**Related skills:**
+- **sybermem-phase-analyze** — Upstream: must run before confirming phases
+- **sybermem-digest** — Downstream: create digests after confirming phases
+- **sybermem-update** — Run if phase-index.md is missing

@@ -17,7 +17,7 @@ Initialize or refresh the SyberMem project record system in the current project.
 - **No protocol update should rewrite more than the bounded `using-sybermem` block when the markers already exist.**
 
 <HARD-GATE>
-Do NOT classify any file without first verifying its existence on disk with a file-system tool (Read, Glob, or equivalent). Do NOT infer existence from settings.json references, previous tool output, or conversation context. If the tool confirms the file does not exist, classify it as `missing` regardless of what other signals suggest.
+Do NOT classify any file without first verifying its existence on disk with a file-system tool. Do NOT infer existence from settings.json references, previous tool output, or conversation context. If the tool confirms the file does not exist, classify it as `missing` regardless of what other signals suggest.
 
 Do NOT create `.sybermem/` in a subdirectory when a parent SyberMem root already exists above cwd. Inform the user and ask before creating a nested project.
 </HARD-GATE>
@@ -71,7 +71,7 @@ Parse the JSON output and branch:
 **If `overall == "needs_update"`:**
 - Process only the `actions_needed` list. Each action specifies its update method:
   - `"create ..."` → create the file from the init-project template
-  - `"insert ..."` → non-destructive partial update (see Non-Destructive Update Rules below)
+  - `"insert ..."` → non-destructive partial update (see `file-classification-rules.md` Non-Destructive Update Rules)
   - `"replace ..."` → full replacement (only for SyberMem-owned files like hooks and templates)
   - `"add ..."` → surgical JSON patch (only for settings.json hook entries)
 - After processing all actions, output a summary of what was changed and skip remaining steps.
@@ -79,90 +79,15 @@ Parse the JSON output and branch:
 **If `overall == "not_initialized"` or the script does not exist:**
 - Proceed with the full initialization flow starting at Step 1.
 
-### Non-Destructive Update Rules
-
-**These rules apply to ALL update operations, whether triggered by fast-path or full flow.**
-
-| File | Allowed Update | Forbidden |
-|---|---|---|
-| `CLAUDE.md` / `AGENTS.md` | Insert or refresh the bounded `SYBERMEM_SESSION_PROTOCOL:START`/`END` block only. If the block exists, replace only its contents. If it does not exist, insert the complete block at the top of the file. All content outside the block markers is preserved verbatim. | Overwriting the entire file when it contains user content outside the protocol block. |
-| `.claude/settings.json` | Read with `json.load`, add/update only SyberMem-owned keys (`env.SYBERMEM_RECORD_MODE`, `hooks.SessionStart`, `hooks.Stop`), write back with `json.dump`. All other keys, env vars, and hooks are preserved. | Overwriting the entire file from template. |
-| `.sybermem/INDEX.md` | Insert missing sections (`## Stage Digests`, `## Topic Index`) at the appropriate position. All existing Key Conclusions, record tables, and user data are preserved. | Regenerating the entire file from template. |
-| `.sybermem/hooks/*.py` | Full replacement from template — these are SyberMem-owned executables with no user content. | — |
-| `.sybermem/templates/*.md` | Full replacement from template — these are SyberMem-owned templates. | — |
-
 ### Step 1: Resolve existing state
 
 - Apply the directory resolution rules above.
 - If `.sybermem/INDEX.md` already exists after resolution, treat the project as already initialized.
 - Before scanning code or regenerating files, inspect project-root `AGENTS.md` and `CLAUDE.md`.
 
-### Step 1.1: Inspect project instruction files
+Read `file-classification-rules.md` for the complete file classification logic, protocol-block handling rules, and non-destructive update rules.
 
-Use these template files from this installed skill as the canonical refresh source:
-
-- `project-files/AGENTS.md`
-- `project-files/CLAUDE.md`
-- `project-files/.claude/settings.json`
-- `project-files/.sybermem/hooks/record_change_on_stop.py`
-- `project-files/.sybermem/hooks/check_project_health.py`
-
-**MANDATORY: Before classifying any file, you MUST verify its existence using a file-system tool (Read, Glob, or equivalent). Do NOT infer existence from settings.json references, previous tool output, or conversation context. If the tool confirms the file does not exist, classify it as `missing` regardless of what other signals suggest.**
-
-Classify each project file as one of:
-
-- **missing** — file does not exist on disk (verified by file-system tool)
-- **fresh** — file exists on disk and matches the current SyberMem-managed behavior set for this release, including the current analysis-aware command set and workflow guidance
-- **stale SyberMem-managed** — file exists on disk and is recognizably SyberMem-managed, but is missing newly required behavior or wording for this release (for example pre-digest or pre-analysis managed content)
-- **custom** — file exists on disk but no longer clearly behaves like a SyberMem-managed instruction file or template-derived file structure for this release.
-
-Refresh rules:
-
-1. **missing** → create it from the matching template file.
-2. **fresh** → leave it unchanged.
-3. **stale SyberMem-managed** → ask the user whether to refresh it. Before overwriting, create a same-directory backup such as `AGENTS.md.backup` or `CLAUDE.md.backup`, then replace it with the current template.
-4. **custom** → do not overwrite automatically. Explain why it appears custom and ask before replacing it.
-
-### Protocol-block handling
-
-For `CLAUDE.md` and `AGENTS.md`, treat the `using-sybermem` session-entry protocol as a marker-bounded managed block.
-
-- If the file already contains `SYBERMEM_SESSION_PROTOCOL:START` and `SYBERMEM_SESSION_PROTOCOL:END`, refresh only the contents inside that block.
-- If the file is still recognizably SyberMem-managed but does not yet contain the block, insert it near the top of the file.
-- If the file is custom and does not contain the block, do not auto-insert it; explain the option and ask first.
-- If the file is custom but already contains the markers, refresh only the block and leave the rest of the file unchanged.
-
-This protocol block is the automatic entrypoint. The separately installed `/using-sybermem` skill is the visible manual entrypoint.
-
-If the project was already initialized and only instruction files needed refresh, you may skip the codebase scan and go directly to the summary.
-
-### Step 1.2: Enable digest capability if missing
-
-For projects that already have `.sybermem/INDEX.md`, check whether digest support is present:
-
-- `.sybermem/digests/`
-- `.sybermem/templates/digest-template.md`
-- `## Stage Digests` section in `.sybermem/INDEX.md`
-
-If any are missing:
-- create the missing `digests/` directory
-- create the missing `digest-template.md` from `project-files/.sybermem/templates/digest-template.md`
-- insert the missing `## Stage Digests` section into `INDEX.md`
-
-Do this idempotently. Never duplicate the section, never overwrite an existing digest template without asking, and never treat the absence of digest support as a reason to reinitialize the whole project.
-
-### Step 1.3: Enable analysis capability if missing
-
-For projects that already have `.sybermem/INDEX.md`, check whether analysis support is present:
-
-- `.sybermem/analysis/` directory
-- `.sybermem/analysis/phase-index.md`
-
-If any are missing:
-- create the missing `analysis/` directory
-- create the missing `phase-index.md` from `project-files/.sybermem/analysis/phase-index.md`
-
-Do this idempotently. Never overwrite an existing phase-index without asking.
+Read `capability-checks.md` for the digest and analysis capability checks.
 
 ### Step 2: Determine project type
 
@@ -200,33 +125,7 @@ Use the standard format, including:
 - `## Stage Digests` section + `<!-- add new digest records here -->` placeholder
 - 4 type tables + `<!-- add new records here -->` placeholder
 
-### Step 5: Scan and analyze existing codebases
-
-For existing codebases only:
-
-1. Identify the tech stack (package.json / requirements.txt / go.mod etc.)
-2. Scan recent Git history (last 20 commits)
-3. Detect special code markers (TODO, FIXME, HACK, workaround)
-4. Present findings to the user and suggest creating corresponding records
-
-Write key findings into `.sybermem/INDEX.md` `## Key Conclusions` in concise bullet form.
-
-### Step 6: Detect existing record files
-
-Scan for common record/documentation files:
-
-| Target | Common paths |
-|--------|-------------|
-| Changelog | `CHANGELOG.md`, `CHANGES.md`, `HISTORY.md` |
-| ADR/decision records | `docs/adr/`, `docs/decisions/`, `adr/`, `doc/architecture/` |
-| Requirements/design docs | `docs/design/`, `docs/specs/`, `docs/rfcs/` |
-| Bug tracking | `BUGS.md`, `KNOWN_ISSUES.md` |
-
-When found, ask the user whether to:
-
-1. **Import and organize** — rewrite content into `.sybermem/` records and keep backups
-2. **Index only** — add links from `.sybermem/INDEX.md`
-3. **Skip** — leave them untouched
+Read `codebase-scan-rules.md` for the existing codebase scan and record detection logic.
 
 ### Step 7: Create or refresh project instruction files
 
@@ -287,6 +186,15 @@ If you catch yourself doing any of these, STOP:
 
 **All of these mean: go back to Step 1.1, re-verify with filesystem tools, and re-classify.**
 
+## Common Rationalizations
+
+| Excuse | Reality |
+|--------|---------|
+| "This file looks fresh, I don't need to check" | Without filesystem verification, you're guessing. HARD-GATE requires tool-verified classification. |
+| "The project was just initialized, everything must be fine" | New features may have been added since initialization. Always verify against current templates. |
+| "I'll skip the backup, the old file wasn't important" | The user may have custom content. Always backup stale files before replacing. |
+| "This settings.json is custom, I'll overwrite it with the template" | Only replace SyberMem-owned entries. Preserve all other user configuration. |
+
 ## Terminal State
 
 This skill is complete when:
@@ -302,3 +210,10 @@ This skill is complete when:
 - **Instruction refresh is explicit**: stale SyberMem-managed project files should be refreshed with backups, custom files only with user approval
 - **Scan but don't auto-create records for existing code**: output suggestions and let the user decide
 - **Idempotent safety**: repeated execution should not destroy valid `.sybermem/` records or custom project instructions
+
+## Integration
+
+**Related skills:**
+- **sybermem-update** — Calls this skill as its Step 2
+- **sybermem-record** — Available after initialization
+- **sybermem-summary** — Available after initialization

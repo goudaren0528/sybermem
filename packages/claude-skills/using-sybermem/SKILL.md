@@ -52,6 +52,30 @@ Explain what would currently happen if the user runs:
 ### Step 3: Recommend the next command
 
 Recommend the most appropriate next SyberMem command based on the current state.
+
+```dot
+digraph recommend_command {
+    "Phase index exists?" [shape=diamond];
+    "Recommend /sybermem-phase-analyze" [shape=box];
+    "Has candidate phases only?" [shape=diamond];
+    "Recommend /sybermem-phase-confirm" [shape=box];
+    "Important work with only auto trail?" [shape=diamond];
+    "Recommend /sybermem-record" [shape=box];
+    "Project partially upgraded?" [shape=diamond];
+    "Recommend /sybermem-update" [shape=box];
+    "Recommend /sybermem-summary" [shape=box];
+
+    "Phase index exists?" -> "Recommend /sybermem-phase-analyze" [label="no"];
+    "Phase index exists?" -> "Has candidate phases only?" [label="yes"];
+    "Has candidate phases only?" -> "Recommend /sybermem-phase-confirm" [label="yes"];
+    "Has candidate phases only?" -> "Important work with only auto trail?" [label="no"];
+    "Important work with only auto trail?" -> "Recommend /sybermem-record" [label="yes"];
+    "Important work with only auto trail?" -> "Project partially upgraded?" [label="no"];
+    "Project partially upgraded?" -> "Recommend /sybermem-update" [label="yes"];
+    "Project partially upgraded?" -> "Recommend /sybermem-summary" [label="no"];
+}
+```
+
 Examples:
 - if no phase index exists and the user wants phase-aware workflows → recommend `/sybermem-phase-analyze`
 - if a candidate phase exists but no confirmed phase exists → recommend `/sybermem-phase-confirm`
@@ -93,3 +117,12 @@ This skill is complete when:
 - the current SyberMem state has been reported
 - the routing implications for the main SyberMem commands have been explained
 - a recommended next command has been given
+
+## Integration
+
+**Related skills:**
+- **sybermem-record** — Recommended when important work is happening
+- **sybermem-phase-analyze** — Recommended when phase index is missing or stale
+- **sybermem-phase-confirm** — Recommended when candidate phases need confirmation
+- **sybermem-summary** — Recommended for status overview
+- **sybermem-update** — Recommended when project appears partially upgraded
