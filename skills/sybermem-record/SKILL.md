@@ -56,7 +56,7 @@ Required sections:
    - a bug this work fixes → propose `fixes`
    - a record discussed in the same session with no clear causality → propose `related`
 
-   Propose to the user, e.g. "This change appears to implement requirement-002. Add `implements: [requirement-002]`?" Only write the relation field into the record's frontmatter if the user confirms or it is clearly correct. Relation values must be existing record IDs. If there is no clear relation, skip silently. This is a proposal — it never blocks the core record steps below.
+   Propose to the user, e.g. "This change appears to implement requirement-002. Add `implements: [requirement-002]`?" Only write the relation field into the record's frontmatter if the user confirms. Relation values must be existing record IDs. If there is no clear relation, skip silently. This is a proposal — it never blocks the core record steps below.
 
 6. **Create file** — path: `.sybermem/{type}/{YYYY-MM-DD}-{NNN}-{title}.md`. Use `templates/{type}.md` as the content template.
 7. **Update INDEX.md table** — insert a new row above the `<!-- add new records here -->` comment in the corresponding table.

@@ -39,7 +39,7 @@ You MUST complete these steps in order:
 
 1. **Resolve project root** — apply directory resolution rules above.
 2. **Parse arguments** — `<source-id> <relation> <target-id>`. If `<relation>` is not one of `implements`/`fixes`/`related`, stop and tell the user the valid relations.
-3. **Verify both records exist** — use a file-system tool to find the source record file (`.sybermem/<type>/<date>-<NNN>-*.md` matching the source ID) and the target record file. If either does not exist, stop and report which one is missing.
+3. **Verify both records exist** — use a file-system tool to find the source and target record files under the real SyberMem record directories (`.sybermem/changes/`, `.sybermem/decisions/`, `.sybermem/requirements/`, `.sybermem/bugs/`). Match the requested record IDs against the actual filenames (`YYYY-MM-DD-NNN-title.md`). If either does not exist, stop and report which one is missing.
 4. **Read the source record** — load its frontmatter.
 5. **Append the relation** — in the source record's frontmatter, add `<target-id>` to the `<relation>` field. If the field does not exist, create it as a list. If `<target-id>` is already present, skip (no duplicate).
 6. **Write the source record only** — save the source file. Do NOT modify the target.
