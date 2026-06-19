@@ -5,6 +5,10 @@ number: {{number}}
 title: {{title}}
 status: {{status}}
 supersedes: {{supersedes}}
+# Optional relations (forward-only, values are existing record IDs):
+# implements: [requirement-NNN]   # this decision implements a requirement
+# fixes: [bug-NNN]                 # this decision addresses a bug
+# related: [type-NNN]              # weak association
 ---
 
 ## Context

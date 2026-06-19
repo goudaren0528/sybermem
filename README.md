@@ -152,6 +152,18 @@ OpenCode 推荐使用其插件路径来获得 `session.created` / `session.idle`
 | `/sybermem-phase-analyze` | 从完整项目历史构建或刷新 `.sybermem/analysis/phase-index.md`，生成可持续维护的阶段分析索引 |
 | `/sybermem-phase-confirm` | 确认、重命名或调整 `phase-index.md` 中的候选阶段，使阶段结构变为明确的项目分析结果 |
 | `/sybermem-update` | 刷新全局安装的 SyberMem skills，然后在当前项目继续执行 `/sybermem-init-project` |
+| `/sybermem-search` | 按关键词、topic、phase 范围、日期范围或记录 ID 检索记录，并显示所属 phase 与关系 |
+| `/sybermem-link` | 在两条已有记录间建立正向关系（implements / fixes / related） |
+
+## 记录关系与检索
+
+记录可以在 frontmatter 中声明可选的正向关系字段：
+
+- `implements: [requirement-NNN]` — 实现某需求/决策
+- `fixes: [bug-NNN]` — 修复某 bug
+- `related: [type-NNN]` — 弱关联
+
+关系只存正向。`/sybermem-search <record-id>` 在查询时实时扫描，反向列出所有引用该记录的记录（`Referenced by`）。`/sybermem-record` 创建记录时会尝试推断并提议关系；`/sybermem-link` 用于事后补充。
 
 ## 在你的项目中会创建什么
 
