@@ -7,7 +7,7 @@
       "name": "sybermem",
       "description": "Project memory and decision tracking system for Claude Code and OpenCode",
       "version": "0.1.0",
-      "source": "../",
+      "source": "./",
       "author": { "name": "goudaren0528" }
     }
   ]
