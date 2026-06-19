@@ -67,6 +67,8 @@ SyberMem commands rely on real project files and durable markdown structure. If 
 - `/sybermem-init-project` — Initialize or refresh the SyberMem system in this project
 - `/sybermem-update` — Refresh installed SyberMem skills, then re-check this project
 - `/using-sybermem` — Show current SyberMem status and the recommended next command
+- `/sybermem-search` — Search/query records by keyword, topic, phase range, date range, or record ID
+- `/sybermem-link` — Add a forward relation between two existing records
 
 ## No Record Needed
 
