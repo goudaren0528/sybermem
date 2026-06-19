@@ -6,6 +6,10 @@ title: {{title}}
 status: {{status}}
 author: {{author}}
 related_files: {{related_files}}
+# Optional relations (forward-only, values are existing record IDs):
+# implements: [requirement-NNN]   # this change implements a requirement/decision
+# fixes: [bug-NNN]                 # this change fixes a bug
+# related: [type-NNN]              # weak association
 ---
 
 ## Change Content
