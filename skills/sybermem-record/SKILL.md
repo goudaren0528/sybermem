@@ -51,10 +51,17 @@ Required sections:
 - **requirement**: source, content, conclusion
 - **bug**: description, root cause, solution
 
-5. **Create file** — path: `.sybermem/{type}/{YYYY-MM-DD}-{NNN}-{title}.md`. Use `templates/{type}.md` as the content template.
-6. **Update INDEX.md table** — insert a new row above the `<!-- add new records here -->` comment in the corresponding table.
-7. **Write back key conclusion** — insert a one-line core conclusion above `<!-- add new conclusions here -->` in `## Key Conclusions`. Format: `- [type-NNN] #topic1 #topic2 — description (date)`. Must include both **what changed** and **why**. Choose 1-3 topic tags from existing tags in the `## Topic Index` section, or create new ones if needed.
-8. **Update Topic Index** — if the `## Topic Index` section exists in INDEX.md, add the new record ID to each relevant topic line. If a topic doesn't exist yet, add a new line for it.
+5. **Infer relations (propose, don't force)** — from the current session context, infer whether this record relates to an existing record. Look for:
+   - a requirement or decision this change/work implements → propose `implements`
+   - a bug this work fixes → propose `fixes`
+   - a record discussed in the same session with no clear causality → propose `related`
+
+   Propose to the user, e.g. "This change appears to implement requirement-002. Add `implements: [requirement-002]`?" Only write the relation field into the record's frontmatter if the user confirms or it is clearly correct. Relation values must be existing record IDs. If there is no clear relation, skip silently. This is a proposal — it never blocks the core record steps below.
+
+6. **Create file** — path: `.sybermem/{type}/{YYYY-MM-DD}-{NNN}-{title}.md`. Use `templates/{type}.md` as the content template.
+7. **Update INDEX.md table** — insert a new row above the `<!-- add new records here -->` comment in the corresponding table.
+8. **Write back key conclusion** — insert a one-line core conclusion above `<!-- add new conclusions here -->` in `## Key Conclusions`. Format: `- [type-NNN] #topic1 #topic2 — description (date)`. Must include both **what changed** and **why**. Choose 1-3 topic tags from existing tags in the `## Topic Index` section, or create new ones if needed.
+9. **Update Topic Index** — if the `## Topic Index` section exists in INDEX.md, add the new record ID to each relevant topic line. If a topic doesn't exist yet, add a new line for it.
 
 ## Error Handling
 
@@ -72,12 +79,13 @@ This skill is complete when:
 
 ## Verification
 
-After completing Steps 5-7, verify:
+After completing Steps 6-8, verify:
 1. **File path check:** Does the record file path match `.sybermem/{type}/{YYYY-MM-DD}-{NNN}-{title}.md`?
 2. **INDEX row check:** Is the new row in the correct type table (not a different table)?
 3. **Key Conclusion quality:** Does the conclusion line contain both *what changed* AND *why*? Does it include `#topic` tags? If missing, add them.
 4a. **Topic Index updated:** Are the record's topics reflected in the `## Topic Index` section?
 4. **Number uniqueness:** Is the NNN unique within its directory?
+5. **Relation validity:** If any `implements`/`fixes`/`related` field was written, does each referenced ID correspond to an existing record?
 
 ## Red Flags — STOP and Re-check
 
