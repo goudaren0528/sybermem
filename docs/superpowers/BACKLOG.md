@@ -86,7 +86,34 @@ digraph install_migration {
 
 ---
 
+## Deferred — 功能能力增强方向
+
+### 3. C 组余下：Phase Hierarchy（阶段结构化）
+
+**目标：** 让 phase 之间能表达依赖/演进/父子关系，不再是扁平 peer。
+
+**触发条件：** 20+ phase 且需要回溯"哪个 phase 使能了哪个"时。
+
+**待做：**
+- phase-index 里加 `depends_on` / `parent` 字段
+- summary 展示 phase 的前置/后续
+- 未来 timeline/roadmap 视图
+
+### 4. D 组：记录生命周期治理
+
+**目标：** 给记录、topic、phase 加上状态管理和清理能力，防止记忆系统随时间变脏。
+
+**触发条件：** 50+ 记录或跨多月使用，开始感到噪音（旧 topic 堆积、过时决策仍被引用、无法区分 active/completed phase）。
+
+**待做：**
+- 记录状态工作流：`proposed → approved → implemented → deprecated / superseded`
+- Topic 衰减/合并：标记 deprecated topic、合并同义 topic
+- Phase 完成标记：`active / completed / archived`
+
+---
+
 ## Status
 
 - Created: 2026-06-19
-- Both tasks: **deferred by user** — focus shifted to feature/design capability enhancement
+- Tasks 1-2 (marketplace + install migration): **deferred** — focus shifted to feature/design capability enhancement
+- Tasks 3-4 (phase hierarchy + record lifecycle): **deferred** — v2 needs real-world usage before deciding priority
