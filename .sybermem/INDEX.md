@@ -23,6 +23,14 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 
 ---
 
+## Archived Conclusions
+
+<!-- Not injected at session start; findable via /sybermem-search -->
+<!-- Suffix each line with: [superseded by <id>] or [compressed in <id>] or [archived] -->
+<!-- add new archived conclusions here -->
+
+---
+
 ## Stage Digests
 
 | Number | Date | Title | Status | Coverage | Link |
