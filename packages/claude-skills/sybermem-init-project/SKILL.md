@@ -87,7 +87,7 @@ Parse the JSON output and branch:
 
 Read `file-classification-rules.md` for the complete file classification logic, protocol-block handling rules, and non-destructive update rules.
 
-Read `capability-checks.md` for the digest and analysis capability checks.
+Read `capability-checks.md` for the digest, analysis, theme-digest, and archived-conclusions capability checks.
 
 ### Step 2: Determine project type
 
@@ -161,6 +161,7 @@ Read `codebase-scan-rules.md` for the existing codebase scan and record detectio
 - `.sybermem/digests/` and digest template when digest support is enabled
 - `.sybermem/theme-digests/` and theme digest template when theme-digest support is enabled
 - `INDEX.md` theme digest navigation when missing
+- `INDEX.md` archived conclusions section when missing
 - `.sybermem/hooks/record_change_on_stop.py` when auto mode is installed
 - `.sybermem/hooks/launch_record_change_on_stop.py` when root-resolving launcher support is installed
 - managed Stop hook command updated to the launcher form when needed

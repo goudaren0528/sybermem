@@ -44,7 +44,7 @@ You MUST complete these steps in order:
    - **phase range** → read `.sybermem/analysis/phase-index.md` coverage map, collect records covered by phases in the range.
    - **date range** → list record files whose `YYYY-MM-DD` filename prefix falls in the range.
    - **record ID** → locate that record, AND reverse-scan all records' `implements`/`fixes`/`related` frontmatter fields for the ID (see Reverse references below).
-   - **free keyword** → Grep `## Key Conclusions` first, then Grep record bodies under `.sybermem/{changes,decisions,requirements,bugs}/`.
+   - **free keyword** → Grep `## Key Conclusions` first, then Grep `## Archived Conclusions`, then Grep record bodies under `.sybermem/{changes,decisions,requirements,bugs}/`. Results from `## Archived Conclusions` are marked with their archive reason (e.g. `[superseded by ...]`, `[archived]`).
 4. **Enrich each hit** — for every matched record, look up its phase (from phase-index coverage map) and read its `implements`/`fixes`/`related` frontmatter fields.
 5. **Rank** — keyword hits in Key Conclusions rank above body-only hits; newer dates rank higher within the same tier.
 6. **Output** — render the result list (see Output Format). Do not write anything to disk.
