@@ -60,12 +60,20 @@ Read and operate on candidate/phase blocks using the shared canonical shapes:
 - phase_id: phase-<NNN>
 - source_candidate_id: candidate-phase-<NNN>
 - status: confirmed
+- lifecycle: active
 - covered_records:
   - <category>-NNN
   - <category>-NNN
 - confirmed_at: <YYYY-MM-DD>
 - notes: <optional short note>
 ```
+
+**Lifecycle management:** Users can also change a confirmed phase's lifecycle:
+- `lifecycle: active` — current work (default for new phases)
+- `lifecycle: completed` — work is done; add `completed_at: YYYY-MM-DD`
+- `lifecycle: archived` — digested and no longer active
+
+When changing lifecycle to `completed`, always add the `completed_at` date field.
 
 Support these explicit actions:
 - confirm candidate as phase
