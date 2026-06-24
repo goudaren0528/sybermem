@@ -149,11 +149,21 @@ OpenCode 推荐使用其插件路径来获得 `session.created` / `session.idle`
 | `/sybermem-record` | 从当前会话上下文创建记录，AI 自动判断类型：变更、决策、需求或 Bug，并写入 `.sybermem/` |
 | `/sybermem-summary` | 动态查看最近活跃 confirmed phase 的当前状态面板；若 analysis layer 不存在，则回退到周报/月报 |
 | `/sybermem-digest` | 从已有记录创建可持久保存的阶段摘要，将其写入 `.sybermem/digests/`，并阻止对同一批源记录重复压缩 |
+| `/sybermem-theme-digest` | 为单个 topic 创建跨多个 phase 的持久化高阶摘要（Theme Digest） |
 | `/sybermem-phase-analyze` | 从完整项目历史构建或刷新 `.sybermem/analysis/phase-index.md`，生成可持续维护的阶段分析索引 |
 | `/sybermem-phase-confirm` | 确认、重命名或调整 `phase-index.md` 中的候选阶段，使阶段结构变为明确的项目分析结果 |
 | `/sybermem-update` | 刷新全局安装的 SyberMem skills，然后在当前项目继续执行 `/sybermem-init-project` |
 | `/sybermem-search` | 按关键词、topic、phase 范围、日期范围或记录 ID 检索记录，并显示所属 phase 与关系 |
 | `/sybermem-link` | 在两条已有记录间建立正向关系（implements / fixes / related） |
+
+## Theme Digest Layer
+
+除了 phase digest (`/sybermem-digest`), SyberMem 现在还支持 theme digest (`/sybermem-theme-digest`)：
+
+- phase digest = 某个阶段最终沉淀了什么
+- theme digest = 某个主题跨多个阶段最终沉淀了什么
+
+Theme digest 目录为 `.sybermem/theme-digests/`。第一版按单个 topic 聚合,优先使用已有 phase digests,再用 raw records 补缺。
 
 ## 记录关系与检索
 

@@ -159,6 +159,8 @@ Read `codebase-scan-rules.md` for the existing codebase scan and record detectio
 - `INDEX.md` digest navigation when missing
 - Template files
 - `.sybermem/digests/` and digest template when digest support is enabled
+- `.sybermem/theme-digests/` and theme digest template when theme-digest support is enabled
+- `INDEX.md` theme digest navigation when missing
 - `.sybermem/hooks/record_change_on_stop.py` when auto mode is installed
 - `.sybermem/hooks/launch_record_change_on_stop.py` when root-resolving launcher support is installed
 - managed Stop hook command updated to the launcher form when needed
