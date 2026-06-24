@@ -138,14 +138,18 @@ def check_index_md(root: Path) -> dict:
     has_digest = "<!-- add new digest records here -->" in content
     has_records = "<!-- add new records here -->" in content
     has_topic_index = "## Topic Index" in content
+    has_theme_digests = "## Theme Digests" in content
+    has_theme_digest_anchor = "<!-- add new theme digest records here -->" in content
 
-    all_present = has_conclusions and has_digest and has_records and has_topic_index
+    all_present = has_conclusions and has_digest and has_records and has_topic_index and has_theme_digests and has_theme_digest_anchor
     return {
         "status": "fresh" if all_present else "stale",
         "has_conclusions_anchor": has_conclusions,
         "has_digest_anchor": has_digest,
         "has_records_anchors": has_records,
         "has_topic_index": has_topic_index,
+        "has_theme_digests": has_theme_digests,
+        "has_theme_digest_anchor": has_theme_digest_anchor,
     }
 
 
@@ -193,11 +197,19 @@ def generate_actions(files: dict) -> list[str]:
     if idx.get("status") == "stale":
         if not idx.get("has_digest_anchor"):
             actions.append("insert Stage Digests section into INDEX.md (preserve existing content)")
+        if not idx.get("has_theme_digests") or not idx.get("has_theme_digest_anchor"):
+            actions.append("insert Theme Digests section into INDEX.md (preserve existing content)")
         if not idx.get("has_topic_index"):
             actions.append("insert Topic Index section into INDEX.md (preserve existing content)")
 
     # Directories and templates — create if missing
-    for d in (".sybermem/digests/", ".sybermem/analysis/phase-index.md", ".sybermem/templates/digest-template.md"):
+    for d in (
+        ".sybermem/digests/",
+        ".sybermem/theme-digests/",
+        ".sybermem/analysis/phase-index.md",
+        ".sybermem/templates/digest-template.md",
+        ".sybermem/templates/theme-digest-template.md",
+    ):
         info = files.get(d, {})
         if info.get("status") == "missing":
             actions.append(f"create {d} from template")
@@ -238,8 +250,10 @@ def main() -> int:
     files[".sybermem/hooks/launch_record_change_on_stop.py"] = check_file_exists(root / ".sybermem" / "hooks" / "launch_record_change_on_stop.py")
     files[".sybermem/INDEX.md"] = check_index_md(root)
     files[".sybermem/digests/"] = check_dir_exists(root / ".sybermem" / "digests")
+    files[".sybermem/theme-digests/"] = check_dir_exists(root / ".sybermem" / "theme-digests")
     files[".sybermem/analysis/phase-index.md"] = check_file_exists(root / ".sybermem" / "analysis" / "phase-index.md")
     files[".sybermem/templates/digest-template.md"] = check_file_exists(root / ".sybermem" / "templates" / "digest-template.md")
+    files[".sybermem/templates/theme-digest-template.md"] = check_file_exists(root / ".sybermem" / "templates" / "theme-digest-template.md")
 
     # Check for health script itself
     files[".sybermem/hooks/check_project_health.py"] = check_file_exists(root / ".sybermem" / "hooks" / "check_project_health.py")
@@ -259,6 +273,7 @@ def main() -> int:
     # Capabilities
     capabilities = {
         "digest": files[".sybermem/digests/"]["status"] == "present",
+        "theme_digest": files[".sybermem/theme-digests/"]["status"] == "present",
         "analysis": files[".sybermem/analysis/phase-index.md"]["status"] != "missing",
         "auto_record_hook": files[".sybermem/hooks/record_change_on_stop.py"]["status"] != "missing",
         "session_start_hook": files[".sybermem/hooks/session_start_context.py"]["status"] != "missing",
