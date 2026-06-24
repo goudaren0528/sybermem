@@ -140,8 +140,10 @@ def check_index_md(root: Path) -> dict:
     has_topic_index = "## Topic Index" in content
     has_theme_digests = "## Theme Digests" in content
     has_theme_digest_anchor = "<!-- add new theme digest records here -->" in content
+    has_archived_conclusions = "## Archived Conclusions" in content
+    has_archived_anchor = "<!-- add new archived conclusions here -->" in content
 
-    all_present = has_conclusions and has_digest and has_records and has_topic_index and has_theme_digests and has_theme_digest_anchor
+    all_present = has_conclusions and has_digest and has_records and has_topic_index and has_theme_digests and has_theme_digest_anchor and has_archived_conclusions and has_archived_anchor
     return {
         "status": "fresh" if all_present else "stale",
         "has_conclusions_anchor": has_conclusions,
@@ -150,6 +152,8 @@ def check_index_md(root: Path) -> dict:
         "has_topic_index": has_topic_index,
         "has_theme_digests": has_theme_digests,
         "has_theme_digest_anchor": has_theme_digest_anchor,
+        "has_archived_conclusions": has_archived_conclusions,
+        "has_archived_anchor": has_archived_anchor,
     }
 
 
@@ -199,6 +203,8 @@ def generate_actions(files: dict) -> list[str]:
             actions.append("insert Stage Digests section into INDEX.md (preserve existing content)")
         if not idx.get("has_theme_digests") or not idx.get("has_theme_digest_anchor"):
             actions.append("insert Theme Digests section into INDEX.md (preserve existing content)")
+        if not idx.get("has_archived_conclusions") or not idx.get("has_archived_anchor"):
+            actions.append("insert Archived Conclusions section into INDEX.md (preserve existing content)")
         if not idx.get("has_topic_index"):
             actions.append("insert Topic Index section into INDEX.md (preserve existing content)")
 
