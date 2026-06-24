@@ -17,6 +17,7 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 - [change-006] #skills #framework — Repaired missing .claude/settings.json, fixed INDEX.md omissions, refreshed phase index, upgraded all 8 skills with HARD-GATE + numbered checklist (2026-06-16)
 - [change-007] Auto-recorded workspace file changes at session stop so the project keeps a lightweight change trail without manual recording (2026-06-18)
 - [change-008] #distribution #hooks #automation — Added Claude Code plugin metadata and lifecycle hook delegators so SyberMem can install as a plugin without breaking existing project-managed hook files (2026-06-18)
+- [change-009] Auto-recorded workspace file changes at session stop so the project keeps a lightweight change trail without manual recording (2026-06-19)
 <!-- add new conclusions here -->
 
 ---
@@ -27,6 +28,15 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 |--------|------|-------|--------|----------|------|
 | 001 | 2026-06-05 | sybermem v1 digest design phase | completed | 3 records | [link](digests/2026-06-05-001-sybermem-v1-digest-design-phase.md) |
 <!-- add new digest records here -->
+
+---
+
+## Theme Digests
+
+| Number | Date | Theme | Status | Coverage | Link |
+|--------|------|-------|--------|----------|------|
+| 001 | 2026-06-22 | hooks | completed | 4 phases, 0 digests, 4 records | [link](theme-digests/2026-06-22-001-hooks.md) |
+<!-- add new theme digest records here -->
 
 ---
 
@@ -41,6 +51,7 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 | 006 | 2026-06-16 | SyberMem framework hardening and project repair | implemented | [link](changes/2026-06-16-006-sybermem-framework-hardening-and-project-repair.md) |
 | 007 | 2026-06-18 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-06-18-007-marketplace-plugin-hooks-and-more.md) |
 | 008 | 2026-06-18 | Add Claude Code plugin skeleton | implemented | [link](changes/2026-06-18-008-add-claude-code-plugin-skeleton.md) |
+| 009 | 2026-06-19 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-06-19-009-marketplace.md) |
 <!-- add new records here -->
 
 ---

@@ -1,0 +1,17 @@
+{
+  "theme_recent_stops": {
+    "misc": [
+      "2026-06-18",
+      "2026-06-19"
+    ]
+  },
+  "last_nudge": {
+    "platform": "claude-code",
+    "type": "none",
+    "theme": "misc",
+    "date": "2026-06-19"
+  },
+  "last_theme": "misc",
+  "last_nudge_type": "none",
+  "last_record": "2026-06-19-009-marketplace.md"
+}

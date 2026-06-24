@@ -2,11 +2,11 @@
 
 ## Analysis Progress
 - status: analyzed
-- last_analysis_at: 2026-06-16
-- last_record_boundary: bug-001 (2026-06-09)
-- last_git_boundary: 8a8ecde (2026-06-13)
+- last_analysis_at: 2026-06-22
+- last_record_boundary: change-009 (2026-06-19)
+- last_git_boundary: c117f1c (2026-06-22)
 - pending_new_records: none (all existing records covered)
-- unassigned_git_work: dual-entry protocol implementation, phase-analysis automation (no records yet)
+- unassigned_git_work: none
 
 ## Phase Candidates
 <!-- use canonical candidate blocks: ### Candidate: <title> + candidate_id/status/covered_records/rationale/proposed_at -->
@@ -68,6 +68,42 @@
 - confirmed_at: 2026-06-16
 - notes: Git-only phase (no SyberMem records yet). Auto-trigger phase analysis when phase-index is missing, auto-confirm candidates after analysis (removing the manual confirmation gate), and batch digest all confirmed phases by default.
 
+### Phase: Framework hardening and skill upgrade
+- phase_id: phase-007
+- source_candidate_id: candidate-phase-007
+- status: confirmed
+- covered_records:
+  - change-006
+- confirmed_at: 2026-06-22
+- notes: Repaired missing .claude/settings.json, fixed INDEX.md omissions, refreshed phase index, and upgraded all 8 SyberMem skills with HARD-GATE + numbered checklist patterns from Superpowers. Also added announce-at-start, dedup directory resolution, verification steps, Red Flags, and health checks. This was the first major quality hardening pass.
+
+### Phase: Lifecycle layer and cross-platform integration
+- phase_id: phase-008
+- source_candidate_id: candidate-phase-008
+- status: confirmed
+- covered_records: []
+- confirmed_at: 2026-06-22
+- notes: Added SessionStart hook for deterministic startup context injection, enhanced Stop hook with commit-gap detection and auto-trail dedup, enhanced OpenCode plugin with stale detection and compaction limits, unified .nudge-state.json across platforms, added update fast-path with check_project_health.py. Git commits 5906b90..e10e739.
+
+### Phase: Platform ecosystem and plugin packaging
+- phase_id: phase-009
+- source_candidate_id: candidate-phase-009
+- status: confirmed
+- covered_records:
+  - change-007
+  - change-008
+  - change-009
+- confirmed_at: 2026-06-22
+- notes: Added Claude Code plugin skeleton (.claude-plugin/, hooks/hooks.json, polyglot run-hook.cmd), multi-platform entry files (Gemini, Cursor, Codex, Kimi, OpenCode), skill design optimization (Rationalization Tables, Integration sections, Flowcharts, init-project split), marketplace validation, and plugin package checker. Git commits d2fb7af..d86ee1b.
+
+### Phase: Search, relations, and theme digest
+- phase_id: phase-010
+- source_candidate_id: candidate-phase-010
+- status: confirmed
+- covered_records: []
+- confirmed_at: 2026-06-22
+- notes: Added /sybermem-search (AI-driven retrieval by keyword/topic/phase/date/record ID with reverse references), /sybermem-link (forward-only relation management), record relation inference at creation time, optional implements/fixes/related frontmatter fields, and /sybermem-theme-digest (topic-level compression layer above phase digests). Git commits e40c666..c117f1c.
+
 ## Coverage Map
 - requirement-001 -> phase-002
 - change-001 -> phase-002
@@ -76,5 +112,7 @@
 - change-005 -> phase-001
 - requirement-002 -> phase-003
 - bug-001 -> phase-004
-- (unassigned) git: dual-entry protocol commits (0acd677..aea19da) -> phase-005
-- (unassigned) git: phase-analysis automation commits (417145d..8a8ecde) -> phase-006
+- change-006 -> phase-007
+- change-007 -> phase-009
+- change-008 -> phase-009
+- change-009 -> phase-009
