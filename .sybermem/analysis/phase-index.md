@@ -17,6 +17,8 @@
 - phase_id: phase-001
 - source_candidate_id: candidate-phase-001
 - status: confirmed
+- lifecycle: completed
+- completed_at: 2026-06-22
 - covered_records:
   - change-002
   - change-005
@@ -27,6 +29,8 @@
 - phase_id: phase-002
 - source_candidate_id: candidate-phase-002
 - status: confirmed
+- lifecycle: completed
+- completed_at: 2026-06-22
 - covered_records:
   - requirement-001
   - change-001
@@ -38,6 +42,8 @@
 - phase_id: phase-003
 - source_candidate_id: candidate-phase-003
 - status: confirmed
+- lifecycle: completed
+- completed_at: 2026-06-22
 - covered_records:
   - requirement-002
 - confirmed_at: 2026-06-16
@@ -47,6 +53,8 @@
 - phase_id: phase-004
 - source_candidate_id: candidate-phase-004
 - status: confirmed
+- lifecycle: completed
+- completed_at: 2026-06-22
 - covered_records:
   - bug-001
 - confirmed_at: 2026-06-16
@@ -56,6 +64,8 @@
 - phase_id: phase-005
 - source_candidate_id: candidate-phase-005
 - status: confirmed
+- lifecycle: completed
+- completed_at: 2026-06-22
 - covered_records: []
 - confirmed_at: 2026-06-16
 - notes: Git-only phase (no SyberMem records yet). Introduced the marker-bounded using-sybermem session protocol block in CLAUDE.md/AGENTS.md, then added a visible /using-sybermem advisory skill as the manual diagnostic entrypoint. Paired automatic session-entry guidance with a user-invocable entry layer.
@@ -64,6 +74,8 @@
 - phase_id: phase-006
 - source_candidate_id: candidate-phase-006
 - status: confirmed
+- lifecycle: completed
+- completed_at: 2026-06-22
 - covered_records: []
 - confirmed_at: 2026-06-16
 - notes: Git-only phase (no SyberMem records yet). Auto-trigger phase analysis when phase-index is missing, auto-confirm candidates after analysis (removing the manual confirmation gate), and batch digest all confirmed phases by default.
@@ -72,6 +84,8 @@
 - phase_id: phase-007
 - source_candidate_id: candidate-phase-007
 - status: confirmed
+- lifecycle: completed
+- completed_at: 2026-06-22
 - covered_records:
   - change-006
 - confirmed_at: 2026-06-22
@@ -81,6 +95,8 @@
 - phase_id: phase-008
 - source_candidate_id: candidate-phase-008
 - status: confirmed
+- lifecycle: completed
+- completed_at: 2026-06-22
 - covered_records: []
 - confirmed_at: 2026-06-22
 - notes: Added SessionStart hook for deterministic startup context injection, enhanced Stop hook with commit-gap detection and auto-trail dedup, enhanced OpenCode plugin with stale detection and compaction limits, unified .nudge-state.json across platforms, added update fast-path with check_project_health.py. Git commits 5906b90..e10e739.
@@ -89,6 +105,8 @@
 - phase_id: phase-009
 - source_candidate_id: candidate-phase-009
 - status: confirmed
+- lifecycle: completed
+- completed_at: 2026-06-22
 - covered_records:
   - change-007
   - change-008
@@ -100,6 +118,7 @@
 - phase_id: phase-010
 - source_candidate_id: candidate-phase-010
 - status: confirmed
+- lifecycle: active
 - covered_records: []
 - confirmed_at: 2026-06-22
 - notes: Added /sybermem-search (AI-driven retrieval by keyword/topic/phase/date/record ID with reverse references), /sybermem-link (forward-only relation management), record relation inference at creation time, optional implements/fixes/related frontmatter fields, and /sybermem-theme-digest (topic-level compression layer above phase digests). Git commits e40c666..c117f1c.
