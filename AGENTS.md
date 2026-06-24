@@ -59,6 +59,7 @@ SyberMem commands rely on real project files and durable markdown structure. If 
 - `/sybermem-record` — Create a record (auto-detects type)
 - `/sybermem-summary` — Generate weekly/monthly reports
 - `/sybermem-digest` — Create a durable phase digest from existing records
+- `/sybermem-theme-digest` — Create a durable topic-level digest that compresses one theme across multiple related phases or records
 - `/sybermem-phase-analyze` — Build or refresh the persistent phase index from full project records
 - `/sybermem-phase-confirm` — Explicitly confirm, rename, adjust, or reject candidate phases
 - `/sybermem-init-project` — Initialize or refresh the SyberMem system in this project
