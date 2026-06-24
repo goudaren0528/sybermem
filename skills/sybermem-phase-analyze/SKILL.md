@@ -76,6 +76,7 @@ After proposing candidates, automatically confirm all of them as phases. The use
 - phase_id: phase-<NNN>
 - source_candidate_id: candidate-phase-<NNN>
 - status: confirmed
+- lifecycle: active
 - covered_records:
   - <category>-NNN
   - <category>-NNN

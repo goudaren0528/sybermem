@@ -36,7 +36,7 @@ You MUST complete these steps in order:
 1. **Resolve project root** — apply Step 0 directory resolution rules above
 2. **Determine summary mode**:
    - If `.sybermem/analysis/phase-index.md` does not exist → **REQUIRED SUB-SKILL:** run `/sybermem-phase-analyze` first, then continue
-   - If phase-index exists with at least one confirmed phase → use the most recently active confirmed phase as the default summary target
+   - If phase-index exists with at least one confirmed phase → use the most recently active confirmed phase with `lifecycle: active` as the default summary target. If no phase has `lifecycle: active`, fall back to the most recent confirmed phase regardless of lifecycle. Phases missing a `lifecycle` field are treated as `active`.
    - If user explicitly passes `weekly` → force weekly fallback mode
    - If user explicitly passes `monthly` → force monthly fallback mode
    - If no confirmed phase structure exists after analysis → fall back to weekly mode

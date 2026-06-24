@@ -60,7 +60,7 @@ Required sections:
 
 6. **Create file** — path: `.sybermem/{type}/{YYYY-MM-DD}-{NNN}-{title}.md`. Use `templates/{type}.md` as the content template.
 7. **Update INDEX.md table** — insert a new row above the `<!-- add new records here -->` comment in the corresponding table.
-8. **Write back key conclusion** — insert a one-line core conclusion above `<!-- add new conclusions here -->` in `## Key Conclusions`. Format: `- [type-NNN] #topic1 #topic2 — description (date)`. Must include both **what changed** and **why**. Choose 1-3 topic tags from existing tags in the `## Topic Index` section, or create new ones if needed.
+8. **Write back key conclusion** — insert a one-line core conclusion above `<!-- add new conclusions here -->` in `## Key Conclusions` (the active section). Never write new conclusions to `## Archived Conclusions`. Format: `- [type-NNN] #topic1 #topic2 — description (date)`. Must include both **what changed** and **why**. Choose 1-3 topic tags from existing tags in the `## Topic Index` section, or create new ones if needed.
 9. **Update Topic Index** — if the `## Topic Index` section exists in INDEX.md, add the new record ID to each relevant topic line. If a topic doesn't exist yet, add a new line for it.
 
 ## Error Handling

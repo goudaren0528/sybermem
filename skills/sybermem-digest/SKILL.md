@@ -55,7 +55,7 @@ You MUST complete these steps in order:
 
 ### Batch mode (default when no explicit source records)
 
-When multiple confirmed phases exist and no explicit source records were provided, create a digest for **each** confirmed phase that does not already have an existing digest with the same source coverage. Process them in chronological order by phase coverage dates. Skip any phase whose raw source records are incomplete or missing.
+When multiple confirmed phases exist and no explicit source records were provided, create a digest for **each** confirmed phase that does not already have an existing digest with the same source coverage. Prefer phases with `lifecycle: completed` first, then `lifecycle: active` if no completed phases remain undigested. Skip phases with `lifecycle: archived` (they already have digests). Process in chronological order by phase coverage dates. Skip any phase whose raw source records are incomplete or missing. Phases missing a `lifecycle` field are treated as `active`.
 
 For each phase, run Steps 4–10 independently. This is the normal batch path — do not stop after the first phase and ask the user which one to digest next.
 
