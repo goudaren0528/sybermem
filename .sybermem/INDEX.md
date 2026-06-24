@@ -18,6 +18,7 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 - [change-007] Auto-recorded workspace file changes at session stop so the project keeps a lightweight change trail without manual recording (2026-06-18)
 - [change-008] #distribution #hooks #automation — Added Claude Code plugin metadata and lifecycle hook delegators so SyberMem can install as a plugin without breaking existing project-managed hook files (2026-06-18)
 - [change-009] Auto-recorded workspace file changes at session stop so the project keeps a lightweight change trail without manual recording (2026-06-19)
+- [change-010] #lifecycle #search #relations #digest #distribution — Transformed SyberMem from v1 (record+group+compress) to v2 (lifecycle-aware, retrieval-capable, relation-linked, topic-compressible, multi-platform) in a single session covering 6 capability rounds (2026-06-22)
 <!-- add new conclusions here -->
 
 ---
@@ -52,6 +53,7 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 | 007 | 2026-06-18 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-06-18-007-marketplace-plugin-hooks-and-more.md) |
 | 008 | 2026-06-18 | Add Claude Code plugin skeleton | implemented | [link](changes/2026-06-18-008-add-claude-code-plugin-skeleton.md) |
 | 009 | 2026-06-19 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-06-19-009-marketplace.md) |
+| 010 | 2026-06-22 | SyberMem v2 — lifecycle, search, relations, theme digest, platform | implemented | [link](changes/2026-06-22-010-sybermem-v2-lifecycle-search-relations-theme-digest-platform.md) |
 <!-- add new records here -->
 
 ---
@@ -101,11 +103,14 @@ When adding records, update this index file accordingly.
 - architecture: requirement-001
 - automation: change-003, change-008
 - compression: requirement-002
-- digest: requirement-002
-- distribution: change-001, change-002, change-008
+- digest: requirement-002, change-010
+- distribution: change-001, change-002, change-008, change-010
 - framework: change-006
 - hooks: change-003, change-005, bug-001, change-008
 - init: change-005, bug-001
 - install: change-001
 - foundation: requirement-001
+- lifecycle: change-010
+- relations: change-010
+- search: change-010
 - skills: change-002, change-006
