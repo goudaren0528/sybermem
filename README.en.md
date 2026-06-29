@@ -51,7 +51,27 @@ SyberMem now uses a `using-sybermem` protocol block near the top of `CLAUDE.md` 
 
 ## Install
 
-### One-liner (requires public repo)
+### Claude Code Plugin Install (Recommended)
+
+For Claude Code users who want plugin-managed hooks and skills, the plugin installation flow is the preferred path.
+
+#### Local development / testing
+
+```bash
+claude --plugin-dir .
+```
+
+This loads `.claude-plugin/` from the current repository, which is useful for validating plugin metadata, lifecycle hooks, and the plugin-facing `skills/` tree.
+
+#### Current distribution status
+
+SyberMem already includes `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json`. Marketplace-style distribution is prepared, but the fully dogfooded runtime paths today are Claude Code and OpenCode.
+
+### Claude Code / OpenCode Script Install (Compatibility Mode)
+
+These commands remain as compatibility/direct install paths rather than the future default.
+
+#### One-liner (requires public repo)
 
 ```bash
 # macOS / Linux
@@ -61,7 +81,7 @@ curl -sSL https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/i
 irm https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/install-remote.ps1 | iex
 ```
 
-### Clone and install
+#### Clone and install
 
 ```bash
 # macOS / Linux
@@ -72,6 +92,10 @@ cd sybermem && ./scripts/install.sh
 git clone https://github.com/goudaren0528/sybermem.git
 cd sybermem; .\scripts\install.ps1
 ```
+
+### OpenCode
+
+OpenCode has a dedicated plugin runtime. See [`.opencode/INSTALL.md`](.opencode/INSTALL.md).
 
 ### Initialize a project
 
@@ -98,34 +122,99 @@ See [INSTALL.md](INSTALL.md) for details.
 
 | Skill | What it does |
 |-------|-------------|
-| `/sybermem-init-project` | Create or refresh the `.sybermem/` directory structure in a project, scan an existing codebase, generate or refresh `CLAUDE.md` / `AGENTS.md`, and auto-migrate legacy `ADR/` on first run |
-| `/sybermem-record` | Create a record from current session context. AI auto-detects the type and writes to `.sybermem/` |
-| `/sybermem-summary` | Dynamically view the current-state panel for the most recently active confirmed phase; fall back to weekly/monthly reporting when the analysis layer is unavailable |
-| `/sybermem-digest` | Create a durable phase digest from existing records, write it to `.sybermem/digests/`, and block duplicate compression of the same source records |
-| `/sybermem-phase-analyze` | Build or refresh `.sybermem/analysis/phase-index.md` from full project history as a persistent phase analysis artifact |
-| `/sybermem-phase-confirm` | Confirm, rename, or adjust candidate phases in `phase-index.md` so the project phase structure becomes explicit |
-| `/sybermem-update` | Refresh the globally installed SyberMem skills, then continue with `/sybermem-init-project` in the current project |
+| `/sybermem-init-project` | Create or refresh the `.sybermem/` structure in a project, refresh managed instruction files, and migrate legacy `ADR/` on first run |
+| `/sybermem-record` | Create a structured change / decision / requirement / bug record from the current session context |
+| `/sybermem-summary` | Show the current-state panel for the most relevant active phase, with weekly/monthly fallback |
+| `/sybermem-digest` | Create a durable phase digest from existing records |
+| `/sybermem-theme-digest` | Create a durable topic-level digest that compresses one theme across multiple phases or records |
+| `/sybermem-phase-analyze` | Build or refresh `.sybermem/analysis/phase-index.md` from project history |
+| `/sybermem-phase-confirm` | Adjust confirmed phases, names, and lifecycle state |
+| `/using-sybermem` | Diagnose the current SyberMem state and recommend the right next command |
+| `/sybermem-update` | Refresh globally installed SyberMem skills, then re-check the current project |
+| `/sybermem-search` | Query records by keyword, topic, phase range, date range, or record ID, including relations |
+| `/sybermem-link` | Add a forward relation between two existing records (`implements` / `fixes` / `related` / `superseded-by`) |
+
+## Daily Workflow
+
+A practical day-to-day path for using SyberMem:
+
+```text
+Look up history             → /sybermem-search <keyword|topic|record-id>
+Check current state         → /sybermem-summary
+Finish meaningful work      → /sybermem-record
+Refresh stale phase index   → /sybermem-phase-analyze
+Close a phase               → /sybermem-digest
+Compress a topic across phases → /sybermem-theme-digest <topic>
+Unsure what to do next      → /using-sybermem
+```
+
+## Theme Digest Layer
+
+In addition to phase digests (`/sybermem-digest`), SyberMem now supports theme digests (`/sybermem-theme-digest`):
+
+- phase digest = what one phase ultimately concluded
+- theme digest = what one topic ultimately concluded across multiple phases
+
+Theme digests live under `.sybermem/theme-digests/`. The first version is single-topic only, prefers existing phase digests when available, and fills gaps with raw records.
+
+## Relations, Search, and Governance
+
+Records can now declare forward-only relationship fields in frontmatter:
+
+- `implements: [requirement-NNN]`
+- `fixes: [bug-NNN]`
+- `related: [type-NNN]`
+- `superseded_by: <record-id>`
+
+`/sybermem-search` can surface:
+- phase membership
+- forward relations
+- reverse references
+- supersession hints
+- archived conclusion matches
+
+Topic Index lines may also carry optional suffixes:
+- `[active]`
+- `[low]`
+- `[deprecated → <new-topic>]`
 
 ## What gets created in your project
 
 ```
 .sybermem/
-├── INDEX.md          # Master index — AI reads Key Conclusions at session start
-├── changes/          # Feature additions, modifications, deletions
-├── decisions/        # Tech choices, architecture designs
-├── requirements/     # User requirements, discussion outcomes
-├── bugs/             # Bug analysis and fixes
-├── digests/          # Phase digests
+├── INDEX.md                        # Master index — Active/Archived Conclusions, Digests, Topic Index
+├── changes/                        # Feature additions, modifications, deletions
+├── decisions/                      # Tech choices, architecture designs
+├── requirements/                   # User requirements, discussion outcomes
+├── bugs/                           # Bug analysis and fixes
+├── digests/                        # Phase digests
+├── theme-digests/                  # Theme digests (topic across multiple phases)
 ├── analysis/
-│   └── phase-index.md            # Persistent project analysis artifact for candidate phases, confirmed phases, and analysis progress; not a final digest
+│   └── phase-index.md              # Persistent project analysis artifact (includes lifecycle field)
 ├── hooks/
-│   └── record_change_on_stop.py   # Default auto-change hook helper
-└── templates/        # Record templates, including the digest template
+│   ├── record_change_on_stop.py    # Default auto-change hook helper
+│   ├── session_start_context.py    # SessionStart context injection script
+│   ├── check_project_health.py     # Update fast-path health check script
+│   └── launch_record_change_on_stop.py # Root-resolving stop-hook launcher helper
+└── templates/
+    ├── change-template.md
+    ├── decision-template.md
+    ├── requirement-template.md
+    ├── bug-template.md
+    ├── digest-template.md
+    └── theme-digest-template.md
 
 CLAUDE.md             # Claude Code instructions (workflow rules)
 AGENTS.md             # OpenCode instructions (same content)
-.claude/settings.json # Project-level hook mode and stop hook
+.claude/settings.json # Project-level hook mode (SessionStart / Stop)
 ```
+
+`INDEX.md` currently contains these core sections:
+- `Key Conclusions` — Active conclusions, injected at session start
+- `Archived Conclusions` — Archived conclusions, not injected at startup but still searchable
+- `Stage Digests` — phase digest index
+- `Theme Digests` — topic-level digest index
+- `Topic Index` — topic → record IDs (supports `[active]` / `[low]` / `[deprecated → ...]` suffixes)
 
 ## Directory resolution rules
 
@@ -136,10 +225,14 @@ AGENTS.md             # OpenCode instructions (same content)
 
 ## Supported Platforms
 
-| Platform | Global skills location | Project-level files |
-|----------|------------------------|---------------------|
-| Claude Code | `~/.claude/skills/` | `CLAUDE.md`, `.claude/settings.json`, `.sybermem/` |
-| OpenCode | `~/.config/opencode/skills/` | `AGENTS.md`, `.claude/settings.json`, `.sybermem/` |
+| Platform | Current status | Notes |
+|----------|----------------|-------|
+| Claude Code | fully supported | Plugin install (recommended) and script install (compatibility mode) are both dogfooded |
+| OpenCode | fully supported | TypeScript plugin implements `session.created`, `session.idle`, and `experimental.session.compacting` |
+| Gemini CLI | entry files present | `GEMINI.md` and extension metadata exist, but runtime behavior has not been dogfooded to the same degree |
+| Cursor | metadata present | `.cursor-plugin/plugin.json` exists; runtime behavior not yet equally validated |
+| Codex | metadata present | `.codex-plugin/plugin.json` exists; runtime behavior not yet equally validated |
+| Kimi | metadata present | `.kimi-plugin/plugin.json` exists; runtime behavior not yet equally validated |
 
 ## Repo Structure
 
@@ -147,16 +240,21 @@ AGENTS.md             # OpenCode instructions (same content)
 packages/claude-skills/               # Skill source for distribution inside the repo, not auto-loaded per project
 ├── sybermem-digest/
 ├── sybermem-init-project/
+├── sybermem-link/
 ├── sybermem-phase-analyze/
 ├── sybermem-phase-confirm/
 ├── sybermem-record/
+├── sybermem-search/
 ├── sybermem-summary/
-└── sybermem-update/
+├── sybermem-theme-digest/
+├── sybermem-update/
+└── using-sybermem/
 
 scripts/                              # Install & update scripts
 ├── install-remote.sh / .ps1          # One-liner remote install
 ├── install.sh / .ps1                 # Local install
-└── update.sh / .ps1                  # Update existing install
+├── update.sh / .ps1                  # Update existing install
+└── check-plugin-package.py           # Plugin package + real CLI validate check
 
 docs/zh/                              # Chinese documentation
 ```
