@@ -152,9 +152,10 @@ OpenCode 推荐使用其插件路径来获得 `session.created` / `session.idle`
 | `/sybermem-theme-digest` | 为单个 topic 创建跨多个 phase 的持久化高阶摘要（Theme Digest） |
 | `/sybermem-phase-analyze` | 从完整项目历史构建或刷新 `.sybermem/analysis/phase-index.md`，生成可持续维护的阶段分析索引 |
 | `/sybermem-phase-confirm` | 确认、重命名或调整 `phase-index.md` 中的候选阶段，使阶段结构变为明确的项目分析结果 |
+| `/using-sybermem` | 显示当前 SyberMem 状态、可用命令以及建议的下一步操作 |
 | `/sybermem-update` | 刷新全局安装的 SyberMem skills，然后在当前项目继续执行 `/sybermem-init-project` |
-| `/sybermem-search` | 按关键词、topic、phase 范围、日期范围或记录 ID 检索记录，并显示所属 phase 与关系 |
-| `/sybermem-link` | 在两条已有记录间建立正向关系（implements / fixes / related） |
+| `/sybermem-search` | 按关键词、topic、phase 范围、日期范围或记录 ID 检索记录，并显示所属 phase、关系与替代提示 |
+| `/sybermem-link` | 在两条已有记录间建立正向关系（implements / fixes / related / superseded-by） |
 
 ## Theme Digest Layer
 
@@ -189,27 +190,57 @@ Topic Index 现在支持可选状态后缀：
 2. 将旧记录的 Key Conclusion 从 `## Key Conclusions` 移到 `## Archived Conclusions`
 3. 在归档行尾追加 `[superseded by <new-id>]`
 
+## 日常工作流
+
+推荐把 SyberMem 当作“项目记忆的日常工具链”来用：
+
+```text
+查历史                → /sybermem-search <keyword|topic|record-id>
+看现状                → /sybermem-summary
+完成有价值工作        → /sybermem-record
+phase-index stale     → /sybermem-phase-analyze
+阶段收束              → /sybermem-digest
+主题跨 phase 收束     → /sybermem-theme-digest <topic>
+不确定当前状态/下一步 → /using-sybermem
+```
+
 ## 在你的项目中会创建什么
 
 ```
 .sybermem/
-├── INDEX.md          # 主索引 — AI 在会话开始时读取关键结论
-├── changes/          # 功能变更
-├── decisions/        # 技术决策
-├── requirements/     # 需求讨论
-├── bugs/             # Bug 修复
-├── digests/          # 阶段 digest
+├── INDEX.md                        # 主索引 — Active/Archived Conclusions、Digests、Topic Index
+├── changes/                        # 功能变更
+├── decisions/                      # 技术决策
+├── requirements/                   # 需求讨论
+├── bugs/                           # Bug 修复
+├── digests/                        # 阶段 digest
+├── theme-digests/                  # 主题 digest（跨多个 phase）
 ├── analysis/
-│   └── phase-index.md            # 持久化项目分析产物，用于记录候选阶段、已确认阶段和分析进度，不是最终 digest
+│   └── phase-index.md              # 持久化项目分析产物（含 lifecycle 字段）
 ├── hooks/
-│   ├── record_change_on_stop.py   # 默认自动 change hook helper
-│   └── session_start_context.py   # SessionStart 上下文注入脚本
-└── templates/        # 记录模板（含 digest 模板）
+│   ├── record_change_on_stop.py    # 默认自动 change hook helper
+│   ├── session_start_context.py    # SessionStart 上下文注入脚本
+│   ├── check_project_health.py     # update fast-path 健康检查脚本
+│   └── launch_record_change_on_stop.py # root-resolving stop-hook launcher helper
+└── templates/
+    ├── change-template.md
+    ├── decision-template.md
+    ├── requirement-template.md
+    ├── bug-template.md
+    ├── digest-template.md
+    └── theme-digest-template.md
 
-CLAUDE.md             # Claude Code 项目指令（工作流规则）
-AGENTS.md             # OpenCode 项目指令（内容相同）
-.claude/settings.json # 项目级 hook 模式和 Stop hook
+CLAUDE.md                           # Claude Code 项目指令（工作流规则）
+AGENTS.md                           # OpenCode 项目指令（内容相同）
+.claude/settings.json               # 项目级 hook 模式（SessionStart / Stop）
 ```
+
+`INDEX.md` 当前包含这些核心区段：
+- `Key Conclusions` — Active conclusions，会在 SessionStart 注入
+- `Archived Conclusions` — 归档结论，不在启动时注入，但仍可搜索
+- `Stage Digests` — phase digest 索引
+- `Theme Digests` — topic-level digest 索引
+- `Topic Index` — topic → record IDs（支持 `[active]` / `[low]` / `[deprecated → ...]` 后缀）
 
 ## 目录解析规则
 
@@ -220,10 +251,14 @@ AGENTS.md             # OpenCode 项目指令（内容相同）
 
 ## 支持平台
 
-| 平台 | 安装形态 | 项目级文件 |
-|------|----------|-----------|
-| Claude Code | 插件安装（推荐）或脚本安装（兼容） | `CLAUDE.md`、`.claude/settings.json`、`.sybermem/` |
-| OpenCode | OpenCode 插件（推荐）或脚本安装（兼容） | `AGENTS.md`、`.claude/settings.json`、`.sybermem/` |
+| 平台 | 当前状态 | 说明 |
+|------|----------|------|
+| Claude Code | fully supported | 插件安装（推荐）或脚本安装（兼容）均已完整 dogfood |
+| OpenCode | fully supported | TypeScript plugin 已实现 `session.created` / `session.idle` / `experimental.session.compacting` |
+| Gemini CLI | entry files present | `GEMINI.md` 与扩展元数据已提供，但未像 Claude/OpenCode 一样完整 dogfood |
+| Cursor | metadata present | `.cursor-plugin/plugin.json` 已存在，运行时行为尚未同等强度验证 |
+| Codex | metadata present | `.codex-plugin/plugin.json` 已存在，运行时行为尚未同等强度验证 |
+| Kimi | metadata present | `.kimi-plugin/plugin.json` 已存在，运行时行为尚未同等强度验证 |
 
 ## 仓库结构
 
@@ -234,17 +269,21 @@ skills/                               # Plugin-facing skills tree
 packages/claude-skills/               # Skills 源码（仓库内分发源，不参与项目自动加载）
 ├── sybermem-digest/
 ├── sybermem-init-project/
+├── sybermem-link/
 ├── sybermem-phase-analyze/
 ├── sybermem-phase-confirm/
 ├── sybermem-record/
+├── sybermem-search/
 ├── sybermem-summary/
-└── sybermem-update/
+├── sybermem-theme-digest/
+├── sybermem-update/
+└── using-sybermem/
 
 scripts/                              # 安装、更新与打包校验脚本
 ├── install-remote.sh / .ps1          # 一行命令远程安装
 ├── install.sh / .ps1                 # 本地脚本安装
 ├── update.sh / .ps1                  # 更新已有安装
-└── check-plugin-package.py           # 插件分发内容完整性校验（可选）
+└── check-plugin-package.py           # 插件分发内容与真实 CLI validate 校验
 
 docs/zh/                              # 中文文档备份
 ```
