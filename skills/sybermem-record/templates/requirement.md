@@ -7,6 +7,7 @@ source: {{source}}
 priority: {{priority}}
 # Optional relations (forward-only, values are existing record IDs):
 # related: [type-NNN]              # weak association with another record
+# superseded_by: requirement-NNN   # this requirement has been replaced by a newer one
 ---
 
 ## Requirement Source

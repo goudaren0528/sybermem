@@ -105,6 +105,7 @@ When adding records, update this index file accordingly.
 ## Topic Index
 
 <!-- Auto-maintained: maps topic tags to record IDs for fast lookup -->
+<!-- Optional suffix: [active] [low] [deprecated → <new-topic>] -->
 - architecture: requirement-001
 - automation: change-003, change-008
 - compression: requirement-002
