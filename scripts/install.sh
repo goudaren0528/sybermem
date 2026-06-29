@@ -23,7 +23,7 @@ install_skills() {
     local label="$2"
     mkdir -p "$target"
     rm -rf "$target/init-project" "$target/record" "$target/summary"
-    for skill in sybermem-init-project sybermem-record sybermem-summary sybermem-digest sybermem-phase-analyze sybermem-phase-confirm using-sybermem sybermem-update; do
+    for skill in sybermem-init-project sybermem-record sybermem-summary sybermem-digest sybermem-phase-analyze sybermem-phase-confirm using-sybermem sybermem-update sybermem-search sybermem-link sybermem-theme-digest; do
         if [ -d "$SKILL_SOURCE/$skill" ]; then
             rm -rf "$target/$skill"
             cp -r "$SKILL_SOURCE/$skill" "$target/"

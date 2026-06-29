@@ -49,7 +49,7 @@ try {
                 Remove-Item -Path $legacyPath -Recurse -Force -Confirm:$false
             }
         }
-        foreach ($skill in @("sybermem-init-project", "sybermem-record", "sybermem-summary", "sybermem-digest", "sybermem-phase-analyze", "sybermem-phase-confirm", "using-sybermem", "sybermem-update")) {
+        foreach ($skill in @("sybermem-init-project", "sybermem-record", "sybermem-summary", "sybermem-digest", "sybermem-phase-analyze", "sybermem-phase-confirm", "using-sybermem", "sybermem-update", "sybermem-search", "sybermem-link", "sybermem-theme-digest")) {
             $src = Join-Path $SkillsSrc $skill
             $dst = Join-Path $target.Path $skill
             if (Test-Path $src) {
