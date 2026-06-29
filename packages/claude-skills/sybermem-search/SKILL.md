@@ -40,12 +40,12 @@ You MUST complete these steps in order:
 1. **Resolve project root** — apply directory resolution rules above. If `.sybermem/INDEX.md` does not exist, tell the user to run `/sybermem-init-project` and stop.
 2. **Parse the query type** — classify the query as topic (`#tag`), phase range (`phaseN..phaseM`), date range (`date..date`), record ID (`type-NNN`), or free keyword.
 3. **Run the matching retrieval path:**
-   - **topic** → read `## Topic Index` in `.sybermem/INDEX.md`, collect the record IDs listed for that topic.
+   - **topic** → read `## Topic Index` in `.sybermem/INDEX.md`, collect the record IDs listed for that topic, and inspect any optional suffix on the topic line: `[active]`, `[low]`, or `[deprecated → <new-topic>]`.
    - **phase range** → read `.sybermem/analysis/phase-index.md` coverage map, collect records covered by phases in the range.
    - **date range** → list record files whose `YYYY-MM-DD` filename prefix falls in the range.
-   - **record ID** → locate that record, AND reverse-scan all records' `implements`/`fixes`/`related` frontmatter fields for the ID (see Reverse references below).
+   - **record ID** → locate that record, AND reverse-scan all records' `implements`/`fixes`/`related` frontmatter fields for the ID, plus scan for records whose `superseded_by:` field points to the ID (see Reverse references below).
    - **free keyword** → Grep `## Key Conclusions` first, then Grep `## Archived Conclusions`, then Grep record bodies under `.sybermem/{changes,decisions,requirements,bugs}/`. Results from `## Archived Conclusions` are marked with their archive reason (e.g. `[superseded by ...]`, `[archived]`).
-4. **Enrich each hit** — for every matched record, look up its phase (from phase-index coverage map) and read its `implements`/`fixes`/`related` frontmatter fields.
+4. **Enrich each hit** — for every matched record, look up its phase (from phase-index coverage map), read its `implements`/`fixes`/`related` fields, read its optional `superseded_by` field, and reverse-scan for records that it supersedes.
 5. **Rank** — keyword hits in Key Conclusions rank above body-only hits; newer dates rank higher within the same tier.
 6. **Output** — render the result list (see Output Format). Do not write anything to disk.
 
@@ -53,7 +53,8 @@ You MUST complete these steps in order:
 
 When the query is a record ID, also find which records point AT it:
 - Grep all record frontmatter under `.sybermem/{changes,decisions,requirements,bugs}/` for the target ID appearing in `implements:`, `fixes:`, or `related:` fields.
-- List those records under `Referenced by:` with the relation type.
+- Grep for records whose `superseded_by:` field points to the target ID; list those under `Supersedes:`.
+- List the first set under `Referenced by:` with the relation type.
 
 This is computed live; no reverse index is stored.
 
@@ -62,6 +63,8 @@ This is computed live; no reverse index is stored.
 ```md
 ## SyberMem Search: "<query>"
 
+[Optional warning line: deprecated topic / low activity]
+
 Found N records:
 
 1. **[type-NNN]** #topic1 #topic2 — one-line conclusion (date)
@@ -69,17 +72,21 @@ Found N records:
    - File: .sybermem/<type>/<file>.md
    - Relations: implements requirement-002, related change-005
    - Referenced by: change-008 (implements)
+   - Superseded by: decision-007 — one-line conclusion
+   - Supersedes: decision-003 — archived old conclusion
 
 2. ...
 ```
 
-Omit `Relations:` or `Referenced by:` lines when there are none.
+Omit `Relations:`, `Referenced by:`, `Superseded by:`, or `Supersedes:` lines when there are none.
 
 ## Error Handling
 
 - `.sybermem/INDEX.md` missing → prompt `/sybermem-init-project`, stop.
 - No matches → say so plainly; do not invent results.
 - Phase-index missing → skip phase enrichment, still return keyword/topic/date results.
+- Deprecated topic → still return legacy results, but show a warning suggesting the replacement topic.
+- Low-activity topic → still return results, but show an informational Low-activity topic note.
 
 ## Red Flags — STOP and Re-check
 
@@ -98,6 +105,8 @@ If you catch yourself doing any of these, STOP:
 | "I roughly remember the records, I'll answer from memory" | Memory drifts. Grep the actual files. |
 | "Close enough match, I'll report it as a hit" | Report what matched, with evidence. Don't pad results. |
 | "Phase-index is missing, I'll guess the phase" | Skip phase enrichment. Never invent a phase. |
+| "The old topic still kind of works, no need to mention it's deprecated" | Search should help users migrate. Show the replacement topic explicitly. |
+| "If a record is superseded, I can ignore it entirely" | Users may be searching historical decisions. Show it, but point them to the replacement. |
 
 ## Terminal State
 
