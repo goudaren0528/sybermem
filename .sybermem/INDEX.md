@@ -15,9 +15,7 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 - [change-005] #init #hooks — Refreshed project instruction files to auto/remind mode and added project-level settings + stop-hook helper (2026-05-13)
 - [requirement-002] #digest #compression — Identified need for persistent phase summary/compression layer to prevent understanding cost from growing linearly with records (2026-06-05)
 - [change-006] #skills #framework — Repaired missing .claude/settings.json, fixed INDEX.md omissions, refreshed phase index, upgraded all 8 skills with HARD-GATE + numbered checklist (2026-06-16)
-- [change-007] Auto-recorded workspace file changes at session stop so the project keeps a lightweight change trail without manual recording (2026-06-18)
 - [change-008] #distribution #hooks #automation — Added Claude Code plugin metadata and lifecycle hook delegators so SyberMem can install as a plugin without breaking existing project-managed hook files (2026-06-18)
-- [change-009] Auto-recorded workspace file changes at session stop so the project keeps a lightweight change trail without manual recording (2026-06-19)
 - [change-010] #lifecycle #search #relations #digest #distribution — Transformed SyberMem from v1 (record+group+compress) to v2 (lifecycle-aware, retrieval-capable, relation-linked, topic-compressible, multi-platform) in a single session covering 6 capability rounds (2026-06-22)
 <!-- add new conclusions here -->
 
@@ -27,6 +25,8 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 
 <!-- Not injected at session start; findable via /sybermem-search -->
 <!-- Suffix each line with: [superseded by <id>] or [compressed in <id>] or [archived] -->
+- [change-007] Auto-recorded workspace file changes at session stop so the project keeps a lightweight change trail without manual recording (2026-06-18) [archived]
+- [change-009] Auto-recorded workspace file changes at session stop so the project keeps a lightweight change trail without manual recording (2026-06-19) [archived]
 <!-- add new archived conclusions here -->
 
 ---
