@@ -175,6 +175,20 @@ Theme digest 目录为 `.sybermem/theme-digests/`。第一版按单个 topic 聚
 
 关系只存正向。`/sybermem-search <record-id>` 在查询时实时扫描，反向列出所有引用该记录的记录（`Referenced by`）。`/sybermem-record` 创建记录时会尝试推断并提议关系；`/sybermem-link` 用于事后补充。
 
+## Topic 治理与替代关系
+
+Topic Index 现在支持可选状态后缀：
+
+- `[active]` — 当前活跃 topic（默认；无标记视为 active）
+- `[low]` — 低活跃度 topic，仍可查询
+- `[deprecated → <new-topic>]` — 已被新 topic 替代，search 会提示使用新 topic
+
+记录 frontmatter 还支持可选的 `superseded_by: <record-id>` 字段，用于表示旧记录已被新记录替代。`/sybermem-link old superseded-by new` 会：
+
+1. 在旧记录 frontmatter 写入 `superseded_by: <new-id>`
+2. 将旧记录的 Key Conclusion 从 `## Key Conclusions` 移到 `## Archived Conclusions`
+3. 在归档行尾追加 `[superseded by <new-id>]`
+
 ## 在你的项目中会创建什么
 
 ```
