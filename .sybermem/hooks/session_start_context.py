@@ -78,7 +78,12 @@ def parse_topic_index(index_text: str) -> dict[str, list[str]]:
 
 
 def parse_phase_index(root: Path) -> dict:
-    """Return phase-index metadata: status, last_git_boundary, active_phase, confirmed_count."""
+    """Return phase-index metadata: status, last_git_boundary, active_phase, confirmed_count.
+
+    `active_phase` prefers the last phase block whose `- lifecycle: active` line is
+    present. If no phase declares lifecycle (older format) or none are active,
+    falls back to the last `### Phase:` heading in document order.
+    """
     phase_path = root / ".sybermem" / "analysis" / "phase-index.md"
     if not phase_path.is_file():
         return {"exists": False}
@@ -88,11 +93,26 @@ def parse_phase_index(root: Path) -> dict:
     boundary_match = re.search(r"^- last_git_boundary:\s*(\S+)", content, re.MULTILINE)
     phases = re.findall(r"### Phase: (.+)", content)
 
+    # Lifecycle-aware active phase selection: scan each phase block for an
+    # `- lifecycle: active` marker and remember the last one. Falls back to
+    # document order when no phase declares lifecycle.
+    active_phase: str | None = None
+    blocks = re.split(r"(?m)^### Phase: ", content)
+    for block in blocks[1:]:
+        title = block.splitlines()[0].strip() if block.splitlines() else None
+        if not title:
+            continue
+        header_match = re.search(r"^- lifecycle:\s*(\S+)", block, re.MULTILINE)
+        if header_match and header_match.group(1).strip() == "active":
+            active_phase = title
+    if active_phase is None and phases:
+        active_phase = phases[-1]
+
     return {
         "exists": True,
         "status": status_match.group(1).strip() if status_match else "unknown",
         "last_git_boundary": boundary_match.group(1).strip() if boundary_match else None,
-        "active_phase": phases[-1] if phases else None,
+        "active_phase": active_phase,
         "confirmed_count": len(phases),
     }
 
