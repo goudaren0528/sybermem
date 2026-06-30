@@ -18,6 +18,7 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 - [change-008] #distribution #hooks #automation — Added Claude Code plugin metadata and lifecycle hook delegators so SyberMem can install as a plugin without breaking existing project-managed hook files (2026-06-18)
 - [change-010] #lifecycle #search #relations #digest #distribution — Transformed SyberMem from v1 (record+group+compress) to v2 (lifecycle-aware, retrieval-capable, relation-linked, topic-compressible, multi-platform) in a single session covering 6 capability rounds (2026-06-22)
 - [change-011] Auto-recorded workspace file changes at session stop so the project keeps a lightweight change trail without manual recording (2026-06-29)
+- [requirement-003] #architecture #collaboration #hub #team — Defined SyberMem cross-project and team memory extension: three-scope model (Project/Hub/Team), Skill-vs-Core separation, phased implementation from Hub MVP to Team Git (2026-06-29)
 <!-- add new conclusions here -->
 
 ---
@@ -84,6 +85,7 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 |--------|------|-------|--------|----------|------|
 | 001 | 2026-05-08 | Create ADR Project Record System | Internal discussion | high | [link](requirements/2026-05-08-001-创建ADR项目规范系统.md) |
 | 002 | 2026-06-05 | Phase summary and record compression requirements | User feedback | high | [link](requirements/2026-06-05-002-阶段性总结与记录压缩需求.md) |
+| 003 | 2026-06-29 | SyberMem 跨项目与团队记忆扩展方案 | Internal review | high | [link](requirements/2026-06-29-003-sybermem-cross-project-team-memory-extension.md) |
 <!-- add new records here -->
 
 ---
@@ -113,13 +115,15 @@ When adding records, update this index file accordingly.
 
 <!-- Auto-maintained: maps topic tags to record IDs for fast lookup -->
 <!-- Optional suffix: [active] [low] [deprecated → <new-topic>] -->
-- architecture: requirement-001
+- architecture: requirement-001, requirement-003
 - automation: change-003, change-008
+- collaboration: requirement-003
 - compression: requirement-002
 - digest: requirement-002, change-010
 - distribution: change-001, change-002, change-008, change-010
 - framework: change-006
 - hooks: change-003, change-005, bug-001, change-008
+- hub: requirement-003
 - init: change-005, bug-001
 - install: change-001
 - foundation: requirement-001
@@ -127,3 +131,4 @@ When adding records, update this index file accordingly.
 - relations: change-010
 - search: change-010
 - skills: change-002, change-006
+- team: requirement-003
