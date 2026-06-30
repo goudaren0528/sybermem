@@ -26,16 +26,30 @@ def search_project(query: str) -> list[dict[str, str]]:
     return results
 
 
-def search_workspace(query: str) -> list[dict[str, str]]:
+def search_workspace(query: str, *, project: str | None = None, type_: str | None = None, project_status: str | None = None) -> list[dict[str, str]]:
     db = index_db_path()
     if not db.is_file():
         raise FileNotFoundError("workspace index not built; run `sybermem index build`")
     conn = sqlite3.connect(db)
     q = f'%{query}%'
-    rows = conn.execute(
-        "SELECT project_id, slug, record_id, type, title, path, created_at FROM records WHERE title LIKE ? OR content LIKE ? OR record_id LIKE ? OR topics LIKE ? ORDER BY slug, created_at DESC",
-        (q, q, q, q)
-    ).fetchall()
+    sql = """
+        SELECT r.project_id, r.slug, r.record_id, r.type, r.title, r.path, r.created_at
+        FROM records r
+        JOIN projects p ON p.project_id = r.project_id
+        WHERE (r.title LIKE ? OR r.content LIKE ? OR r.record_id LIKE ? OR r.topics LIKE ?)
+    """
+    params: list[str] = [q, q, q, q]
+    if project:
+        sql += " AND r.slug = ?"
+        params.append(project)
+    if type_:
+        sql += " AND r.type = ?"
+        params.append(type_)
+    if project_status:
+        sql += " AND p.status = ?"
+        params.append(project_status)
+    sql += " ORDER BY r.slug, r.created_at DESC"
+    rows = conn.execute(sql, params).fetchall()
     conn.close()
     return [
         {
