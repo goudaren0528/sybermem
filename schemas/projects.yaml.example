@@ -1,0 +1,7 @@
+schema_version: 1
+projects:
+  - project_id: prj_01JEXAMPLE0001
+    slug: example-project
+    path: D:/workspace/example-project
+    remote: github.com/example/example-project
+    registered_at: 2026-06-30T10:00:00+08:00
