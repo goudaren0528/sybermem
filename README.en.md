@@ -63,6 +63,14 @@ claude --plugin-dir .
 
 This loads `.claude-plugin/` from the current repository, which is useful for validating plugin metadata, lifecycle hooks, and the plugin-facing `skills/` tree.
 
+Once installed or updated, the CLI is available as a normal command:
+
+```bash
+sybermem project init --register
+sybermem index build
+sybermem search hooks --scope workspace
+```
+
 #### Current distribution status
 
 SyberMem already includes `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json`. Marketplace-style distribution is prepared, but the fully dogfooded runtime paths today are Claude Code and OpenCode.

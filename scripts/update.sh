@@ -12,6 +12,9 @@ LAUNCHER_PATH="$LAUNCHER_DIR/launch_record_change_on_stop.py"
 LAUNCHER_SOURCE="$ADR_PATH/scripts/global-stop-hook-launcher.py"
 SESSION_LAUNCHER_SOURCE="$ADR_PATH/scripts/global-session-start-launcher.py"
 SESSION_LAUNCHER_PATH="$LAUNCHER_DIR/launch_session_start_context.py"
+CLI_DIR="$HOME/.claude/sybermem/cli"
+CLI_VENV="$CLI_DIR/venv"
+CLI_WRAPPER="$CLI_DIR/sybermem"
 LEGACY_LOCAL_SKILLS="$ADR_PATH/.claude/skills"
 
 echo "=== SyberMem 更新 ==="
@@ -40,6 +43,17 @@ echo "  [Global] 已安装 stop hook launcher: $LAUNCHER_PATH"
 cp "$SESSION_LAUNCHER_SOURCE" "$SESSION_LAUNCHER_PATH"
 chmod +x "$SESSION_LAUNCHER_PATH"
 echo "  [Global] 已安装 session start launcher: $SESSION_LAUNCHER_PATH"
+mkdir -p "$CLI_DIR"
+python -m venv "$CLI_VENV"
+"$CLI_VENV/bin/python" -m pip install --upgrade pip
+"$CLI_VENV/bin/pip" install "$ADR_PATH/packages/core" "$ADR_PATH/packages/cli"
+cat > "$CLI_WRAPPER" <<'EOF'
+#!/bin/bash
+SYBERMEM_HOME="$HOME/.claude/sybermem/cli"
+exec "$SYBERMEM_HOME/venv/bin/sybermem" "$@"
+EOF
+chmod +x "$CLI_WRAPPER"
+echo "  [Global] 已安装 sybermem CLI: $CLI_WRAPPER"
 
 echo ""
 echo "=== 更新完成 ==="
@@ -56,6 +70,8 @@ echo "  /sybermem-update        — 更新全局 Skills 并重新检查当前项
 echo "  /sybermem-search        — 按关键词、topic、phase 范围、日期范围或记录 ID 检索记录"
 echo "  /sybermem-link          — 在两条已有记录间建立正向关系（implements / fixes / related / superseded-by）"
 echo "  /sybermem-theme-digest  — 为单个 topic 创建跨多个 phase 的持久化高阶摘要"
+echo ""
+echo "sybermem CLI 已安装，可直接运行：sybermem project init --register"
 echo ""
 echo "下一步：进入你的项目目录后执行 /sybermem-update"
 echo "如果你只想检查项目本地文档是否需要刷新，可执行 /sybermem-init-project"

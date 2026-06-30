@@ -20,6 +20,14 @@ v2 当前已具备的治理能力：
 
 平台支持：Claude Code 与 OpenCode 为 fully supported；Gemini / Cursor / Codex / Kimi 目前是入口文件或 metadata 已提供，运行时尚未同等强度验证。
 
+安装或更新后，可直接运行：
+
+```bash
+sybermem project init --register
+sybermem index build
+sybermem search hooks --scope workspace
+```
+
 ## 日常工作流
 
 ```text

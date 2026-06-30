@@ -14,6 +14,9 @@ OPENCODE_SKILLS="$HOME/.config/opencode/skills"
 LAUNCHER_DIR="$HOME/.claude/sybermem"
 LAUNCHER_PATH="$LAUNCHER_DIR/launch_record_change_on_stop.py"
 SESSION_LAUNCHER_PATH="$LAUNCHER_DIR/launch_session_start_context.py"
+CLI_DIR="$HOME/.claude/sybermem/cli"
+CLI_VENV="$CLI_DIR/venv"
+CLI_WRAPPER="$CLI_DIR/sybermem"
 OPENCODE_PLUGIN_DIR="$HOME/.config/opencode/plugins"
 
 echo "=== SyberMem Remote Install ==="
@@ -29,6 +32,8 @@ SKILLS_SRC="$TMPDIR/$ARCHIVE_PREFIX/packages/claude-skills"
 LAUNCHER_SOURCE="$TMPDIR/$ARCHIVE_PREFIX/scripts/global-stop-hook-launcher.py"
 SESSION_LAUNCHER_SOURCE="$TMPDIR/$ARCHIVE_PREFIX/scripts/global-session-start-launcher.py"
 PLUGIN_SOURCE="$TMPDIR/$ARCHIVE_PREFIX/packages/opencode-plugin/sybermem.ts"
+CORE_SOURCE="$TMPDIR/$ARCHIVE_PREFIX/packages/core"
+CLI_SOURCE="$TMPDIR/$ARCHIVE_PREFIX/packages/cli"
 
 if [ ! -d "$SKILLS_SRC" ]; then
     echo "Error: skills not found in archive"
@@ -63,6 +68,17 @@ if [ -d "$HOME/.claude" ]; then
         chmod +x "$SESSION_LAUNCHER_PATH"
         echo "  [Claude Code] installed session start launcher: $SESSION_LAUNCHER_PATH"
     fi
+    mkdir -p "$CLI_DIR"
+    python -m venv "$CLI_VENV"
+    "$CLI_VENV/bin/python" -m pip install --upgrade pip
+    "$CLI_VENV/bin/pip" install "$CORE_SOURCE" "$CLI_SOURCE"
+    cat > "$CLI_WRAPPER" <<'EOF'
+#!/bin/bash
+SYBERMEM_HOME="$HOME/.claude/sybermem/cli"
+exec "$SYBERMEM_HOME/venv/bin/sybermem" "$@"
+EOF
+    chmod +x "$CLI_WRAPPER"
+    echo "  [Claude Code] installed sybermem CLI: $CLI_WRAPPER"
 fi
 
 # OpenCode: install plugin
@@ -89,6 +105,8 @@ echo "  /sybermem-update        — Refresh global skills, then re-check the cur
 echo "  /sybermem-search        — Search/query records by keyword, topic, phase range, date range, or record ID"
 echo "  /sybermem-link          — Add a forward relation between two existing records (implements / fixes / related / superseded-by)"
 echo "  /sybermem-theme-digest  — Create a durable topic-level digest that compresses one theme across multiple related phases or records"
+echo ""
+echo "sybermem CLI is installed. You can now run: sybermem project init --register"
 echo ""
 echo "Next: open your project and run /sybermem-update"
 echo "If you only want the local project refresh check, run /sybermem-init-project"
