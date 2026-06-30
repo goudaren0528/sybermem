@@ -220,6 +220,11 @@ def generate_actions(files: dict) -> list[str]:
         if info.get("status") == "missing":
             actions.append(f"create {d} from template")
 
+    # Project identity
+    proj = files.get(".sybermem/project.yaml", {})
+    if proj.get("status") == "missing":
+        actions.append("create .sybermem/project.yaml with project identity")
+
     return actions
 
 
@@ -263,6 +268,9 @@ def main() -> int:
 
     # Check for health script itself
     files[".sybermem/hooks/check_project_health.py"] = check_file_exists(root / ".sybermem" / "hooks" / "check_project_health.py")
+
+    # Project identity
+    files[".sybermem/project.yaml"] = check_file_exists(root / ".sybermem" / "project.yaml")
 
     # Determine overall status
     index_status = files[".sybermem/INDEX.md"]["status"]
