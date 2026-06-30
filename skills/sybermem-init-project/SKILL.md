@@ -135,6 +135,8 @@ Read `codebase-scan-rules.md` for the existing codebase scan and record detectio
 - Ensure the global launcher `~/.claude/sybermem/launch_record_change_on_stop.py` exists; if not, instruct the user to refresh global skills first or run `/sybermem-update`.
 - Create missing `.sybermem/hooks/session_start_context.py` from the template file when startup context injection is being installed.
 - Create missing `.sybermem/hooks/check_project_health.py` from the template file to enable fast-path updates on subsequent runs.
+- Create missing `.sybermem/project.yaml` with project identity. Generate `project_id` as a ULID or UUID4 (once, never changes). Derive `slug` from `git remote get-url origin` (last path segment without `.git`) or fall back to the current directory name. Set `schema_version: 1`, `name` equal to `slug`, `repository.remote` and `repository.default_branch` from git (leave empty if unavailable), and `created_at` as current ISO8601 timestamp. If `project.yaml` already exists, do not overwrite it.
+- After generating or confirming `project.yaml`, register the project in the user's Hub registry at `~/.sybermem/projects.yaml`. Read the existing registry (create the file and `~/.sybermem/` directory if missing). Look up the current `project_id`: if found, update its `path` to the current project root; if not found, append a new entry with `project_id`, `slug`, `path`, `remote`, and `registered_at`. Write the file back.
 - Ensure the global session start launcher `~/.claude/sybermem/launch_session_start_context.py` exists; if not, instruct the user to refresh global skills first or run `/sybermem-update`.
 - Create missing `.sybermem/hooks/launch_record_change_on_stop.py` from the template file.
 - If the project uses the SyberMem-managed Stop hook entry, rewrite `.claude/settings.json` to call the global absolute launcher path instead of any project-local relative hook path.
@@ -167,6 +169,8 @@ Read `codebase-scan-rules.md` for the existing codebase scan and record detectio
 - managed Stop hook command updated to the launcher form when needed
 - `.sybermem/hooks/session_start_context.py` when startup context injection is installed
 - `.sybermem/hooks/check_project_health.py` for fast-path update detection
+- `.sybermem/project.yaml` project identity when missing
+- `~/.sybermem/projects.yaml` user Hub registry entry
 - managed SessionStart hook command updated to the launcher form when needed
 - `using-sybermem` session protocol block inserted or refreshed in `CLAUDE.md` / `AGENTS.md` when applicable
 - `CLAUDE.md` / `AGENTS.md` / project-level `.claude/settings.json`

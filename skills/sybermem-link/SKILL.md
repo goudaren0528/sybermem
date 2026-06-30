@@ -44,8 +44,8 @@ You MUST complete these steps in order:
 4. **Read the source record** — load its frontmatter.
 5. **Apply the relation behavior**
    - For `implements`/`fixes`/`related`, append `<target-id>` to the matching frontmatter list field. If the field does not exist, create it as a list. If `<target-id>` is already present, skip (no duplicate).
-   - For `superseded-by`, write `superseded_by: <target-id>` in the source frontmatter.
-6. **Apply the archive side-effect for `superseded-by`** — move the source conclusion from `## Key Conclusions` to `## Archived Conclusions`, appending `[superseded by <target-id>]`.
+   - For `superseded-by`, write `superseded_by: <target-id>` in the source frontmatter. If the field already exists with the same value, skip. If it exists with a different value, warn and ask before overwriting.
+6. **Apply the archive side-effect for `superseded-by`** — move the source conclusion from `## Key Conclusions` to `## Archived Conclusions`, appending `[superseded by <target-id>]`. If it is already archived with the same suffix, skip.
 7. **Write the source-side updates only** — save the source file and any required source-side conclusion move in `.sybermem/INDEX.md`. Do NOT modify the target record.
 8. **Report** — tell the user which source record fields were updated and whether the source conclusion was archived.
 
