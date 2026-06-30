@@ -33,6 +33,8 @@ def parse_record_file(path: Path, project_id: str, slug: str) -> dict[str, str]:
     date = ""
     topics: list[str] = []
     record_id = ""
+    status = ""
+    superseded_by = ""
     for line in text.splitlines():
         if line.startswith("type:"):
             rtype = line.split(":", 1)[1].strip()
@@ -40,6 +42,10 @@ def parse_record_file(path: Path, project_id: str, slug: str) -> dict[str, str]:
             date = line.split(":", 1)[1].strip()
         elif line.startswith("title:"):
             title = line.split(":", 1)[1].strip()
+        elif line.startswith("status:"):
+            status = line.split(":", 1)[1].strip()
+        elif line.startswith("superseded_by:"):
+            superseded_by = line.split(":", 1)[1].strip()
     m = re.match(r"\d{4}-\d{2}-\d{2}-(\d{3})-", path.name)
     if m and rtype:
         record_id = f"{rtype}-{m.group(1)}"
@@ -53,4 +59,6 @@ def parse_record_file(path: Path, project_id: str, slug: str) -> dict[str, str]:
         "topics": ",".join(topics),
         "path": str(path).replace('\\', '/'),
         "created_at": date,
+        "status": status,
+        "superseded_by": superseded_by,
     }
