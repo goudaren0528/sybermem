@@ -17,6 +17,7 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 - [change-006] #skills #framework — Repaired missing .claude/settings.json, fixed INDEX.md omissions, refreshed phase index, upgraded all 8 skills with HARD-GATE + numbered checklist (2026-06-16)
 - [change-008] #distribution #hooks #automation — Added Claude Code plugin metadata and lifecycle hook delegators so SyberMem can install as a plugin without breaking existing project-managed hook files (2026-06-18)
 - [change-010] #lifecycle #search #relations #digest #distribution — Transformed SyberMem from v1 (record+group+compress) to v2 (lifecycle-aware, retrieval-capable, relation-linked, topic-compressible, multi-platform) in a single session covering 6 capability rounds (2026-06-22)
+- [change-011] Auto-recorded workspace file changes at session stop so the project keeps a lightweight change trail without manual recording (2026-06-29)
 <!-- add new conclusions here -->
 
 ---
@@ -36,6 +37,8 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 | Number | Date | Title | Status | Coverage | Link |
 |--------|------|-------|--------|----------|------|
 | 001 | 2026-06-05 | sybermem v1 digest design phase | completed | 3 records | [link](digests/2026-06-05-001-sybermem-v1-digest-design-phase.md) |
+| 002 | 2026-06-29 | foundation and distribution phase | completed | 3 records | [link](digests/2026-06-29-002-foundation-and-distribution-phase.md) |
+| 003 | 2026-06-29 | platform ecosystem and plugin packaging phase | completed | 3 records | [link](digests/2026-06-29-003-platform-ecosystem-and-plugin-packaging-phase.md) |
 <!-- add new digest records here -->
 
 ---
@@ -62,6 +65,7 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 | 008 | 2026-06-18 | Add Claude Code plugin skeleton | implemented | [link](changes/2026-06-18-008-add-claude-code-plugin-skeleton.md) |
 | 009 | 2026-06-19 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-06-19-009-marketplace.md) |
 | 010 | 2026-06-22 | SyberMem v2 — lifecycle, search, relations, theme digest, platform | implemented | [link](changes/2026-06-22-010-sybermem-v2-lifecycle-search-relations-theme-digest-platform.md) |
+| 011 | 2026-06-29 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-06-29-011-skill-skill.md) |
 <!-- add new records here -->
 
 ---
