@@ -2,7 +2,8 @@
   "theme_recent_stops": {
     "misc": [
       "2026-06-18",
-      "2026-06-19"
+      "2026-06-19",
+      "2026-06-30"
     ],
     "skills": [
       "2026-06-29",
@@ -13,13 +14,14 @@
   "last_nudge": {
     "platform": "claude-code",
     "type": "digest",
-    "theme": "skills",
+    "theme": "misc",
     "date": "2026-06-30"
   },
-  "last_theme": "skills",
+  "last_theme": "misc",
   "last_nudge_type": "digest",
-  "last_record": "2026-06-30-013-skill-superpowers-skill-design-analysis.md",
+  "last_record": "2026-06-30-014-init-cpython-310-main-cpython-310-init-cpython-310-and-more.md",
   "digest_nudged_at_window_len": {
-    "skills": 3
+    "skills": 3,
+    "misc": 3
   }
 }

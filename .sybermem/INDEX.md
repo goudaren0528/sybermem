@@ -21,6 +21,7 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 - [requirement-003] #architecture #collaboration #hub #team — Defined SyberMem cross-project and team memory extension: three-scope model (Project/Hub/Team), Skill-vs-Core separation, phased implementation from Hub MVP to Team Git (2026-06-29)
 - [change-012] Auto-recorded workspace file changes at session stop so the project keeps a lightweight change trail without manual recording (2026-06-30)
 - [change-013] Auto-recorded workspace file changes at session stop so the project keeps a lightweight change trail without manual recording (2026-06-30)
+- [change-014] Auto-recorded workspace file changes at session stop so the project keeps a lightweight change trail without manual recording (2026-06-30)
 <!-- add new conclusions here -->
 
 ---
@@ -71,6 +72,7 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 | 011 | 2026-06-29 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-06-29-011-skill-skill.md) |
 | 012 | 2026-06-30 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-06-30-012-skill-skill-superpowers-skill-design-analysis.md) |
 | 013 | 2026-06-30 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-06-30-013-skill-superpowers-skill-design-analysis.md) |
+| 014 | 2026-06-30 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-06-30-014-init-cpython-310-main-cpython-310-init-cpython-310-and-more.md) |
 <!-- add new records here -->
 
 ---
