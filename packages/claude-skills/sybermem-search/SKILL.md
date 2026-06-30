@@ -48,13 +48,9 @@ You MUST complete these steps in order:
    - **free keyword** → Grep `## Key Conclusions` first, then Grep `## Archived Conclusions`, then Grep record bodies under `.sybermem/{changes,decisions,requirements,bugs}/`. Results from `## Archived Conclusions` are marked with their archive reason (e.g. `[superseded by ...]`, `[archived]`).
 
    **When `--scope workspace` is specified:**
-   - Read `~/.sybermem/projects.yaml` to get the list of registered projects.
-   - If the file does not exist or contains no projects, tell the user to run `/sybermem-update` in target projects first.
-   - For each registered project:
-     - Check that the `path` exists and contains `.sybermem/INDEX.md`. If not, mark as `[unavailable]` and skip.
-     - Run the same retrieval path (topic / keyword / record ID / phase range / date range) against that project's `.sybermem/` directory.
-   - Group results by project slug.
-   - Prefix each result with `[project: <slug>]`.
+   - Prefer running `sybermem search <query> --scope workspace --format json`.
+   - If the CLI reports that the workspace index is missing, tell the user to run `sybermem index build` first.
+   - Use the returned JSON as the source of truth, then explain or group the results for the user.
 4. **Enrich each hit** — for every matched record, look up its phase (from phase-index coverage map), read its `implements`/`fixes`/`related` fields, read its optional `superseded_by` field, and reverse-scan for records that it supersedes.
 5. **Rank** — keyword hits in Key Conclusions rank above body-only hits; newer dates rank higher within the same tier.
 6. **Output** — render the result list (see Output Format). Do not write anything to disk.
