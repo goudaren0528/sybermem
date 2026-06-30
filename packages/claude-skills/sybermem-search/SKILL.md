@@ -32,6 +32,7 @@ Resolve project root by walking up from cwd to find `.sybermem/` + `.claude/sett
 | `phase-002..phase-004` | phase range |
 | `2026-05-01..2026-06-15` | date range |
 | `requirement-002` | record ID lookup, including reverse references |
+| `--scope workspace` | search across all registered projects in `~/.sybermem/projects.yaml` |
 
 ## Flow
 
@@ -45,6 +46,15 @@ You MUST complete these steps in order:
    - **date range** → list record files whose `YYYY-MM-DD` filename prefix falls in the range.
    - **record ID** → locate that record, AND reverse-scan all records' `implements`/`fixes`/`related` frontmatter fields for the ID, plus scan for records whose `superseded_by:` field points to the ID (see Reverse references below).
    - **free keyword** → Grep `## Key Conclusions` first, then Grep `## Archived Conclusions`, then Grep record bodies under `.sybermem/{changes,decisions,requirements,bugs}/`. Results from `## Archived Conclusions` are marked with their archive reason (e.g. `[superseded by ...]`, `[archived]`).
+
+   **When `--scope workspace` is specified:**
+   - Read `~/.sybermem/projects.yaml` to get the list of registered projects.
+   - If the file does not exist or contains no projects, tell the user to run `/sybermem-update` in target projects first.
+   - For each registered project:
+     - Check that the `path` exists and contains `.sybermem/INDEX.md`. If not, mark as `[unavailable]` and skip.
+     - Run the same retrieval path (topic / keyword / record ID / phase range / date range) against that project's `.sybermem/` directory.
+   - Group results by project slug.
+   - Prefix each result with `[project: <slug>]`.
 4. **Enrich each hit** — for every matched record, look up its phase (from phase-index coverage map), read its `implements`/`fixes`/`related` fields, read its optional `superseded_by` field, and reverse-scan for records that it supersedes.
 5. **Rank** — keyword hits in Key Conclusions rank above body-only hits; newer dates rank higher within the same tier.
 6. **Output** — render the result list (see Output Format). Do not write anything to disk.
@@ -78,6 +88,25 @@ Found N records:
 2. ...
 ```
 
+When `--scope workspace`, use this format instead:
+
+```md
+## SyberMem Workspace Search: "<query>"
+
+### [eszyzu] (N results)
+1. **[type-NNN]** #topic — one-line (date)
+   - File: <absolute-path>/.sybermem/<type>/<file>.md
+   ...
+
+### [sybermem] (0 results)
+No matches.
+
+### [old-project] [unavailable]
+Project path not accessible.
+```
+
+Omit the per-project section entirely if the project has zero results and is available (to reduce noise). Always show `[unavailable]` projects.
+
 Omit `Relations:`, `Referenced by:`, `Superseded by:`, or `Supersedes:` lines when there are none.
 
 ## Error Handling
@@ -87,6 +116,9 @@ Omit `Relations:`, `Referenced by:`, `Superseded by:`, or `Supersedes:` lines wh
 - Phase-index missing → skip phase enrichment, still return keyword/topic/date results.
 - Deprecated topic → still return legacy results, but show a warning suggesting the replacement topic.
 - Low-activity topic → still return results, but show an informational Low-activity topic note.
+- `--scope workspace` with no `~/.sybermem/projects.yaml` → tell the user to run `/sybermem-update` in target projects.
+- `--scope workspace` with all projects unavailable → report all unavailable, no results.
+- `--scope workspace` with some unavailable → show available results + list unavailable projects at the end.
 
 ## Red Flags — STOP and Re-check
 
