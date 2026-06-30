@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "query": { "type": "string" },
+    "scope": { "type": "string", "enum": ["project", "workspace"] },
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "project_id": { "type": "string" },
+          "slug": { "type": "string" },
+          "record_id": { "type": "string" },
+          "type": { "type": "string" },
+          "title": { "type": "string" },
+          "path": { "type": "string" },
+          "score": { "type": "number" }
+        },
+        "required": ["project_id", "slug", "record_id", "type", "title", "path"]
+      }
+    }
+  },
+  "required": ["query", "scope", "results"]
+}
