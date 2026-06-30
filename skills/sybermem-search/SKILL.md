@@ -49,6 +49,7 @@ You MUST complete these steps in order:
 
    **When `--scope workspace` is specified:**
    - Prefer running `sybermem search <query> --scope workspace --format json`.
+   - Optional filters may be added: `--project <slug>`, `--type <change|decision|requirement|bug>`, `--project-status <active|missing|stale>`.
    - If the CLI reports that the workspace index is missing, tell the user to run `sybermem index build` first.
    - Use the returned JSON as the source of truth, then explain or group the results for the user.
 4. **Enrich each hit** — for every matched record, look up its phase (from phase-index coverage map), read its `implements`/`fixes`/`related` fields, read its optional `superseded_by` field, and reverse-scan for records that it supersedes.
