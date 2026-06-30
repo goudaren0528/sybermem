@@ -50,6 +50,13 @@ def run_git(*args: str, cwd: Path | None = None) -> str:
     return result.stdout.strip() if result.returncode == 0 else ""
 
 
+def read_text(path: Path) -> str | None:
+    try:
+        return path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return None
+
+
 def parse_conclusions(index_text: str) -> list[str]:
     match = re.search(
         r"## Key Conclusions\s*\n([\s\S]*?)(?=\n---|\n## )", index_text
@@ -117,6 +124,26 @@ def parse_phase_index(root: Path) -> dict:
     }
 
 
+def parse_project_identity(root: Path) -> dict:
+    """Read .sybermem/project.yaml and return project_id and slug."""
+    proj_path = root / ".sybermem" / "project.yaml"
+    if not proj_path.is_file():
+        return {"exists": False}
+    content = read_text(proj_path)
+    if content is None:
+        return {"exists": False}
+    # Simple line-based parsing (no PyYAML dependency)
+    project_id = None
+    slug = None
+    for line in content.splitlines():
+        line = line.strip()
+        if line.startswith("project_id:"):
+            project_id = line.split(":", 1)[1].strip()
+        elif line.startswith("slug:"):
+            slug = line.split(":", 1)[1].strip()
+    return {"exists": True, "project_id": project_id, "slug": slug}
+
+
 def detect_stale_signal(root: Path, boundary_commit: str | None) -> dict:
     """Compare phase-index boundary to current HEAD."""
     if not boundary_commit:
@@ -152,8 +179,13 @@ def build_context(root: Path) -> str:
     conclusions = parse_conclusions(index_text)
     topics = parse_topic_index(index_text)
     phase_info = parse_phase_index(root)
+    project_info = parse_project_identity(root)
 
     lines: list[str] = ["SyberMem startup context:"]
+
+    if project_info["exists"] and project_info.get("slug"):
+        lines.append(f"Project: {project_info['slug']} ({project_info.get('project_id', 'no id')}).")
+
     lines.append(f"Loaded {len(conclusions)} key conclusions from SyberMem.")
 
     if topics:
