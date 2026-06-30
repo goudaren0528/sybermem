@@ -22,6 +22,8 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 - [change-012] Auto-recorded workspace file changes at session stop so the project keeps a lightweight change trail without manual recording (2026-06-30)
 - [change-013] Auto-recorded workspace file changes at session stop so the project keeps a lightweight change trail without manual recording (2026-06-30)
 - [change-014] Auto-recorded workspace file changes at session stop so the project keeps a lightweight change trail without manual recording (2026-06-30)
+- [change-015] Auto-recorded workspace file changes at session stop so the project keeps a lightweight change trail without manual recording (2026-06-30)
+- [change-016] Auto-recorded workspace file changes at session stop so the project keeps a lightweight change trail without manual recording (2026-06-30)
 <!-- add new conclusions here -->
 
 ---
@@ -73,6 +75,8 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 | 012 | 2026-06-30 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-06-30-012-skill-skill-superpowers-skill-design-analysis.md) |
 | 013 | 2026-06-30 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-06-30-013-skill-superpowers-skill-design-analysis.md) |
 | 014 | 2026-06-30 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-06-30-014-init-cpython-310-main-cpython-310-init-cpython-310-and-more.md) |
+| 015 | 2026-06-30 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-06-30-015-readme-en-readme-2026-06-30-sybermem-core-phase1-and-more.md) |
+| 016 | 2026-06-30 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-06-30-016-init-main-pkg-info-and-more.md) |
 <!-- add new records here -->
 
 ---
