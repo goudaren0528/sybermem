@@ -1,0 +1,8 @@
+schema_version: 1
+project_id: prj_01J6SYBERMEM0001
+slug: sybermem
+name: sybermem
+repository:
+  remote: github.com/goudaren0528/sybermem
+  default_branch: main
+created_at: 2026-06-29T18:00:00+08:00
