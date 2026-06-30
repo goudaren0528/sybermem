@@ -19,6 +19,8 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 - [change-010] #lifecycle #search #relations #digest #distribution — Transformed SyberMem from v1 (record+group+compress) to v2 (lifecycle-aware, retrieval-capable, relation-linked, topic-compressible, multi-platform) in a single session covering 6 capability rounds (2026-06-22)
 - [change-011] Auto-recorded workspace file changes at session stop so the project keeps a lightweight change trail without manual recording (2026-06-29)
 - [requirement-003] #architecture #collaboration #hub #team — Defined SyberMem cross-project and team memory extension: three-scope model (Project/Hub/Team), Skill-vs-Core separation, phased implementation from Hub MVP to Team Git (2026-06-29)
+- [change-012] Auto-recorded workspace file changes at session stop so the project keeps a lightweight change trail without manual recording (2026-06-30)
+- [change-013] Auto-recorded workspace file changes at session stop so the project keeps a lightweight change trail without manual recording (2026-06-30)
 <!-- add new conclusions here -->
 
 ---
@@ -67,6 +69,8 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 | 009 | 2026-06-19 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-06-19-009-marketplace.md) |
 | 010 | 2026-06-22 | SyberMem v2 — lifecycle, search, relations, theme digest, platform | implemented | [link](changes/2026-06-22-010-sybermem-v2-lifecycle-search-relations-theme-digest-platform.md) |
 | 011 | 2026-06-29 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-06-29-011-skill-skill.md) |
+| 012 | 2026-06-30 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-06-30-012-skill-skill-superpowers-skill-design-analysis.md) |
+| 013 | 2026-06-30 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-06-30-013-skill-superpowers-skill-design-analysis.md) |
 <!-- add new records here -->
 
 ---

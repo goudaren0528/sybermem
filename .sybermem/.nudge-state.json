@@ -3,15 +3,23 @@
     "misc": [
       "2026-06-18",
       "2026-06-19"
+    ],
+    "skills": [
+      "2026-06-29",
+      "2026-06-30",
+      "2026-06-30"
     ]
   },
   "last_nudge": {
     "platform": "claude-code",
-    "type": "none",
-    "theme": "misc",
-    "date": "2026-06-19"
+    "type": "digest",
+    "theme": "skills",
+    "date": "2026-06-30"
   },
-  "last_theme": "misc",
-  "last_nudge_type": "none",
-  "last_record": "2026-06-19-009-marketplace.md"
+  "last_theme": "skills",
+  "last_nudge_type": "digest",
+  "last_record": "2026-06-30-013-skill-superpowers-skill-design-analysis.md",
+  "digest_nudged_at_window_len": {
+    "skills": 3
+  }
 }
