@@ -10,6 +10,9 @@ $ArchivePrefix = "sybermem-$Branch"
 $LauncherDir = Join-Path $env:USERPROFILE ".claude\sybermem"
 $LauncherPath = Join-Path $LauncherDir "launch_record_change_on_stop.py"
 $SessionLauncherPath = Join-Path $LauncherDir "launch_session_start_context.py"
+$CliDir = Join-Path $LauncherDir "cli"
+$CliVenv = Join-Path $CliDir "venv"
+$CliWrapper = Join-Path $CliDir "sybermem.cmd"
 $OpenCodePluginDir = Join-Path $env:USERPROFILE ".config\opencode\plugins"
 
 $Targets = @(
@@ -34,6 +37,8 @@ try {
     $LauncherSource = Join-Path $TmpDir "$ArchivePrefix\scripts\global-stop-hook-launcher.py"
     $SessionLauncherSource = Join-Path $TmpDir "$ArchivePrefix\scripts\global-session-start-launcher.py"
     $PluginSource = Join-Path $TmpDir "$ArchivePrefix\packages\opencode-plugin\sybermem.ts"
+    $CoreSource = Join-Path $TmpDir "$ArchivePrefix\packages\core"
+    $CliSource = Join-Path $TmpDir "$ArchivePrefix\packages\cli"
 
     if (-not (Test-Path $SkillsSrc)) {
         throw "Skills not found in archive"
@@ -73,6 +78,18 @@ try {
             Copy-Item -Path $SessionLauncherSource -Destination $SessionLauncherPath -Force
             Write-Host "  [Claude Code] installed session start launcher: $SessionLauncherPath"
         }
+        if (-not (Test-Path $CliDir)) {
+            New-Item -ItemType Directory -Path $CliDir -Force | Out-Null
+        }
+        python -m venv $CliVenv
+        & (Join-Path $CliVenv "Scripts\python.exe") -m pip install --upgrade pip
+        & (Join-Path $CliVenv "Scripts\pip.exe") install $CoreSource $CliSource
+        @'
+@echo off
+set "SYBERMEM_HOME=%USERPROFILE%\.claude\sybermem\cli"
+"%SYBERMEM_HOME%\venv\Scripts\sybermem.exe" %*
+'@ | Set-Content -Path $CliWrapper -Encoding ASCII
+        Write-Host "  [Claude Code] installed sybermem CLI: $CliWrapper"
     }
 
     # OpenCode: install plugin
@@ -104,6 +121,8 @@ Write-Host "  /sybermem-update        — Refresh global skills, then re-check t
 Write-Host "  /sybermem-search        — Search/query records by keyword, topic, phase range, date range, or record ID"
 Write-Host "  /sybermem-link          — Add a forward relation between two existing records (implements / fixes / related / superseded-by)"
 Write-Host "  /sybermem-theme-digest  — Create a durable topic-level digest that compresses one theme across multiple related phases or records"
+Write-Host ""
+Write-Host "sybermem CLI is installed. You can now run: sybermem project init --register"
 Write-Host ""
 Write-Host "Next: open your project and run /sybermem-update"
 Write-Host "If you only want the local project refresh check, run /sybermem-init-project"

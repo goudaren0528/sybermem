@@ -9,6 +9,9 @@ $LauncherPath = Join-Path $LauncherDir "launch_record_change_on_stop.py"
 $LauncherSource = Join-Path $AdrPath "scripts\global-stop-hook-launcher.py"
 $SessionLauncherSource = Join-Path $AdrPath "scripts\global-session-start-launcher.py"
 $SessionLauncherPath = Join-Path $LauncherDir "launch_session_start_context.py"
+$CliDir = Join-Path $env:USERPROFILE ".claude\sybermem\cli"
+$CliVenv = Join-Path $CliDir "venv"
+$CliWrapper = Join-Path $CliDir "sybermem.cmd"
 $PluginSource = Join-Path $AdrPath "packages\opencode-plugin\sybermem.ts"
 $OpenCodePluginDir = Join-Path $env:USERPROFILE ".config\opencode\plugins"
 $LegacyLocalSkills = Join-Path $AdrPath ".claude\skills"
@@ -52,6 +55,18 @@ if (Test-Path (Join-Path $env:USERPROFILE ".claude")) {
     Write-Host "  [Claude Code] 已安装 stop hook launcher: $LauncherPath"
     Copy-Item -Path $SessionLauncherSource -Destination $SessionLauncherPath -Force
     Write-Host "  [Claude Code] 已安装 session start launcher: $SessionLauncherPath"
+    if (-not (Test-Path $CliDir)) {
+        New-Item -ItemType Directory -Path $CliDir -Force | Out-Null
+    }
+    python -m venv $CliVenv
+    & (Join-Path $CliVenv "Scripts\python.exe") -m pip install --upgrade pip
+    & (Join-Path $CliVenv "Scripts\pip.exe") install (Join-Path $AdrPath "packages\core") (Join-Path $AdrPath "packages\cli")
+    @'
+@echo off
+set "SYBERMEM_HOME=%USERPROFILE%\.claude\sybermem\cli"
+"%SYBERMEM_HOME%\venv\Scripts\sybermem.exe" %*
+'@ | Set-Content -Path $CliWrapper -Encoding ASCII
+    Write-Host "  [Claude Code] 已安装 sybermem CLI: $CliWrapper"
 }
 
 # OpenCode: install plugin
@@ -78,6 +93,8 @@ Write-Host "  /sybermem-update        — 更新全局 Skills 并重新检查当
 Write-Host "  /sybermem-search        — 按关键词、topic、phase 范围、日期范围或记录 ID 检索记录"
 Write-Host "  /sybermem-link          — 在两条已有记录间建立正向关系（implements / fixes / related / superseded-by）"
 Write-Host "  /sybermem-theme-digest  — 为单个 topic 创建跨多个 phase 的持久化高阶摘要"
+Write-Host ""
+Write-Host "sybermem CLI 已安装，可直接运行：sybermem project init --register"
 Write-Host ""
 Write-Host "下一步：进入你的项目目录后执行 /sybermem-update"
 Write-Host "如果你只想初始化或刷新当前项目，可执行 /sybermem-init-project"

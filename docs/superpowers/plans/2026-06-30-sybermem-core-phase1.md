@@ -178,6 +178,12 @@ git commit -m "feat: scaffold sybermem core and CLI packages"
 - Modify: `packages/core/sybermem_core/registry.py`
 - Modify: `packages/cli/sybermem_cli/main.py`
 
+Once Phase 1.5 is done, users and skills should invoke this as:
+
+```bash
+sybermem project init --register --format json
+```
+
 - [ ] **Step 1: Implement `identity.py`**
 
 ```python

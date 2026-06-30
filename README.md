@@ -166,6 +166,14 @@ OpenCode 推荐使用其插件路径来获得 `session.created` / `session.idle`
 
 Theme digest 目录为 `.sybermem/theme-digests/`。第一版按单个 topic 聚合,优先使用已有 phase digests,再用 raw records 补缺。
 
+安装或更新后，可直接运行：
+
+```bash
+sybermem project init --register
+sybermem index build
+sybermem search hooks --scope workspace
+```
+
 ## 记录关系与检索
 
 记录可以在 frontmatter 中声明可选的正向关系字段：
