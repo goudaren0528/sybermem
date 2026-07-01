@@ -1,111 +1,118 @@
-# SyberMem Team MVP Phase B 设计
+# SyberMem Team MVP Phase B 设计（修正版）
 
-> 在 Team Phase A 的仓库骨架之上，先发布最小可用的团队项目状态：`project.md` + `current-status.md`。
+> Team repo 不应接收机械的空状态快照，而应接收“足够有意义”的项目级摘要。`publish status` 成为一个带前置补齐能力的编排入口。
 
 **Date:** 2026-07-01
 **Status:** Draft
-**Scope:** Requirement-003 / Team MVP Phase B。只做 `publish status`，不做 digest/lesson/review/search/sync/history。
+**Scope:** Requirement-003 / Team MVP Phase B（修正版）。发布 team-facing project summary + project.md，并在需要时自动补 phase digest。 
 **Parent spec:** `docs/superpowers/specs/2026-06-30-sybermem-team-mvp-phaseA-design.md`
 
 ---
 
 ## 1. Background & Problem
 
-Phase A 已经交付了 Team repo 的基础：
-- `team.yaml`
-- Team Git 仓库目录骨架
-- `sybermem team init`
-- 远程 Git 绑定
+原始 Phase B 设计假设：
+- 发布 `project.md`
+- 发布 `current-status.md`
 
-但此时 Team repo 还只是一个空壳。它虽然已经是“团队统一存储”的容器，但没有任何实际内容，因此还不能让团队成员回答：
+但这会产生一个问题：
 
-- 这个项目是什么？
-- 它现在进行到哪里？
-- 最近有什么变化？
-- 有什么待处理事项？
+> 如果项目只有很薄的 current-status，而没有 digest / theme digest / recent records 的有意义沉淀，那么 Team repo 里只是空壳状态文件，后续 agent 很难基于它做进展管理、经验提取和规范总结。
 
-如果 Phase B 一上来就发布 raw records / digests / lessons，就会立即引入隐私、审核、重复和共享边界问题。对 MVP 而言，这太重。
+因此，Team MVP 的核心目标应改为：
 
-因此，Phase B 的目标必须收敛为：
-
-> **先把每个项目的“身份卡片 + 当前状态快照”发布到 Team repo。**
+```text
+发布“足够有意义”的项目级摘要
+而不是机械地发布所有项目的状态文件
+```
 
 ---
 
 ## 2. Design Goal
 
-新增一个最小命令：
+`sybermem publish status` 成为编排入口：
 
 ```bash
 sybermem publish status --team-path D:/team-memory
 ```
 
-它把当前项目的最小状态发布到：
+它的行为不是“直接发 status”，而是：
 
 ```text
-<team-repo>/projects/<slug>/
-├── project.md
-└── current-status.md
+1. 判断当前项目是否已有可用 digest / theme digest
+2. 如果没有，判断是否有足够内容自动补 digest
+3. 如果内容仍不足，则默认不同步
+4. 如果有足够内容，则生成 team-facing project summary 并发布到 Team repo
 ```
 
-这一步完成后，多个项目就能第一次真正汇总到 Team repo 中统一管理。
+---
+
+## 3. 发布阈值（已确认）
+
+用户接受的第一版阈值：
+
+### 满足任一条件才允许自动补 digest 并发布
+- 至少 **2 条 record**
+- 或者存在 **1 条 decision**
+- 或者存在 **1 条 completed phase**
+
+如果三项都不满足，则默认：
+
+```text
+不发布
+```
+
+并提示：
+
+```text
+Project does not yet have enough meaningful material to publish to Team memory.
+```
 
 ---
 
-## 3. Design Choice
+## 4. Publish 编排规则
 
-### 为什么发布 `project.md` + `current-status.md`
+### 4.1 有 digest / theme digest
 
-#### 不选：只发布 `current-status.md`
-缺点：只有状态，没有项目身份卡片；以后团队仓库里目录一多，缺少稳定的项目入口页。
+优先使用它们作为 source material。
 
-#### 不选：再加 digest 摘要
-缺点：立刻碰到“哪些 digest 能共享”“要不要脱敏”“是否需要审核”等问题，会把 Phase B scope 拉大。
+```text
+phase digest / theme digest
+  → 提取决策 / 改进 / 教训 / 风险 / 下一步
+  → 生成 team-facing project summary
+```
 
-#### 选择：`project.md` + `current-status.md`
-优点：
-- `project.md` 负责“这个项目是谁”
-- `current-status.md` 负责“它现在怎么样”
-- 两个文件就能形成 Team repo 的最小项目入口
+### 4.2 没有 digest，但内容足够
 
----
+自动触发：
+- 优先补 **phase digest**
+- 只有在 phase 不适合、但 topic 已明显成熟时才考虑 theme digest（第一版可先不自动补 theme digest）
 
-## 4. Command Design
+然后再继续 publish。
 
-### 命令
+### 4.3 没有 digest，且内容不足
+
+默认不同步。
+
+### 4.4 用户强制要求
+
+未来可支持：
 
 ```bash
-sybermem publish status --team-path D:/team-memory
-sybermem publish status --team-path D:/team-memory --format json
+sybermem publish status --team-path D:/team-memory --force
 ```
 
-### 行为流程
+此时允许直接做一次轻量提炼而不创建正式 digest。
 
-1. 解析当前 project root
-2. 读取 `.sybermem/project.yaml`
-3. 调用现有 `sybermem project status --format json`
-4. 读取 Team repo 的 `team.yaml`
-5. 校验 Team repo 结构存在
-6. 在 `projects/<slug>/` 下写入/更新：
-   - `project.md`
-   - `current-status.md`
-7. 输出结果
-
-### Phase B 明确不做
-
-- 不自动 commit
-- 不自动 push
-- 不生成 `status-history/`
-- 不批量发布多个项目
-- 不发布 digests / lessons / decisions / records
+**第一版不做 `--force`，只保留设计空间。**
 
 ---
 
-## 5. Published Artifacts
+## 5. 发布产物重定义
 
 ### 5.1 `project.md`
 
-稳定、低频变化的项目身份卡片。
+稳定身份卡片，变化少：
 
 ```markdown
 # sybermem
@@ -118,12 +125,12 @@ sybermem publish status --team-path D:/team-memory --format json
 - Registered at: 2026-06-29T18:00:00+08:00
 ```
 
-### 5.2 `current-status.md`
+### 5.2 `current-status.md` → 升级为 team-facing project summary
 
-高频覆盖更新的状态快照。
+它不再只是薄薄的 status 快照，而是：
 
 ```markdown
-# sybermem — Current Status
+# sybermem — Team Project Summary
 
 - Updated at: 2026-07-01T10:00:00+08:00
 - Source commit: 20d1cc4
@@ -131,72 +138,38 @@ sybermem publish status --team-path D:/team-memory --format json
 ## Active Phase
 - phase-010 — Search, relations, and theme digest
 
-## Recent Records
-- change-010
-- decision-001
+## Progress
+- 已完成 Theme Digest Layer
+- 已完成 Topic governance / superseded handling
+- 已完成 Hub MVP 与 portfolio polish
 
-## Open Bugs
-- none
+## Key Decisions
+- Team MVP should precede full Hub experience for Requirement-003
 
-## Open Requirements
-- requirement-003
+## Notable Improvements
+- 新增跨项目 search
+- 新增 team init / publish status
+
+## Lessons / Pitfalls
+- Windows 输出编码仍需单独处理
+- 未分析项目需要避免 phase 模板回退误判
+
+## Open Issues / Risks
+- team sync 尚未实现
+- team-level search 尚未实现
 
 ## Next
-- continue Team MVP Phase B
+- continue Team MVP Phase C
 ```
 
-### 为什么不带更多内容
+这个文件要足够让其他 agent 直接消费，用于：
+- 进展汇总
+- 跨项目状态比较
+- 后续经验提取和规范总结
 
-第一版的目标是“统一管理项目状态”，不是“团队知识全量发布”。所以：
-- 只带当前最重要的可共享状态信息
-- 不带完整 record 正文
-- 不带 digest 正文
-- 不带私人推测或 lesson 提炼
+### 5.3 `meta.json`
 
----
-
-## 6. Team Repo Structure After Phase B
-
-Phase A 结束时：
-
-```text
-team.yaml
-projects/
-lessons/
-standards/
-architecture/
-publications/
-dashboards/
-```
-
-Phase B 之后，第一个真实业务内容出现：
-
-```text
-projects/
-└── sybermem/
-    ├── project.md
-    └── current-status.md
-```
-
-当第二个项目（如 teamspark）发布状态后：
-
-```text
-projects/
-├── sybermem/
-│   ├── project.md
-│   └── current-status.md
-└── teamspark/
-    ├── project.md
-    └── current-status.md
-```
-
-这时 Team repo 已经具备统一管理多个项目状态的最小可用形态。
-
----
-
-## 7. Output Design
-
-### JSON 输出
+保留结构化索引：
 
 ```json
 {
@@ -204,66 +177,92 @@ projects/
   "team_id": "team_rental_platform",
   "project_id": "prj_01J6SYBERMEM0001",
   "slug": "sybermem",
-  "team_path": "D:/team-memory",
-  "files": [
-    "D:/team-memory/projects/sybermem/project.md",
-    "D:/team-memory/projects/sybermem/current-status.md"
-  ]
+  "published_at": "2026-07-01T10:00:00+08:00",
+  "source_commit": "20d1cc4",
+  "source_digest": "digests/2026-07-001-...md"
 }
 ```
 
-### Text 输出
+用于未来的 Team search / sync / dashboard，不需要现在就全面启用。
+
+---
+
+## 6. Team Repo 结构（修正版）
 
 ```text
-Published project status to Team repo:
-- team: team_rental_platform
-- project: sybermem
-- files:
-  - projects/sybermem/project.md
-  - projects/sybermem/current-status.md
+<team-repo>/projects/<slug>/
+├── project.md
+├── current-status.md      # 团队可消费摘要
+└── meta.json
+```
+
+`latest-phase-digest.md` / `latest-theme-digest.md` 第一版不直接复制过去，而是作为 source material 内部使用。避免 Team repo 里立刻堆满 digest 文件。
+
+---
+
+## 7. CLI 形态
+
+### 第一版命令
+
+```bash
+sybermem publish status --team-path D:/team-memory
+sybermem publish status --team-path D:/team-memory --format json
+```
+
+### 行为流程
+
+1. 解析当前项目 root
+2. 读取 `.sybermem/project.yaml`
+3. 读取 Team repo 的 `team.yaml`
+4. 判断是否满足最小阈值
+5. 如果已有 digest / theme digest → 用它们做摘要来源
+6. 如果没有，但阈值满足 → 自动补 phase digest
+7. 生成 `project.md` + `current-status.md` + `meta.json`
+8. 输出结果
+
+---
+
+## 8. 为什么这才是 MVP
+
+这样做之后，Team repo 里存的不是“所有项目都一刀切的薄 status”，而是：
+
+> **所有有意义项目的团队可消费摘要**
+
+这就让其他 agent 可以真正基于 Team memory 做：
+- 项目管理
+- 进展汇总
+- 风险提示
+- 经验提取
+- 规范总结
+
+也更符合你的真实成功标准：
+
+```text
+各项目的进展会每 1~2 天汇总到 Team 记忆库
+其他 agent 再基于它做分析和反馈
 ```
 
 ---
 
-## 8. File Manifest
+## 9. Out of Scope
 
-| 操作 | 文件 | 说明 |
-|------|------|------|
-| 新增 | `packages/core/sybermem_core/publish.py` | status publication core logic |
-| 修改 | `packages/cli/sybermem_cli/main.py` | 新增 `publish status` 命令 |
-| 可选修改 | `packages/core/sybermem_core/team.py` | 如果需要复用 team repo 读取逻辑 |
-
----
-
-## 9. Backward Compatibility
-
-- 不影响 Project / Hub 现有命令
-- 不修改项目 `.sybermem/` 内容
-- Team repo 仍然不需要自动 push
-- 没有 Team repo 的用户不会受影响
+第一版仍然不做：
+- `team sync`
+- `team review`
+- 发布 lessons / digests 原文
+- team-level search
+- `--force` 直接提炼
 
 ---
 
-## 10. Out of Scope
+## 10. Success Criteria
 
-Phase B 明确不做：
-- `status-history/`
-- `sybermem team sync`
-- `sybermem team review`
-- `publish digest`
-- `publish lesson`
-- Team search
-- 审核状态流
-- 访问控制
-
-这些留到后续 Team Phase C / D。
-
----
-
-## 11. Success Criteria
-
-1. `sybermem publish status --team-path <path>` 可以运行
-2. Team repo 中创建 `projects/<slug>/project.md`
-3. Team repo 中创建 `projects/<slug>/current-status.md`
-4. 同一个项目重复发布是幂等的（覆盖更新，不重复创建）
-5. 多个项目发布后，`projects/` 目录成为真正的团队统一状态入口
+1. `publish status` 会先判断是否有足够材料发布
+2. 若已有 digest → 直接用作高质量 source
+3. 若无 digest 且内容足够 → 自动补 phase digest 再发布
+4. 若内容不足 → 默认不发布并说明原因
+5. Team repo 中得到：
+   - `project.md`
+   - `current-status.md`（团队可消费摘要）
+   - `meta.json`
+6. 其他 agent 可以直接基于 `current-status.md` 做跨项目管理/汇总/提炼
