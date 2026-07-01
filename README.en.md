@@ -267,6 +267,15 @@ scripts/                              # Install & update scripts
 docs/zh/                              # Chinese documentation
 ```
 
+## Team MVP (in progress)
+
+SyberMem has started the Team MVP track. The first step is `sybermem team init`, which:
+- creates the team repo skeleton
+- writes `team.yaml`
+- binds the Git remote
+
+`publish status`, `team sync`, and `team review` will build on top of that foundation.
+
 ## License
 
 MIT

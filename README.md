@@ -296,6 +296,15 @@ scripts/                              # 安装、更新与打包校验脚本
 docs/zh/                              # 中文文档备份
 ```
 
+## Team MVP（进行中）
+
+SyberMem 已经开始进入 Team MVP 路线。当前第一步是 `sybermem team init`：
+- 创建 team repo 骨架
+- 写 `team.yaml`
+- 绑定远程 Git
+
+后续 `publish status` / `team sync` / `team review` 会在此基础上叠加。
+
 ## License
 
 MIT
