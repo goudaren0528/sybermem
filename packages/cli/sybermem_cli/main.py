@@ -12,6 +12,7 @@ from sybermem_core.index import rebuild_index
 from sybermem_core.search import search_project, search_workspace
 from sybermem_core.status import project_status
 from sybermem_core.portfolio import build_portfolio
+from sybermem_core.team import init_team_repo
 
 
 def cmd_project_init(args: argparse.Namespace) -> int:
@@ -122,6 +123,24 @@ def cmd_portfolio(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_team_init(args: argparse.Namespace) -> int:
+    try:
+        payload = init_team_repo(Path(args.path), args.team_id, args.name, args.remote)
+    except Exception as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+
+    if args.format == "json":
+        print(dump_json(payload))
+    else:
+        print("Initialized team repo:")
+        print(f"- team_id: {payload['team_id']}")
+        print(f"- name: {payload['name']}")
+        print(f"- path: {payload['path']}")
+        print(f"- remote: {payload['remote']}")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(prog="sybermem")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -156,6 +175,16 @@ def main() -> int:
     portfolio = sub.add_parser("portfolio")
     portfolio.add_argument("--format", choices=["text", "json"], default="text")
     portfolio.set_defaults(func=cmd_portfolio)
+
+    team = sub.add_parser("team")
+    team_sub = team.add_subparsers(dest="team_command", required=True)
+    team_init = team_sub.add_parser("init")
+    team_init.add_argument("--path", required=True)
+    team_init.add_argument("--team-id", required=True)
+    team_init.add_argument("--name", required=True)
+    team_init.add_argument("--remote", required=True)
+    team_init.add_argument("--format", choices=["text", "json"], default="text")
+    team_init.set_defaults(func=cmd_team_init)
 
     args = parser.parse_args()
     return args.func(args)
