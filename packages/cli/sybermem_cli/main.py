@@ -152,9 +152,13 @@ def cmd_publish_status(args: argparse.Namespace) -> int:
     if args.format == "json":
         print(dump_json(payload))
     else:
-        print("Published project status to Team repo:")
+        print("Published project summary to Team repo:")
         print(f"- team: {payload['team_id']}")
         print(f"- project: {payload['slug']}")
+        if payload.get('source_phase_digest'):
+            print(f"- latest phase digest: {payload['source_phase_digest']}")
+        if payload.get('source_theme_digest'):
+            print(f"- latest theme digest: {payload['source_theme_digest']}")
         print("- files:")
         for f in payload["files"]:
             print(f"  - {f}")
