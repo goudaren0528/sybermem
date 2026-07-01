@@ -6,6 +6,39 @@ from .records import parse_project_yaml, iter_record_files, parse_record_file
 from .identity import now_iso
 
 
+def publication_readiness(root: Path) -> dict:
+    """Return whether the project has enough meaningful material to publish.
+
+    Threshold (confirmed with the user): publish is allowed when ANY of these are true:
+    - at least 2 records
+    - at least 1 decision
+    - at least 1 completed phase
+    """
+    all_records = [parse_record_file(p, "", root.name) for p in iter_record_files(root)]
+    record_count = len(all_records)
+    decision_count = sum(1 for r in all_records if r.get("type") == "decision")
+
+    completed_phase_count = 0
+    phase_path = root / ".sybermem" / "analysis" / "phase-index.md"
+    if phase_path.is_file():
+        for line in phase_path.read_text(encoding="utf-8").splitlines():
+            if line.startswith("- lifecycle:") and line.split(":", 1)[1].strip() == "completed":
+                completed_phase_count += 1
+
+    enough_material = (
+        record_count >= 2 or
+        decision_count >= 1 or
+        completed_phase_count >= 1
+    )
+
+    return {
+        "record_count": record_count,
+        "decision_count": decision_count,
+        "completed_phase_count": completed_phase_count,
+        "enough_material": enough_material,
+    }
+
+
 def project_status(root: Path) -> dict:
     meta = parse_project_yaml(root)
     phase_path = root / ".sybermem" / "analysis" / "phase-index.md"
