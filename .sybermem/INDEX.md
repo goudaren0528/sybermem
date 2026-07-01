@@ -24,6 +24,7 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 - [change-014] Auto-recorded workspace file changes at session stop so the project keeps a lightweight change trail without manual recording (2026-06-30)
 - [change-015] Auto-recorded workspace file changes at session stop so the project keeps a lightweight change trail without manual recording (2026-06-30)
 - [change-016] Auto-recorded workspace file changes at session stop so the project keeps a lightweight change trail without manual recording (2026-06-30)
+- [decision-001] #architecture #collaboration #team — Chose to prioritize a minimal Team Git repository MVP before fully polishing the personal Hub experience, because unified team-managed storage is the real near-term value of Requirement-003 (2026-06-30)
 <!-- add new conclusions here -->
 
 ---
@@ -85,6 +86,7 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 
 | Number | Date | Title | Status | Link |
 |--------|------|-------|--------|------|
+| 001 | 2026-06-30 | Team MVP should precede full Hub experience for Requirement-003 | decided | [link](decisions/2026-06-30-001-team-mvp-before-full-hub-experience.md) |
 <!-- add new records here -->
 
 ---
@@ -125,9 +127,9 @@ When adding records, update this index file accordingly.
 
 <!-- Auto-maintained: maps topic tags to record IDs for fast lookup -->
 <!-- Optional suffix: [active] [low] [deprecated → <new-topic>] -->
-- architecture: requirement-001, requirement-003
+- architecture: requirement-001, requirement-003, decision-001
 - automation: change-003, change-008
-- collaboration: requirement-003
+- collaboration: requirement-003, decision-001
 - compression: requirement-002
 - digest: requirement-002, change-010
 - distribution: change-001, change-002, change-008, change-010
@@ -141,4 +143,4 @@ When adding records, update this index file accordingly.
 - relations: change-010
 - search: change-010
 - skills: change-002, change-006
-- team: requirement-003
+- team: requirement-003, decision-001
