@@ -4,7 +4,7 @@ from pathlib import Path
 
 from .project import resolve_project_root
 from .records import parse_project_yaml
-from .status import project_status
+from .status import project_status, publication_readiness
 
 
 def render_project_card(project_meta: dict[str, str], team_id: str) -> str:
@@ -58,6 +58,22 @@ def render_current_status(status: dict, source_commit: str) -> str:
     return "\n".join(lines) + "\n"
 
 
+def latest_phase_digest(root: Path) -> str:
+    digests_dir = root / ".sybermem" / "digests"
+    if not digests_dir.is_dir():
+        return ""
+    files = sorted(digests_dir.glob("*.md"))
+    return str(files[-1]).replace('\\', '/') if files else ""
+
+
+def latest_theme_digest(root: Path) -> str:
+    digests_dir = root / ".sybermem" / "theme-digests"
+    if not digests_dir.is_dir():
+        return ""
+    files = sorted(digests_dir.glob("*.md"))
+    return str(files[-1]).replace('\\', '/') if files else ""
+
+
 def read_team_yaml(team_root: Path) -> tuple[str, str]:
     team_yaml = team_root / "team.yaml"
     if not team_yaml.is_file():
@@ -88,18 +104,39 @@ def publish_status(team_path: Path) -> dict[str, object]:
     if not project_meta.get("project_id"):
         raise ValueError("Current project has no project.yaml identity. Run `sybermem project init --register` first.")
 
+    readiness = publication_readiness(root)
+    if not readiness["enough_material"]:
+        raise ValueError(
+            "Project does not yet have enough meaningful material to publish to Team memory "
+            f"(records={readiness['record_count']}, decisions={readiness['decision_count']}, completed_phases={readiness['completed_phase_count']})."
+        )
+
     status = project_status(root)
     slug = project_meta.get("slug", root.name)
     source_commit = project_meta.get("repository.commit", "")
+    phase_digest = latest_phase_digest(root)
+    theme_digest = latest_theme_digest(root)
 
     project_dir = team_root / "projects" / slug
     project_dir.mkdir(parents=True, exist_ok=True)
 
     project_md = project_dir / "project.md"
     current_status_md = project_dir / "current-status.md"
+    meta_json = project_dir / "meta.json"
 
     project_md.write_text(render_project_card(project_meta, team_id), encoding="utf-8")
     current_status_md.write_text(render_current_status(status, source_commit), encoding="utf-8")
+    import json as _json
+    meta_json.write_text(_json.dumps({
+        "status": "published",
+        "team_id": team_id,
+        "project_id": project_meta["project_id"],
+        "slug": slug,
+        "published_at": status["as_of"],
+        "source_commit": source_commit,
+        "source_phase_digest": phase_digest,
+        "source_theme_digest": theme_digest,
+    }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
     return {
         "status": "published",
@@ -110,5 +147,8 @@ def publish_status(team_path: Path) -> dict[str, object]:
         "files": [
             str(project_md).replace('\\', '/'),
             str(current_status_md).replace('\\', '/'),
+            str(meta_json).replace('\\', '/'),
         ],
+        "source_phase_digest": phase_digest,
+        "source_theme_digest": theme_digest,
     }
