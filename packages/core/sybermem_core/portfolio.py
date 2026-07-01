@@ -14,15 +14,19 @@ def build_portfolio() -> dict:
                 "project_id": entry["project_id"],
                 "slug": entry["slug"],
                 "status": "missing",
-                "phase": "",
+                "phase": {"id": "", "name": "", "lifecycle": ""},
+                "reason": "path not accessible",
             })
             continue
+
         if (path / ".sybermem" / "INDEX.md").is_file():
             status = project_status(path)
             projects.append({
                 "project_id": entry["project_id"],
                 "slug": entry["slug"],
                 "status": entry.get("status", "active"),
-                "phase": status["phase"]["id"] or status["phase"]["name"],
+                "phase": status["phase"],
+                "reason": "",
             })
+
     return {"projects": projects}
