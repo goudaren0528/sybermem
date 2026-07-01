@@ -13,6 +13,7 @@ from sybermem_core.search import search_project, search_workspace
 from sybermem_core.status import project_status
 from sybermem_core.portfolio import build_portfolio
 from sybermem_core.team import init_team_repo
+from sybermem_core.publish import publish_status
 
 
 def cmd_project_init(args: argparse.Namespace) -> int:
@@ -141,6 +142,25 @@ def cmd_team_init(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_publish_status(args: argparse.Namespace) -> int:
+    try:
+        payload = publish_status(Path(args.team_path))
+    except Exception as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+
+    if args.format == "json":
+        print(dump_json(payload))
+    else:
+        print("Published project status to Team repo:")
+        print(f"- team: {payload['team_id']}")
+        print(f"- project: {payload['slug']}")
+        print("- files:")
+        for f in payload["files"]:
+            print(f"  - {f}")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(prog="sybermem")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -185,6 +205,13 @@ def main() -> int:
     team_init.add_argument("--remote", required=True)
     team_init.add_argument("--format", choices=["text", "json"], default="text")
     team_init.set_defaults(func=cmd_team_init)
+
+    publish = sub.add_parser("publish")
+    publish_sub = publish.add_subparsers(dest="publish_command", required=True)
+    publish_status_cmd = publish_sub.add_parser("status")
+    publish_status_cmd.add_argument("--team-path", required=True)
+    publish_status_cmd.add_argument("--format", choices=["text", "json"], default="text")
+    publish_status_cmd.set_defaults(func=cmd_publish_status)
 
     args = parser.parse_args()
     return args.func(args)
