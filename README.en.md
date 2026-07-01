@@ -269,12 +269,12 @@ docs/zh/                              # Chinese documentation
 
 ## Team MVP (in progress)
 
-SyberMem has started the Team MVP track. The first step is `sybermem team init`, which:
-- creates the team repo skeleton
-- writes `team.yaml`
-- binds the Git remote
+SyberMem is now moving into the Team MVP track:
 
-`publish status`, `team sync`, and `team review` will build on top of that foundation.
+- **Phase A**: `sybermem team init` — create the Team repo skeleton, write `team.yaml`, and bind the Git remote
+- **Phase B**: `sybermem publish status` — publish the current project's `project.md` + `current-status.md` into the Team repo
+
+`team sync`, `team review`, and digest/lesson publication will build on top of that foundation.
 
 ## License
 

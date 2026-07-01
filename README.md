@@ -298,12 +298,12 @@ docs/zh/                              # 中文文档备份
 
 ## Team MVP（进行中）
 
-SyberMem 已经开始进入 Team MVP 路线。当前第一步是 `sybermem team init`：
-- 创建 team repo 骨架
-- 写 `team.yaml`
-- 绑定远程 Git
+SyberMem 正在进入 Team MVP 路线：
 
-后续 `publish status` / `team sync` / `team review` 会在此基础上叠加。
+- **Phase A**：`sybermem team init` —— 创建 team repo 骨架、写 `team.yaml`、绑定远程 Git
+- **Phase B**：`sybermem publish status` —— 将当前项目的 `project.md` + `current-status.md` 发布到 Team repo
+
+后续 `team sync`、`team review`、digest/lesson 发布会在此基础上叠加。
 
 ## License
 
