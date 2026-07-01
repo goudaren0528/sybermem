@@ -12,12 +12,15 @@ def project_status(root: Path) -> dict:
     phase_id = ""
     phase_name = ""
     lifecycle = ""
+    analysis_status = ""
     if phase_path.is_file():
         lines = phase_path.read_text(encoding="utf-8").splitlines()
         current_name = ""
         current_id = ""
         current_lifecycle = ""
         for line in lines:
+            if line.startswith("- status:") and not analysis_status:
+                analysis_status = line.split(":", 1)[1].strip()
             if line.startswith("### Phase: "):
                 current_name = line.replace("### Phase: ", "").strip()
                 current_id = ""
@@ -30,9 +33,9 @@ def project_status(root: Path) -> dict:
                     phase_name = current_name
                     phase_id = current_id
                     lifecycle = current_lifecycle
-        if not phase_name:
+        if not phase_name and analysis_status != "not_yet_analyzed":
             text = phase_path.read_text(encoding="utf-8")
-            phases = re.findall(r"### Phase: (.+)", text)
+            phases = re.findall(r"(?m)^### Phase: (.+)", text)
             if phases:
                 phase_name = phases[-1]
 

@@ -98,8 +98,27 @@ def cmd_portfolio(args: argparse.Namespace) -> int:
     if args.format == "json":
         print(dump_json(payload))
     else:
+        buckets = {"active": [], "stale": [], "missing": []}
         for p in payload["projects"]:
-            print(f"- {p['slug']} → {p['status']} {p['phase']}")
+            buckets.setdefault(p["status"], []).append(p)
+
+        for status_key in ["active", "stale", "missing"]:
+            items = buckets.get(status_key, [])
+            if not items:
+                continue
+            print(f"[{status_key}]")
+            for p in items:
+                if status_key == "missing":
+                    print(f"- {p['slug']} → {p['reason']}")
+                else:
+                    phase = p["phase"]
+                    phase_label = phase.get("id") or phase.get("name") or "(no phase)"
+                    phase_name = phase.get("name", "")
+                    if phase_name and phase.get("id"):
+                        print(f"- {p['slug']} → {phase_label} {phase_name}")
+                    else:
+                        print(f"- {p['slug']} → {phase_label}")
+            print("")
     return 0
 
 
