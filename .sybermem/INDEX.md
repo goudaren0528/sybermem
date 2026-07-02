@@ -26,6 +26,8 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 - [change-016] Auto-recorded workspace file changes at session stop so the project keeps a lightweight change trail without manual recording (2026-06-30)
 - [decision-001] #architecture #collaboration #team — Chose to prioritize a minimal Team Git repository MVP before fully polishing the personal Hub experience, because unified team-managed storage is the real near-term value of Requirement-003 (2026-06-30)
 - [change-017] Auto-recorded workspace file changes at session stop so the project keeps a lightweight change trail without manual recording (2026-07-01)
+- [change-018] Auto-recorded workspace file changes at session stop so the project keeps a lightweight change trail without manual recording (2026-07-01)
+- [change-019] Auto-recorded workspace file changes at session stop so the project keeps a lightweight change trail without manual recording (2026-07-02)
 <!-- add new conclusions here -->
 
 ---
@@ -80,6 +82,8 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 | 015 | 2026-06-30 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-06-30-015-readme-en-readme-2026-06-30-sybermem-core-phase1-and-more.md) |
 | 016 | 2026-06-30 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-06-30-016-init-main-pkg-info-and-more.md) |
 | 017 | 2026-07-01 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-07-01-017-init-cpython-310-main-cpython-310-init-cpython-310-and-more.md) |
+| 018 | 2026-07-01 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-07-01-018-publish.md) |
+| 019 | 2026-07-02 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-07-02-019-init-main-pkg-info-and-more.md) |
 <!-- add new records here -->
 
 ---
