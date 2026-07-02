@@ -14,6 +14,7 @@ from sybermem_core.status import project_status
 from sybermem_core.portfolio import build_portfolio
 from sybermem_core.team import init_team_repo
 from sybermem_core.publish import publish_status
+from sybermem_core.team_summary import build_team_management_summary
 
 
 def cmd_project_init(args: argparse.Namespace) -> int:
@@ -170,6 +171,25 @@ def cmd_publish_status(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_team_summary(args: argparse.Namespace) -> int:
+    try:
+        result = build_team_management_summary(Path(args.team_path))
+    except Exception as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+
+    payload = result["payload"]
+    if args.format == "json":
+        print(dump_json(payload))
+    else:
+        print("Generated Team management summary:")
+        print(f"- team: {result['team_id']}")
+        print(f"- markdown: {result['summary_markdown']}")
+        print(f"- json: {result['summary_json']}")
+        print(f"- baseline state: {result['summary_state']}")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(prog="sybermem")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -214,6 +234,11 @@ def main() -> int:
     team_init.add_argument("--remote", required=True)
     team_init.add_argument("--format", choices=["text", "json"], default="text")
     team_init.set_defaults(func=cmd_team_init)
+
+    team_summary = team_sub.add_parser("summary")
+    team_summary.add_argument("--team-path", required=True)
+    team_summary.add_argument("--format", choices=["text", "json"], default="text")
+    team_summary.set_defaults(func=cmd_team_summary)
 
     publish = sub.add_parser("publish")
     publish_sub = publish.add_subparsers(dest="publish_command", required=True)
