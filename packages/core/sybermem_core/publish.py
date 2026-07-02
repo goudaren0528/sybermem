@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .project import resolve_project_root
+from .project import resolve_project_root, read_team_from_project_yaml, write_team_to_project_yaml
 from .records import parse_project_yaml
 from .status import project_status, publication_readiness
 
@@ -188,10 +188,22 @@ def read_team_yaml(team_root: Path) -> tuple[str, str]:
     return team_id, remote
 
 
-def publish_status(team_path: Path) -> dict[str, object]:
+def publish_status(team_path: Path | None = None) -> dict[str, object]:
     root = resolve_project_root()
     if root is None:
         raise ValueError("No SyberMem project root found.")
+
+    # Resolve team path: explicit arg > project.yaml > error
+    if team_path is None:
+        saved = read_team_from_project_yaml(root)
+        if saved.get("team_path"):
+            team_path = Path(saved["team_path"])
+        else:
+            raise ValueError(
+                "No --team-path provided and no team association found in project.yaml. "
+                "Run `sybermem publish status --team-path <path>` to set it, "
+                "or `sybermem team init` to create a Team repo first."
+            )
 
     team_root = team_path.resolve()
     if not team_root.exists():
@@ -257,22 +269,31 @@ def publish_status(team_path: Path) -> dict[str, object]:
         ["git", "add", f"projects/{slug}/", "dashboards/"],
         cwd=team_root, check=True,
     )
-    subprocess.run(
-        ["git", "commit", "-m", f"publish: {slug} status update"],
-        cwd=team_root, check=True,
+    diff_check = subprocess.run(
+        ["git", "diff", "--cached", "--quiet"],
+        cwd=team_root, check=False,
     )
-    # Push if origin exists
+    has_changes = diff_check.returncode == 1
+    if has_changes:
+        subprocess.run(
+            ["git", "commit", "-m", f"publish: {slug} status update"],
+            cwd=team_root, check=True,
+        )
+    # Push if origin exists and there was a new commit
     remote_check = subprocess.run(
         ["git", "remote", "get-url", "origin"],
         cwd=team_root, capture_output=True, text=True, check=False,
     )
     pushed = False
-    if remote_check.returncode == 0 and remote_check.stdout.strip():
+    if has_changes and remote_check.returncode == 0 and remote_check.stdout.strip():
         push_result = subprocess.run(
             ["git", "push", "origin"],
             cwd=team_root, capture_output=True, text=True, check=False,
         )
         pushed = push_result.returncode == 0
+
+    # Persist team association in project.yaml for future publishes.
+    write_team_to_project_yaml(root, team_id, str(team_root).replace('\\', '/'))
 
     return {
         "status": "published",
