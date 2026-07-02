@@ -21,39 +21,70 @@ def render_project_card(project_meta: dict[str, str], team_id: str) -> str:
 
 def render_current_status(status: dict, source_commit: str) -> str:
     phase = status["phase"]
+    phase_label = phase["id"] or "(no phase)"
+    phase_name = phase.get("name", "")
+    digest_tail = []
+    if phase["id"]:
+        digest_tail.append(f"Current phase remains {phase['id']}")
+    if phase_name:
+        digest_tail.append(phase_name)
+
+    progress = []
+    if status["recent_records"]:
+        progress.append(f"Recent records published: {', '.join(status['recent_records'][:3])}")
+    if phase["id"]:
+        progress.append(f"Active phase is {phase['id']}{(' — ' + phase_name) if phase_name else ''}")
+
+    focus = []
+    if phase_name:
+        focus.append(f"Current work is centered on {phase_name.lower()}")
+    elif phase["id"]:
+        focus.append(f"Current work is centered on {phase['id']}")
+    else:
+        focus.append("Current work is still too early to resolve into an active phase")
+
+    risks = []
+    if status["open_bugs"]:
+        risks.append(f"Open bugs still need attention ({len(status['open_bugs'])})")
+    if status["open_requirements"]:
+        risks.append(f"Open requirements remain unresolved ({len(status['open_requirements'])})")
+    if not risks:
+        risks.append("No major risks surfaced from the current project status snapshot")
+
+    next_items = status["next"][:] if status["next"] else []
+    if not next_items:
+        if status["open_bugs"] or status["open_requirements"]:
+            next_items.append("Resolve the open bugs and requirements before the next publication cycle")
+        elif phase_name:
+            next_items.append(f"Continue advancing the current {phase_name.lower()} phase")
+        else:
+            next_items.append("Continue gathering enough material to clarify the active phase and next milestone")
+
     lines = [
-        f"# {status['slug']} — Current Status",
+        f"# {status['slug']} — Team Project Summary",
         "",
         f"- Updated at: {status['as_of']}",
         f"- Source commit: {source_commit}",
         "",
-        "## Active Phase",
-        f"- {phase['id'] or '(no phase)'}{(' — ' + phase['name']) if phase['name'] else ''}",
-        "",
-        "## Recent Records",
+        "## Current Focus",
     ]
-    if status["recent_records"]:
-        lines.extend([f"- {r}" for r in status["recent_records"]])
-    else:
-        lines.append("- none")
+    lines.extend([f"- {item}" for item in focus])
 
-    lines.extend(["", "## Open Bugs"])
-    if status["open_bugs"]:
-        lines.extend([f"- {r}" for r in status["open_bugs"]])
-    else:
-        lines.append("- none")
+    lines.extend(["", "## Recent Progress"])
+    lines.extend([f"- {item}" for item in progress] if progress else ["- No significant recent progress detected"])
 
-    lines.extend(["", "## Open Requirements"])
-    if status["open_requirements"]:
-        lines.extend([f"- {r}" for r in status["open_requirements"]])
-    else:
-        lines.append("- none")
+    lines.extend(["", "## Risks / Attention"])
+    lines.extend([f"- {item}" for item in risks])
 
     lines.extend(["", "## Next"])
-    if status["next"]:
-        lines.extend([f"- {n}" for n in status["next"]])
-    else:
-        lines.append("- none")
+    lines.extend([f"- {item}" for item in next_items])
+
+    lines.extend(["", "## Supporting Signals"])
+    lines.append(f"- Active Phase: {phase_label}{(' — ' + phase_name) if phase_name else ''}")
+    lines.append(f"- Open Bugs: {len(status['open_bugs'])}")
+    lines.append(f"- Open Requirements: {len(status['open_requirements'])}")
+    if digest_tail:
+        lines.append(f"- Context: {'; '.join(digest_tail)}")
 
     return "\n".join(lines) + "\n"
 
