@@ -105,6 +105,29 @@ def latest_theme_digest(root: Path) -> str:
     return str(files[-1]).replace('\\', '/') if files else ""
 
 
+def sync_markdown_history(src_dir: Path, dst_dir: Path) -> tuple[int, list[str]]:
+    """Sync markdown files from src to dst.
+
+    Returns:
+      (count, paths) where count is number of files present in src,
+      and paths are the files that were created/updated in dst.
+    """
+    if not src_dir.is_dir():
+        return 0, []
+
+    dst_dir.mkdir(parents=True, exist_ok=True)
+    changed = []
+    files = sorted(src_dir.glob("*.md"))
+    for src in files:
+        dst = dst_dir / src.name
+        src_text = src.read_text(encoding="utf-8")
+        dst_text = dst.read_text(encoding="utf-8") if dst.is_file() else None
+        if dst_text != src_text:
+            dst.write_text(src_text, encoding="utf-8")
+            changed.append(str(dst).replace('\\', '/'))
+    return len(files), changed
+
+
 def parse_published_status(project_dir: Path) -> dict[str, str | list[str]]:
     status_md = project_dir / "current-status.md"
     meta_json = project_dir / "meta.json"
@@ -266,10 +289,18 @@ def publish_status(team_path: Path | None = None) -> dict[str, object]:
     project_md = project_dir / "project.md"
     current_status_md = project_dir / "current-status.md"
     meta_json = project_dir / "meta.json"
+    phase_digests_dir = project_dir / "phase-digests"
+    theme_digests_dir = project_dir / "theme-digests"
 
     project_md.write_text(render_project_card(project_meta, team_id), encoding="utf-8")
     current_status_md.write_text(render_current_status(status, source_commit), encoding="utf-8")
+
+    phase_count, phase_changed = sync_markdown_history(root / ".sybermem" / "digests", phase_digests_dir)
+    theme_count, theme_changed = sync_markdown_history(root / ".sybermem" / "theme-digests", theme_digests_dir)
+
     import json as _json
+    latest_phase_published = str(phase_digests_dir / Path(phase_digest).name).replace('\\', '/') if phase_digest else ""
+    latest_theme_published = str(theme_digests_dir / Path(theme_digest).name).replace('\\', '/') if theme_digest else ""
     meta_json.write_text(_json.dumps({
         "status": "published",
         "team_id": team_id,
@@ -279,6 +310,10 @@ def publish_status(team_path: Path | None = None) -> dict[str, object]:
         "source_commit": source_commit,
         "source_phase_digest": phase_digest,
         "source_theme_digest": theme_digest,
+        "latest_phase_digest": latest_phase_published,
+        "latest_theme_digest": latest_theme_published,
+        "phase_digest_count": phase_count,
+        "theme_digest_count": theme_count,
     }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
     # Rebuild team-wide overview from all published project summaries
