@@ -14,6 +14,7 @@ from sybermem_core.status import project_status
 from sybermem_core.portfolio import build_portfolio
 from sybermem_core.team import init_team_repo
 from sybermem_core.publish import publish_status
+from sybermem_core.publish_bootstrap import bootstrap_publish_status
 from sybermem_core.team_summary import build_team_management_summary
 
 
@@ -146,7 +147,7 @@ def cmd_team_init(args: argparse.Namespace) -> int:
 def cmd_publish_status(args: argparse.Namespace) -> int:
     try:
         tp = Path(args.team_path) if args.team_path else None
-        payload = publish_status(tp)
+        payload = bootstrap_publish_status(tp)
     except Exception as exc:
         print(str(exc), file=sys.stderr)
         return 1
