@@ -26,6 +26,10 @@ def git_remote(root: Path) -> str:
         return ""
 
 
+def is_valid_team_repo(path: Path) -> bool:
+    return path.is_dir() and (path / ".git").exists() and (path / "team.yaml").is_file()
+
+
 def init_team_repo(path: Path, team_id: str, name: str, remote: str) -> dict[str, str]:
     if path.exists() and not path.is_dir():
         raise ValueError(f"Path exists but is not a directory: {path}")
