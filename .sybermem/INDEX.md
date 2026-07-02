@@ -28,6 +28,9 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 - [change-017] Auto-recorded workspace file changes at session stop so the project keeps a lightweight change trail without manual recording (2026-07-01)
 - [change-018] Auto-recorded workspace file changes at session stop so the project keeps a lightweight change trail without manual recording (2026-07-01)
 - [change-019] Auto-recorded workspace file changes at session stop so the project keeps a lightweight change trail without manual recording (2026-07-02)
+- [change-020] Auto-recorded workspace file changes at session stop so the project keeps a lightweight change trail without manual recording (2026-07-02)
+- [change-021] Auto-recorded workspace file changes at session stop so the project keeps a lightweight change trail without manual recording (2026-07-02)
+- [change-022] Auto-recorded workspace file changes at session stop so the project keeps a lightweight change trail without manual recording (2026-07-02)
 <!-- add new conclusions here -->
 
 ---
@@ -84,6 +87,9 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 | 017 | 2026-07-01 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-07-01-017-init-cpython-310-main-cpython-310-init-cpython-310-and-more.md) |
 | 018 | 2026-07-01 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-07-01-018-publish.md) |
 | 019 | 2026-07-02 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-07-02-019-init-main-pkg-info-and-more.md) |
+| 020 | 2026-07-02 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-07-02-020-main-project-publish-and-more.md) |
+| 021 | 2026-07-02 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-07-02-021-main-project-publish-and-more.md) |
+| 022 | 2026-07-02 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-07-02-022-init-cpython-310-main-cpython-310-init-cpython-310-and-more.md) |
 <!-- add new records here -->
 
 ---
