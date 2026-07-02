@@ -28,6 +28,10 @@ def ensure_project_yaml(root: Path) -> tuple[str, str, str]:
     return ("created", project_id, slug)
 
 
+def is_sybermem_project(root: Path) -> bool:
+    return (root / ".sybermem").is_dir()
+
+
 def read_team_from_project_yaml(root: Path) -> dict[str, str]:
     yaml_path = root / ".sybermem" / "project.yaml"
     if not yaml_path.is_file():
