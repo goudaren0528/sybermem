@@ -303,6 +303,7 @@ SyberMem 正在进入 Team MVP 路线：
 - **Phase A**：`sybermem team init` —— 创建 team repo 骨架、写 `team.yaml`、绑定远程 Git
 - **Phase B**：`sybermem publish status` —— 必要时先利用现有 digest（或在材料足够时先补 phase digest），再将 `project.md` + Team-facing `current-status.md` + `meta.json` 发布到 Team repo
 - **Phase C**：每次 `publish status` 后自动重建 `dashboards/current-overview.md`，作为团队统一总览入口
+- **Phase D**：`publish status` 自动记住团队关联，无需每次传 `--team-path`；`team init` 自动首次提交并推送
 
 后续 `team sync`、`team review`、digest/lesson 发布会在此基础上叠加。
 
