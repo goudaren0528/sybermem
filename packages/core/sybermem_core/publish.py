@@ -74,6 +74,106 @@ def latest_theme_digest(root: Path) -> str:
     return str(files[-1]).replace('\\', '/') if files else ""
 
 
+def parse_published_status(project_dir: Path) -> dict[str, str | list[str]]:
+    status_md = project_dir / "current-status.md"
+    meta_json = project_dir / "meta.json"
+    if not status_md.is_file() or not meta_json.is_file():
+        return {}
+
+    import json as _json
+    meta = _json.loads(meta_json.read_text(encoding="utf-8"))
+    text = status_md.read_text(encoding="utf-8")
+
+    phase_line = ""
+    for line in text.splitlines():
+        if line.startswith("- phase-") or line.startswith("- (no phase)"):
+            phase_line = line[2:].strip()
+            break
+
+    open_bugs = []
+    open_requirements = []
+    section = None
+    for line in text.splitlines():
+        if line.startswith("## Open Bugs"):
+            section = "bugs"
+            continue
+        if line.startswith("## Open Requirements"):
+            section = "reqs"
+            continue
+        if line.startswith("## "):
+            section = None
+            continue
+        if section == "bugs" and line.startswith("- ") and line.strip() != "- none":
+            open_bugs.append(line[2:].strip())
+        if section == "reqs" and line.startswith("- ") and line.strip() != "- none":
+            open_requirements.append(line[2:].strip())
+
+    return {
+        "slug": project_dir.name,
+        "published_at": meta.get("published_at", ""),
+        "phase_line": phase_line,
+        "open_bugs": open_bugs,
+        "open_requirements": open_requirements,
+        "source_phase_digest": meta.get("source_phase_digest", ""),
+        "source_theme_digest": meta.get("source_theme_digest", ""),
+    }
+
+
+def render_team_overview(team_id: str, summaries: list[dict]) -> str:
+    active = []
+    stale = []
+    attention = []
+    sources = []
+
+    summaries = sorted(summaries, key=lambda s: s.get("published_at", ""), reverse=True)
+
+    for s in summaries:
+        slug = s["slug"]
+        phase_line = s.get("phase_line", "")
+        published_at = s.get("published_at", "")
+        source_phase = bool(s.get("source_phase_digest"))
+        source_theme = bool(s.get("source_theme_digest"))
+
+        if phase_line and phase_line != "(no phase)":
+            active.append(f"- {slug} → {phase_line}")
+        else:
+            attention.append(f"- {slug} — no active phase")
+
+        if published_at:
+            stale.append(f"- {slug} — {published_at[:10]}")
+
+        if s.get("open_bugs"):
+            attention.append(f"- {slug} — open bugs: {len(s['open_bugs'])}")
+        if s.get("open_requirements"):
+            attention.append(f"- {slug} — open requirements: {len(s['open_requirements'])}")
+
+        if source_phase and source_theme:
+            sources.append(f"- {slug} → phase digest available, theme digest available")
+        elif source_phase:
+            sources.append(f"- {slug} → phase digest available")
+        elif source_theme:
+            sources.append(f"- {slug} → theme digest available")
+        else:
+            sources.append(f"- {slug} → no digest published")
+
+    lines = [
+        "# Team Overview",
+        "",
+        f"- Updated at: {summaries[0]['published_at'] if summaries else ''}",
+        f"- Team: {team_id}",
+        "",
+        "## Active Projects",
+    ]
+    lines.extend(active or ["- none"])
+    lines.extend(["", "## Recently Updated"])
+    lines.extend(stale or ["- none"])
+    lines.extend(["", "## Needs Attention"])
+    lines.extend(attention or ["- none"])
+    lines.extend(["", "## Published Sources"])
+    lines.extend(sources or ["- none"])
+    return "\n".join(lines) + "\n"
+
+
 def read_team_yaml(team_root: Path) -> tuple[str, str]:
     team_yaml = team_root / "team.yaml"
     if not team_yaml.is_file():
@@ -138,6 +238,19 @@ def publish_status(team_path: Path) -> dict[str, object]:
         "source_theme_digest": theme_digest,
     }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
+    # Rebuild team-wide overview from all published project summaries
+    dashboards_dir = team_root / "dashboards"
+    dashboards_dir.mkdir(parents=True, exist_ok=True)
+    summaries = []
+    projects_root = team_root / "projects"
+    for child in sorted(projects_root.iterdir()):
+        if child.is_dir():
+            parsed = parse_published_status(child)
+            if parsed:
+                summaries.append(parsed)
+    overview = dashboards_dir / "current-overview.md"
+    overview.write_text(render_team_overview(team_id, summaries), encoding="utf-8")
+
     return {
         "status": "published",
         "team_id": team_id,
@@ -148,6 +261,7 @@ def publish_status(team_path: Path) -> dict[str, object]:
             str(project_md).replace('\\', '/'),
             str(current_status_md).replace('\\', '/'),
             str(meta_json).replace('\\', '/'),
+            str(overview).replace('\\', '/'),
         ],
         "source_phase_digest": phase_digest,
         "source_theme_digest": theme_digest,
