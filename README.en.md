@@ -275,6 +275,7 @@ SyberMem is now moving into the Team MVP track:
 - **Phase B**: `sybermem publish status` — when needed, first use existing digests (or create a phase digest if the project has enough material), then publish `project.md` + a Team-facing `current-status.md` + `meta.json` into the Team repo
 - **Phase C**: after each `publish status`, automatically rebuild `dashboards/current-overview.md` as the team-wide overview entrypoint
 - **Phase D**: `publish status` remembers the team association automatically — no need to pass `--team-path` every time; `team init` auto-commits and pushes on first run
+- **Phase E**: `sybermem team summary` — generate a low-cost management summary (markdown + json) from Team repo publications for management-agent consumption
 
 `team sync`, `team review`, and digest/lesson publication will build on top of that foundation.
 
