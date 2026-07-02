@@ -278,6 +278,8 @@ SyberMem is now moving into the Team MVP track:
 - **Phase E**: `sybermem team summary` — generate a low-cost management summary (markdown + json) from Team repo publications for management-agent consumption
 - **Phase F**: publish now syncs the full phase/theme digest history into the Team repo, so you can skim status and then drill into digest history for detail
 
+> `sybermem publish status` is the single Team publication entrypoint. You do not need separate team-push/bootstrap commands; the system fills in low-risk prerequisites during publish and asks for confirmation before high-impact actions.
+
 `team sync`, `team review`, and digest/lesson publication will build on top of that foundation.
 
 ## License
