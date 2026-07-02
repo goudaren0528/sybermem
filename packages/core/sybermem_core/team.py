@@ -41,6 +41,7 @@ def init_team_repo(path: Path, team_id: str, name: str, remote: str) -> dict[str
         if not created and any(path.iterdir()):
             raise ValueError(f"Path exists but is not a git repository: {path}")
         subprocess.run(["git", "init"], cwd=path, check=True)
+        subprocess.run(["git", "branch", "-M", "main"], cwd=path, check=False)
 
     current_remote = git_remote(path)
     if current_remote:
@@ -70,10 +71,28 @@ def init_team_repo(path: Path, team_id: str, name: str, remote: str) -> dict[str
     else:
         status = "existing"
 
+    # Initial commit and push for new repos
+    pushed = False
+    if status == "created":
+        subprocess.run(["git", "add", "."], cwd=path, check=True)
+        subprocess.run(
+            ["git", "commit", "-m", "init: team repo skeleton"],
+            cwd=path, check=True,
+        )
+        push_result = subprocess.run(
+            ["git", "push", "-u", "origin", "main"],
+            cwd=path, capture_output=True, text=True, check=False,
+        )
+        pushed = push_result.returncode == 0
+        if not pushed:
+            import sys
+            print("Warning: initial push failed. Check that the remote repo exists and is accessible.", file=sys.stderr)
+
     return {
         "status": status,
         "team_id": team_id,
         "name": name,
         "path": str(path).replace('\\', '/'),
         "remote": remote,
+        "pushed": str(pushed).lower(),
     }
