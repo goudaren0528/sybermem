@@ -31,7 +31,7 @@ def render_current_status(status: dict, source_commit: str) -> str:
 
     progress = []
     if status["recent_records"]:
-        progress.append(f"Recent records published: {', '.join(status['recent_records'][:3])}")
+        progress.append(f"{len(status['recent_records'])} recent record updates were published")
     if phase["id"]:
         progress.append(f"Active phase is {phase['id']}{(' — ' + phase_name) if phase_name else ''}")
 
