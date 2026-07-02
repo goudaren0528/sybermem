@@ -251,6 +251,29 @@ def publish_status(team_path: Path) -> dict[str, object]:
     overview = dashboards_dir / "current-overview.md"
     overview.write_text(render_team_overview(team_id, summaries), encoding="utf-8")
 
+    # Auto-commit and push to remote
+    import subprocess
+    subprocess.run(
+        ["git", "add", f"projects/{slug}/", "dashboards/"],
+        cwd=team_root, check=True,
+    )
+    subprocess.run(
+        ["git", "commit", "-m", f"publish: {slug} status update"],
+        cwd=team_root, check=True,
+    )
+    # Push if origin exists
+    remote_check = subprocess.run(
+        ["git", "remote", "get-url", "origin"],
+        cwd=team_root, capture_output=True, text=True, check=False,
+    )
+    pushed = False
+    if remote_check.returncode == 0 and remote_check.stdout.strip():
+        push_result = subprocess.run(
+            ["git", "push", "origin"],
+            cwd=team_root, capture_output=True, text=True, check=False,
+        )
+        pushed = push_result.returncode == 0
+
     return {
         "status": "published",
         "team_id": team_id,
@@ -265,4 +288,5 @@ def publish_status(team_path: Path) -> dict[str, object]:
         ],
         "source_phase_digest": phase_digest,
         "source_theme_digest": theme_digest,
+        "pushed": pushed,
     }

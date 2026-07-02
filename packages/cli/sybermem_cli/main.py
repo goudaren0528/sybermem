@@ -162,6 +162,10 @@ def cmd_publish_status(args: argparse.Namespace) -> int:
         print("- files:")
         for f in payload["files"]:
             print(f"  - {f}")
+        if payload.get("pushed"):
+            print("- pushed to remote: yes")
+        else:
+            print("- pushed to remote: no (push manually or check remote config)")
     return 0
 
 
