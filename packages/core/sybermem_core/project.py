@@ -26,3 +26,50 @@ def ensure_project_yaml(root: Path) -> tuple[str, str, str]:
     slug = derive_slug(root)
     proj.write_text(render_project_yaml(project_id, slug, root), encoding="utf-8")
     return ("created", project_id, slug)
+
+
+def read_team_from_project_yaml(root: Path) -> dict[str, str]:
+    yaml_path = root / ".sybermem" / "project.yaml"
+    if not yaml_path.is_file():
+        return {}
+    team_id = ""
+    team_path = ""
+    in_team = False
+    for line in yaml_path.read_text(encoding="utf-8").splitlines():
+        if line.rstrip() == "team:":
+            in_team = True
+            continue
+        if in_team and line.startswith("  team_id:"):
+            team_id = line.split(":", 1)[1].strip()
+        elif in_team and line.startswith("  team_path:"):
+            team_path = line.split(":", 1)[1].strip()
+        elif not line.startswith(" ") and not line.startswith("\t"):
+            in_team = False
+    return {"team_id": team_id, "team_path": team_path}
+
+
+def write_team_to_project_yaml(root: Path, team_id: str, team_path: str) -> None:
+    yaml_path = root / ".sybermem" / "project.yaml"
+    if not yaml_path.is_file():
+        return
+    text = yaml_path.read_text(encoding="utf-8")
+
+    # Remove existing team block if present
+    lines = text.splitlines()
+    new_lines = []
+    skip = False
+    for line in lines:
+        if line.rstrip() == "team:":
+            skip = True
+            continue
+        if skip and (line.startswith("  ") or line.startswith("\t")):
+            continue
+        skip = False
+        new_lines.append(line)
+
+    # Append team block
+    new_lines.append("team:")
+    new_lines.append(f"  team_id: {team_id}")
+    new_lines.append(f"  team_path: {team_path}")
+
+    yaml_path.write_text("\n".join(new_lines) + "\n", encoding="utf-8")

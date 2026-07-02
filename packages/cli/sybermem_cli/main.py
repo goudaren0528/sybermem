@@ -144,7 +144,8 @@ def cmd_team_init(args: argparse.Namespace) -> int:
 
 def cmd_publish_status(args: argparse.Namespace) -> int:
     try:
-        payload = publish_status(Path(args.team_path))
+        tp = Path(args.team_path) if args.team_path else None
+        payload = publish_status(tp)
     except Exception as exc:
         print(str(exc), file=sys.stderr)
         return 1
@@ -217,7 +218,7 @@ def main() -> int:
     publish = sub.add_parser("publish")
     publish_sub = publish.add_subparsers(dest="publish_command", required=True)
     publish_status_cmd = publish_sub.add_parser("status")
-    publish_status_cmd.add_argument("--team-path", required=True)
+    publish_status_cmd.add_argument("--team-path", default=None)
     publish_status_cmd.add_argument("--format", choices=["text", "json"], default="text")
     publish_status_cmd.set_defaults(func=cmd_publish_status)
 
