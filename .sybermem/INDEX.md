@@ -31,6 +31,8 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 - [change-020] Auto-recorded workspace file changes at session stop so the project keeps a lightweight change trail without manual recording (2026-07-02)
 - [change-021] Auto-recorded workspace file changes at session stop so the project keeps a lightweight change trail without manual recording (2026-07-02)
 - [change-022] Auto-recorded workspace file changes at session stop so the project keeps a lightweight change trail without manual recording (2026-07-02)
+- [change-023] #team #collaboration #digest — Built the end-to-end Team memory publication, summary, and digest-history pipeline so multiple projects can publish into a shared Team repo and management agents can consume it directly (2026-07-02)
+- [change-024] Auto-recorded workspace file changes at session stop so the project keeps a lightweight change trail without manual recording (2026-07-02)
 <!-- add new conclusions here -->
 
 ---
@@ -90,6 +92,8 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 | 020 | 2026-07-02 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-07-02-020-main-project-publish-and-more.md) |
 | 021 | 2026-07-02 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-07-02-021-main-project-publish-and-more.md) |
 | 022 | 2026-07-02 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-07-02-022-init-cpython-310-main-cpython-310-init-cpython-310-and-more.md) |
+| 023 | 2026-07-02 | Build Team memory publication and management layer | implemented | [link](changes/2026-07-02-023-build-team-memory-publication-and-management-layer.md) |
+| 024 | 2026-07-02 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-07-02-024-init-main-pkg-info-and-more.md) |
 <!-- add new records here -->
 
 ---
@@ -141,9 +145,9 @@ When adding records, update this index file accordingly.
 <!-- Optional suffix: [active] [low] [deprecated → <new-topic>] -->
 - architecture: requirement-001, requirement-003, decision-001
 - automation: change-003, change-008
-- collaboration: requirement-003, decision-001
+- collaboration: requirement-003, decision-001, change-023
 - compression: requirement-002
-- digest: requirement-002, change-010
+- digest: requirement-002, change-010, change-023
 - distribution: change-001, change-002, change-008, change-010
 - framework: change-006
 - hooks: change-003, change-005, bug-001, change-008
@@ -155,4 +159,4 @@ When adding records, update this index file accordingly.
 - relations: change-010
 - search: change-010
 - skills: change-002, change-006
-- team: requirement-003, decision-001
+- team: requirement-003, decision-001, change-023
