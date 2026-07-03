@@ -1,7 +1,6 @@
 {
   "theme_recent_stops": {
     "misc": [
-      "2026-06-19",
       "2026-06-30",
       "2026-06-30",
       "2026-07-01",
@@ -10,7 +9,8 @@
       "2026-07-02",
       "2026-07-02",
       "2026-07-02",
-      "2026-07-02"
+      "2026-07-02",
+      "2026-07-03"
     ],
     "skills": [
       "2026-06-29",
@@ -23,13 +23,13 @@
   },
   "last_nudge": {
     "platform": "claude-code",
-    "type": "digest",
+    "type": "record",
     "theme": "misc",
-    "date": "2026-07-02"
+    "date": "2026-07-03"
   },
   "last_theme": "misc",
-  "last_nudge_type": "digest",
-  "last_record": "2026-07-02-024-init-main-pkg-info-and-more.md",
+  "last_nudge_type": "record",
+  "last_record": "2026-07-03-025-init-main-pkg-info-and-more.md",
   "digest_nudged_at_window_len": {
     "skills": 3,
     "misc": 10
