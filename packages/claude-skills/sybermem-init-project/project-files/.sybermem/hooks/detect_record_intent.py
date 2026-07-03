@@ -65,7 +65,8 @@ def main() -> int:
     root = resolve_sybermem_root()
     intent_path = root / ".sybermem" / ".record-intent.json"
 
-    payload = json.load(sys.stdin)
+    raw = sys.stdin.buffer.read()
+    payload = json.loads(raw.decode("utf-8", errors="replace"))
     user_text = payload.get("prompt", "") or payload.get("userPrompt", "") or ""
 
     matched_ok, matched = detect_record_intent(user_text)
