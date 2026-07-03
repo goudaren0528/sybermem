@@ -31,7 +31,7 @@ foreach ($target in $Targets) {
             Remove-Item -Path $legacyPath -Recurse -Force -Confirm:$false
         }
     }
-    foreach ($skill in @("sybermem-init-project", "sybermem-record", "sybermem-summary", "sybermem-digest", "sybermem-phase-analyze", "sybermem-phase-confirm", "using-sybermem", "sybermem-update", "sybermem-search", "sybermem-link", "sybermem-theme-digest")) {
+    foreach ($skill in @("sybermem-init-project", "sybermem-record", "sybermem-summary", "sybermem-digest", "sybermem-phase-analyze", "sybermem-phase-confirm", "using-sybermem", "sybermem-update", "sybermem-search", "sybermem-link", "sybermem-theme-digest", "sybermem-team-publish", "sybermem-team-summary")) {
         $src = Join-Path $SkillSource $skill
         $dst = Join-Path $target.Path $skill
         if (Test-Path $src) {
@@ -79,6 +79,8 @@ Write-Host "  /sybermem-update        — 更新全局 Skills 并重新检查当
 Write-Host "  /sybermem-search        — 按关键词、topic、phase 范围、日期范围或记录 ID 检索记录"
 Write-Host "  /sybermem-link          — 在两条已有记录间建立正向关系（implements / fixes / related / superseded-by）"
 Write-Host "  /sybermem-theme-digest  — 为单个 topic 创建跨多个 phase 的持久化高阶摘要"
+Write-Host "  /sybermem-team-publish  — 将当前项目发布到 Team memory"
+Write-Host "  /sybermem-team-summary  — 生成 Team 管理摘要"
 Write-Host ""
 Write-Host "sybermem CLI 已安装，可直接运行：sybermem project init --register"
 Write-Host ""
