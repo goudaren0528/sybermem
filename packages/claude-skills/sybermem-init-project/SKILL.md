@@ -132,6 +132,7 @@ Read `codebase-scan-rules.md` for the existing codebase scan and record detectio
 - Create missing `CLAUDE.md` / `AGENTS.md` from the template files.
 - Create missing project-level `.claude/settings.json` from the template file when the project does not already define its own hook settings.
 - Create missing `.sybermem/hooks/record_change_on_stop.py` from the template file when automatic mode is being installed.
+- Create missing `.sybermem/hooks/detect_record_intent.py` from the template file when reminder-first record-intent capture is being installed.
 - Ensure the global launcher `~/.claude/sybermem/launch_record_change_on_stop.py` exists; if not, instruct the user to refresh global skills first or run `/sybermem-update`.
 - Create missing `.sybermem/hooks/session_start_context.py` from the template file when startup context injection is being installed.
 - Create missing `.sybermem/hooks/check_project_health.py` from the template file to enable fast-path updates on subsequent runs.
@@ -141,7 +142,7 @@ Read `codebase-scan-rules.md` for the existing codebase scan and record detectio
 - Create missing `.sybermem/hooks/launch_record_change_on_stop.py` from the template file.
 - If the project uses the SyberMem-managed Stop hook entry, rewrite `.claude/settings.json` to call the global absolute launcher path instead of any project-local relative hook path.
 - Even if `.claude/settings.json` is otherwise custom, if the Stop hook contains a recognized old SyberMem hook command, replace just that command with the global launcher path and leave the rest of the file unchanged.
-- The generated `.claude/settings.json` must set `SYBERMEM_RECORD_MODE`, install the default SessionStart hook for startup context injection, and install the default Stop hook for automatic `change` records.
+- The generated `.claude/settings.json` must set `SYBERMEM_RECORD_MODE`, install the default SessionStart hook for startup context injection, install the default `UserPromptSubmit` hook for natural-language record-intent capture, and install the default Stop hook for automatic `change` records / reminder-first nudges.
 - If the user approved a refresh in Step 1.1, back up and overwrite the stale SyberMem-managed files.
 - Treat an existing `.claude/settings.json` as custom unless it clearly matches the SyberMem-managed template. Do not overwrite unrelated custom hook settings automatically.
 - Keep custom files unless the user explicitly approves replacement.
@@ -165,6 +166,7 @@ Read `codebase-scan-rules.md` for the existing codebase scan and record detectio
 - `INDEX.md` theme digest navigation when missing
 - `INDEX.md` archived conclusions section when missing
 - `.sybermem/hooks/record_change_on_stop.py` when auto mode is installed
+- `.sybermem/hooks/detect_record_intent.py` when reminder-first record-intent capture is installed
 - `.sybermem/hooks/launch_record_change_on_stop.py` when root-resolving launcher support is installed
 - managed Stop hook command updated to the launcher form when needed
 - `.sybermem/hooks/session_start_context.py` when startup context injection is installed
