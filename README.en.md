@@ -122,6 +122,10 @@ This creates or refreshes:
 - `AGENTS.md`
 - `.claude/settings.json` (with the default SyberMem `auto` / `remind` mode)
 
+Where:
+- `auto` = lightweight `change` trail + reminders
+- `remind` = reminders only, with no automatic `change` trail
+
 It does not install another copy of the skills into the project.
 
 See [INSTALL.md](INSTALL.md) for details.

@@ -137,6 +137,10 @@ OpenCode 推荐使用其插件路径来获得 `session.created` / `session.idle`
 - `AGENTS.md`
 - `.claude/settings.json`（默认启用 SyberMem `auto` / `remind` 模式）
 
+其中：
+- `auto` = 轻量 `change` trail + 提醒
+- `remind` = 只提醒，不自动写 `change` trail
+
 不会在项目里再安装一份 skills。
 
 详见 [INSTALL.md](INSTALL.md)。
