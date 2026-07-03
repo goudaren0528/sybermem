@@ -84,18 +84,21 @@ def check_settings_json(root: Path) -> dict:
             "status": "missing",
             "has_session_start_hook": False,
             "has_stop_hook": False,
+            "has_record_intent_hook": False,
             "has_auto_mode": False,
         }
 
     has_session_start = "launch_session_start_context" in content
     has_stop = "launch_record_change_on_stop" in content
+    has_record_intent_hook = "detect_record_intent.py" in content
     has_auto_mode = "SYBERMEM_RECORD_MODE" in content
 
-    all_present = has_session_start and has_stop and has_auto_mode
+    all_present = has_session_start and has_stop and has_record_intent_hook and has_auto_mode
     return {
         "status": "fresh" if all_present else "stale",
         "has_session_start_hook": has_session_start,
         "has_stop_hook": has_stop,
+        "has_record_intent_hook": has_record_intent_hook,
         "has_auto_mode": has_auto_mode,
     }
 
@@ -178,6 +181,8 @@ def generate_actions(files: dict) -> list[str]:
             actions.append("add SessionStart hook entry to .claude/settings.json (preserve other hooks)")
         if not sj.get("has_stop_hook"):
             actions.append("add Stop hook entry to .claude/settings.json (preserve other hooks)")
+        if not sj.get("has_record_intent_hook"):
+            actions.append("add UserPromptSubmit hook entry to .claude/settings.json (preserve other hooks)")
         if not sj.get("has_auto_mode"):
             actions.append("add SYBERMEM_RECORD_MODE to .claude/settings.json (preserve other env)")
 
@@ -185,6 +190,7 @@ def generate_actions(files: dict) -> list[str]:
     for hook_name, key in [
         ("session_start_context.py", ".sybermem/hooks/session_start_context.py"),
         ("launch_record_change_on_stop.py", ".sybermem/hooks/launch_record_change_on_stop.py"),
+        ("detect_record_intent.py", ".sybermem/hooks/detect_record_intent.py"),
     ]:
         info = files.get(key, {})
         if info.get("status") == "missing":
@@ -268,6 +274,7 @@ def main() -> int:
 
     # Check for health script itself
     files[".sybermem/hooks/check_project_health.py"] = check_file_exists(root / ".sybermem" / "hooks" / "check_project_health.py")
+    files[".sybermem/hooks/detect_record_intent.py"] = check_file_exists(root / ".sybermem" / "hooks" / "detect_record_intent.py")
 
     # Project identity
     files[".sybermem/project.yaml"] = check_file_exists(root / ".sybermem" / "project.yaml")

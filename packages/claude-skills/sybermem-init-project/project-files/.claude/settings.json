@@ -3,6 +3,18 @@
     "SYBERMEM_RECORD_MODE": "auto"
   },
   "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .sybermem/hooks/detect_record_intent.py",
+            "timeout": 10,
+            "statusMessage": "SyberMem checking whether this round should be recorded..."
+          }
+        ]
+      }
+    ],
     "SessionStart": [
       {
         "hooks": [
