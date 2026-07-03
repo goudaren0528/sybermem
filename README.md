@@ -306,6 +306,7 @@ SyberMem 正在进入 Team MVP 路线：
 - **Phase D**：`publish status` 自动记住团队关联，无需每次传 `--team-path`；`team init` 自动首次提交并推送
 - **Phase E**：`sybermem team summary` —— 基于 Team repo 已发布内容生成低成本管理摘要（markdown + json），服务管理 agent 的日常消费
 - **Phase F**：发布时同步完整的 phase/theme digest 历史到 Team repo，形成“概括看 status、详细看 digest”的团队工程记忆层
+- **Team Skills**：`/sybermem-team-publish` 与 `/sybermem-team-summary` 提供与项目级 slash workflow 一致的 Team 入口
 
 > `sybermem publish status` 是 Team 发布的唯一入口。不要再记多个 team push / bootstrap 命令；系统会在 publish 流程中自动补齐低风险前置条件，并在高影响动作前提示你确认。
 
