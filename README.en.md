@@ -277,6 +277,7 @@ SyberMem is now moving into the Team MVP track:
 - **Phase D**: `publish status` remembers the team association automatically — no need to pass `--team-path` every time; `team init` auto-commits and pushes on first run
 - **Phase E**: `sybermem team summary` — generate a low-cost management summary (markdown + json) from Team repo publications for management-agent consumption
 - **Phase F**: publish now syncs the full phase/theme digest history into the Team repo, so you can skim status and then drill into digest history for detail
+- **Team Skills**: `/sybermem-team-publish` and `/sybermem-team-summary` provide Team entrypoints consistent with the project-level slash workflow
 
 > `sybermem publish status` is the single Team publication entrypoint. You do not need separate team-push/bootstrap commands; the system fills in low-risk prerequisites during publish and asks for confirmation before high-impact actions.
 
