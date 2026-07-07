@@ -35,6 +35,7 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 - [change-024] Auto-recorded workspace file changes at session stop so the project keeps a lightweight change trail without manual recording (2026-07-02)
 - [change-025] Auto-recorded workspace file changes at session stop so the project keeps a lightweight change trail without manual recording (2026-07-03)
 - [change-026] #team #skills #collaboration — Exposed Team publish and Team summary as first-class SyberMem skills so Team workflows now match the project-level slash-command experience instead of requiring raw CLI usage (2026-07-03)
+- [change-027] Auto-recorded workspace file changes at session stop so the project keeps a lightweight change trail without manual recording (2026-07-03)
 <!-- add new conclusions here -->
 
 ---
@@ -98,6 +99,7 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 | 024 | 2026-07-02 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-07-02-024-init-main-pkg-info-and-more.md) |
 | 025 | 2026-07-03 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-07-03-025-init-main-pkg-info-and-more.md) |
 | 026 | 2026-07-03 | Expose Team workflows as first-class SyberMem skills | implemented | [link](changes/2026-07-03-026-expose-team-workflows-as-first-class-sybermem-skills.md) |
+| 027 | 2026-07-03 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-07-03-027-detect-record-intent.md) |
 <!-- add new records here -->
 
 ---

@@ -15,7 +15,9 @@
     "skills": [
       "2026-06-29",
       "2026-06-30",
-      "2026-06-30"
+      "2026-06-30",
+      "2026-07-03",
+      "2026-07-03"
     ],
     "docs-scripts": [
       "2026-06-30"
@@ -23,13 +25,13 @@
   },
   "last_nudge": {
     "platform": "claude-code",
-    "type": "record",
-    "theme": "misc",
+    "type": "none",
+    "theme": "skills",
     "date": "2026-07-03"
   },
-  "last_theme": "misc",
-  "last_nudge_type": "record",
-  "last_record": "2026-07-03-025-init-main-pkg-info-and-more.md",
+  "last_theme": "skills",
+  "last_nudge_type": "none",
+  "last_record": "2026-07-03-028-detect-record-intent-tmp-record-intent-check.md",
   "digest_nudged_at_window_len": {
     "skills": 3,
     "misc": 10
