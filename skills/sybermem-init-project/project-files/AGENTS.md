@@ -67,6 +67,8 @@ SyberMem commands rely on real project files and durable markdown structure. If 
 - `/using-sybermem` — Show current SyberMem status and the recommended next command
 - `/sybermem-search` — Search/query records by keyword, topic, phase range, date range, or record ID
 - `/sybermem-link` — Add a forward relation between two existing records
+- `/sybermem-team-publish` — Publish the current project into Team memory
+- `/sybermem-team-summary` — Generate the Team management summary
 
 ## No Record Needed
 

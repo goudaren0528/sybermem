@@ -180,6 +180,8 @@ Read `codebase-scan-rules.md` for the existing codebase scan and record detectio
 **Next steps:**
 - Use `/sybermem-record` after meaningful work
 - Use `/sybermem-summary` for weekly or monthly progress reports
+- If this project belongs in Team memory, use `/sybermem-team-publish`
+- If the project is already linked to Team memory, use `/sybermem-team-summary` to generate a Team management summary
 - Use `/sybermem-update` later to refresh global skills and re-check this project
 ```
 
