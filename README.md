@@ -316,6 +316,8 @@ SyberMem 正在进入 Team MVP 路线：
 
 后续 `team sync`、`team review`、digest/lesson 发布会在此基础上叠加。
 
+- **Workflow Router**：SyberMem 现在会优先按 `record > digest > team-publish` 的顺序推荐下一步动作，避免在一轮工作结束后犹豫先做哪个
+
 ## License
 
 MIT

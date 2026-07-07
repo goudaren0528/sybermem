@@ -524,11 +524,26 @@ def main() -> int:
     record_intent = load_record_intent()
     intent_active = bool(record_intent.get("record_intent"))
     followup_hint, theme_key, nudge_message = classify_followup(all_files, nudge_state)
+    try:
+        import sys
+        from pathlib import Path as _Path
+        for p in [
+            _Path.home() / '.claude' / 'sybermem' / 'cli' / 'venv' / 'Lib' / 'site-packages',
+            _Path.home() / '.claude' / 'sybermem' / 'cli' / 'venv' / 'lib' / 'python3.10' / 'site-packages',
+        ]:
+            if p.exists() and str(p) not in sys.path:
+                sys.path.insert(0, str(p))
+        from sybermem_core.next_step_router import recommend_next_step
+        router_hint = recommend_next_step(ROOT)
+    except Exception:
+        router_hint = None
 
     def emit_reminder() -> None:
         if intent_active:
             print("You marked this work as worth recording earlier. If this round is complete, run /sybermem-record now.")
             clear_record_intent()
+        elif router_hint:
+            print(f"Recommended next step: {router_hint['action']} — {router_hint['reason']}")
         elif nudge_message:
             print(nudge_message)
 
