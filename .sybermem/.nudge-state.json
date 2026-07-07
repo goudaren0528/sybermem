@@ -1,16 +1,16 @@
 {
   "theme_recent_stops": {
     "misc": [
-      "2026-06-30",
-      "2026-06-30",
-      "2026-07-01",
       "2026-07-01",
       "2026-07-02",
       "2026-07-02",
       "2026-07-02",
       "2026-07-02",
       "2026-07-02",
-      "2026-07-03"
+      "2026-07-03",
+      "2026-07-07",
+      "2026-07-07",
+      "2026-07-07"
     ],
     "skills": [
       "2026-06-29",
@@ -25,13 +25,13 @@
   },
   "last_nudge": {
     "platform": "claude-code",
-    "type": "none",
-    "theme": "skills",
-    "date": "2026-07-03"
+    "type": "record",
+    "theme": "misc",
+    "date": "2026-07-07"
   },
-  "last_theme": "skills",
-  "last_nudge_type": "none",
-  "last_record": "2026-07-03-028-detect-record-intent-tmp-record-intent-check.md",
+  "last_theme": "misc",
+  "last_nudge_type": "record",
+  "last_record": "2026-07-07-028-init-cpython-310-identity-cpython-310-next-step-router-cpython-310-and-more.md",
   "digest_nudged_at_window_len": {
     "skills": 3,
     "misc": 10
