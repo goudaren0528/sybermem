@@ -287,6 +287,8 @@ SyberMem is now moving into the Team MVP track:
 
 `team sync`, `team review`, and digest/lesson publication will build on top of that foundation.
 
+- **Workflow Router**: SyberMem now recommends the next step using the priority order `record > digest > team-publish`, reducing the “what should I do next?” friction after a round of work.
+
 ## License
 
 MIT
