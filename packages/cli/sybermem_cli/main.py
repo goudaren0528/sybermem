@@ -169,6 +169,7 @@ def cmd_publish_status(args: argparse.Namespace) -> int:
             print("- pushed to remote: yes")
         else:
             print("- pushed to remote: no (push manually or check remote config)")
+        print("- suggested follow-up: /sybermem-team-summary")
     return 0
 
 
@@ -188,6 +189,8 @@ def cmd_team_summary(args: argparse.Namespace) -> int:
         print(f"- markdown: {result['summary_markdown']}")
         print(f"- json: {result['summary_json']}")
         print(f"- baseline state: {result['summary_state']}")
+        if payload.get("deep_review_candidates"):
+            print("- suggested deeper review: inspect the projects listed under Worth Deeper Review")
     return 0
 
 

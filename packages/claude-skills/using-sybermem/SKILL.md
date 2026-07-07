@@ -62,6 +62,12 @@ Explain what would currently happen if the user runs:
 
 Recommend the most appropriate next SyberMem command based on the current state.
 
+Team-aware priority order when several actions seem plausible:
+
+```text
+record > digest > team-publish
+```
+
 ```dot
 digraph recommend_command {
     "Phase index exists?" [shape=diamond];
@@ -89,6 +95,8 @@ Examples:
 - if no phase index exists and the user wants phase-aware workflows → recommend `/sybermem-phase-analyze`
 - if a candidate phase exists but no confirmed phase exists → recommend `/sybermem-phase-confirm`
 - if important work is happening and only a lightweight trail exists → recommend `/sybermem-record`
+- if the current project has enough material but no digest → recommend `/sybermem-digest`
+- if the project has a Team association and Team memory is stale → recommend `/sybermem-team-publish`
 - if the project appears partially upgraded → recommend `/sybermem-update`
 
 ## Output Style
