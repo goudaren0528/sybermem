@@ -45,7 +45,7 @@ install_skills() {
     local label="$2"
     mkdir -p "$target"
     rm -rf "$target/init-project" "$target/record" "$target/summary"
-    for skill in sybermem-init-project sybermem-record sybermem-summary sybermem-digest sybermem-phase-analyze sybermem-phase-confirm using-sybermem sybermem-update sybermem-search sybermem-link sybermem-theme-digest; do
+    for skill in sybermem-init-project sybermem-record sybermem-summary sybermem-digest sybermem-phase-analyze sybermem-phase-confirm using-sybermem sybermem-update sybermem-search sybermem-link sybermem-theme-digest sybermem-team-publish sybermem-team-summary; do
         if [ -d "$SKILLS_SRC/$skill" ]; then
             rm -rf "$target/$skill"
             cp -r "$SKILLS_SRC/$skill" "$target/"
@@ -105,6 +105,8 @@ echo "  /sybermem-update        — Refresh global skills, then re-check the cur
 echo "  /sybermem-search        — Search/query records by keyword, topic, phase range, date range, or record ID"
 echo "  /sybermem-link          — Add a forward relation between two existing records (implements / fixes / related / superseded-by)"
 echo "  /sybermem-theme-digest  — Create a durable topic-level digest that compresses one theme across multiple related phases or records"
+echo "  /sybermem-team-publish  — Publish the current project into Team memory"
+echo "  /sybermem-team-summary  — Generate the Team management summary"
 echo ""
 echo "sybermem CLI is installed. You can now run: sybermem project init --register"
 echo ""

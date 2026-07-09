@@ -54,7 +54,7 @@ try {
                 Remove-Item -Path $legacyPath -Recurse -Force -Confirm:$false
             }
         }
-        foreach ($skill in @("sybermem-init-project", "sybermem-record", "sybermem-summary", "sybermem-digest", "sybermem-phase-analyze", "sybermem-phase-confirm", "using-sybermem", "sybermem-update", "sybermem-search", "sybermem-link", "sybermem-theme-digest")) {
+        foreach ($skill in @("sybermem-init-project", "sybermem-record", "sybermem-summary", "sybermem-digest", "sybermem-phase-analyze", "sybermem-phase-confirm", "using-sybermem", "sybermem-update", "sybermem-search", "sybermem-link", "sybermem-theme-digest", "sybermem-team-publish", "sybermem-team-summary")) {
             $src = Join-Path $SkillsSrc $skill
             $dst = Join-Path $target.Path $skill
             if (Test-Path $src) {
@@ -121,6 +121,8 @@ Write-Host "  /sybermem-update        — Refresh global skills, then re-check t
 Write-Host "  /sybermem-search        — Search/query records by keyword, topic, phase range, date range, or record ID"
 Write-Host "  /sybermem-link          — Add a forward relation between two existing records (implements / fixes / related / superseded-by)"
 Write-Host "  /sybermem-theme-digest  — Create a durable topic-level digest that compresses one theme across multiple related phases or records"
+Write-Host "  /sybermem-team-publish  — Publish the current project into Team memory"
+Write-Host "  /sybermem-team-summary  — Generate the Team management summary"
 Write-Host ""
 Write-Host "sybermem CLI is installed. You can now run: sybermem project init --register"
 Write-Host ""
