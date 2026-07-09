@@ -37,6 +37,8 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 - [change-026] #team #skills #collaboration — Exposed Team publish and Team summary as first-class SyberMem skills so Team workflows now match the project-level slash-command experience instead of requiring raw CLI usage (2026-07-03)
 - [change-027] Auto-recorded workspace file changes at session stop so the project keeps a lightweight change trail without manual recording (2026-07-03)
 - [change-028] Auto-recorded workspace file changes at session stop so the project keeps a lightweight change trail without manual recording (2026-07-07)
+- [change-029] Auto-recorded workspace file changes at session stop so the project keeps a lightweight change trail without manual recording (2026-07-07)
+- [change-030] #team #hooks #init — Aligned init-project propagation, templates, and health checks with the new Team workflows and reminder-first record-intent behavior so installs and updates now carry those capabilities consistently (2026-07-07)
 <!-- add new conclusions here -->
 
 ---
@@ -102,6 +104,8 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 | 026 | 2026-07-03 | Expose Team workflows as first-class SyberMem skills | implemented | [link](changes/2026-07-03-026-expose-team-workflows-as-first-class-sybermem-skills.md) |
 | 027 | 2026-07-03 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-07-03-027-detect-record-intent.md) |
 | 028 | 2026-07-07 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-07-07-028-init-cpython-310-identity-cpython-310-next-step-router-cpython-310-and-more.md) |
+| 029 | 2026-07-07 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-07-07-029-init-cpython-310-main-cpython-310-init-cpython-310-and-more.md) |
+| 030 | 2026-07-07 | Align init-project propagation with Team and reminder workflows | implemented | [link](changes/2026-07-07-030-align-init-project-propagation-with-team-and-reminder-workflows.md) |
 <!-- add new records here -->
 
 ---
@@ -158,13 +162,13 @@ When adding records, update this index file accordingly.
 - digest: requirement-002, change-010, change-023
 - distribution: change-001, change-002, change-008, change-010
 - framework: change-006
-- hooks: change-003, change-005, bug-001, change-008
+- hooks: change-003, change-005, bug-001, change-008, change-030
 - hub: requirement-003
-- init: change-005, bug-001
+- init: change-005, bug-001, change-030
 - install: change-001
 - foundation: requirement-001
 - lifecycle: change-010
 - relations: change-010
 - search: change-010
 - skills: change-002, change-006, change-026
-- team: requirement-003, decision-001, change-023, change-026
+- team: requirement-003, decision-001, change-023, change-026, change-030
