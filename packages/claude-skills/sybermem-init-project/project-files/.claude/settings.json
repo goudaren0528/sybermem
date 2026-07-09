@@ -20,7 +20,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python C:/Users/69046/.claude/sybermem/launch_session_start_context.py",
+            "command": "python .sybermem/hooks/session_start_context.py",
             "timeout": 15,
             "statusMessage": "SyberMem loading project memory..."
           }
@@ -32,7 +32,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python C:/Users/69046/.claude/sybermem/launch_record_change_on_stop.py",
+            "command": "python .sybermem/hooks/record_change_on_stop.py",
             "timeout": 60,
             "statusMessage": "SyberMem checking whether to record a change..."
           }
