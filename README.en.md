@@ -2,84 +2,50 @@
 
 # SyberMem
 
-A set of Claude Code / OpenCode skills for tracking project development history. It records changes, decisions, requirements, and bugs as structured files, so AI can recall project context across sessions.
+SyberMem is an AI-oriented project and team engineering-memory system.
 
-## How It Works
+It helps you store:
+- project progress
+- technical decisions
+- phase-level conclusions
+- team-facing summaries
 
-Install the skills, run `/sybermem-init-project` in your project, use `/sybermem-record` after meaningful work, use `/sybermem-phase-analyze` to build or refresh `.sybermem/analysis/phase-index.md` from project history, use `/sybermem-phase-confirm` to confirm or adjust candidate phases, use `/sybermem-summary` to view the current-state panel for the most recently active confirmed phase (falling back to the weekly/monthly dynamic report if the analysis layer does not exist yet), and use `/sybermem-digest` when a meaningful phase ends and you want a durable summary stored in `.sybermem/digests/`. The phase index is a persistent project analysis artifact, not a final digest. At session start, AI reads `.sybermem/INDEX.md` to recall key conclusions from past work. In `auto` mode, the stop hook still writes a lightweight `change` trail automatically, but it may also emit a non-blocking suggestion that a change is important enough for `/sybermem-record`, or that a recent cluster of work may be ready for `/sybermem-digest`.
+as structured memory so project owners, managers, and management agents can keep consuming those signals across sessions.
 
-`/sybermem-summary` answers “what is the current state of this phase?”, while `/sybermem-digest` records “what did this phase ultimately conclude?”
+## Current Capabilities
 
-## Recommended upgrade path
+### Project
+- structured records (`change` / `decision` / `requirement` / `bug`)
+- persistent phase index
+- phase digests / theme digests
+- relations and supersession (`implements`, `fixes`, `related`, `superseded_by`)
+- project-level summary / search / link
 
-For an existing project, run `/sybermem-update`:
+### Hub
+- project registry
+- workspace search
+- project status
+- portfolio view
 
-1. Refresh the globally installed SyberMem skills
-2. Continue in the current project with `/sybermem-init-project`
-3. Migrate legacy `ADR/` if needed
-4. Check whether local `AGENTS.md` / `CLAUDE.md` files are stale and offer a refresh
-
-## Upgrading from ADR/
-
-If your project already uses `ADR/`, do not rename anything manually. The first run of `/sybermem-init-project`, `/sybermem-record`, `/sybermem-summary`, `/sybermem-digest`, `/sybermem-phase-analyze`, or `/sybermem-phase-confirm` automatically migrates the old `ADR/` directory to `.sybermem/`.
-
-If both `.sybermem/` and `ADR/` exist, the system uses `.sybermem/` and warns that `ADR/` was ignored.
-
-Refreshing global skills alone does not automatically refresh project-local `AGENTS.md` / `CLAUDE.md`, so after upgrading you should run `/sybermem-update` inside each target project.
-
-Updating global skills does not automatically enable digest support inside every project. To use `/sybermem-digest` in a project, run `/sybermem-update` in that project first. This creates only the missing digest-related structure and does not silently overwrite project-owned files.
-
-Existing projects also receive `.sybermem/analysis/phase-index.md` project by project through `/sybermem-update`.
-
-If an older project still contains project-local copies such as `.claude/skills/sybermem-*`, Claude may load both the local and global copies and show duplicates in the `/` list. If you have adopted the global-install model, you can safely delete those old local copies.
-
-If you want an existing project to receive the refreshed stop-hook nudge behavior, you still need to enter that project and run `/sybermem-update` there. Global skills update once, but local hook/template/instruction refresh still applies project by project.
-
-If you previously encountered stop hook errors (file not found) when working in a subdirectory, running `/sybermem-update` fixes the issue. The updated hook automatically walks up to find the nearest ancestor with both `.sybermem/` and `.claude/settings.json` as the project root.
-
-The subdirectory stop-hook fix now uses a global launcher. Updated projects automatically migrate the Stop hook command to the global absolute path `python C:/Users/69046/.claude/sybermem/launch_record_change_on_stop.py`. That means the launcher can always start, find the real project root, and then invoke the project-local `record_change_on_stop.py`.
-
-After `/sybermem-update`, existing projects should be auto-repaired this way. Even if `.claude/settings.json` is otherwise custom, SyberMem should still replace that one line when the old Stop hook command is clearly recognized as SyberMem-managed.
-
-Many SyberMem behavior changes do not live only in the globally installed skill definitions. They also depend on project-local managed files such as `CLAUDE.md`, `AGENTS.md`, `.claude/settings.json`, and hook templates. For existing projects, you usually need to run `/sybermem-update` once after upgrading so the project actually receives the new local behavior.
-
-`/sybermem-update` should create missing managed files, refresh stale SyberMem-managed files, and preserve custom local files without silently overwriting them.
-
-SyberMem now uses a `using-sybermem` protocol block near the top of `CLAUDE.md` / `AGENTS.md` to establish session-entry rules. When an existing project runs `/sybermem-update`, managed instruction files should receive that block automatically; custom files should not be overwritten wholesale by default.
-
-`using-sybermem` is now a dual-entry protocol: the bounded block at the top of `CLAUDE.md` / `AGENTS.md` applies automatically at session start, while `/using-sybermem` is the visible diagnostic entrypoint. When run manually, it reports the current SyberMem state, the routing behavior for summary/digest/analyze/record, and the recommended next command.
+### Team
+- team init
+- team publish
+- team overview
+- team management summary
+- Team Project Summary
+- full phase / theme digest history sync
 
 ## Install
 
-### Claude Code Plugin Install (Recommended)
-
-For Claude Code users who want plugin-managed hooks and skills, the plugin installation flow is the preferred path.
-
-#### Local development / testing
+### Claude Code plugin install (recommended)
 
 ```bash
 claude --plugin-dir .
 ```
 
-This loads `.claude-plugin/` from the current repository, which is useful for validating plugin metadata, lifecycle hooks, and the plugin-facing `skills/` tree.
+This is the recommended path for Claude Code users who want hooks and skills managed through the plugin runtime.
 
-Once installed or updated, the CLI is available as a normal command:
-
-```bash
-sybermem project init --register
-sybermem index build
-sybermem search hooks --scope workspace
-```
-
-#### Current distribution status
-
-SyberMem already includes `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json`. Marketplace-style distribution is prepared, but the fully dogfooded runtime paths today are Claude Code and OpenCode.
-
-### Claude Code / OpenCode Script Install (Compatibility Mode)
-
-These commands remain as compatibility/direct install paths rather than the future default.
-
-#### One-liner (requires public repo)
+### Claude Code / OpenCode script install (compatibility mode)
 
 ```bash
 # macOS / Linux
@@ -89,25 +55,13 @@ curl -sSL https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/i
 irm https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/install-remote.ps1 | iex
 ```
 
-#### Clone and install
-
-```bash
-# macOS / Linux
-git clone https://github.com/goudaren0528/sybermem.git
-cd sybermem && ./scripts/install.sh
-
-# Windows (PowerShell)
-git clone https://github.com/goudaren0528/sybermem.git
-cd sybermem; .\scripts\install.ps1
-```
-
 ### OpenCode
 
-OpenCode has a dedicated plugin runtime. See [`.opencode/INSTALL.md`](.opencode/INSTALL.md).
+OpenCode can also use SyberMem through its plugin/runtime path. See [`.opencode/INSTALL.md`](.opencode/INSTALL.md).
 
-### Initialize a project
+## Initialize a Project
 
-After the global install, open your project and run:
+Inside your project directory, run:
 
 ```text
 /sybermem-init-project
@@ -115,179 +69,103 @@ After the global install, open your project and run:
 
 This creates or refreshes:
 - `.sybermem/`
-- `.sybermem/digests/` (phase digest directory)
-- `.sybermem/analysis/phase-index.md` (persistent phase analysis artifact)
-- `.sybermem/hooks/record_change_on_stop.py` (default auto-change hook helper)
+- `.sybermem/digests/`
+- `.sybermem/theme-digests/`
+- `.sybermem/analysis/phase-index.md`
+- `.sybermem/project.yaml`
+- `.sybermem/hooks/record_change_on_stop.py`
+- `.sybermem/hooks/detect_record_intent.py`
 - `CLAUDE.md`
 - `AGENTS.md`
-- `.claude/settings.json` (with the default SyberMem `auto` / `remind` mode)
+- `.claude/settings.json`
 
 Where:
 - `auto` = lightweight `change` trail + reminders
 - `remind` = reminders only, with no automatic `change` trail
 
-It does not install another copy of the skills into the project.
+## Daily Usage
 
-See [INSTALL.md](INSTALL.md) for details.
+### Project owner
+- `/sybermem-record` — record a meaningful round of work
+- `/sybermem-summary` — inspect current project state
+- `/sybermem-digest` — capture a stable phase conclusion
+- `/sybermem-theme-digest` — capture a cross-phase topic conclusion
+- `/sybermem-team-publish` — publish the current project into Team memory
 
-## Skills
+### Manager / management agent
+- `/sybermem-team-summary` — generate the Team management summary
+- read `dashboards/current-overview.md` / `latest-management-summary.md`
 
-| Skill | What it does |
-|-------|-------------|
-| `/sybermem-init-project` | Create or refresh the `.sybermem/` structure in a project, refresh managed instruction files, and migrate legacy `ADR/` on first run |
-| `/sybermem-record` | Create a structured change / decision / requirement / bug record from the current session context |
-| `/sybermem-summary` | Show the current-state panel for the most relevant active phase, with weekly/monthly fallback |
-| `/sybermem-digest` | Create a durable phase digest from existing records |
-| `/sybermem-theme-digest` | Create a durable topic-level digest that compresses one theme across multiple phases or records |
-| `/sybermem-phase-analyze` | Build or refresh `.sybermem/analysis/phase-index.md` from project history |
-| `/sybermem-phase-confirm` | Adjust confirmed phases, names, and lifecycle state |
-| `/using-sybermem` | Diagnose the current SyberMem state and recommend the right next command |
-| `/sybermem-update` | Refresh globally installed SyberMem skills, then re-check the current project |
-| `/sybermem-search` | Query records by keyword, topic, phase range, date range, or record ID, including relations |
-| `/sybermem-link` | Add a forward relation between two existing records (`implements` / `fixes` / `related` / `superseded-by`) |
+### If you're unsure what to do next
+- `/using-sybermem` — inspect the current state and get the recommended command
 
-## Daily Workflow
+## Team Workflow
 
-A practical day-to-day path for using SyberMem:
+The recommended Team workflow today is:
+
+1. record and digest work inside each project
+2. publish the project into the Team repo with `/sybermem-team-publish`
+3. let Team overview rebuild automatically
+4. generate a management summary with `/sybermem-team-summary`
+5. drill into digest history when more detail is needed
+
+In other words:
 
 ```text
-Look up history             → /sybermem-search <keyword|topic|record-id>
-Check current state         → /sybermem-summary
-Finish meaningful work      → /sybermem-record
-Refresh stale phase index   → /sybermem-phase-analyze
-Close a phase               → /sybermem-digest
-Compress a topic across phases → /sybermem-theme-digest <topic>
-Unsure what to do next      → /using-sybermem
+skim status
+read digest history for detail
 ```
 
-## Theme Digest Layer
-
-In addition to phase digests (`/sybermem-digest`), SyberMem now supports theme digests (`/sybermem-theme-digest`):
-
-- phase digest = what one phase ultimately concluded
-- theme digest = what one topic ultimately concluded across multiple phases
-
-Theme digests live under `.sybermem/theme-digests/`. The first version is single-topic only, prefers existing phase digests when available, and fills gaps with raw records.
-
-## Relations, Search, and Governance
-
-Records can now declare forward-only relationship fields in frontmatter:
-
-- `implements: [requirement-NNN]`
-- `fixes: [bug-NNN]`
-- `related: [type-NNN]`
-- `superseded_by: <record-id>`
-
-`/sybermem-search` can surface:
-- phase membership
-- forward relations
-- reverse references
-- supersession hints
-- archived conclusion matches
-
-Topic Index lines may also carry optional suffixes:
-- `[active]`
-- `[low]`
-- `[deprecated → <new-topic>]`
-
-## What gets created in your project
-
-```
-.sybermem/
-├── INDEX.md                        # Master index — Active/Archived Conclusions, Digests, Topic Index
-├── changes/                        # Feature additions, modifications, deletions
-├── decisions/                      # Tech choices, architecture designs
-├── requirements/                   # User requirements, discussion outcomes
-├── bugs/                           # Bug analysis and fixes
-├── digests/                        # Phase digests
-├── theme-digests/                  # Theme digests (topic across multiple phases)
-├── analysis/
-│   └── phase-index.md              # Persistent project analysis artifact (includes lifecycle field)
-├── hooks/
-│   ├── record_change_on_stop.py    # Default auto-change hook helper
-│   ├── session_start_context.py    # SessionStart context injection script
-│   ├── check_project_health.py     # Update fast-path health check script
-│   └── launch_record_change_on_stop.py # Root-resolving stop-hook launcher helper
-└── templates/
-    ├── change-template.md
-    ├── decision-template.md
-    ├── requirement-template.md
-    ├── bug-template.md
-    ├── digest-template.md
-    └── theme-digest-template.md
-
-CLAUDE.md             # Claude Code instructions (workflow rules)
-AGENTS.md             # OpenCode instructions (same content)
-.claude/settings.json # Project-level hook mode (SessionStart / Stop)
-```
-
-`INDEX.md` currently contains these core sections:
-- `Key Conclusions` — Active conclusions, injected at session start
-- `Archived Conclusions` — Archived conclusions, not injected at startup but still searchable
-- `Stage Digests` — phase digest index
-- `Theme Digests` — topic-level digest index
-- `Topic Index` — topic → record IDs (supports `[active]` / `[low]` / `[deprecated → ...]` suffixes)
-
-## Directory resolution rules
-
-- `.sybermem/` is canonical.
-- If `.sybermem/` already exists, use it.
-- If only `ADR/` exists, the first run of `/sybermem-init-project`, `/sybermem-record`, `/sybermem-summary`, `/sybermem-digest`, `/sybermem-phase-analyze`, or `/sybermem-phase-confirm` automatically renames it to `.sybermem/`.
-- If both `.sybermem/` and `ADR/` exist, use `.sybermem/` and warn that `ADR/` was ignored.
-
-## Supported Platforms
-
-| Platform | Current status | Notes |
-|----------|----------------|-------|
-| Claude Code | fully supported | Plugin install (recommended) and script install (compatibility mode) are both dogfooded |
-| OpenCode | fully supported | TypeScript plugin implements `session.created`, `session.idle`, and `experimental.session.compacting` |
-| Gemini CLI | entry files present | `GEMINI.md` and extension metadata exist, but runtime behavior has not been dogfooded to the same degree |
-| Cursor | metadata present | `.cursor-plugin/plugin.json` exists; runtime behavior not yet equally validated |
-| Codex | metadata present | `.codex-plugin/plugin.json` exists; runtime behavior not yet equally validated |
-| Kimi | metadata present | `.kimi-plugin/plugin.json` exists; runtime behavior not yet equally validated |
-
-## Repo Structure
-
-```
-packages/claude-skills/               # Skill source for distribution inside the repo, not auto-loaded per project
-├── sybermem-digest/
-├── sybermem-init-project/
-├── sybermem-link/
-├── sybermem-phase-analyze/
-├── sybermem-phase-confirm/
-├── sybermem-record/
-├── sybermem-search/
-├── sybermem-summary/
-├── sybermem-theme-digest/
-├── sybermem-update/
-└── using-sybermem/
-
-scripts/                              # Install & update scripts
-├── install-remote.sh / .ps1          # One-liner remote install
-├── install.sh / .ps1                 # Local install
-├── update.sh / .ps1                  # Update existing install
-└── check-plugin-package.py           # Plugin package + real CLI validate check
-
-docs/zh/                              # Chinese documentation
-```
-
-## Team MVP (in progress)
-
-SyberMem is now moving into the Team MVP track:
-
+### Team support available today
 - **Phase A**: `sybermem team init` — create the Team repo skeleton, write `team.yaml`, and bind the Git remote
-- **Phase B**: `sybermem publish status` — when needed, first use existing digests (or create a phase digest if the project has enough material), then publish `project.md` + a Team Project Summary style `current-status.md` + `meta.json` into the Team repo
-- **Phase C**: after each `publish status`, automatically rebuild `dashboards/current-overview.md` as the team-wide overview entrypoint
-- **Phase D**: `publish status` remembers the team association automatically — no need to pass `--team-path` every time; `team init` auto-commits and pushes on first run
-- **Phase E**: `sybermem team summary` — generate a low-cost management summary (markdown + json) from Team repo publications for management-agent consumption
-- **Phase F**: publish now syncs the full phase/theme digest history into the Team repo, so you can skim status and then drill into digest history for detail
-- **Team Skills**: `/sybermem-team-publish` and `/sybermem-team-summary` provide Team entrypoints consistent with the project-level slash workflow
+- **Phase B**: `sybermem publish status` — publish `project.md` + a Team Project Summary style `current-status.md` + `meta.json`
+- **Phase C**: automatically rebuild `dashboards/current-overview.md` after each `publish status`
+- **Phase D**: remember Team association so `publish status` no longer needs `--team-path` every time
+- **Phase E**: `sybermem team summary` — generate a low-cost management summary (markdown + json)
+- **Phase F**: sync the full phase / theme digest history into the Team repo
+- **Team Skills**: `/sybermem-team-publish` and `/sybermem-team-summary`
 
 > `sybermem publish status` is the single Team publication entrypoint. You do not need separate team-push/bootstrap commands; the system fills in low-risk prerequisites during publish and asks for confirmation before high-impact actions.
 
-`team sync`, `team review`, and digest/lesson publication will build on top of that foundation.
+## Modes and Reminders
 
-- **Workflow Router**: SyberMem now recommends the next step using the priority order `record > digest > team-publish`, reducing the “what should I do next?” friction after a round of work.
+- `auto` = lightweight automatic `change` trail + reminders
+- `remind` = reminders only, no automatic `change` trail
+- If you explicitly say something like “remind me to record this round when it’s done”, SyberMem can remember that intent and remind you to run `/sybermem-record` at the right time.
+
+## Workflow Router
+
+SyberMem now recommends the next step using this priority order:
+
+```text
+record > digest > team-publish
+```
+
+This reduces the “what should I do next?” friction after a round of work.
+
+## Repo Structure
+
+```text
+.claude-plugin/                      # Claude Code plugin metadata and marketplace manifest
+hooks/                               # Claude Code hook declarations and delegators
+skills/                              # Plugin-facing skills tree
+packages/claude-skills/              # Skill source for distribution
+packages/core/                       # Core memory / Team publication logic
+packages/cli/                        # sybermem CLI
+scripts/                             # Install, update, and packaging scripts
+```
+
+## Compatibility
+
+- `.sybermem/` is the canonical project data directory
+- if a project still uses legacy `ADR/`, first use will migrate it automatically to `.sybermem/`
+- for deeper upgrade and compatibility notes, see `INSTALL.md`
+
+## More Docs
+
+- [INSTALL.md](INSTALL.md)
+- [`docs/superpowers/specs/`](docs/superpowers/specs/)
+- [`docs/zh/`](docs/zh/)
 
 ## License
 
