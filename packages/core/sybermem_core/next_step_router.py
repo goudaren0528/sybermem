@@ -3,10 +3,36 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from pathlib import Path
 import json
+import re
+import subprocess
 
 from .project import read_team_from_project_yaml
 from .status import project_status, publication_readiness
 from .publish import latest_phase_digest, latest_theme_digest
+
+
+def _count_commits_since_last_record(root: Path) -> int:
+    """Count git commits since the most recent record file date."""
+    latest_date = ""
+    syb = root / ".sybermem"
+    for subdir in ("changes", "decisions", "requirements", "bugs"):
+        d = syb / subdir
+        if not d.is_dir():
+            continue
+        for p in d.glob("*.md"):
+            m = re.match(r"(\d{4}-\d{2}-\d{2})-", p.name)
+            if m and m.group(1) > latest_date:
+                latest_date = m.group(1)
+    if not latest_date:
+        return 0
+    try:
+        r = subprocess.run(
+            ["git", "rev-list", "--count", f"--since={latest_date}", "HEAD"],
+            cwd=root, capture_output=True, text=True, check=False,
+        )
+        return int(r.stdout.strip()) if r.returncode == 0 else 0
+    except Exception:
+        return 0
 
 
 def recommend_next_step(root: Path) -> dict[str, str]:
@@ -17,11 +43,30 @@ def recommend_next_step(root: Path) -> dict[str, str]:
     phase_digest = latest_phase_digest(root)
     theme_digest = latest_theme_digest(root)
 
+    # 0) If phase-index is missing or not yet analyzed, recommend phase-analyze first
+    phase_index_path = root / ".sybermem" / "analysis" / "phase-index.md"
+    if phase_index_path.is_file():
+        text = phase_index_path.read_text(encoding="utf-8")
+        for line in text.splitlines():
+            if line.startswith("- status:") and line.split(":", 1)[1].strip() == "not_yet_analyzed":
+                return {
+                    "action": "/sybermem-phase-analyze",
+                    "reason": "The project phase index has not been analyzed yet. Run phase analysis to build the structural foundation."
+                }
+                break
+    else:
+        return {
+            "action": "/sybermem-phase-analyze",
+            "reason": "No phase index exists. Run phase analysis to build the structural foundation."
+        }
+
     # 1) record > digest > team-publish
-    if readiness["record_count"] >= 1 and not phase_digest and not theme_digest:
+    # Only recommend record if there is unrecorded work (commit gap), not just because records exist
+    commit_gap = _count_commits_since_last_record(root)
+    if commit_gap >= 3 and not phase_digest and not theme_digest:
         return {
             "action": "/sybermem-record",
-            "reason": "This round has meaningful project changes, but no durable manual record exists yet."
+            "reason": f"There are {commit_gap} commits since the last record. Consider creating a durable record for this round of work."
         }
 
     if readiness["enough_material"] and not phase_digest:
