@@ -39,6 +39,7 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 - [change-028] Auto-recorded workspace file changes at session stop so the project keeps a lightweight change trail without manual recording (2026-07-07)
 - [change-029] Auto-recorded workspace file changes at session stop so the project keeps a lightweight change trail without manual recording (2026-07-07)
 - [change-030] #team #hooks #init — Aligned init-project propagation, templates, and health checks with the new Team workflows and reminder-first record-intent behavior so installs and updates now carry those capabilities consistently (2026-07-07)
+- [change-031] Auto-recorded workspace file changes at session stop so the project keeps a lightweight change trail without manual recording (2026-07-10)
 <!-- add new conclusions here -->
 
 ---
@@ -106,6 +107,7 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 | 028 | 2026-07-07 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-07-07-028-init-cpython-310-identity-cpython-310-next-step-router-cpython-310-and-more.md) |
 | 029 | 2026-07-07 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-07-07-029-init-cpython-310-main-cpython-310-init-cpython-310-and-more.md) |
 | 030 | 2026-07-07 | Align init-project propagation with Team and reminder workflows | implemented | [link](changes/2026-07-07-030-align-init-project-propagation-with-team-and-reminder-workflows.md) |
+| 031 | 2026-07-10 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-07-10-031-init-cpython-310-uninstall-cpython-310.md) |
 <!-- add new records here -->
 
 ---
