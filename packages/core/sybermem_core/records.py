@@ -46,6 +46,8 @@ def parse_record_file(path: Path, project_id: str, slug: str) -> dict[str, str]:
             status = line.split(":", 1)[1].strip()
         elif line.startswith("superseded_by:"):
             superseded_by = line.split(":", 1)[1].strip()
+    # Extract #topic tags from the full text (e.g. "#architecture #foundation")
+    topics = re.findall(r"#([a-zA-Z][a-zA-Z0-9_-]*)", text)
     m = re.match(r"\d{4}-\d{2}-\d{2}-(\d{3})-", path.name)
     if m and rtype:
         record_id = f"{rtype}-{m.group(1)}"

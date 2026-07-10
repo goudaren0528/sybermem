@@ -31,14 +31,29 @@ def search_workspace(query: str, *, project: str | None = None, type_: str | Non
     if not db.is_file():
         raise FileNotFoundError("workspace index not built; run `sybermem index build`")
     conn = sqlite3.connect(db)
-    q = f'%{query}%'
-    sql = """
-        SELECT r.project_id, r.slug, r.record_id, r.type, r.title, r.path, r.created_at
-        FROM records r
-        JOIN projects p ON p.project_id = r.project_id
-        WHERE (r.title LIKE ? OR r.content LIKE ? OR r.record_id LIKE ? OR r.topics LIKE ?)
-    """
-    params: list[str] = [q, q, q, q]
+
+    # Try FTS5 first; fall back to LIKE if FTS table is missing
+    has_fts = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='records_fts'").fetchone()
+    if has_fts:
+        fts_query = query.strip()
+        sql = """
+            SELECT r.project_id, r.slug, r.record_id, r.type, r.title, r.path, r.created_at
+            FROM records r
+            JOIN projects p ON p.project_id = r.project_id
+            JOIN records_fts f ON f.rowid = r.rowid
+            WHERE records_fts MATCH ?
+        """
+        params: list[str] = [fts_query]
+    else:
+        q = f'%{query}%'
+        sql = """
+            SELECT r.project_id, r.slug, r.record_id, r.type, r.title, r.path, r.created_at
+            FROM records r
+            JOIN projects p ON p.project_id = r.project_id
+            WHERE (r.title LIKE ? OR r.content LIKE ? OR r.record_id LIKE ? OR r.topics LIKE ?)
+        """
+        params = [q, q, q, q]
+
     if project:
         sql += " AND r.slug = ?"
         params.append(project)

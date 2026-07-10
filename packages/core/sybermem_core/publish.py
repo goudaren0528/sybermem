@@ -76,6 +76,18 @@ def render_current_status(status: dict, source_commit: str) -> str:
     lines.extend(["", "## Risks / Attention"])
     lines.extend([f"- {item}" for item in risks])
 
+    lines.extend(["", "## Open Bugs"])
+    if status["open_bugs"]:
+        lines.extend([f"- {bid}" for bid in status["open_bugs"]])
+    else:
+        lines.append("- none")
+
+    lines.extend(["", "## Open Requirements"])
+    if status["open_requirements"]:
+        lines.extend([f"- {rid}" for rid in status["open_requirements"]])
+    else:
+        lines.append("- none")
+
     lines.extend(["", "## Next"])
     lines.extend([f"- {item}" for item in next_items])
 

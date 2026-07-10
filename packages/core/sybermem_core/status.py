@@ -75,8 +75,8 @@ def project_status(root: Path) -> dict:
     all_records = [parse_record_file(p, meta.get("project_id", ""), meta.get("slug", root.name)) for p in iter_record_files(root)]
     all_records.sort(key=lambda r: r.get("created_at", ""), reverse=True)
     recent_records = [r["record_id"] for r in all_records[:3] if r.get("record_id")]
-    open_bugs = [r["record_id"] for r in all_records if r.get("type") == "bug"]
-    open_requirements = [r["record_id"] for r in all_records if r.get("type") == "requirement"]
+    open_bugs = [r["record_id"] for r in all_records if r.get("type") == "bug" and r.get("status") != "resolved"]
+    open_requirements = [r["record_id"] for r in all_records if r.get("type") == "requirement" and r.get("status") != "resolved"]
 
     return {
         "project_id": meta.get("project_id", ""),
