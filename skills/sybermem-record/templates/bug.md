@@ -4,6 +4,7 @@ date: {{date}}
 number: {{number}}
 title: {{title}}
 severity: {{severity}}
+status: open
 # Optional relations (forward-only, values are existing record IDs):
 # fixes: [bug-NNN]                 # this bug fix addresses another bug
 # related: [type-NNN]              # weak association (e.g. caused by change-NNN)
