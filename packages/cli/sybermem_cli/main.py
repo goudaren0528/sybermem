@@ -16,6 +16,7 @@ from sybermem_core.team import init_team_repo
 from sybermem_core.publish import publish_status
 from sybermem_core.publish_bootstrap import bootstrap_publish_status
 from sybermem_core.team_summary import build_team_management_summary
+from sybermem_core.uninstall import deactivate_project_sybermem
 
 
 def cmd_project_init(args: argparse.Namespace) -> int:
@@ -194,6 +195,29 @@ def cmd_team_summary(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_project_uninstall(args: argparse.Namespace) -> int:
+    root = resolve_project_root()
+    if root is None:
+        print("No SyberMem project root found.", file=sys.stderr)
+        return 1
+    try:
+        payload = deactivate_project_sybermem(root)
+    except Exception as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    if args.format == "json":
+        print(dump_json(payload))
+    else:
+        print("Deactivated SyberMem runtime in this project:")
+        print(f"- project root: {payload['root']}")
+        print("- history preserved: yes")
+        if payload['changed_files']:
+            print("- changed files:")
+            for f in payload['changed_files']:
+                print(f"  - {f}")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(prog="sybermem")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -208,6 +232,10 @@ def main() -> int:
     status_cmd = project_sub.add_parser("status")
     status_cmd.add_argument("--format", choices=["text", "json"], default="text")
     status_cmd.set_defaults(func=cmd_project_status)
+
+    uninstall_cmd = project_sub.add_parser("uninstall")
+    uninstall_cmd.add_argument("--format", choices=["text", "json"], default="text")
+    uninstall_cmd.set_defaults(func=cmd_project_uninstall)
 
     index = sub.add_parser("index")
     index_sub = index.add_subparsers(dest="index_command", required=True)
