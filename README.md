@@ -155,17 +155,40 @@ packages/cli/                        # sybermem CLI
 scripts/                             # 安装、更新与打包校验脚本
 ```
 
+## 卸载
+
+SyberMem 的卸载分为两层：
+
+### 项目级卸载（保留历史，停用运行时接管）
+
+```text
+sybermem project uninstall
+```
+
+- 保留 `.sybermem/` 历史内容
+- 只移除 `.claude/settings.json` 中的 SyberMem hooks / env
+- 只移除 `CLAUDE.md` / `AGENTS.md` 中的 SyberMem 协议块
+- 用户原有内容不受破坏
+- 之后可重新运行 `/sybermem-update` 恢复
+
+### 全局卸载（删除全局能力，不碰项目历史）
+
+```bash
+# Windows (PowerShell)
+.\scripts\uninstall.ps1
+
+# macOS / Linux
+./scripts/uninstall.sh
+```
+
+- 删除全局 skills / CLI / launcher / OpenCode plugin
+- 不删除任何项目里的 `.sybermem/` 历史
+
 ## 兼容说明
 
 - `.sybermem/` 是规范目录
 - 如果项目里仍是旧的 `ADR/`，首次运行相关命令时会自动迁移为 `.sybermem/`
 - 更多升级与兼容细节见 `INSTALL.md`
-
-## 更多文档
-
-- [INSTALL.md](INSTALL.md)
-- [`docs/superpowers/specs/`](docs/superpowers/specs/)
-- [`docs/zh/`](docs/zh/)
 
 ## License
 

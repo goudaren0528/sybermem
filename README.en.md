@@ -155,17 +155,40 @@ packages/cli/                        # sybermem CLI
 scripts/                             # Install, update, and packaging scripts
 ```
 
+## Uninstall
+
+SyberMem supports two layers of uninstall:
+
+### Project-level uninstall (preserve history, deactivate runtime)
+
+```text
+sybermem project uninstall
+```
+
+- preserves `.sybermem/` history
+- only removes SyberMem hooks / env from `.claude/settings.json`
+- only removes the SyberMem protocol block from `CLAUDE.md` / `AGENTS.md`
+- user's own content is never destroyed
+- can be re-enabled later by running `/sybermem-update`
+
+### Global uninstall (remove global runtime, preserve project history)
+
+```bash
+# Windows (PowerShell)
+.\scripts\uninstall.ps1
+
+# macOS / Linux
+./scripts/uninstall.sh
+```
+
+- removes global skills / CLI / launcher / OpenCode plugin
+- does not delete any `.sybermem/` history inside projects
+
 ## Compatibility
 
 - `.sybermem/` is the canonical project data directory
 - if a project still uses legacy `ADR/`, first use will migrate it automatically to `.sybermem/`
 - for deeper upgrade and compatibility notes, see `INSTALL.md`
-
-## More Docs
-
-- [INSTALL.md](INSTALL.md)
-- [`docs/superpowers/specs/`](docs/superpowers/specs/)
-- [`docs/zh/`](docs/zh/)
 
 ## License
 
