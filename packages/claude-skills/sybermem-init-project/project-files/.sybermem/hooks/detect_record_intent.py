@@ -41,6 +41,10 @@ INTENT_PATTERNS = [
     re.compile(r"做完.*提醒我.*/sybermem-record"),
     re.compile(r"做完.*提醒我"),
     re.compile(r"这轮工作.*记录到.*sybermem", re.IGNORECASE),
+    re.compile(r"remind me to .*\bsybermem-record\b", re.IGNORECASE),
+    re.compile(r"remind me to record (this|the) (round|session|work)", re.IGNORECASE),
+    re.compile(r"after (this|the) .*(round|session).* remind me to record", re.IGNORECASE),
+    re.compile(r"let'?s record (this|the) (round|work) (to|in) sybermem", re.IGNORECASE),
 ]
 
 
@@ -58,6 +62,9 @@ def detect_record_intent(text: str) -> tuple[bool, str]:
         return True, "fallback:这轮+提醒我"
     if "做完" in text and "提醒我" in text:
         return True, "fallback:做完+提醒我"
+    # English fallback
+    if "remind me" in text.lower() and "record" in text.lower():
+        return True, "fallback:remind+record"
     return False, ""
 
 

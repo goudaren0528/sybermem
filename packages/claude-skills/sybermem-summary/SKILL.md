@@ -42,6 +42,7 @@ You MUST complete these steps in order:
    - If no confirmed phase structure exists after analysis → fall back to weekly mode
 3. **Collect data**:
    - Phase-aware mode: read phase-index, identify most recently active confirmed phase, collect covered raw records, inspect recent raw records as supporting detail
+   - **Check for existing digest**: read `.sybermem/digests/` for any digest whose source phase matches the current active phase. If a digest exists, reference it as the canonical conclusion and note any divergence between the digest's conclusion and the current raw-record state.
    - Fallback time-window mode: scan `.sybermem/` records in the requested time range, reference git log for commit history
 4. **Generate summary** — output this dynamic current-state panel (phase-aware mode):
 
@@ -49,19 +50,25 @@ You MUST complete these steps in order:
 # Phase Summary: <phase title>
 
 ## Current Phase
-- ...
+- phase_id: <id>
+- phase title: <title>
+- lifecycle: <active|completed|archived>
 
 ## Status
-- ...
+- total records in phase: <count>
+- last record date: <date>
+- digest status: <digest exists|no digest yet>
 
 ## Open Issues
-- ...
+- open bugs: <bug-001, bug-002 or "none">
+- open requirements: <requirement-001 or "none">
 
 ## Next Steps
-- ...
+- <derived from /using-sybermem routing or recommend_next_step()>
 
 ## Recent Changes
-- ...
+- <record-id>: <title> (<date>)
+- <last 3 records by date>
 ```
 
 In fallback weekly/monthly mode, keep the current time-window report shape.
@@ -82,6 +89,7 @@ If you catch yourself doing any of these, STOP:
 - Treating the summary as a digest or durable conclusion
 - Ignoring confirmed phase structure when it exists in the phase-index
 - Generating a summary without reading any actual `.sybermem/` records
+- Generating a summary without checking whether a phase digest already exists for the active phase
 
 **All of these mean: go back to the relevant step and re-verify.**
 
