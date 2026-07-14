@@ -19,7 +19,7 @@ def parse_project_yaml(root: Path) -> dict[str, str]:
 def iter_record_files(root: Path) -> list[Path]:
     syb = root / ".sybermem"
     files: list[Path] = []
-    for sub in ["changes", "decisions", "requirements", "bugs"]:
+    for sub in ["changes", "decisions", "requirements", "bugs", "digests", "theme-digests"]:
         d = syb / sub
         if d.is_dir():
             files.extend(sorted(d.glob("*.md")))
