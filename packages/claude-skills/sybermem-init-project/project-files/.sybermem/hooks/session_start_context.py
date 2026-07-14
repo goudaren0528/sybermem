@@ -63,11 +63,17 @@ def parse_conclusions(index_text: str) -> list[str]:
     )
     if not match:
         return []
-    return [
+    lines = [
         line.strip()
         for line in match.group(1).splitlines()
         if line.strip().startswith("- [")
     ]
+    # Sort by date extracted from conclusion (YYYY-MM-DD) so most recent comes last
+    def _date_key(line: str) -> str:
+        m = re.search(r"\((\d{4}-\d{2}-\d{2})\)", line)
+        return m.group(1) if m else ""
+    lines.sort(key=_date_key)
+    return lines
 
 
 def parse_topic_index(index_text: str) -> dict[str, list[str]]:
