@@ -114,6 +114,19 @@ def check_stop_hook(root: Path) -> dict:
     return {"status": "fresh" if has_unified_nudge else "stale"}
 
 
+def check_session_start_hook(root: Path) -> dict:
+    """Check session_start_context.py status — detect stale versions that over-inject."""
+    path = root / ".sybermem" / "hooks" / "session_start_context.py"
+    content = read_text(path)
+    if content is None:
+        return {"status": "missing"}
+    # Stale if it still injects full Topic Index or skill list into output
+    has_topic_dump = "Topic Index:" in content and "for topic, records" in content
+    has_skill_list = "SyberMem skills available:" in content
+    is_stale = has_topic_dump or has_skill_list
+    return {"status": "stale" if is_stale else "fresh"}
+
+
 def check_file_exists(path: Path) -> dict:
     """Simple existence check for files that are either present or missing."""
     return {"status": "fresh" if path.is_file() else "missing"}
@@ -263,7 +276,7 @@ def main() -> int:
     files["AGENTS.md"] = check_instruction_file(root, "AGENTS.md", template_agents)
     files[".claude/settings.json"] = check_settings_json(root)
     files[".sybermem/hooks/record_change_on_stop.py"] = check_stop_hook(root)
-    files[".sybermem/hooks/session_start_context.py"] = check_file_exists(root / ".sybermem" / "hooks" / "session_start_context.py")
+    files[".sybermem/hooks/session_start_context.py"] = check_session_start_hook(root)
     files[".sybermem/hooks/launch_record_change_on_stop.py"] = check_file_exists(root / ".sybermem" / "hooks" / "launch_record_change_on_stop.py")
     files[".sybermem/INDEX.md"] = check_index_md(root)
     files[".sybermem/digests/"] = check_dir_exists(root / ".sybermem" / "digests")
