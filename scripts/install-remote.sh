@@ -69,9 +69,19 @@ if [ -d "$HOME/.claude" ]; then
         echo "  [Claude Code] installed session start launcher: $SESSION_LAUNCHER_PATH"
     fi
     mkdir -p "$CLI_DIR"
-    python -m venv "$CLI_VENV"
-    "$CLI_VENV/bin/python" -m pip install --upgrade pip
-    "$CLI_VENV/bin/pip" install "$CORE_SOURCE" "$CLI_SOURCE"
+    NEEDS_PIP=1
+    if [ -x "$CLI_VENV/bin/pip" ]; then
+        if "$CLI_VENV/bin/pip" show sybermem-core >/dev/null 2>&1; then
+            NEEDS_PIP=0
+        fi
+    fi
+    if [ "$NEEDS_PIP" = "1" ]; then
+        python -m venv "$CLI_VENV"
+        "$CLI_VENV/bin/python" -m pip install --upgrade pip
+        "$CLI_VENV/bin/pip" install "$CORE_SOURCE" "$CLI_SOURCE"
+    else
+        echo "  [CLI] sybermem-core already installed, skipping pip install"
+    fi
     cat > "$CLI_WRAPPER" <<'EOF'
 #!/bin/bash
 SYBERMEM_HOME="$HOME/.claude/sybermem/cli"
