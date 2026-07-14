@@ -502,9 +502,9 @@ def insert_before_marker(path: Path, marker: str, addition: str) -> None:
 
 def update_index(record_date: str, number: str, title: str, slug: str) -> None:
     link_name = f"{record_date}-{number}-{slug}.md"
-    conclusion = f"- [change-{number}] Auto-recorded workspace file changes at session stop so the project keeps a lightweight change trail without manual recording ({record_date})\n"
     row = f"| {number} | {record_date} | Auto-record workspace file changes on stop | implemented | [link](changes/{link_name}) |\n"
-    insert_before_marker(INDEX_PATH, "<!-- add new conclusions here -->", conclusion)
+    # Auto-trail records only go into the Feature Changes table, NOT Key Conclusions.
+    # Key Conclusions should only contain meaningful manually-created records.
     insert_before_marker(INDEX_PATH, "<!-- add new records here -->", row)
 
 
