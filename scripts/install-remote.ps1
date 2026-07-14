@@ -81,9 +81,19 @@ try {
         if (-not (Test-Path $CliDir)) {
             New-Item -ItemType Directory -Path $CliDir -Force | Out-Null
         }
-        python -m venv $CliVenv
-        & (Join-Path $CliVenv "Scripts\python.exe") -m pip install --upgrade pip
-        & (Join-Path $CliVenv "Scripts\pip.exe") install $CoreSource $CliSource
+        $pipExe = Join-Path $CliVenv "Scripts\pip.exe"
+        $needsPip = (-not (Test-Path $pipExe))
+        if (-not $needsPip) {
+            $showResult = & $pipExe show sybermem-core 2>&1
+            if ($LASTEXITCODE -ne 0) { $needsPip = $true }
+        }
+        if ($needsPip) {
+            python -m venv $CliVenv
+            & (Join-Path $CliVenv "Scripts\python.exe") -m pip install --upgrade pip
+            & $pipExe install $CoreSource $CliSource
+        } else {
+            Write-Host "  [CLI] sybermem-core already installed, skipping pip install"
+        }
         @'
 @echo off
 set "SYBERMEM_HOME=%USERPROFILE%\.claude\sybermem\cli"

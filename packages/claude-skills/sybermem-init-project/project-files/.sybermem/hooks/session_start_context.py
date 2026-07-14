@@ -212,25 +212,9 @@ def build_context(root: Path) -> str:
     if conclusions:
         lines.append("")
         lines.append("Key Conclusions:")
-        for c in conclusions:
+        # Only inject the most recent 5 conclusions to keep context lean
+        for c in conclusions[-5:]:
             lines.append(c)
-
-    if topics:
-        lines.append("")
-        lines.append("Topic Index:")
-        for topic, records in sorted(topics.items()):
-            lines.append(f"- {topic}: {', '.join(records)}")
-
-    lines.extend([
-        "",
-        "SyberMem skills available:",
-        "- /sybermem:record — create a project record after meaningful work",
-        "- /sybermem:summary — view current phase status",
-        "- /sybermem:digest — create a durable phase digest",
-        "- /sybermem:phase-analyze — refresh phase index",
-        "- /sybermem:update — refresh project managed files",
-        "- /sybermem:using-sybermem — full diagnostic",
-    ])
 
     return "\n".join(lines)
 
