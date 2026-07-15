@@ -270,6 +270,25 @@ def main() -> int:
         print(json.dumps({"root": None, "overall": "not_initialized", "files": {}, "capabilities": {}, "actions_needed": []}))
         return 0
 
+    # Self-update: if the globally installed template is newer, replace ourselves and re-exec.
+    # This ensures the health check always knows about the latest managed-file requirements,
+    # even when the project was initialized with an older version of SyberMem.
+    me = Path(__file__).resolve()
+    for skill_base in (
+        Path.home() / ".claude" / "skills" / "sybermem-init-project" / "project-files" / ".sybermem" / "hooks",
+        Path.home() / ".config" / "opencode" / "skills" / "sybermem-init-project" / "project-files" / ".sybermem" / "hooks",
+    ):
+        template_health = skill_base / "check_project_health.py"
+        if template_health.is_file():
+            template_text = template_health.read_text(encoding="utf-8")
+            my_text = me.read_text(encoding="utf-8")
+            if template_text != my_text:
+                me.write_text(template_text, encoding="utf-8")
+                import sys
+                result = subprocess.run([sys.executable, str(me)], cwd=Path.cwd())
+                raise SystemExit(result.returncode)
+            break
+
     # Load template content for comparison
     # Templates are in the installed skill's project-files directory
     # But this script runs from the project, so we read templates relative to the skill install
