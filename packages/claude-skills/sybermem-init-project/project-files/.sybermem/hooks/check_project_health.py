@@ -68,10 +68,23 @@ def check_instruction_file(root: Path, name: str, template_content: str) -> dict
     template_stripped = block_pattern.sub("", template_content).strip()
     is_sybermem_only = file_stripped == template_stripped
 
+    # Even if protocol block exists, check if its content matches the template
+    # (detects stale/over-heavy protocol blocks from older versions)
+    block_is_current = True
+    if has_block and template_content:
+        file_block_m = block_pattern.search(content)
+        template_block_m = block_pattern.search(template_content)
+        if file_block_m and template_block_m:
+            file_block = file_block_m.group(0).strip()
+            template_block = template_block_m.group(0).strip()
+            block_is_current = file_block == template_block
+
+    status = "fresh" if (has_block and block_is_current) else "stale"
     return {
-        "status": "fresh" if has_block else "stale",
+        "status": status,
         "has_protocol_block": has_block,
         "is_sybermem_only": is_sybermem_only,
+        "block_is_current": block_is_current,
     }
 
 
@@ -177,13 +190,15 @@ def generate_actions(files: dict) -> list[str]:
     """Generate the list of actions needed based on file statuses."""
     actions: list[str] = []
 
-    # Instruction files — insert only, never overwrite
+    # Instruction files — insert or refresh protocol block, never overwrite user content
     for name in ("CLAUDE.md", "AGENTS.md"):
         info = files.get(name, {})
         if info.get("status") == "missing":
             actions.append(f"create {name} from template")
         elif not info.get("has_protocol_block"):
             actions.append(f"insert protocol block into {name} (preserve existing content)")
+        elif not info.get("block_is_current", True):
+            actions.append(f"replace protocol block in {name} (preserve content outside block)")
 
     # settings.json — surgical patch only
     sj = files.get(".claude/settings.json", {})
@@ -199,7 +214,7 @@ def generate_actions(files: dict) -> list[str]:
         if not sj.get("has_auto_mode"):
             actions.append("add SYBERMEM_RECORD_MODE to .claude/settings.json (preserve other env)")
 
-    # SyberMem-owned hooks — create or replace
+    # SyberMem-owned hooks — create if missing, replace if stale
     for hook_name, key in [
         ("session_start_context.py", ".sybermem/hooks/session_start_context.py"),
         ("launch_record_change_on_stop.py", ".sybermem/hooks/launch_record_change_on_stop.py"),
@@ -208,6 +223,8 @@ def generate_actions(files: dict) -> list[str]:
         info = files.get(key, {})
         if info.get("status") == "missing":
             actions.append(f"create {key} from template")
+        elif info.get("status") == "stale":
+            actions.append(f"replace {key} from template")
 
     rcos = files.get(".sybermem/hooks/record_change_on_stop.py", {})
     if rcos.get("status") == "missing":
