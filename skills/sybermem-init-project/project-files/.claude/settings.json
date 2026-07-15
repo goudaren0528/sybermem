@@ -1,6 +1,6 @@
 {
   "env": {
-    "SYBERMEM_RECORD_MODE": "auto"
+    "SYBERMEM_RECORD_MODE": "remind"
   },
   "hooks": {
     "UserPromptSubmit": [
