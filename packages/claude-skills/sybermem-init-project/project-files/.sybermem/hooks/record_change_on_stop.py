@@ -251,7 +251,7 @@ def detect_high_level_areas(files: list[str]) -> set[str]:
     return matched
 
 
-COMMIT_GAP_THRESHOLD = 10
+COMMIT_GAP_THRESHOLD = 5
 
 
 def count_commits_since_last_record() -> int:
@@ -516,13 +516,18 @@ def main() -> int:
         return 0
 
     all_files = list_changed_files()
+    record_intent = load_record_intent()
+    intent_active = bool(record_intent.get("record_intent"))
+
+    # Even with no changed files, honor explicit record intent
     if not all_files:
+        if intent_active:
+            print("You marked this work as worth recording earlier. If this round is complete, run /sybermem-record now.")
+            clear_record_intent()
         return 0
 
     files = trail_files(all_files)
     nudge_state = load_nudge_state()
-    record_intent = load_record_intent()
-    intent_active = bool(record_intent.get("record_intent"))
     followup_hint, theme_key, nudge_message = classify_followup(all_files, nudge_state)
     try:
         import sys
