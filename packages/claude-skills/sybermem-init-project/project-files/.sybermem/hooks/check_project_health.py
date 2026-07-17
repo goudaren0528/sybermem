@@ -68,6 +68,16 @@ def check_instruction_file(root: Path, name: str, template_content: str) -> dict
     template_stripped = block_pattern.sub("", template_content).strip()
     is_sybermem_only = file_stripped == template_stripped
 
+    # Detect old SyberMem templates that have heavy sections outside the protocol block.
+    # These are NOT user custom content — they are leftover from older SyberMem versions.
+    has_old_sybermem_sections = (
+        "## Available Skills" in content
+        or "## Workflow" in content
+        or ("## Directory Resolution" in content and "## Core Rule" in content)
+    )
+    if has_old_sybermem_sections:
+        is_sybermem_only = True
+
     # Even if protocol block exists, check if its content matches the template
     # (detects stale/over-heavy protocol blocks from older versions)
     block_is_current = True
@@ -79,12 +89,19 @@ def check_instruction_file(root: Path, name: str, template_content: str) -> dict
             template_block = template_block_m.group(0).strip()
             block_is_current = file_block == template_block
 
-    status = "fresh" if (has_block and block_is_current) else "stale"
+    # If file is entirely SyberMem-managed (including old heavy templates),
+    # compare the whole file to the current template
+    content_is_current = True
+    if is_sybermem_only and template_content:
+        content_is_current = content.strip() == template_content.strip()
+
+    status = "fresh" if (has_block and block_is_current and content_is_current) else "stale"
     return {
         "status": status,
         "has_protocol_block": has_block,
         "is_sybermem_only": is_sybermem_only,
         "block_is_current": block_is_current,
+        "content_is_current": content_is_current,
     }
 
 
@@ -195,6 +212,9 @@ def generate_actions(files: dict) -> list[str]:
         info = files.get(name, {})
         if info.get("status") == "missing":
             actions.append(f"create {name} from template")
+        elif info.get("is_sybermem_only") and not info.get("content_is_current", True):
+            # File is entirely SyberMem-managed (or old heavy template) — safe to replace whole file
+            actions.append(f"replace {name} from template")
         elif not info.get("has_protocol_block"):
             actions.append(f"insert protocol block into {name} (preserve existing content)")
         elif not info.get("block_is_current", True):
