@@ -74,7 +74,12 @@ This is computed live; no reverse index is stored.
 
 Found N records:
 
-1. **[type-NNN]** #topic1 #topic2 — one-line conclusion (date)
+1. **[type-NNN]** title (date)
+   - Authority: authoritative | summarized | evidence
+   - Lifecycle: active | resolved | superseded | archived
+   - Freshness: current | historical | stale
+   - Match: keyword | topic | relation | record-id
+   - Related digest: digest-NNN (if any)
    - Phase: phase-00X (phase title)
    - File: .sybermem/<type>/<file>.md
    - Relations: implements requirement-002, related change-005
@@ -91,12 +96,14 @@ When `--scope workspace`, use this format instead:
 ## SyberMem Workspace Search: "<query>"
 
 ### [eszyzu] (N results)
-1. **[type-NNN]** #topic — one-line (date)
+1. **[type-NNN]** title (date)
+   - Authority: authoritative | summarized | evidence
+   - Lifecycle: active | resolved | superseded | archived
+   - Freshness: current | historical | stale
+   - Match: keyword | topic | relation | record-id
+   - Related digest: digest-NNN (if any)
    - File: <absolute-path>/.sybermem/<type>/<file>.md
    ...
-
-### [sybermem] (0 results)
-No matches.
 
 ### [old-project] [unavailable]
 Project path not accessible.
@@ -104,7 +111,9 @@ Project path not accessible.
 
 Omit the per-project section entirely if the project has zero results and is available (to reduce noise). Always show `[unavailable]` projects.
 
-Omit `Relations:`, `Referenced by:`, `Superseded by:`, or `Supersedes:` lines when there are none.
+Omit `Relations:`, `Referenced by:`, `Superseded by:`, `Supersedes:`, or `Related digest:` lines when there are none.
+
+Archived, superseded, or resolved records are still searchable, but they must be marked clearly and never presented as the current authoritative fact when newer records exist.
 
 ## Error Handling
 
