@@ -35,6 +35,9 @@ def parse_record_file(path: Path, project_id: str, slug: str) -> dict[str, str]:
     record_id = ""
     status = ""
     superseded_by = ""
+    fixes = ""
+    implements = ""
+    related = ""
     for line in text.splitlines():
         if line.startswith("type:"):
             rtype = line.split(":", 1)[1].strip()
@@ -46,6 +49,12 @@ def parse_record_file(path: Path, project_id: str, slug: str) -> dict[str, str]:
             status = line.split(":", 1)[1].strip()
         elif line.startswith("superseded_by:"):
             superseded_by = line.split(":", 1)[1].strip()
+        elif line.startswith("fixes:"):
+            fixes = line.split(":", 1)[1].strip()
+        elif line.startswith("implements:"):
+            implements = line.split(":", 1)[1].strip()
+        elif line.startswith("related:"):
+            related = line.split(":", 1)[1].strip()
     # Extract #topic tags from the full text (e.g. "#architecture #foundation")
     topics = re.findall(r"#([a-zA-Z][a-zA-Z0-9_-]*)", text)
     m = re.match(r"\d{4}-\d{2}-\d{2}-(\d{3})-", path.name)
@@ -63,4 +72,7 @@ def parse_record_file(path: Path, project_id: str, slug: str) -> dict[str, str]:
         "created_at": date,
         "status": status,
         "superseded_by": superseded_by,
+        "fixes": fixes,
+        "implements": implements,
+        "related": related,
     }

@@ -6,6 +6,27 @@ import sqlite3
 from .index import index_db_path
 from .project import resolve_project_root
 from .records import iter_record_files, parse_project_yaml, parse_record_file
+from .retrieval import (
+    classify_authority,
+    classify_freshness,
+    classify_lifecycle,
+    classify_source_kind,
+)
+
+
+def _with_retrieval_metadata(row: dict[str, str]) -> dict[str, str]:
+    source_kind = classify_source_kind(row["path"])
+    authority = classify_authority(source_kind, row.get("title", ""), row.get("content", ""))
+    archived = "[archived]" in row.get("content", "")
+    lifecycle = classify_lifecycle(row.get("status", ""), row.get("superseded_by", ""), archived)
+    freshness = classify_freshness(lifecycle)
+    enriched = dict(row)
+    enriched["source_kind"] = source_kind
+    enriched["authority"] = authority
+    enriched["lifecycle"] = lifecycle
+    enriched["freshness"] = freshness
+    enriched["related_digest"] = ""
+    return enriched
 
 
 def search_project(query: str) -> list[dict[str, str]]:
@@ -22,7 +43,7 @@ def search_project(query: str) -> list[dict[str, str]]:
         haystack = f"{row['record_id']} {row['title']} {row['content']} {row['topics']}".lower()
         if q in haystack:
             row['score'] = 1.0
-            results.append(row)
+            results.append(_with_retrieval_metadata(row))
     return results
 
 
@@ -67,15 +88,24 @@ def search_workspace(query: str, *, project: str | None = None, type_: str | Non
     rows = conn.execute(sql, params).fetchall()
     conn.close()
     return [
-        {
-            "project_id": r[0],
-            "slug": r[1],
-            "record_id": r[2],
-            "type": r[3],
-            "title": r[4],
-            "path": r[5],
-            "created_at": r[6],
-            "score": 1.0,
-        }
+        _with_retrieval_metadata(
+            {
+                "project_id": r[0],
+                "slug": r[1],
+                "record_id": r[2],
+                "type": r[3],
+                "title": r[4],
+                "path": r[5],
+                "created_at": r[6],
+                "content": "",
+                "topics": "",
+                "status": "",
+                "superseded_by": "",
+                "fixes": "",
+                "implements": "",
+                "related": "",
+                "score": 1.0,
+            }
+        )
         for r in rows
     ]
