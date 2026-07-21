@@ -11,7 +11,11 @@ def classify_source_kind(path: str) -> str:
 def classify_authority(source_kind: str, title: str, content: str) -> str:
     if source_kind == 'digest':
         return 'summarized'
-    if 'Auto-record workspace file changes on stop' in title or 'Auto-recorded workspace file changes at session stop' in content:
+    if (
+        'Auto-record workspace file changes on stop' in title
+        or 'Auto-recorded workspace file changes at session stop' in content
+        or 'Auto-generated from workspace changes detected at session stop.' in content
+    ):
         return 'evidence'
     return 'authoritative'
 
