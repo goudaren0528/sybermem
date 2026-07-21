@@ -78,7 +78,13 @@ def cmd_search(args: argparse.Namespace) -> int:
             if row["slug"] != current_project:
                 current_project = row["slug"]
                 print(f"[{current_project}]")
-            print(f"- {row['record_id']} {row['title']}")
+            print(f"- [{row['record_id']}] {row['title']}")
+            print(f"  - Authority: {row.get('authority', 'unknown')}")
+            print(f"  - Lifecycle: {row.get('lifecycle', 'unknown')}")
+            print(f"  - Freshness: {row.get('freshness', 'unknown')}")
+            print(f"  - Match: {row.get('match', 'keyword')}")
+            if row.get('related_digest'):
+                print(f"  - Related digest: {row['related_digest']}")
         if not results:
             print("No matches.")
     return 0
