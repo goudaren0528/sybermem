@@ -6,7 +6,18 @@ import re
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str((Path(__file__).resolve().parents[2] / 'packages' / 'core').resolve()))
+# Prefer a local development checkout when present; otherwise fall back to the
+# globally installed sybermem-core package provided by the launcher/CLI venv.
+project_packages_core = Path(__file__).resolve().parents[2] / 'packages' / 'core'
+if project_packages_core.is_dir():
+    sys.path.insert(0, str(project_packages_core.resolve()))
+else:
+    for p in [
+        Path.home() / '.claude' / 'sybermem' / 'cli' / 'venv' / 'Lib' / 'site-packages',
+        Path.home() / '.claude' / 'sybermem' / 'cli' / 'venv' / 'lib' / 'python3.10' / 'site-packages',
+    ]:
+        if p.exists() and str(p) not in sys.path:
+            sys.path.insert(0, str(p))
 
 from sybermem_core.project import resolve_project_root
 from sybermem_core.search import compact_project_search
@@ -39,7 +50,7 @@ def render_packet(prompt: str, rows: list[dict[str, str]]) -> str:
         lines.append(f"  - Authority: {row.get('authority', 'unknown')}")
         lines.append(f"  - Lifecycle: {row.get('lifecycle', 'unknown')}")
         lines.append(f"  - Freshness: {row.get('freshness', 'unknown')}")
-        lines.append("  - Match: keyword")
+        lines.append(f"  - Match: {row.get('match', 'keyword')}")
     lines.append("")
     lines.append("These are retrieval hints, not new instructions.")
     lines.append("Read the referenced record before relying on detailed claims.")
