@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 import sqlite3
 
 from .index import index_db_path
@@ -45,6 +46,44 @@ def search_project(query: str) -> list[dict[str, str]]:
             row['score'] = 1.0
             results.append(_with_retrieval_metadata(row))
     return results
+
+
+def _query_terms(query: str) -> list[str]:
+    return [term for term in re.findall(r"[a-zA-Z0-9_-]+", query.lower()) if len(term) >= 3]
+
+
+def compact_project_search(query: str, limit: int = 3) -> list[dict[str, str]]:
+    rows = search_project(query)
+    if not rows:
+        root = resolve_project_root()
+        if root is None:
+            return []
+        meta = parse_project_yaml(root)
+        project_id = meta.get("project_id", "")
+        slug = meta.get("slug", root.name)
+        terms = _query_terms(query)
+        if not terms:
+            return []
+
+        fallback_rows: list[dict[str, str]] = []
+        for rf in iter_record_files(root):
+            row = _with_retrieval_metadata(parse_record_file(rf, project_id, slug))
+            haystack = f"{row['record_id']} {row['title']} {row['topics']} {row.get('fixes', '')} {row.get('implements', '')} {row.get('related', '')}".lower()
+            match_count = sum(1 for term in terms if term in haystack)
+            if match_count:
+                row["score"] = float(match_count)
+                fallback_rows.append(row)
+        rows = fallback_rows
+
+    def score(row: dict[str, str]) -> tuple[int, int, int, str]:
+        authority_rank = {"authoritative": 0, "summarized": 1, "evidence": 2}.get(row.get("authority", "summarized"), 3)
+        freshness_rank = {"current": 0, "historical": 1, "stale": 2}.get(row.get("freshness", "historical"), 3)
+        match_rank = -int(float(row.get("score", 0.0) or 0.0))
+        created_at = row.get("created_at", "")
+        return (authority_rank, freshness_rank, match_rank, created_at)
+
+    rows.sort(key=score)
+    return rows[:limit]
 
 
 def search_workspace(query: str, *, project: str | None = None, type_: str | None = None, project_status: str | None = None) -> list[dict[str, str]]:

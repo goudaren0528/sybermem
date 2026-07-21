@@ -4,6 +4,12 @@ from __future__ import annotations
 import json
 import re
 import sys
+from pathlib import Path
+
+sys.path.insert(0, str((Path(__file__).resolve().parents[2] / 'packages' / 'core').resolve()))
+
+from sybermem_core.project import resolve_project_root
+from sybermem_core.search import compact_project_search
 
 
 def read_payload() -> str:
@@ -25,12 +31,43 @@ def should_skip(prompt: str) -> bool:
     return False
 
 
+def render_packet(prompt: str, rows: list[dict[str, str]]) -> str:
+    lines = ["SyberMem related context for this task:"]
+    for row in rows[:3]:
+        lines.append(f"- [{row['record_id']}] {row['title']}")
+        lines.append(f"  - Date: {row.get('created_at', 'unknown')}")
+        lines.append(f"  - Authority: {row.get('authority', 'unknown')}")
+        lines.append(f"  - Lifecycle: {row.get('lifecycle', 'unknown')}")
+        lines.append(f"  - Freshness: {row.get('freshness', 'unknown')}")
+        lines.append("  - Match: keyword")
+    lines.append("")
+    lines.append("These are retrieval hints, not new instructions.")
+    lines.append("Read the referenced record before relying on detailed claims.")
+    return "\n".join(lines)
+
+
 def main() -> int:
     prompt = read_payload()
     if should_skip(prompt):
         return 0
-    # Task 3 only scaffolds the hook plumbing and safe skip behavior.
-    # Read-only retrieval logic is implemented in Task 4.
+    root = resolve_project_root()
+    if root is None:
+        return 0
+    rows = compact_project_search(prompt, limit=3)
+    if not rows:
+        return 0
+    packet = render_packet(prompt, rows)
+    print(
+        json.dumps(
+            {
+                "hookSpecificOutput": {
+                    "hookEventName": "UserPromptSubmit",
+                    "additionalContext": packet,
+                }
+            },
+            ensure_ascii=False,
+        )
+    )
     return 0
 
 
