@@ -37,8 +37,14 @@ def init_schema(conn: sqlite3.Connection) -> None:
     # Detect whether the existing projects table matches the Phase 2 shape.
     needs_rebuild = False
     try:
-        cols = [row[1] for row in conn.execute("PRAGMA table_info(projects)").fetchall()]
-        if cols and "name" not in cols:
+        project_cols = [row[1] for row in conn.execute("PRAGMA table_info(projects)").fetchall()]
+        if project_cols and "name" not in project_cols:
+            needs_rebuild = True
+        record_cols = {row[1] for row in conn.execute("PRAGMA table_info(records)").fetchall()}
+        if record_cols and not {"fixes", "implements", "related"}.issubset(record_cols):
+            needs_rebuild = True
+        fts_cols = {row[1] for row in conn.execute("PRAGMA table_info(records_fts)").fetchall()}
+        if fts_cols and not {"fixes", "implements", "related"}.issubset(fts_cols):
             needs_rebuild = True
     except sqlite3.DatabaseError:
         needs_rebuild = True
@@ -75,9 +81,12 @@ def init_schema(conn: sqlite3.Connection) -> None:
             path TEXT,
             created_at TEXT,
             status TEXT,
-            superseded_by TEXT
+            superseded_by TEXT,
+            fixes TEXT,
+            implements TEXT,
+            related TEXT
         );
-        CREATE VIRTUAL TABLE IF NOT EXISTS records_fts USING fts5(record_id, title, content, topics, slug);
+        CREATE VIRTUAL TABLE IF NOT EXISTS records_fts USING fts5(record_id, title, content, topics, slug, fixes, implements, related);
         """
     )
 
@@ -126,15 +135,16 @@ def rebuild_index(project_filter: str | None = None) -> dict[str, int]:
         for rf in iter_record_files(root):
             row = parse_record_file(rf, p["project_id"], slug)
             conn.execute(
-                "INSERT INTO records(project_id, slug, record_id, type, title, content, topics, path, created_at, status, superseded_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO records(project_id, slug, record_id, type, title, content, topics, path, created_at, status, superseded_by, fixes, implements, related) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     row["project_id"], row["slug"], row["record_id"], row["type"], row["title"],
-                    row["content"], row["topics"], row["path"], row["created_at"], row["status"], row["superseded_by"]
+                    row["content"], row["topics"], row["path"], row["created_at"], row["status"], row["superseded_by"],
+                    row["fixes"], row["implements"], row["related"]
                 )
             )
             conn.execute(
-                "INSERT INTO records_fts(record_id, title, content, topics, slug) VALUES (?, ?, ?, ?, ?)",
-                (row["record_id"], row["title"], row["content"], row["topics"], row["slug"])
+                "INSERT INTO records_fts(record_id, title, content, topics, slug, fixes, implements, related) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (row["record_id"], row["title"], row["content"], row["topics"], row["slug"], row["fixes"], row["implements"], row["related"])
             )
             indexed_records += 1
         indexed_projects += 1
@@ -143,7 +153,7 @@ def rebuild_index(project_filter: str | None = None) -> dict[str, int]:
     conn.commit()
     conn.close()
     state.write_text(json.dumps({
-        "schema_version": 1,
+        "schema_version": 2,
         "last_built_at": now_iso(),
         "projects_indexed": indexed_projects,
         "records_indexed": indexed_records,
