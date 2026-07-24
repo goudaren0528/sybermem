@@ -53,6 +53,10 @@ def _created_rank(row: dict[str, str]) -> int:
     return int(created.replace("-", "")) if created else 0
 
 
+def _fts_query(query: str) -> str:
+    return '"' + query.strip().replace('"', '""') + '"'
+
+
 def search_project(query: str) -> list[dict[str, str]]:
     root = resolve_project_root()
     if root is None:
@@ -120,7 +124,7 @@ def search_workspace(query: str, *, project: str | None = None, type_: str | Non
     # Try FTS5 first; fall back to LIKE if FTS table is missing
     has_fts = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='records_fts'").fetchone()
     if has_fts:
-        fts_query = query.strip()
+        fts_query = _fts_query(query)
         sql = """
             SELECT r.project_id, r.slug, r.record_id, r.type, r.title, r.path, r.created_at,
                    r.content, r.topics, r.status, r.superseded_by, r.fixes, r.implements, r.related
@@ -137,9 +141,9 @@ def search_workspace(query: str, *, project: str | None = None, type_: str | Non
                    r.content, r.topics, r.status, r.superseded_by, r.fixes, r.implements, r.related
             FROM records r
             JOIN projects p ON p.project_id = r.project_id
-            WHERE (r.title LIKE ? OR r.content LIKE ? OR r.record_id LIKE ? OR r.topics LIKE ?)
+            WHERE (r.title LIKE ? OR r.content LIKE ? OR r.record_id LIKE ? OR r.topics LIKE ? OR r.fixes LIKE ? OR r.implements LIKE ? OR r.related LIKE ?)
         """
-        params = [q, q, q, q]
+        params = [q, q, q, q, q, q, q]
 
     if project:
         sql += " AND r.slug = ?"
