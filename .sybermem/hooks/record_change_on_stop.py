@@ -6,6 +6,7 @@ import os
 import re
 import subprocess
 from datetime import date
+from importlib import import_module
 from pathlib import Path
 
 def resolve_sybermem_root() -> Path:
@@ -51,7 +52,7 @@ def resolve_sybermem_root() -> Path:
 
 
 ROOT = resolve_sybermem_root()
-GIT_CWD = Path.cwd()
+GIT_CWD = ROOT
 SYBERMEM_DIR = ROOT / ".sybermem"
 INDEX_PATH = SYBERMEM_DIR / "INDEX.md"
 CHANGES_DIR = SYBERMEM_DIR / "changes"
@@ -529,6 +530,7 @@ def main() -> int:
     files = trail_files(all_files)
     nudge_state = load_nudge_state()
     followup_hint, theme_key, nudge_message = classify_followup(all_files, nudge_state)
+    theme_key = theme_key or "misc"
     try:
         import sys
         from pathlib import Path as _Path
@@ -538,14 +540,20 @@ def main() -> int:
         ]:
             if p.exists() and str(p) not in sys.path:
                 sys.path.insert(0, str(p))
-        from sybermem_core.next_step_router import recommend_next_step
+        recommend_next_step = getattr(import_module("sybermem_core.next_step_router"), "recommend_next_step")
         router_hint = recommend_next_step(ROOT)
     except Exception:
         router_hint = None
 
     def emit_reminder() -> None:
         if intent_active:
-            print("You marked this work as worth recording earlier. If this round is complete, run /sybermem-record now.")
+            action = record_intent.get("action") or "/sybermem-record"
+            reason = record_intent.get("reason") or "You marked this work as worth recording earlier."
+            if action == "/sybermem-record":
+                classification = record_intent.get("classification") or "record"
+                print(f"Recommended next step: /sybermem-record — {reason} Classification: {classification}.")
+            elif action:
+                print(f"Recommended next step: {action} — {reason}")
             clear_record_intent()
         elif router_hint:
             print(f"Recommended next step: {router_hint['action']} — {router_hint['reason']}")
