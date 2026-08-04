@@ -1,7 +1,13 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from pathlib import Path
 from .identity import derive_slug, generate_project_id, render_project_yaml
+from .records import iter_record_files, parse_project_yaml, parse_record_file
+
+
+SOURCE_SCOPE = "project_records_digests_identity"
 
 
 def resolve_project_root(start: Path | None = None) -> Path | None:
@@ -77,3 +83,47 @@ def write_team_to_project_yaml(root: Path, team_id: str, team_path: str) -> None
     new_lines.append(f"  team_path: {team_path}")
 
     yaml_path.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+
+
+def project_source_snapshot(root: Path) -> dict:
+    """Return a deterministic read-only snapshot of publishable Project memory."""
+    meta = parse_project_yaml(root)
+    identity = {
+        "project_id": meta.get("project_id", ""),
+        "slug": meta.get("slug", root.name),
+        "name": meta.get("name", meta.get("slug", root.name)),
+    }
+    selected_records: list[str] = []
+    selected_digests: list[str] = []
+    source_files = []
+    latest_source = ""
+
+    for path in iter_record_files(root):
+        record = parse_record_file(path, identity["project_id"], identity["slug"])
+        record_id = record.get("record_id", "")
+        if record.get("type") == "digest":
+            selected_digests.append(record_id)
+        elif record_id:
+            selected_records.append(record_id)
+        rel_path = str(path.relative_to(root)).replace("\\", "/")
+        content_hash = hashlib.sha256(path.read_bytes()).hexdigest()
+        source_files.append({"path": rel_path, "record_id": record_id, "sha256": content_hash})
+        source_order = f"{record.get('created_at', '')}:{rel_path}:{record_id}"
+        if source_order > latest_source:
+            latest_source = source_order
+
+    payload = {
+        "source_scope": SOURCE_SCOPE,
+        "identity": identity,
+        "sources": sorted(source_files, key=lambda item: item["path"]),
+    }
+    encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    source_hash = hashlib.sha256(encoded).hexdigest()
+    latest_id = latest_source.rsplit(":", 1)[-1] if latest_source else identity["slug"]
+    return {
+        "source_scope": SOURCE_SCOPE,
+        "source_revision": f"{latest_id}:{source_hash[:12]}",
+        "source_hash": source_hash,
+        "selected_records": selected_records,
+        "selected_digests": selected_digests,
+    }

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 import re
+from .project import project_source_snapshot, read_team_from_project_yaml
 from .records import parse_project_yaml, iter_record_files, parse_record_file
 from .identity import now_iso
 
@@ -78,7 +80,7 @@ def project_status(root: Path) -> dict:
     open_bugs = [r["record_id"] for r in all_records if r.get("type") == "bug" and r.get("status") != "resolved"]
     open_requirements = [r["record_id"] for r in all_records if r.get("type") == "requirement" and r.get("status") != "resolved"]
 
-    return {
+    status = {
         "project_id": meta.get("project_id", ""),
         "slug": meta.get("slug", root.name),
         "as_of": now_iso(),
@@ -91,4 +93,81 @@ def project_status(root: Path) -> dict:
         "open_bugs": open_bugs,
         "open_requirements": open_requirements,
         "next": [],
+    }
+    preview = build_publication_preview(root, status=status)
+    status["publication"] = {
+        "preview": preview,
+        "team": team_publication_metadata(root, status["slug"], preview=preview),
+    }
+    return status
+
+
+def build_publication_preview(root: Path, status: dict | None = None) -> dict:
+    """Build a read-only publish preview from Project canonical records and digests."""
+    snapshot = project_source_snapshot(root)
+    current_status = status or project_status(root)
+    conflicts = []
+    for record_id in current_status.get("open_bugs", []):
+        conflicts.append({"kind": "open_bug", "record_id": record_id})
+    for record_id in current_status.get("open_requirements", []):
+        conflicts.append({"kind": "open_requirement", "record_id": record_id})
+
+    phase = current_status.get("phase", {})
+    freshness = "current"
+    phase_path = root / ".sybermem" / "analysis" / "phase-index.md"
+    phase_status = ""
+    if phase_path.is_file():
+        for line in phase_path.read_text(encoding="utf-8").splitlines():
+            if line.startswith("- status:"):
+                phase_status = line.split(":", 1)[1].strip()
+                break
+    if not phase_path.is_file() or phase_status == "not_yet_analyzed" or phase.get("lifecycle") == "not_yet_analyzed":
+        freshness = "stale"
+    return {
+        "status": "preview",
+        "source_revision": snapshot["source_revision"],
+        "source_hash": snapshot["source_hash"],
+        "source_scope": snapshot["source_scope"],
+        "selected_records": snapshot["selected_records"],
+        "selected_digests": snapshot["selected_digests"],
+        "freshness": freshness,
+        "conflicts": conflicts,
+        "review_required": bool(snapshot["selected_records"] or snapshot["selected_digests"]),
+    }
+
+
+def team_publication_metadata(root: Path, slug: str, preview: dict | None = None) -> dict:
+    """Return additive Team trust metadata without touching Team or Project files."""
+    team = read_team_from_project_yaml(root)
+    if not team.get("team_path"):
+        return {}
+
+    team_path = Path(team["team_path"])
+    meta_path = team_path / "projects" / slug / "meta.json"
+    preview = preview or build_publication_preview(root, status={"phase": {}, "open_bugs": [], "open_requirements": []})
+    published_at = ""
+    source_scope = preview["source_scope"]
+    published_hash = ""
+    stale = False
+    conflict = bool(preview["conflicts"])
+    review_required = bool(preview["review_required"])
+    if meta_path.is_file():
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        published_at = meta.get("published_at", "")
+        source_scope = meta.get("source_scope", source_scope)
+        published_hash = meta.get("source_hash", "")
+        stale = bool(meta.get("stale", False))
+        conflict = bool(meta.get("conflict", conflict))
+        review_required = bool(meta.get("review_required", review_required))
+
+    local_changes = bool(published_hash and published_hash != preview["source_hash"])
+    return {
+        "team_id": team.get("team_id", ""),
+        "team_path": str(team_path).replace("\\", "/"),
+        "published_at": published_at,
+        "source_scope": source_scope,
+        "local_changes_after_publish": local_changes,
+        "stale": stale or local_changes or preview["freshness"] == "stale",
+        "conflict": conflict,
+        "review_required": review_required,
     }
