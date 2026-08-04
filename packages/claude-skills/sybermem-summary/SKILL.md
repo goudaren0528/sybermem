@@ -9,6 +9,8 @@ description: Use when generating weekly or monthly SyberMem project summaries, i
 
 Generate SyberMem project current-state summaries. When `.sybermem/analysis/phase-index.md` exists and contains confirmed phases, default to the most recently active confirmed phase. Fall back to weekly/monthly time-window reporting only when confirmed phase structure is unavailable.
 
+If the user is trying to get back into work with natural language, such as "resume this project", "what was I doing", or "what should I do next", prefer `/sybermem-resume` first. Use `/sybermem-summary` when the user wants a phase-aware status panel rather than a resume handoff.
+
 ## Core Invariants
 
 - **Summary is a dynamic current-state panel, not a durable conclusion artifact.**
@@ -107,4 +109,5 @@ This skill is complete when:
 - **sybermem-phase-analyze** — Required when phase index is missing
 
 **Related skills:**
+- **sybermem-resume** — Preferred for natural-language restart and bounded next-step handoff
 - **sybermem-digest** — Redirect here when user wants a durable conclusion (not a status panel)
