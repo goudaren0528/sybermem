@@ -59,6 +59,8 @@ irm https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/install
 
 OpenCode 也可以通过其插件路径使用。安装说明见 [`.opencode/INSTALL.md`](.opencode/INSTALL.md)。
 
+当前文档化限制仍然成立，OpenCode 没有已文档化的逐次用户提示词自动注入回调，因此不会注册不受支持的 `UserPromptSubmit` 自动注入。OpenCode 侧的 task recall 仍以手动 `/sybermem-search` 和受支持的 compaction 流程为主。
+
 ## 初始化项目
 
 进入项目目录后，运行：
@@ -75,6 +77,7 @@ OpenCode 也可以通过其插件路径使用。安装说明见 [`.opencode/INST
 - `.sybermem/project.yaml`
 - `.sybermem/hooks/record_change_on_stop.py`
 - `.sybermem/hooks/detect_record_intent.py`
+- `.sybermem/hooks/task_recall.py`
 - `CLAUDE.md`
 - `AGENTS.md`
 - `.claude/settings.json`
@@ -82,6 +85,8 @@ OpenCode 也可以通过其插件路径使用。安装说明见 [`.opencode/INST
 其中：
 - `auto` = 轻量 `change` trail + 提醒
 - `remind` = 只提醒，不自动写 `change` trail
+- Claude 的默认 `UserPromptSubmit` hook 同时负责自然语言记录意图捕获与只读 task recall
+- 如果项目已有自定义 `.claude/settings.json`，只会对可识别的 SyberMem 管理项做外科式补丁，不会覆盖无关的自定义 hooks、env 或说明
 
 ## 日常使用
 

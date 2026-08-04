@@ -59,6 +59,8 @@ irm https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/install
 
 OpenCode can also use SyberMem through its plugin/runtime path. See [`.opencode/INSTALL.md`](.opencode/INSTALL.md).
 
+The documented limitation still applies: OpenCode does not expose a documented per-prompt automatic injection callback, so SyberMem does not claim or register unsupported `UserPromptSubmit` prompt injection there. On OpenCode, task recall still relies on manual `/sybermem-search` and the supported compaction flow.
+
 ## Initialize a Project
 
 Inside your project directory, run:
@@ -75,6 +77,7 @@ This creates or refreshes:
 - `.sybermem/project.yaml`
 - `.sybermem/hooks/record_change_on_stop.py`
 - `.sybermem/hooks/detect_record_intent.py`
+- `.sybermem/hooks/task_recall.py`
 - `CLAUDE.md`
 - `AGENTS.md`
 - `.claude/settings.json`
@@ -82,6 +85,8 @@ This creates or refreshes:
 Where:
 - `auto` = lightweight `change` trail + reminders
 - `remind` = reminders only, with no automatic `change` trail
+- the default Claude `UserPromptSubmit` hook handles both natural-language record-intent capture and read-only task recall
+- if a project already has a custom `.claude/settings.json`, SyberMem applies only surgical patches to recognized managed entries and does not overwrite unrelated custom hooks, env, or instructions
 
 ## Daily Usage
 
