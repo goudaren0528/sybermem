@@ -24,6 +24,14 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 - [change-030] #team #hooks #init — Aligned init-project propagation, templates, and health checks with the new Team workflows and reminder-first record-intent behavior so installs and updates now carry those capabilities consistently (2026-07-07)
 - [change-032] #injection #quality #distribution #uninstall — Slimmed CLAUDE.md/AGENTS.md injection from ~76 to ~22 lines, fixed 8 core quality issues (bug lifecycle, publish-summary contract, FTS5 search, router nudge loop, summary schema, English intent, stop hook threshold, search coverage), hardened distribution chain (template pollution, hardcoded paths, self-updating health check, old-template detection), and added two-layer uninstall model (2026-07-10)
 - [change-033] #search #quality — Improved natural English multi-term and Chinese/CJK search matching with safe FTS fallback and extracted helpers so automatic recall is more relevant while `search.py` stays below the 250 pure-LOC ceiling (2026-08-04)
+- [decision-002] #architecture #quality #search #team — Adopted a lightweight continuity and trust experience layer over existing records, retrieval, digests, relations, and Team publish to reduce restart friction without creating a second canonical memory system (2026-08-04)
+- [change-036] #hooks #search #quality — Upgraded automatic task recall packets to source-aware bounded retrieval hints so recalled context is explainable without becoming instructions (2026-08-04)
+- [change-037] #team #quality — Added a read-only Team publish preview trust envelope and stale-preview rejection so high-impact publication is reviewable without creating a second canonical store (2026-08-04)
+- [bug-002] #team #quality — Fixed publish preview bootstrap side effects and JSON stdout leakage so read-only preview and machine-readable publish remain trustworthy (2026-08-04)
+- [change-039] #quality #search #team — Implemented bounded project continuity, source-aware recall, safe record routing, correction guidance, and revision-aware Team publish so memory is easier to resume and trust without a second canonical store (2026-08-04)
+- [bug-003] #team #quality #skills — Fixed Team publish trust summary, preview freshness, path diagnostics, and skill hash-flow gaps so high-impact publish is reviewable end to end (2026-08-04)
+- [change-040] #search #quality #hub — Fixed workspace search completeness gaps so stale indexes become actionable, workspace guidance matches project search, digest freshness stays relation-scoped, and low-signal substring noise is suppressed (2026-08-04)
+- [change-041] #quality #search #team — Closed continuity/trust review findings so Team publish, workspace recall, and Core-unavailable diagnostics are auditable and safe (2026-08-04)
 <!-- add new conclusions here -->
 
 ---
@@ -112,6 +120,16 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 | 031 | 2026-07-10 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-07-10-031-init-cpython-310-uninstall-cpython-310.md) |
 | 032 | 2026-07-10 | Injection slimming, core quality fixes, and distribution chain hardening | implemented | [link](changes/2026-07-10-032-injection-slimming-core-quality-and-distribution-hardening.md) |
 | 033 | 2026-08-04 | Improve natural-language search matching | implemented | [link](changes/2026-08-04-033-improve-natural-language-search-matching.md) |
+| 034 | 2026-08-04 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-08-04-034-ses-033df0fbcffeqyba0s73awy2uf.md) |
+| 035 | 2026-08-04 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-08-04-035-ses-0336c3bd8ffetz577almie35yc-ses-0336eef75ffe1ilmviizik84kc-ses-0336fc40fffebm7dwdusugh7wk-and-more.md) |
+| 036 | 2026-08-04 | Upgrade source-aware task recall packets | implemented | [link](changes/2026-08-04-036-upgrade-source-aware-task-recall-packets.md) |
+| 037 | 2026-08-04 | Add Team publish preview trust envelope | implemented | [link](changes/2026-08-04-037-add-team-publish-preview-trust-envelope.md) |
+| 038 | 2026-08-04 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-08-04-038-install-install-readme-en-and-more.md) |
+| 039 | 2026-08-04 | Implement continuity and trust experience | implemented | [link](changes/2026-08-04-039-implement-continuity-trust-experience.md) |
+| 040 | 2026-08-04 | Fix workspace search completeness | implemented | [link](changes/2026-08-04-040-fix-workspace-search-completeness.md) |
+| 041 | 2026-08-04 | Close continuity and trust review findings | implemented | [link](changes/2026-08-04-041-close-continuity-trust-review-findings.md) |
+| 042 | 2026-08-04 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-08-04-042-install-install-readme-en-and-more.md) |
+| 043 | 2026-08-04 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-08-04-043-gitignore-install-install-and-more.md) |
 <!-- add new records here -->
 
 ---
@@ -121,6 +139,7 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 | Number | Date | Title | Status | Link |
 |--------|------|-------|--------|------|
 | 001 | 2026-06-30 | Team MVP should precede full Hub experience for Requirement-003 | decided | [link](decisions/2026-06-30-001-team-mvp-before-full-hub-experience.md) |
+| 002 | 2026-08-04 | Adopt a lightweight continuity and trust experience layer | accepted | [link](decisions/2026-08-04-002-sybermem-continuity-trust-experience.md) |
 <!-- add new records here -->
 
 ---
@@ -141,6 +160,8 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 | Number | Date | Title | Severity | Link |
 |--------|------|-------|----------|------|
 | 001 | 2026-06-09 | init-project misclassifies missing hook file as custom/kept | medium | [link](bugs/2026-06-09-001-init-project-misclassifies-missing-hook-file.md) |
+| 002 | 2026-08-04 | Publish preview bootstrap and JSON output leaks | high | [link](bugs/2026-08-04-002-publish-preview-bootstrap-json-output.md) |
+| 003 | 2026-08-04 | Publish trust summary and skill flow gaps | high | [link](bugs/2026-08-04-003-publish-trust-summary-and-skill-flow-gaps.md) |
 <!-- add new records here -->
 
 ---
@@ -161,23 +182,23 @@ When adding records, update this index file accordingly.
 
 <!-- Auto-maintained: maps topic tags to record IDs for fast lookup -->
 <!-- Optional suffix: [active] [low] [deprecated → <new-topic>] -->
-- architecture: requirement-001, requirement-003, decision-001
+- architecture: requirement-001, requirement-003, decision-001, decision-002
 - automation: change-003, change-008
 - collaboration: requirement-003, decision-001, change-023, change-026
 - compression: requirement-002
 - digest: requirement-002, change-010, change-023
 - distribution: change-001, change-002, change-008, change-010, change-032
 - framework: change-006
-- hooks: change-003, change-005, bug-001, change-008, change-030
-- hub: requirement-003
+- hooks: change-003, change-005, bug-001, change-008, change-030, change-036, change-041
+- hub: requirement-003, change-040, change-041
 - init: change-005, bug-001, change-030
 - injection: change-032
 - install: change-001
 - foundation: requirement-001
 - lifecycle: change-010
-- quality: change-032, change-033
+- quality: change-032, change-033, decision-002, change-036, change-037, bug-002, change-039, bug-003, change-040, change-041
 - relations: change-010
-- search: change-010, change-033
-- skills: change-002, change-006, change-026
-- team: requirement-003, decision-001, change-023, change-026, change-030
+- search: change-010, change-033, decision-002, change-036, change-039, change-040, change-041
+- skills: change-002, change-006, change-026, bug-003, change-041
+- team: requirement-003, decision-001, decision-002, change-023, change-026, change-030, change-037, bug-002, change-039, bug-003, change-041
 - uninstall: change-032
