@@ -9,14 +9,15 @@ from sybermem_core.project import resolve_project_root, ensure_project_yaml
 from sybermem_core.registry import register_project
 from sybermem_core.identity import git_remote
 from sybermem_core.index import rebuild_index
-from sybermem_core.search import search_project, search_workspace
+from sybermem_core.search import WorkspaceIndexIncompatibleError, search_project, search_workspace
 from sybermem_core.status import project_status
 from sybermem_core.portfolio import build_portfolio
 from sybermem_core.team import init_team_repo
-from sybermem_core.publish import publish_status
 from sybermem_core.publish_bootstrap import bootstrap_publish_status
 from sybermem_core.team_summary import build_team_management_summary
 from sybermem_core.uninstall import deactivate_project_sybermem
+from sybermem_cli.publish_render import render_publish_status_text
+from sybermem_cli.search_render import render_search_text
 
 
 def cmd_project_init(args: argparse.Namespace) -> int:
@@ -54,7 +55,7 @@ def cmd_search(args: argparse.Namespace) -> int:
     if args.scope == "workspace":
         try:
             results = search_workspace(args.query, project=args.project, type_=args.type, project_status=args.project_status)
-        except FileNotFoundError as exc:
+        except (FileNotFoundError, WorkspaceIndexIncompatibleError) as exc:
             print(str(exc), file=sys.stderr)
             return 1
     else:
@@ -73,20 +74,7 @@ def cmd_search(args: argparse.Namespace) -> int:
     if args.format == "json":
         print(dump_json(payload))
     else:
-        current_project = None
-        for row in results:
-            if row["slug"] != current_project:
-                current_project = row["slug"]
-                print(f"[{current_project}]")
-            print(f"- [{row['record_id']}] {row['title']}")
-            print(f"  - Authority: {row.get('authority', 'unknown')}")
-            print(f"  - Lifecycle: {row.get('lifecycle', 'unknown')}")
-            print(f"  - Freshness: {row.get('freshness', 'unknown')}")
-            print(f"  - Match: {row.get('match', 'keyword')}")
-            if row.get('related_digest'):
-                print(f"  - Related digest: {row['related_digest']}")
-        if not results:
-            print("No matches.")
+        render_search_text(results)
     return 0
 
 
@@ -154,29 +142,17 @@ def cmd_team_init(args: argparse.Namespace) -> int:
 def cmd_publish_status(args: argparse.Namespace) -> int:
     try:
         tp = Path(args.team_path) if args.team_path else None
-        payload = bootstrap_publish_status(tp)
+        payload = bootstrap_publish_status(tp, preview=args.preview, preview_source_hash=args.preview_source_hash)
     except Exception as exc:
         print(str(exc), file=sys.stderr)
         return 1
 
     if args.format == "json":
         print(dump_json(payload))
+        if payload.get("status") in {"stale_preview", "blocked"}:
+            return 1
     else:
-        print("Published project summary to Team repo:")
-        print(f"- team: {payload['team_id']}")
-        print(f"- project: {payload['slug']}")
-        if payload.get('source_phase_digest'):
-            print(f"- latest phase digest: {payload['source_phase_digest']}")
-        if payload.get('source_theme_digest'):
-            print(f"- latest theme digest: {payload['source_theme_digest']}")
-        print("- files:")
-        for f in payload["files"]:
-            print(f"  - {f}")
-        if payload.get("pushed"):
-            print("- pushed to remote: yes")
-        else:
-            print("- pushed to remote: no (push manually or check remote config)")
-        print("- suggested follow-up: /sybermem-team-summary")
+        return render_publish_status_text(payload)
     return 0
 
 
@@ -282,6 +258,8 @@ def main() -> int:
     publish_sub = publish.add_subparsers(dest="publish_command", required=True)
     publish_status_cmd = publish_sub.add_parser("status")
     publish_status_cmd.add_argument("--team-path", default=None)
+    publish_status_cmd.add_argument("--preview", action="store_true")
+    publish_status_cmd.add_argument("--preview-source-hash", default=None)
     publish_status_cmd.add_argument("--format", choices=["text", "json"], default="text")
     publish_status_cmd.set_defaults(func=cmd_publish_status)
 
