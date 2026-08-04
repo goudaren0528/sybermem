@@ -9,6 +9,7 @@ import subprocess
 from .project import read_team_from_project_yaml
 from .status import project_status, publication_readiness
 from .publish import latest_phase_digest, latest_theme_digest
+from .record_intent import RecordCandidate, classify_record_intent, route_record_candidate
 
 
 def _count_commits_since_last_record(root: Path) -> int:
@@ -38,12 +39,52 @@ def _count_commits_since_last_record(root: Path) -> int:
 def recommend_next_step(root: Path) -> dict[str, str]:
     status = project_status(root)
     readiness = publication_readiness(root)
-    team = read_team_from_project_yaml(root)
-
     phase_digest = latest_phase_digest(root)
     theme_digest = latest_theme_digest(root)
 
+    first_pass = recommend_next_step_read_only(
+        root,
+        status=status,
+        readiness=readiness,
+        phase_digest=phase_digest,
+        theme_digest=theme_digest,
+    )
+    if first_pass["action"] == "/sybermem-phase-analyze":
+        return first_pass
+
+    return recommend_next_step_read_only(
+        root,
+        status=status,
+        readiness=readiness,
+        phase_digest=phase_digest,
+        theme_digest=theme_digest,
+        commit_gap=_count_commits_since_last_record(root),
+    )
+
+
+def recommend_next_step_read_only(
+    root: Path,
+    *,
+    status: dict | None = None,
+    readiness: dict | None = None,
+    phase_digest: str | None = None,
+    theme_digest: str | None = None,
+    commit_gap: int | None = None,
+    phase_state: str | None = None,
+    record_candidate: RecordCandidate | None = None,
+) -> dict[str, str]:
+    status = status or project_status(root)
+    readiness = readiness or publication_readiness(root)
+    phase_digest = latest_phase_digest(root) if phase_digest is None else phase_digest
+    theme_digest = latest_theme_digest(root) if theme_digest is None else theme_digest
+    team = read_team_from_project_yaml(root)
+
     # 0) If phase-index is missing or not yet analyzed, recommend phase-analyze first
+    if phase_state == "stale":
+        return {
+            "action": "/sybermem-phase-analyze",
+            "reason": "The project phase index is stale relative to newer project memory. Run phase analysis to refresh the structural foundation."
+        }
     phase_index_path = root / ".sybermem" / "analysis" / "phase-index.md"
     if phase_index_path.is_file():
         text = phase_index_path.read_text(encoding="utf-8")
@@ -61,9 +102,12 @@ def recommend_next_step(root: Path) -> dict[str, str]:
         }
 
     # 1) record > digest > team-publish
+    if record_candidate is not None:
+        routed_candidate = route_record_candidate(record_candidate)
+        return routed_candidate
+
     # Only recommend record if there is unrecorded work (commit gap), not just because records exist
-    commit_gap = _count_commits_since_last_record(root)
-    if commit_gap >= 3 and not phase_digest and not theme_digest:
+    if commit_gap is not None and commit_gap >= 3 and not phase_digest and not theme_digest:
         return {
             "action": "/sybermem-record",
             "reason": f"There are {commit_gap} commits since the last record. Consider creating a durable record for this round of work."
