@@ -56,6 +56,18 @@ You MUST complete these steps in order:
 5. **Rank** — keyword hits in Key Conclusions rank above body-only hits; newer dates rank higher within the same tier.
 6. **Output** — render the result list (see Output Format). Do not write anything to disk.
 
+## Abstention and historical evidence
+
+- Automatic/compact recall must prefer silence over weak memory. If only weak-overlap, auto-trail-only, stale-only, superseded-only, archived-only, or resolved-only matches are available, do not present them as task recall hints.
+- Explicit historical search remains allowed: if the user asks to search records, inspect and show historical evidence, but mark Authority, Lifecycle, Freshness, Conflict, and successor/current guidance clearly.
+- If a compact diagnostic path returns `no_reliable_recall`, treat it as a terminal abstention result, not as a record hit. Do not pad the answer with low-signal records.
+
+```md
+No reliable SyberMem recall for "<query>".
+- Reason: weak overlap | only auto-trail evidence | only historical or stale matches
+- Explicit historical search can still inspect matching evidence if the user asks for it.
+```
+
 ## Reverse references
 
 When the query is a record ID, also find which records point AT it:
@@ -86,6 +98,7 @@ Found N records:
    - Referenced by: change-008 (implements)
    - Superseded by: decision-007 — one-line conclusion
    - Supersedes: decision-003 — archived old conclusion
+   - Current guidance: Prefer successor decision-007 for current guidance.
 
 2. ...
 ```
@@ -115,6 +128,16 @@ Omit `Relations:`, `Referenced by:`, `Superseded by:`, `Supersedes:`, or `Relate
 
 Archived, superseded, or resolved records are still searchable, but they must be marked clearly and never presented as the current authoritative fact when newer records exist.
 
+## Corrections and supersession
+
+Historical records are durable evidence. When a search result is outdated or wrong:
+
+1. Create a new `decision`, `requirement`, `bug`, or `change` record with the corrected current truth.
+2. Link the old record to the successor with `superseded_by: <new-record-id>` or link the fixing/current record with `fixes: <old-record-id>` where appropriate.
+3. Present both sides in search: the old record remains visible as historical evidence, and the successor/current record is the guidance to follow.
+
+Do not silently edit historical truth away just to make search look current. If the user asks to correct memory, route them to `/sybermem-record` and `/sybermem-link` after showing the evidence.
+
 ## Error Handling
 
 - `.sybermem/INDEX.md` missing → prompt `/sybermem-init-project`, stop.
@@ -133,6 +156,8 @@ If you catch yourself doing any of these, STOP:
 - Reporting a record without verifying it exists on disk
 - Inventing a relation or phase that is not in the frontmatter / coverage map
 - Returning results when the query clearly matched nothing
+- Treating `no_reliable_recall` as permission to show weak or stale automatic recall hits
+- Mutating an old record instead of creating/linking a successor for correction
 
 **All of these mean: go back to the relevant step and re-verify.**
 

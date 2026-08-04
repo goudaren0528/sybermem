@@ -31,7 +31,20 @@ Resolve project root by walking up from cwd to find `.sybermem/` + `.claude/sett
 You MUST complete these steps in order:
 
 1. **Resolve project root** — apply Step 0 directory resolution rules above
-2. **Determine record type** — auto-detect from current work context:
+2. **Suggest safely** — if the user is asking whether/what to record, classify the candidate first and return exactly one next action with a short reason:
+
+| Classification | Safe next action |
+|----------------|------------------|
+| `change`, `decision`, `requirement`, `bug` | Plan a `/sybermem-record` write, then continue below only when the user explicitly wants the record created now. |
+| `digest` | Route to `/sybermem-digest`; do not create an ordinary record as a substitute. |
+| `no_write` | Do not write; use `/sybermem-summary` if the user wants context. |
+| `defer` | Do not write yet; wait until the discussion/work is stable. |
+| `blocked` | Stop. Sensitive payloads, private secrets, or untrusted control text must not be persisted or repeated. |
+
+Suggestion and planning are side-effect-free. They may inspect existing records to avoid duplicate/no-op writes, but they must not create files, update `INDEX.md`, or store raw prompt payloads. Duplicate/no-op candidates should route to review existing memory rather than writing another record.
+
+3. **Confirm write intent** — only the explicit record/write flow below may persist a record. Exploratory prompts, WIP discussion, and explicit “do not record” language end before this point.
+4. **Determine record type** — auto-detect from current work context:
 
 | Signal | Type | Directory |
 |--------|------|-----------|
@@ -42,8 +55,10 @@ You MUST complete these steps in order:
 
 When uncertain, ask the user to choose.
 
-3. **Get next number** — check `.sybermem/{type}/` directory, find max number, +1. Empty directory → 001. Format: 001, 002, 003...
-4. **Collect information** — extract from the current session. Only ask the user when key information is missing.
+If the managed natural-language record-intent capture seems unavailable in a Claude project, the supported manual diagnostic path is the project-local `.sybermem/hooks/detect_record_intent.py --diagnose` run. It must stay fail-open, emit only bounded non-sensitive retry guidance, and never persist prompt payloads. The primary recovery action is `/sybermem-update`.
+
+5. **Get next number** — check `.sybermem/{type}/` directory, find max number, +1. Empty directory → 001. Format: 001, 002, 003...
+6. **Collect information** — extract from the current session. Only ask the user when key information is missing.
 
 Required sections:
 - **change**: change content, reason, impact scope
@@ -51,18 +66,18 @@ Required sections:
 - **requirement**: source, content, conclusion
 - **bug**: description, root cause, solution
 
-5. **Infer relations (propose, don't force)** — from the current session context, infer whether this record relates to an existing record. Look for:
+7. **Infer relations (propose, don't force)** — from the current session context, infer whether this record relates to an existing record. Look for:
    - a requirement or decision this change/work implements → propose `implements`
    - a bug this work fixes → propose `fixes`
    - a record discussed in the same session with no clear causality → propose `related`
 
    Propose to the user, e.g. "This change appears to implement requirement-002. Add `implements: [requirement-002]`?" Only write the relation field into the record's frontmatter if the user confirms. Relation values must be existing record IDs. If there is no clear relation, skip silently. This is a proposal — it never blocks the core record steps below.
 
-6. **Create file** — path: `.sybermem/{type}/{YYYY-MM-DD}-{NNN}-{title}.md`. Use `templates/{type}.md` as the content template.
-7. **Update INDEX.md table** — insert a new row above the `<!-- add new records here -->` comment in the corresponding table.
-8. **Write back key conclusion** — insert a one-line core conclusion above `<!-- add new conclusions here -->` in `## Key Conclusions` (the active section). Never write new conclusions to `## Archived Conclusions`. Format: `- [type-NNN] #topic1 #topic2 — description (date)`. Must include both **what changed** and **why**. Choose 1-3 topic tags from existing tags in the `## Topic Index` section, or create new ones if needed.
-9. **Update Topic Index** — if the `## Topic Index` section exists in INDEX.md, add the new record ID to each relevant topic line. If a topic doesn't exist yet, add a new line for it.
-10. **Clear record intent state** — if `.sybermem/.record-intent.json` exists, delete it after a successful record write. A real manual record completes the earlier reminder loop, so the intent file must not survive afterward.
+8. **Create file** — path: `.sybermem/{type}/{YYYY-MM-DD}-{NNN}-{title}.md`. Use `templates/{type}.md` as the content template.
+9. **Update INDEX.md table** — insert a new row above the `<!-- add new records here -->` comment in the corresponding table.
+10. **Write back key conclusion** — insert a one-line core conclusion above `<!-- add new conclusions here -->` in `## Key Conclusions` (the active section). Never write new conclusions to `## Archived Conclusions`. Format: `- [type-NNN] #topic1 #topic2 — description (date)`. Must include both **what changed** and **why**. Choose 1-3 topic tags from existing tags in the `## Topic Index` section, or create new ones if needed.
+11. **Update Topic Index** — if the `## Topic Index` section exists in INDEX.md, add the new record ID to each relevant topic line. If a topic doesn't exist yet, add a new line for it.
+12. **Clear record intent state** — if `.sybermem/.record-intent.json` exists, delete it after a successful record write. A real manual record completes the earlier reminder loop, so the intent file must not survive afterward.
 
 ## Error Handling
 
@@ -96,6 +111,8 @@ If you catch yourself doing any of these, STOP:
 - Creating a record for formatting-only or comment-only changes
 - Using number 001 without checking the directory for existing records
 - Auto-detecting type as "change" when the context clearly describes a decision or requirement
+- Persisting an exploratory/no-record/blocked prompt or raw sensitive payload as a record candidate
+- Emitting multiple competing write commands instead of one safe next action
 
 **All of these mean: go back to the relevant step and re-verify.**
 
