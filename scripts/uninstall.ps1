@@ -7,7 +7,7 @@ $opencodePlugin = Join-Path $env:USERPROFILE ".config\opencode\plugins\sybermem.
 
 foreach ($name in @(
   "sybermem-init-project", "sybermem-record", "sybermem-summary", "sybermem-digest",
-  "sybermem-phase-analyze", "sybermem-phase-confirm", "using-sybermem",
+  "sybermem-resume", "sybermem-phase-analyze", "sybermem-phase-confirm", "using-sybermem",
   "sybermem-update", "sybermem-search", "sybermem-link", "sybermem-theme-digest",
   "sybermem-team-publish", "sybermem-team-summary"
 )) {

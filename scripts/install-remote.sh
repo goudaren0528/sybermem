@@ -45,7 +45,7 @@ install_skills() {
     local label="$2"
     mkdir -p "$target"
     rm -rf "$target/init-project" "$target/record" "$target/summary"
-    for skill in sybermem-init-project sybermem-record sybermem-summary sybermem-digest sybermem-phase-analyze sybermem-phase-confirm using-sybermem sybermem-update sybermem-search sybermem-link sybermem-theme-digest sybermem-team-publish sybermem-team-summary; do
+    for skill in sybermem-init-project sybermem-record sybermem-summary sybermem-resume sybermem-digest sybermem-phase-analyze sybermem-phase-confirm using-sybermem sybermem-update sybermem-search sybermem-link sybermem-theme-digest sybermem-team-publish sybermem-team-summary; do
         if [ -d "$SKILLS_SRC/$skill" ]; then
             rm -rf "$target/$skill"
             cp -r "$SKILLS_SRC/$skill" "$target/"
@@ -69,19 +69,9 @@ if [ -d "$HOME/.claude" ]; then
         echo "  [Claude Code] installed session start launcher: $SESSION_LAUNCHER_PATH"
     fi
     mkdir -p "$CLI_DIR"
-    NEEDS_PIP=1
-    if [ -x "$CLI_VENV/bin/pip" ]; then
-        if "$CLI_VENV/bin/pip" show sybermem-core >/dev/null 2>&1; then
-            NEEDS_PIP=0
-        fi
-    fi
-    if [ "$NEEDS_PIP" = "1" ]; then
-        python -m venv "$CLI_VENV"
-        "$CLI_VENV/bin/python" -m pip install --upgrade pip
-        "$CLI_VENV/bin/pip" install "$CORE_SOURCE" "$CLI_SOURCE"
-    else
-        echo "  [CLI] sybermem-core already installed, skipping pip install"
-    fi
+    python -m venv "$CLI_VENV"
+    "$CLI_VENV/bin/python" -m pip install --upgrade pip
+    "$CLI_VENV/bin/pip" install --upgrade --force-reinstall "$CORE_SOURCE" "$CLI_SOURCE"
     cat > "$CLI_WRAPPER" <<'EOF'
 #!/bin/bash
 SYBERMEM_HOME="$HOME/.claude/sybermem/cli"
@@ -107,6 +97,7 @@ echo "Available Skills:"
 echo "  /sybermem-init-project  — Initialize or refresh SyberMem in the current project"
 echo "  /sybermem-record        — Create a record (auto-detects type)"
 echo "  /sybermem-summary       — Generate weekly/monthly reports"
+echo "  /sybermem-resume        — Build a read-only restart view for the current project"
 echo "  /sybermem-digest        — Create a durable phase digest from existing records"
 echo "  /sybermem-phase-analyze — Build or refresh the persistent phase index from project history"
 echo "  /sybermem-phase-confirm — Confirm or adjust candidate phases in the phase index"

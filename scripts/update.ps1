@@ -1,5 +1,5 @@
-# SyberMem - 更新脚本 (Windows)
-# 同步最新 skills 到 Claude Code 和 OpenCode 用户级目录
+# SyberMem - update script (Windows)
+# Sync current skills to the Claude Code and OpenCode user directories.
 
 $ErrorActionPreference = "Stop"
 $AdrPath = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
@@ -12,6 +12,8 @@ $SessionLauncherPath = Join-Path $LauncherDir "launch_session_start_context.py"
 $CliDir = Join-Path $env:USERPROFILE ".claude\sybermem\cli"
 $CliVenv = Join-Path $CliDir "venv"
 $CliWrapper = Join-Path $CliDir "sybermem.cmd"
+$PluginSource = Join-Path $AdrPath "packages\opencode-plugin\sybermem.ts"
+$OpenCodePluginDir = Join-Path $env:USERPROFILE ".config\opencode\plugins"
 $LegacyLocalSkills = Join-Path $AdrPath ".claude\skills"
 
 $Targets = @(
@@ -19,7 +21,7 @@ $Targets = @(
     @{ Path = Join-Path $env:USERPROFILE ".config\opencode\skills"; Label = "OpenCode" }
 )
 
-Write-Host "=== SyberMem 更新 ==="
+Write-Host "=== SyberMem Update ==="
 
 foreach ($target in $Targets) {
     if (-not (Test-Path $target.Path)) {
@@ -31,7 +33,7 @@ foreach ($target in $Targets) {
             Remove-Item -Path $legacyPath -Recurse -Force -Confirm:$false
         }
     }
-    foreach ($skill in @("sybermem-init-project", "sybermem-record", "sybermem-summary", "sybermem-digest", "sybermem-phase-analyze", "sybermem-phase-confirm", "using-sybermem", "sybermem-update", "sybermem-search", "sybermem-link", "sybermem-theme-digest", "sybermem-team-publish", "sybermem-team-summary")) {
+    foreach ($skill in @("sybermem-init-project", "sybermem-record", "sybermem-summary", "sybermem-resume", "sybermem-digest", "sybermem-phase-analyze", "sybermem-phase-confirm", "using-sybermem", "sybermem-update", "sybermem-search", "sybermem-link", "sybermem-theme-digest", "sybermem-team-publish", "sybermem-team-summary")) {
         $src = Join-Path $SkillSource $skill
         $dst = Join-Path $target.Path $skill
         if (Test-Path $src) {
@@ -39,7 +41,7 @@ foreach ($target in $Targets) {
                 Remove-Item -Path $dst -Recurse -Force -Confirm:$false
             }
             Copy-Item -Path $src -Destination $dst -Recurse -Force
-            Write-Host "  [$($target.Label)] 已更新: /$skill"
+            Write-Host "  [$($target.Label)] updated: /$skill"
         }
     }
 }
@@ -48,9 +50,9 @@ if (-not (Test-Path $LauncherDir)) {
     New-Item -ItemType Directory -Path $LauncherDir -Force | Out-Null
 }
 Copy-Item -Path $LauncherSource -Destination $LauncherPath -Force
-Write-Host "  [Global] 已安装 stop hook launcher: $LauncherPath"
+Write-Host "  [Global] installed stop hook launcher: $LauncherPath"
 Copy-Item -Path $SessionLauncherSource -Destination $SessionLauncherPath -Force
-Write-Host "  [Global] 已安装 session start launcher: $SessionLauncherPath"
+Write-Host "  [Global] installed session start launcher: $SessionLauncherPath"
 if (-not (Test-Path $CliDir)) {
     New-Item -ItemType Directory -Path $CliDir -Force | Out-Null
 }
@@ -62,39 +64,48 @@ python -m venv $CliVenv
 set "SYBERMEM_HOME=%USERPROFILE%\.claude\sybermem\cli"
 "%SYBERMEM_HOME%\venv\Scripts\sybermem.exe" %*
 '@ | Set-Content -Path $CliWrapper -Encoding ASCII
-Write-Host "  [Global] 已安装 sybermem CLI: $CliWrapper"
+Write-Host "  [Global] installed sybermem CLI: $CliWrapper"
+
+if (Test-Path (Join-Path $env:USERPROFILE ".config\opencode")) {
+    if (-not (Test-Path $OpenCodePluginDir)) {
+        New-Item -ItemType Directory -Path $OpenCodePluginDir -Force | Out-Null
+    }
+    Copy-Item -Path $PluginSource -Destination (Join-Path $OpenCodePluginDir "sybermem.ts") -Force
+    Write-Host "  [OpenCode] updated plugin: $OpenCodePluginDir\sybermem.ts"
+}
 
 Write-Host ""
-Write-Host "=== 更新完成 ==="
+Write-Host "=== Update Complete ==="
 Write-Host ""
-Write-Host "可用 Skills："
-Write-Host "  /sybermem-init-project  — 初始化或刷新当前项目的 SyberMem 配置"
-Write-Host "  /sybermem-record        — 创建记录（自动判断类型）"
-Write-Host "  /sybermem-summary       — 基于现有记录生成周报/月报"
-Write-Host "  /sybermem-digest        — 基于现有记录沉淀阶段摘要"
-Write-Host "  /sybermem-phase-analyze — 从项目历史构建或刷新持久化阶段索引"
-Write-Host "  /sybermem-phase-confirm — 确认或调整阶段索引中的候选阶段"
-Write-Host "  /using-sybermem         — 显示当前 SyberMem 状态和建议的下一步命令"
-Write-Host "  /sybermem-update        — 更新全局 Skills 并重新检查当前项目"
-Write-Host "  /sybermem-search        — 按关键词、topic、phase 范围、日期范围或记录 ID 检索记录"
-Write-Host "  /sybermem-link          — 在两条已有记录间建立正向关系（implements / fixes / related / superseded-by）"
-Write-Host "  /sybermem-theme-digest  — 为单个 topic 创建跨多个 phase 的持久化高阶摘要"
-Write-Host "  /sybermem-team-publish  — 将当前项目发布到 Team memory"
-Write-Host "  /sybermem-team-summary  — 生成 Team 管理摘要"
+Write-Host "Available Skills:"
+Write-Host "  /sybermem-init-project  - Initialize or refresh the current project"
+Write-Host "  /sybermem-record        - Create a record (auto-detects type)"
+Write-Host "  /sybermem-summary       - Generate weekly/monthly reports"
+Write-Host "  /sybermem-resume        - Build a read-only restart view"
+Write-Host "  /sybermem-digest        - Create a durable phase digest"
+Write-Host "  /sybermem-phase-analyze - Build or refresh the phase index"
+Write-Host "  /sybermem-phase-confirm - Confirm or adjust phase candidates"
+Write-Host "  /using-sybermem         - Show status and the recommended next command"
+Write-Host "  /sybermem-update        - Refresh global skills and the current project"
+Write-Host "  /sybermem-search        - Search records by query, topic, phase, date, or ID"
+Write-Host "  /sybermem-link          - Link existing records"
+Write-Host "  /sybermem-theme-digest  - Create a cross-phase topic digest"
+Write-Host "  /sybermem-team-publish  - Publish the current project to Team memory"
+Write-Host "  /sybermem-team-summary  - Generate the Team management summary"
 Write-Host ""
-Write-Host "sybermem CLI 已安装，可直接运行：sybermem project init --register"
+Write-Host "sybermem CLI installed. Run: sybermem project init --register"
 Write-Host ""
-Write-Host "下一步：进入你的项目目录后执行 /sybermem-update"
-Write-Host "如果你只想检查项目本地文档是否需要刷新，可执行 /sybermem-init-project"
+Write-Host "Next: open your project and run /sybermem-update"
+Write-Host "For a local project refresh check, run /sybermem-init-project"
 Write-Host ""
-Write-Host "注意：更新全局 Skills 不会自动刷新项目里的 AGENTS.md / CLAUDE.md；请在项目内运行 /sybermem-update 或 /sybermem-init-project"
-Write-Host "注意：stop hook 的子目录兼容现在由全局 launcher 提供：~/.claude/sybermem/launch_record_change_on_stop.py"
+Write-Host "Note: global updates do not refresh project AGENTS.md / CLAUDE.md; run /sybermem-update in the project"
+Write-Host "Note: subdirectory stop-hook support is provided by ~/.claude/sybermem/launch_record_change_on_stop.py"
 
 if ((Test-Path (Join-Path $LegacyLocalSkills "sybermem-init-project")) -or
     (Test-Path (Join-Path $LegacyLocalSkills "sybermem-record")) -or
     (Test-Path (Join-Path $LegacyLocalSkills "sybermem-summary")) -or
     (Test-Path (Join-Path $LegacyLocalSkills "sybermem-update"))) {
     Write-Host ""
-    Write-Host "迁移提示：当前仓库仍存在旧的项目级 SyberMem skills 副本 (.claude/skills/sybermem-*)。"
-    Write-Host "这些副本会和全局 skills 重复显示；确认已切换到全局安装模式后，可以安全删除它们。"
+    Write-Host "Migration note: this repository still has old project-level SyberMem skill copies (.claude/skills/sybermem-*)."
+    Write-Host "They may appear alongside global skills; delete them after switching to global installation."
 }

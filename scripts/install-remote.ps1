@@ -54,7 +54,7 @@ try {
                 Remove-Item -Path $legacyPath -Recurse -Force -Confirm:$false
             }
         }
-        foreach ($skill in @("sybermem-init-project", "sybermem-record", "sybermem-summary", "sybermem-digest", "sybermem-phase-analyze", "sybermem-phase-confirm", "using-sybermem", "sybermem-update", "sybermem-search", "sybermem-link", "sybermem-theme-digest", "sybermem-team-publish", "sybermem-team-summary")) {
+        foreach ($skill in @("sybermem-init-project", "sybermem-record", "sybermem-summary", "sybermem-resume", "sybermem-digest", "sybermem-phase-analyze", "sybermem-phase-confirm", "using-sybermem", "sybermem-update", "sybermem-search", "sybermem-link", "sybermem-theme-digest", "sybermem-team-publish", "sybermem-team-summary")) {
             $src = Join-Path $SkillsSrc $skill
             $dst = Join-Path $target.Path $skill
             if (Test-Path $src) {
@@ -82,18 +82,9 @@ try {
             New-Item -ItemType Directory -Path $CliDir -Force | Out-Null
         }
         $pipExe = Join-Path $CliVenv "Scripts\pip.exe"
-        $needsPip = (-not (Test-Path $pipExe))
-        if (-not $needsPip) {
-            $showResult = & $pipExe show sybermem-core 2>&1
-            if ($LASTEXITCODE -ne 0) { $needsPip = $true }
-        }
-        if ($needsPip) {
-            python -m venv $CliVenv
-            & (Join-Path $CliVenv "Scripts\python.exe") -m pip install --upgrade pip
-            & $pipExe install $CoreSource $CliSource
-        } else {
-            Write-Host "  [CLI] sybermem-core already installed, skipping pip install"
-        }
+        python -m venv $CliVenv
+        & (Join-Path $CliVenv "Scripts\python.exe") -m pip install --upgrade pip
+        & $pipExe install --upgrade --force-reinstall $CoreSource $CliSource
         @'
 @echo off
 set "SYBERMEM_HOME=%USERPROFILE%\.claude\sybermem\cli"
@@ -120,19 +111,20 @@ Write-Host ""
 Write-Host "=== Installation Complete ==="
 Write-Host ""
 Write-Host "Available Skills:"
-Write-Host "  /sybermem-init-project  — Initialize or refresh SyberMem in the current project"
-Write-Host "  /sybermem-record        — Create a record (auto-detects type)"
-Write-Host "  /sybermem-summary       — Generate weekly/monthly reports"
-Write-Host "  /sybermem-digest        — Create a durable phase digest from existing records"
-Write-Host "  /sybermem-phase-analyze — Build or refresh the persistent phase index from project history"
-Write-Host "  /sybermem-phase-confirm — Confirm or adjust candidate phases in the phase index"
-Write-Host "  /using-sybermem         — Show current SyberMem status and the recommended next command"
-Write-Host "  /sybermem-update        — Refresh global skills, then re-check the current project"
-Write-Host "  /sybermem-search        — Search/query records by keyword, topic, phase range, date range, or record ID"
-Write-Host "  /sybermem-link          — Add a forward relation between two existing records (implements / fixes / related / superseded-by)"
-Write-Host "  /sybermem-theme-digest  — Create a durable topic-level digest that compresses one theme across multiple related phases or records"
-Write-Host "  /sybermem-team-publish  — Publish the current project into Team memory"
-Write-Host "  /sybermem-team-summary  — Generate the Team management summary"
+Write-Host "  /sybermem-init-project  - Initialize or refresh SyberMem in the current project"
+Write-Host "  /sybermem-record        - Create a record (auto-detects type)"
+Write-Host "  /sybermem-summary       - Generate weekly/monthly reports"
+Write-Host "  /sybermem-resume        - Build a read-only restart view for the current project"
+Write-Host "  /sybermem-digest        - Create a durable phase digest from existing records"
+Write-Host "  /sybermem-phase-analyze - Build or refresh the persistent phase index from project history"
+Write-Host "  /sybermem-phase-confirm - Confirm or adjust candidate phases in the phase index"
+Write-Host "  /using-sybermem         - Show current SyberMem status and the recommended next command"
+Write-Host "  /sybermem-update        - Refresh global skills, then re-check the current project"
+Write-Host "  /sybermem-search        - Search/query records by keyword, topic, phase range, date range, or record ID"
+Write-Host "  /sybermem-link          - Add a forward relation between two existing records"
+Write-Host "  /sybermem-theme-digest  - Create a durable topic-level digest"
+Write-Host "  /sybermem-team-publish  - Publish the current project into Team memory"
+Write-Host "  /sybermem-team-summary  - Generate the Team management summary"
 Write-Host ""
 Write-Host "sybermem CLI is installed. You can now run: sybermem project init --register"
 Write-Host ""
