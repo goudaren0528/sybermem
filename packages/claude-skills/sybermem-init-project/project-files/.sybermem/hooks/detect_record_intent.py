@@ -3,10 +3,18 @@ from __future__ import annotations
 
 import json
 import re
+from importlib import import_module
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 import subprocess
 import sys
+
+
+DIAGNOSTIC_ARG = "--diagnose"
+CORE_UNAVAILABLE_DIAGNOSTIC = (
+    "SyberMem record-intent capture is unavailable because the Core classifier could not be loaded. "
+    "No prompt content was stored. Retry after /sybermem-update or reinstalling the managed UserPromptSubmit hook.\n"
+)
 
 
 def resolve_sybermem_root() -> Path:
@@ -68,25 +76,74 @@ def detect_record_intent(text: str) -> tuple[bool, str]:
     return False, ""
 
 
+def load_core_classifier():
+    core_path = Path(__file__).resolve().parents[2] / "packages" / "core"
+    candidate_paths = [
+        core_path,
+        Path.home() / '.claude' / 'sybermem' / 'cli' / 'venv' / 'Lib' / 'site-packages',
+        Path.home() / '.claude' / 'sybermem' / 'cli' / 'venv' / 'lib' / 'python3.10' / 'site-packages',
+    ]
+    for path in candidate_paths:
+        if not path.is_dir():
+            continue
+        if str(path) not in sys.path:
+            sys.path.insert(0, str(path))
+        try:
+            return getattr(import_module("sybermem_core.next_step_router"), "classify_record_intent")
+        except (AttributeError, ImportError):
+            sys.modules.pop("sybermem_core.next_step_router", None)
+            sys.modules.pop("sybermem_core", None)
+            continue
+    return None
+
+
+def should_capture_classification(classification: str) -> bool:
+    return classification in {"change", "decision", "requirement", "bug", "digest"}
+
+
+def diagnostics_requested(argv: list[str]) -> bool:
+    return DIAGNOSTIC_ARG in argv[1:]
+
+
+def emit_core_unavailable_diagnostic() -> None:
+    sys.stderr.write(CORE_UNAVAILABLE_DIAGNOSTIC)
+
+
 def main() -> int:
     root = resolve_sybermem_root()
     intent_path = root / ".sybermem" / ".record-intent.json"
 
     raw = sys.stdin.buffer.read()
-    payload = json.loads(raw.decode("utf-8", errors="replace"))
+    try:
+        payload = json.loads(raw.decode("utf-8", errors="replace"))
+    except json.JSONDecodeError:
+        return 0
+    if not isinstance(payload, dict):
+        return 0
     user_text = payload.get("prompt", "") or payload.get("userPrompt", "") or ""
 
-    matched_ok, matched = detect_record_intent(user_text)
-    if not matched_ok:
+    classifier = load_core_classifier()
+    if classifier is not None:
+        try:
+            candidate = classifier(root, user_text)
+        except Exception:  # noqa: BROAD_EXCEPT_OK - top-level hook boundary must fail open.
+            return 0
+        classification = candidate.get("classification", "")
+        if not should_capture_classification(classification):
+            return 0
+        intent_path.write_text(json.dumps({
+            "record_intent": True,
+            "source": "user-declared",
+            "created_at": now_iso(),
+            "classification": classification,
+            "action": candidate.get("action", "/sybermem-record"),
+            "reason": candidate.get("reason", ""),
+            "matched_pattern": "classifier",
+            "phrase": "",
+        }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         return 0
-
-    intent_path.write_text(json.dumps({
-        "record_intent": True,
-        "source": "user-declared",
-        "created_at": now_iso(),
-        "phrase": user_text,
-        "matched_pattern": matched,
-    }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    if diagnostics_requested(sys.argv):
+        emit_core_unavailable_diagnostic()
     return 0
 
 
