@@ -88,35 +88,76 @@ def test_project_search_derives_summary_and_related_digest_from_markdown(tmp_pat
     row = next(item for item in rows if item["record_id"] == "change-001")
     assert row["summary"] == "Recall packets include bounded metadata only."
     assert row["related_digest"] == "digest-001"
+    assert row["match_reason"] == row["match"]
+    assert {
+        "source_kind",
+        "authority",
+        "lifecycle",
+        "freshness",
+        "match_reason",
+        "related_digest",
+        "conflict_note",
+    }.issubset(row)
 
 
-def test_compact_project_search_notes_historical_digest_when_newer_authoritative_record_matches(tmp_path: Path, monkeypatch) -> None:
-    # Given: a historical digest and a newer authoritative record matching the same query
+def test_project_search_derives_archived_lifecycle_from_index_archived_conclusions(tmp_path: Path, monkeypatch) -> None:
+    # Given: a record archived only by the canonical INDEX archived-conclusions section
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    write_project(project_root)
+    (project_root / ".sybermem" / "INDEX.md").write_text(
+        "# SyberMem Index\n\n"
+        "## Key Conclusions\n\n"
+        "## Archived Conclusions\n\n"
+        "- [change-001] #search — archived-index-token was compressed into later history (2026-08-04) [archived]\n",
+        encoding="utf-8",
+    )
+    write_record(
+        project_root,
+        "changes",
+        "2026-08-04-001-index-archived.md",
+        ["type: change", "date: 2026-08-04", "title: Index archived record", "status: implemented"],
+        "## Summary\narchived-index-token appears without a body archived marker.",
+    )
+    monkeypatch.chdir(project_root)
+
+    # When: search derives metadata from Markdown records and INDEX state
+    rows = search_project("archived-index-token")
+
+    # Then: INDEX archival marks the record historical without adding canonical record fields
+    row = next(item for item in rows if item["record_id"] == "change-001")
+    assert row["lifecycle"] == "archived"
+    assert row["freshness"] == "historical"
+
+
+def test_compact_project_search_notes_parallel_authoritative_conflicts(tmp_path: Path, monkeypatch) -> None:
+    # Given: two equally current authoritative records matching the same conflict-bearing query
     project_root = tmp_path / "project"
     project_root.mkdir()
     write_project(project_root)
     write_record(
         project_root,
-        "digests",
-        "2026-08-04-001-old-digest.md",
-        ["type: digest", "kind: phase", "date: 2026-08-04", "number: 001", "title: old digest", "status: completed"],
-        "## Core Conclusions\n- conflict-token used to mean the old digest conclusion.",
+        "decisions",
+        "2026-08-04-001-first-policy.md",
+        ["type: decision", "date: 2026-08-04", "title: First conflict policy", "status: decided"],
+        "## Summary\nconflict-token should use policy A.",
     )
     write_record(
         project_root,
         "decisions",
-        "2026-08-05-001-new-decision.md",
-        ["type: decision", "date: 2026-08-05", "title: New conflict decision", "status: decided"],
-        "## Summary\nconflict-token is now governed by the newer decision.",
+        "2026-08-04-002-second-policy.md",
+        ["type: decision", "date: 2026-08-04", "title: Second conflict policy", "status: decided"],
+        "## Summary\nconflict-token should use policy B.",
     )
     monkeypatch.chdir(project_root)
 
-    # When: compact recall sees both matching rows
+    # When: compact recall sees equally strong authoritative candidates
     rows = compact_project_search("conflict-token", limit=3)
 
-    # Then: the digest remains present but carries deterministic conflict metadata
-    digest = next(row for row in rows if row["record_id"] == "digest-001")
-    assert digest["conflict_note"] == "historical digest; newer authoritative record exists"
+    # Then: the sources remain searchable and carry an explicit review note
+    assert [row["record_id"] for row in rows] == ["decision-001", "decision-002"]
+    assert {row["freshness"] for row in rows} == {"conflicted"}
+    assert {row["conflict_note"] for row in rows} == {"parallel authoritative records match; review before relying on either"}
 
 
 def test_compact_project_search_matches_english_terms_across_record_fields(tmp_path: Path, monkeypatch) -> None:
@@ -195,3 +236,280 @@ def test_compact_project_search_ignores_low_signal_prompt(tmp_path: Path, monkey
 
     # Then: automatic recall stays quiet
     assert rows == []
+
+
+def test_compact_project_search_can_explain_weak_abstention_without_hook_noise(tmp_path: Path, monkeypatch) -> None:
+    # Given: a weak one-field overlap that explicit search can still inspect
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    write_project(project_root)
+    write_record(
+        project_root,
+        "changes",
+        "2026-08-04-001-weak.md",
+        ["type: change", "date: 2026-08-04", "title: Weaknoise note", "status: implemented"],
+        "## Summary\nA record with only one meaningful overlap.",
+    )
+    monkeypatch.chdir(project_root)
+
+    # When: compact recall is used by hooks versus an explicit compact diagnostic caller
+    silent_rows = compact_project_search("weaknoise unrelated", limit=3)
+    diagnostic_rows = compact_project_search("weaknoise unrelated", limit=3, include_abstention=True)
+    explicit_rows = search_project("weaknoise unrelated")
+
+    # Then: hook-bound automatic recall remains silent, while diagnostics explain the abstention
+    assert silent_rows == []
+    assert diagnostic_rows == [
+        {
+            "result": "no_reliable_recall",
+            "reason": "matches did not cross compact recall reliability threshold",
+            "query": "weaknoise unrelated",
+        }
+    ]
+    assert [row["record_id"] for row in explicit_rows] == ["change-001"]
+
+
+def test_compact_project_search_abstains_from_stale_only_matches_but_explicit_search_shows_history(tmp_path: Path, monkeypatch) -> None:
+    # Given: the only matching record is superseded historical evidence
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    write_project(project_root)
+    write_record(
+        project_root,
+        "decisions",
+        "2026-08-04-001-old-policy.md",
+        [
+            "type: decision",
+            "date: 2026-08-04",
+            "title: Historical stale-token policy",
+            "status: decided",
+            "superseded_by: decision-002",
+        ],
+        "## Summary\nstale-token policy was replaced by a newer decision.",
+    )
+    monkeypatch.chdir(project_root)
+
+    # When: automatic and explicit retrieval ask for the same historical fact
+    silent_rows = compact_project_search("stale-token policy", limit=3)
+    diagnostic_rows = compact_project_search("stale-token policy", limit=3, include_abstention=True)
+    explicit_rows = search_project("stale-token policy")
+
+    # Then: automatic recall abstains, but explicit search still exposes the evidence as historical
+    assert silent_rows == []
+    assert diagnostic_rows[0]["result"] == "no_reliable_recall"
+    assert diagnostic_rows[0]["reason"] == "only historical or stale matches were found"
+    assert [row["record_id"] for row in explicit_rows] == ["decision-001"]
+    assert explicit_rows[0]["lifecycle"] == "superseded"
+    assert explicit_rows[0]["freshness"] == "historical"
+
+
+def test_project_search_adds_successor_guidance_for_superseded_records(tmp_path: Path, monkeypatch) -> None:
+    # Given: an old decision points at its successor using existing superseded_by frontmatter
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    write_project(project_root)
+    write_record(
+        project_root,
+        "decisions",
+        "2026-08-04-001-old-decision.md",
+        [
+            "type: decision",
+            "date: 2026-08-04",
+            "title: Old correction-token decision",
+            "status: decided",
+            "superseded_by: decision-002",
+        ],
+        "## Summary\ncorrection-token used the old approach.",
+    )
+    write_record(
+        project_root,
+        "decisions",
+        "2026-08-05-002-new-decision.md",
+        ["type: decision", "date: 2026-08-05", "title: New correction-token decision", "status: decided"],
+        "## Summary\ncorrection-token now uses the successor approach.",
+    )
+    monkeypatch.chdir(project_root)
+
+    # When: explicit historical search returns the superseded hit
+    rows = search_project("old correction-token")
+
+    # Then: the hit points at the current successor record without mutating history
+    row = next(item for item in rows if item["record_id"] == "decision-001")
+    assert row["successor_record"] == "decision-002"
+    assert row["successor_title"] == "New correction-token decision"
+    assert row["current_record"] == "decision-002"
+    assert row["current_guidance"] == "Prefer successor decision-002 for current guidance."
+
+
+def test_project_search_adds_current_guidance_for_resolved_records_and_fixes(tmp_path: Path, monkeypatch) -> None:
+    # Given: a resolved bug and a later change using the existing fixes relation
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    write_project(project_root)
+    write_record(
+        project_root,
+        "bugs",
+        "2026-08-04-001-resolved-bug.md",
+        ["type: bug", "date: 2026-08-04", "title: Resolved current-token bug", "status: resolved"],
+        "## Summary\ncurrent-token bug was fixed after diagnosis.",
+    )
+    write_record(
+        project_root,
+        "changes",
+        "2026-08-05-002-fix-change.md",
+        ["type: change", "date: 2026-08-05", "title: Fix current-token bug", "status: implemented", "fixes: bug-001"],
+        "## Summary\ncurrent-token is fixed by the current change.",
+    )
+    monkeypatch.chdir(project_root)
+
+    # When: explicit search finds both the resolved lifecycle evidence and the fixing change
+    rows = search_project("current-token bug")
+
+    # Then: the resolved record points to its fixing successor, and the fixer identifies itself as current
+    bug = next(item for item in rows if item["record_id"] == "bug-001")
+    fix = next(item for item in rows if item["record_id"] == "change-002")
+    assert bug["successor_record"] == "change-002"
+    assert bug["current_record"] == "change-002"
+    assert bug["current_guidance"] == "Prefer successor change-002 for current guidance."
+    assert fix["current_record"] == "change-002"
+    assert fix["current_guidance"] == "This record resolves bug-001."
+
+
+def test_project_search_chases_superseded_fixer_to_active_replacement(tmp_path: Path, monkeypatch) -> None:
+    # Given: a resolved bug was fixed by a change that is itself superseded by an active replacement
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    write_project(project_root)
+    write_record(
+        project_root,
+        "bugs",
+        "2026-08-04-001-chain-bug.md",
+        ["type: bug", "date: 2026-08-04", "title: Resolved chain-token bug", "status: resolved"],
+        "## Summary\nchain-token bug was resolved by a stale fix.",
+    )
+    write_record(
+        project_root,
+        "changes",
+        "2026-08-05-002-stale-fix.md",
+        [
+            "type: change",
+            "date: 2026-08-05",
+            "title: Stale chain-token fix",
+            "status: implemented",
+            "fixes: bug-001",
+            "superseded_by: change-003",
+        ],
+        "## Summary\nchain-token fix was replaced.",
+    )
+    write_record(
+        project_root,
+        "changes",
+        "2026-08-06-003-active-fix.md",
+        ["type: change", "date: 2026-08-06", "title: Active chain-token fix", "status: implemented"],
+        "## Summary\nchain-token is fixed by the active replacement.",
+    )
+    monkeypatch.chdir(project_root)
+
+    # When: explicit search presents the resolved bug and stale fixing change
+    rows = search_project("chain-token")
+
+    # Then: both historical records point to the active replacement, not the stale fixer
+    bug = next(item for item in rows if item["record_id"] == "bug-001")
+    stale_fix = next(item for item in rows if item["record_id"] == "change-002")
+    assert bug["successor_record"] == "change-003"
+    assert bug["current_record"] == "change-003"
+    assert stale_fix["successor_record"] == "change-003"
+    assert stale_fix["current_record"] == "change-003"
+
+
+def test_project_search_omits_current_guidance_for_missing_superseded_target(tmp_path: Path, monkeypatch) -> None:
+    # Given: a historical record points at a missing successor id
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    write_project(project_root)
+    write_record(
+        project_root,
+        "decisions",
+        "2026-08-04-001-missing-target.md",
+        [
+            "type: decision",
+            "date: 2026-08-04",
+            "title: Missing miss-token successor",
+            "status: decided",
+            "superseded_by: decision-099",
+        ],
+        "## Summary\nmiss-token points to a missing successor.",
+    )
+    monkeypatch.chdir(project_root)
+
+    # When: explicit search returns the stale historical record
+    rows = search_project("miss-token")
+
+    # Then: missing targets are not promoted as current guidance
+    row = next(item for item in rows if item["record_id"] == "decision-001")
+    assert "successor_record" not in row
+    assert "current_record" not in row
+    assert "current_guidance" not in row
+
+
+def test_project_search_never_promotes_evidence_fixer_as_current(tmp_path: Path, monkeypatch) -> None:
+    # Given: the only fixing record is auto-trail evidence
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    write_project(project_root)
+    write_record(
+        project_root,
+        "bugs",
+        "2026-08-04-001-evidence-bug.md",
+        ["type: bug", "date: 2026-08-04", "title: Resolved evidence-token bug", "status: resolved"],
+        "## Summary\nevidence-token bug was resolved.",
+    )
+    write_record(
+        project_root,
+        "changes",
+        "2026-08-05-002-auto-fix.md",
+        ["type: change", "date: 2026-08-05", "title: Auto evidence-token fix", "status: implemented", "fixes: bug-001"],
+        "## Change Content\nAuto-generated from workspace changes detected at session stop. evidence-token",
+    )
+    monkeypatch.chdir(project_root)
+
+    # When: explicit search sees both the resolved bug and auto-trail fixer evidence
+    rows = search_project("evidence-token")
+
+    # Then: the evidence fixer remains searchable but is not promoted as current guidance
+    bug = next(item for item in rows if item["record_id"] == "bug-001")
+    auto_fix = next(item for item in rows if item["record_id"] == "change-002")
+    assert auto_fix["authority"] == "evidence"
+    assert "successor_record" not in bug
+    assert "current_record" not in bug
+    assert "current_guidance" not in auto_fix
+
+
+def test_project_search_omits_current_guidance_for_successor_cycle(tmp_path: Path, monkeypatch) -> None:
+    # Given: two stale decisions point at each other as successors
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    write_project(project_root)
+    write_record(
+        project_root,
+        "decisions",
+        "2026-08-04-001-cycle-a.md",
+        ["type: decision", "date: 2026-08-04", "title: Cycle cycle-token A", "status: decided", "superseded_by: decision-002"],
+        "## Summary\ncycle-token A points to B.",
+    )
+    write_record(
+        project_root,
+        "decisions",
+        "2026-08-05-002-cycle-b.md",
+        ["type: decision", "date: 2026-08-05", "title: Cycle cycle-token B", "status: decided", "superseded_by: decision-001"],
+        "## Summary\ncycle-token B points to A.",
+    )
+    monkeypatch.chdir(project_root)
+
+    # When: explicit search returns both historical records
+    rows = search_project("cycle-token")
+
+    # Then: cycles are guarded and no stale record is promoted as current
+    assert {row["record_id"] for row in rows} == {"decision-001", "decision-002"}
+    assert all("current_record" not in row for row in rows)
+    assert all("successor_record" not in row for row in rows)
