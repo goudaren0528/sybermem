@@ -1,3 +1,7 @@
 .claude/settings.local.json
 .claude/worktrees/
+.omo/
+__pycache__/
+*.pyc
+.pytest_cache/
 docs/superpowers/plans/
