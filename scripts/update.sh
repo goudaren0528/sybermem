@@ -15,6 +15,8 @@ SESSION_LAUNCHER_PATH="$LAUNCHER_DIR/launch_session_start_context.py"
 CLI_DIR="$HOME/.claude/sybermem/cli"
 CLI_VENV="$CLI_DIR/venv"
 CLI_WRAPPER="$CLI_DIR/sybermem"
+PLUGIN_SOURCE="$ADR_PATH/packages/opencode-plugin/sybermem.ts"
+OPENCODE_PLUGIN_DIR="$HOME/.config/opencode/plugins"
 LEGACY_LOCAL_SKILLS="$ADR_PATH/.claude/skills"
 
 echo "=== SyberMem 更新 ==="
@@ -24,7 +26,7 @@ sync_skills() {
     local label="$2"
     mkdir -p "$target"
     rm -rf "$target/init-project" "$target/record" "$target/summary"
-    for skill in sybermem-init-project sybermem-record sybermem-summary sybermem-digest sybermem-phase-analyze sybermem-phase-confirm using-sybermem sybermem-update sybermem-search sybermem-link sybermem-theme-digest sybermem-team-publish sybermem-team-summary; do
+    for skill in sybermem-init-project sybermem-record sybermem-summary sybermem-resume sybermem-digest sybermem-phase-analyze sybermem-phase-confirm using-sybermem sybermem-update sybermem-search sybermem-link sybermem-theme-digest sybermem-team-publish sybermem-team-summary; do
         if [ -d "$SKILL_SOURCE/$skill" ]; then
             rm -rf "$target/$skill"
             cp -r "$SKILL_SOURCE/$skill" "$target/"
@@ -55,6 +57,12 @@ EOF
 chmod +x "$CLI_WRAPPER"
 echo "  [Global] 已安装 sybermem CLI: $CLI_WRAPPER"
 
+if [ -d "$HOME/.config/opencode" ]; then
+    mkdir -p "$OPENCODE_PLUGIN_DIR"
+    cp "$PLUGIN_SOURCE" "$OPENCODE_PLUGIN_DIR/sybermem.ts"
+    echo "  [OpenCode] 已更新 plugin: $OPENCODE_PLUGIN_DIR/sybermem.ts"
+fi
+
 echo ""
 echo "=== 更新完成 ==="
 echo ""
@@ -62,6 +70,7 @@ echo "可用 Skills："
 echo "  /sybermem-init-project  — 初始化或刷新当前项目的 SyberMem 配置"
 echo "  /sybermem-record        — 创建记录（自动判断类型）"
 echo "  /sybermem-summary       — 基于现有记录生成周报/月报"
+echo "  /sybermem-resume        — 基于当前项目状态生成只读续接视图"
 echo "  /sybermem-digest        — 基于现有记录沉淀阶段摘要"
 echo "  /sybermem-phase-analyze — 从项目历史构建或刷新持久化阶段索引"
 echo "  /sybermem-phase-confirm — 确认或调整阶段索引中的候选阶段"
