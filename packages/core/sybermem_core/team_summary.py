@@ -54,6 +54,9 @@ def load_project_publications(team_root: Path) -> list[dict]:
             if line.startswith("- phase-") or line.startswith("- (no phase)"):
                 phase_line = line[2:].strip()
                 break
+            if line.startswith("- Active Phase:"):
+                phase_line = line.split(":", 1)[1].strip()
+                break
 
         open_bugs = []
         open_requirements = []
@@ -76,6 +79,13 @@ def load_project_publications(team_root: Path) -> list[dict]:
         items.append({
             "slug": child.name,
             "published_at": meta.get("published_at", ""),
+            "source_revision": meta.get("source_revision", ""),
+            "source_hash": meta.get("source_hash", ""),
+            "source_scope": meta.get("source_scope", ""),
+            "local_changes_after_publish": bool(meta.get("local_changes_after_publish", False)),
+            "stale": bool(meta.get("stale", False)),
+            "conflict": bool(meta.get("conflict", False)),
+            "review_required": bool(meta.get("review_required", False)),
             "phase_line": phase_line,
             "source_phase_digest": meta.get("source_phase_digest", ""),
             "source_theme_digest": meta.get("source_theme_digest", ""),
@@ -102,6 +112,7 @@ def build_team_management_summary(team_root: Path) -> dict[str, Path | dict | st
     attention = []
     deep_review = []
     recent_updates = []
+    projects = []
     next_seen = {}
 
     for p in publications:
@@ -117,6 +128,20 @@ def build_team_management_summary(team_root: Path) -> dict[str, Path | dict | st
                 "phase": p.get("phase_line", ""),
             })
 
+        trust = {
+            "slug": slug,
+            "source_revision": p.get("source_revision", ""),
+            "source_hash": p.get("source_hash", ""),
+            "published_at": published_at,
+            "source_scope": p.get("source_scope", ""),
+            "local_changes_after_publish": bool(p.get("local_changes_after_publish", False)),
+            "stale": bool(p.get("stale", False)),
+            "conflict": bool(p.get("conflict", False)),
+            "review_required": bool(p.get("review_required", False)),
+            "recommended_next_action": _recommended_next_action(p),
+        }
+        projects.append(trust)
+
         if published_at:
             try:
                 published_dt = datetime.fromisoformat(published_at)
@@ -131,6 +156,10 @@ def build_team_management_summary(team_root: Path) -> dict[str, Path | dict | st
 
         if not p.get("phase_line") or p.get("phase_line") == "(no phase)":
             attention.append({"slug": slug, "reason": "no_active_phase", "count": 0})
+        if p.get("local_changes_after_publish") or p.get("stale"):
+            attention.append({"slug": slug, "reason": "publish_stale", "count": 0})
+        if p.get("conflict"):
+            attention.append({"slug": slug, "reason": "publish_conflict", "count": 0})
         if p.get("open_bugs"):
             attention.append({"slug": slug, "reason": "open_bugs", "count": len(p["open_bugs"])})
         if p.get("open_requirements"):
@@ -172,6 +201,27 @@ def build_team_management_summary(team_root: Path) -> dict[str, Path | dict | st
                 md_lines.append(f"- {item['slug']} — open bugs: {item['count']}")
             elif item["reason"] == "open_requirements":
                 md_lines.append(f"- {item['slug']} — open requirements: {item['count']}")
+            elif item["reason"] == "publish_stale":
+                md_lines.append(f"- {item['slug']} — Team publication is stale or has local changes after publish")
+            elif item["reason"] == "publish_conflict":
+                md_lines.append(f"- {item['slug']} — Team publication has conflict signals")
+    else:
+        md_lines.append("- none")
+
+    md_lines.extend(["", "## Publish Trust Envelope"])
+    if projects:
+        for item in projects:
+            source_revision = item.get("source_revision", "") or "unknown"
+            source_hash = item.get("source_hash", "") or "unknown"
+            next_action = item.get("recommended_next_action", "") or "none"
+            md_lines.append(
+                f"- {item['slug']} — source revision {source_revision}; source hash {source_hash}; "
+                f"published {item.get('published_at', '') or 'unknown'}; "
+                f"source_scope={item.get('source_scope', '') or 'unknown'}; "
+                f"local_changes_after_publish={item['local_changes_after_publish']}; "
+                f"stale={item['stale']}; conflict={item['conflict']}; "
+                f"review_required={item['review_required']}; next={next_action}"
+            )
     else:
         md_lines.append("- none")
 
@@ -202,6 +252,7 @@ def build_team_management_summary(team_root: Path) -> dict[str, Path | dict | st
         "attention": attention,
         "deep_review_candidates": deep_review,
         "recent_updates": recent_updates,
+        "projects": projects,
     }
     summary_json.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
@@ -218,3 +269,13 @@ def build_team_management_summary(team_root: Path) -> dict[str, Path | dict | st
         "summary_state": state_path,
         "payload": payload,
     }
+
+
+def _recommended_next_action(publication: dict) -> str:
+    if publication.get("conflict"):
+        return "/sybermem-resume"
+    if publication.get("local_changes_after_publish") or publication.get("stale"):
+        return "/sybermem-team-publish"
+    if not publication.get("phase_line") or publication.get("phase_line") == "(no phase)":
+        return "/sybermem-phase-analyze"
+    return "/sybermem-team-summary"
