@@ -27,7 +27,7 @@ def current_head(root: Path) -> str:
         return ""
 
 
-def init_schema(conn: sqlite3.Connection) -> None:
+def init_schema(conn: sqlite3.Connection) -> bool:
     """Ensure the current Phase 2 schema exists.
 
     If an older Phase 1 schema is detected (missing columns like `name`),
@@ -89,69 +89,76 @@ def init_schema(conn: sqlite3.Connection) -> None:
         CREATE VIRTUAL TABLE IF NOT EXISTS records_fts USING fts5(record_id, title, content, topics, slug, fixes, implements, related);
         """
     )
+    return needs_rebuild
+
+
+def rebuild_records_fts(conn: sqlite3.Connection) -> None:
+    conn.execute("DELETE FROM records_fts")
+    conn.execute(
+        """
+        INSERT INTO records_fts(rowid, record_id, title, content, topics, slug, fixes, implements, related)
+        SELECT rowid, record_id, title, content, topics, slug, fixes, implements, related
+        FROM records
+        """
+    )
 
 
 def rebuild_index(project_filter: str | None = None) -> dict[str, int]:
     db = index_db_path()
     state = index_state_path()
     ensure_dir(db.parent)
-    conn = sqlite3.connect(db)
-    init_schema(conn)
+    with sqlite3.connect(db) as conn:
+        schema_rebuilt = init_schema(conn)
 
-    projects = load_registry()
-    indexed_projects = 0
-    indexed_records = 0
+        projects = load_registry()
+        indexed_projects = 0
+        indexed_records = 0
 
-    for p in projects:
-        if project_filter and p.get("slug") != project_filter:
-            continue
-        root = Path(p["path"])
-        if not (root / ".sybermem" / "INDEX.md").is_file():
-            update_registry_index_metadata(p["project_id"], commit="", indexed_at=now_iso(), status="missing")
-            continue
+        for p in projects:
+            if project_filter and p.get("slug") != project_filter:
+                continue
+            root = Path(p["path"])
+            if not (root / ".sybermem" / "INDEX.md").is_file():
+                update_registry_index_metadata(p["project_id"], commit="", indexed_at=now_iso(), status="missing")
+                continue
 
-        head = current_head(root)
-        if head and p.get("last_seen_commit") == head:
-            continue
+            head = current_head(root)
+            if head and p.get("last_seen_commit") == head and not schema_rebuilt:
+                continue
 
-        conn.execute("DELETE FROM records WHERE project_id = ?", (p["project_id"],))
-        conn.execute("DELETE FROM projects WHERE project_id = ?", (p["project_id"],))
+            conn.execute("DELETE FROM records WHERE project_id = ?", (p["project_id"],))
+            conn.execute("DELETE FROM projects WHERE project_id = ?", (p["project_id"],))
 
-        proj_meta = parse_project_yaml(root)
-        slug = proj_meta.get("slug") or p.get("slug", "")
-        conn.execute(
-            "INSERT INTO projects(project_id, slug, name, path, remote, status, last_seen_commit, last_indexed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (
-                p["project_id"],
-                slug,
-                p.get("name", slug),
-                p["path"],
-                p.get("remote", ""),
-                "active",
-                head,
-                now_iso(),
-            ),
-        )
-        for rf in iter_record_files(root):
-            row = parse_record_file(rf, p["project_id"], slug)
+            proj_meta = parse_project_yaml(root)
+            slug = proj_meta.get("slug") or p.get("slug", "")
             conn.execute(
-                "INSERT INTO records(project_id, slug, record_id, type, title, content, topics, path, created_at, status, superseded_by, fixes, implements, related) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO projects(project_id, slug, name, path, remote, status, last_seen_commit, last_indexed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 (
-                    row["project_id"], row["slug"], row["record_id"], row["type"], row["title"],
-                    row["content"], row["topics"], row["path"], row["created_at"], row["status"], row["superseded_by"],
-                    row["fixes"], row["implements"], row["related"]
+                    p["project_id"],
+                    slug,
+                    p.get("name", slug),
+                    p["path"],
+                    p.get("remote", ""),
+                    "active",
+                    head,
+                    now_iso(),
+                ),
+            )
+            for rf in iter_record_files(root):
+                row = parse_record_file(rf, p["project_id"], slug)
+                conn.execute(
+                    "INSERT INTO records(project_id, slug, record_id, type, title, content, topics, path, created_at, status, superseded_by, fixes, implements, related) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (
+                        row["project_id"], row["slug"], row["record_id"], row["type"], row["title"],
+                        row["content"], row["topics"], row["path"], row["created_at"], row["status"], row["superseded_by"],
+                        row["fixes"], row["implements"], row["related"]
+                    )
                 )
-            )
-            conn.execute(
-                "INSERT INTO records_fts(record_id, title, content, topics, slug, fixes, implements, related) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                (row["record_id"], row["title"], row["content"], row["topics"], row["slug"], row["fixes"], row["implements"], row["related"])
-            )
-            indexed_records += 1
-        indexed_projects += 1
-        update_registry_index_metadata(p["project_id"], commit=head, indexed_at=now_iso(), status="active")
+                indexed_records += 1
+            indexed_projects += 1
+            update_registry_index_metadata(p["project_id"], commit=head, indexed_at=now_iso(), status="active")
 
-    conn.commit()
-    conn.close()
+        rebuild_records_fts(conn)
     state.write_text(json.dumps({
         "schema_version": 2,
         "last_built_at": now_iso(),
