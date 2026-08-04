@@ -5,7 +5,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from sybermem_core import index as index_module
-from sybermem_core import search as search_module
+from sybermem_core import workspace_search as workspace_search_module
 from sybermem_core.index import init_schema, rebuild_index
 from sybermem_core.search import search_workspace
 
@@ -70,7 +70,7 @@ def test_rebuild_index_removes_stale_fts_rows(tmp_path: Path, monkeypatch) -> No
         "update_registry_index_metadata",
         lambda project_id, *, commit, indexed_at, status: None,
     )
-    monkeypatch.setattr(search_module, "index_db_path", lambda: db_path)
+    monkeypatch.setattr(workspace_search_module, "index_db_path", lambda: db_path)
     rebuild_index()
 
     (project_root / ".sybermem" / "changes" / old_record).unlink()
@@ -119,7 +119,7 @@ def test_search_workspace_rejects_mismatched_fts_rowid(tmp_path: Path, monkeypat
     )
     conn.commit()
     conn.close()
-    monkeypatch.setattr(search_module, "index_db_path", lambda: db_path)
+    monkeypatch.setattr(workspace_search_module, "index_db_path", lambda: db_path)
 
     # When: FTS matches the corrupted row
     rows = search_workspace("mismatch-token")
@@ -185,7 +185,7 @@ def test_old_schema_rebuild_reindexes_project_even_when_commit_is_current(tmp_pa
         "update_registry_index_metadata",
         lambda project_id, *, commit, indexed_at, status: None,
     )
-    monkeypatch.setattr(search_module, "index_db_path", lambda: db_path)
+    monkeypatch.setattr(workspace_search_module, "index_db_path", lambda: db_path)
 
     # When: rebuild_index migrates the disposable cache schema
     summary = rebuild_index()
@@ -227,7 +227,7 @@ def test_search_workspace_falls_back_when_fts_match_raises_operational_error(tmp
     conn.execute("CREATE TABLE records_fts(rowid INTEGER PRIMARY KEY, content TEXT)")
     conn.commit()
     conn.close()
-    monkeypatch.setattr(search_module, "index_db_path", lambda: db_path)
+    monkeypatch.setattr(workspace_search_module, "index_db_path", lambda: db_path)
 
     # When: the malformed FTS table raises during MATCH execution
     rows = search_workspace("fallback-token")
@@ -270,7 +270,7 @@ def test_search_workspace_escapes_terms_and_falls_back_from_fts_syntax_error(tmp
     )
     conn.commit()
     conn.close()
-    monkeypatch.setattr(search_module, "index_db_path", lambda: db_path)
+    monkeypatch.setattr(workspace_search_module, "index_db_path", lambda: db_path)
 
     # When: a user prompt includes FTS metacharacters that used to make MATCH brittle
     rows = search_workspace('alpha OR "unterminated beta')

@@ -54,6 +54,19 @@ def workspace_fts_query(terms: QueryTerms) -> tuple[str, list[str]]:
     )
 
 
+def workspace_guidance_query() -> tuple[str, list[str]]:
+    return (
+        """
+            SELECT r.project_id, r.slug, r.record_id, r.type, r.title, r.path, r.created_at,
+                   r.content, r.topics, r.status, r.superseded_by, r.fixes, r.implements, r.related
+            FROM records r
+            JOIN projects p ON p.project_id = r.project_id
+            WHERE 1 = 1
+        """,
+        [],
+    )
+
+
 def apply_workspace_filters(
     sql: str,
     params: list[str],
