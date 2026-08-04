@@ -17,19 +17,21 @@ as structured memory so project owners, managers, and management agents can keep
 ### Project
 - structured records (`change` / `decision` / `requirement` / `bug`)
 - persistent phase index
+- user-invoked, bounded, read-only `/sybermem-resume`
 - phase digests / theme digests
 - relations and supersession (`implements`, `fixes`, `related`, `superseded_by`)
-- project-level summary / search / link
+- project-level summary / search / link with source-aware trust fields
 
 ### Hub
 - project registry
 - workspace search
+- safe guidance for missing or stale workspace indexes
 - project status
 - portfolio view
 
 ### Team
 - team init
-- team publish
+- Team publish preview, review, and publish-with-hash flow
 - team overview
 - team management summary
 - Team Project Summary
@@ -59,7 +61,20 @@ irm https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/install
 
 OpenCode can also use SyberMem through its plugin/runtime path. See [`.opencode/INSTALL.md`](.opencode/INSTALL.md).
 
-The documented limitation still applies: OpenCode does not expose a documented per-prompt automatic injection callback, so SyberMem does not claim or register unsupported `UserPromptSubmit` prompt injection there. On OpenCode, task recall still relies on manual `/sybermem-search` and the supported compaction flow.
+The documented limitation still applies: OpenCode does not expose a documented per-prompt automatic injection callback, so SyberMem does not claim or register unsupported `UserPromptSubmit` prompt injection there. On OpenCode, explicit historical recall is still manual through `/sybermem-search`, while automatic carry-forward is limited to the supported compaction flow.
+
+`/sybermem-resume` is also available manually on OpenCode, but it stays a read-only restart view. It does not auto-run the suggested action, and it does not claim hidden auto-resume, background execution, or unsupported prompt-time injection.
+
+### Install and upgrade order
+
+1. Refresh the global install first.
+   - The install scripts refresh Claude Code skills, OpenCode skills, the OpenCode plugin, and the CLI/Core runtime.
+   - Re-running the remote install command is a supported global runtime refresh.
+2. Then open each target project and run `/sybermem-update`.
+   - That is the project-local repair step for managed hooks, templates, instruction files, and managed settings patches.
+3. If the project is not initialized yet, run `/sybermem-init-project`.
+
+In short, global first, then project-local. Existing projects do not pick up new managed behavior from a global refresh alone.
 
 ## Initialize a Project
 
@@ -91,28 +106,46 @@ Where:
 ## Daily Usage
 
 ### Project owner
+- `/sybermem-resume` — rebuild the current project context from natural language with a bounded, read-only restart brief
 - `/sybermem-record` — record a meaningful round of work
 - `/sybermem-summary` — inspect current project state
 - `/sybermem-digest` — capture a stable phase conclusion
 - `/sybermem-theme-digest` — capture a cross-phase topic conclusion
-- `/sybermem-team-publish` — publish the current project into Team memory
+- `/sybermem-team-publish` — preview, review, then publish the current project into Team memory with the preview hash
 
 ### Manager / management agent
 - `/sybermem-team-summary` — generate the Team management summary
 - read `dashboards/current-overview.md` / `latest-management-summary.md`
 
 ### If you're unsure what to do next
+- `/sybermem-resume` — get the read-only restart brief before choosing whether to run the next step
 - `/using-sybermem` — inspect the current state and get the recommended command
+
+## Resume and trust UX
+
+`/sybermem-resume` is the natural-language-first restart entrypoint for requests like "resume this project", "what was I doing", or "what should I do next".
+
+- `fast`: a short restart brief with the current phase, recent progress, top risk, next action, and the reason for that recommendation
+- `standard`: the default handoff, with a bit more trust context such as digest coverage or the most important unresolved question
+- `deep`: still bounded, but points you to the right records or digests for follow-up instead of auto-reading full history
+
+The restart brief should show current phase, recent progress, risks, next action, confidence, freshness, and reason.
+
+`/sybermem-resume` is read-only. It never auto-executes the suggested action, and it never writes records, digests, or settings. Trust fields should make it clear whether the result is grounded in a current authoritative record, a digest, or lower-confidence supporting evidence. It uses the existing resume, status, search, and next-step path, not a second memory store.
+
+When you need explicit historical evidence, run `/sybermem-search`. Project search and workspace search aim to surface authority, lifecycle, freshness, and successor guidance clearly. Workspace search depends on a `sybermem index build` cache. If that index is missing, stale, or FTS falls back, the system should guide recovery safely instead of inventing recall.
 
 ## Team Workflow
 
 The recommended Team workflow today is:
 
 1. record and digest work inside each project
-2. publish the project into the Team repo with `/sybermem-team-publish`
-3. let Team overview rebuild automatically
-4. generate a management summary with `/sybermem-team-summary`
-5. drill into digest history when more detail is needed
+2. generate a read-only preview with `/sybermem-team-publish`
+3. review source revision, source hash, freshness, conflicts, and review-required state
+4. publish with the reviewed preview hash
+5. let Team overview rebuild automatically
+6. generate a management summary with `/sybermem-team-summary`
+7. drill into digest history when more detail is needed
 
 In other words:
 
@@ -123,14 +156,15 @@ read digest history for detail
 
 ### Team support available today
 - **Phase A**: `sybermem team init` — create the Team repo skeleton, write `team.yaml`, and bind the Git remote
-- **Phase B**: `sybermem publish status` — publish `project.md` + a Team Project Summary style `current-status.md` + `meta.json`
-- **Phase C**: automatically rebuild `dashboards/current-overview.md` after each `publish status`
-- **Phase D**: remember Team association so `publish status` no longer needs `--team-path` every time
-- **Phase E**: `sybermem team summary` — generate a low-cost management summary (markdown + json)
-- **Phase F**: sync the full phase / theme digest history into the Team repo
+- **Phase B**: `sybermem publish status --preview --format json` — generate a read-only preview for review
+- **Phase C**: `sybermem publish status --preview-source-hash <source_hash> --format json` — perform the actual publish from the reviewed preview
+- **Phase D**: automatically rebuild `dashboards/current-overview.md` after each `publish status`
+- **Phase E**: remember Team association so `publish status` no longer needs `--team-path` every time
+- **Phase F**: `sybermem team summary` — generate a low-cost management summary (markdown + json)
+- **Phase G**: sync the full phase / theme digest history into the Team repo
 - **Team Skills**: `/sybermem-team-publish` and `/sybermem-team-summary`
 
-> `sybermem publish status` is the single Team publication entrypoint. You do not need separate team-push/bootstrap commands; the system fills in low-risk prerequisites during publish and asks for confirmation before high-impact actions.
+> The safe Team publish path is preview → review → publish with hash. The preview is read-only. If publish returns `stale_preview`, generate a fresh preview before publishing again.
 
 ## Modes and Reminders
 
@@ -193,6 +227,7 @@ sybermem project uninstall
 
 - `.sybermem/` is the canonical project data directory
 - if a project still uses legacy `ADR/`, first use will migrate it automatically to `.sybermem/`
+- Claude-specific `UserPromptSubmit` repair applies only to managed Claude hooks. OpenCode does not support, and SyberMem does not claim, the same prompt-time injection model there.
 - for deeper upgrade and compatibility notes, see `INSTALL.md`
 
 ## License

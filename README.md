@@ -17,19 +17,21 @@ SyberMem 是一个面向 AI 工作流的项目 / 团队工程记忆系统。
 ### Project
 - 结构化 records（change / decision / requirement / bug）
 - 持久化 phase index
+- 用户手动触发的 `/sybermem-resume` 有界只读续接
 - phase digest / theme digest
 - 关系与替代（implements / fixes / related / superseded_by）
-- 项目内 summary / search / link
+- 带 source-aware trust 字段的项目内 summary / search / link
 
 ### Hub
 - project registry
 - workspace search
+- workspace index 缺失 / 过期时的安全恢复提示
 - project status
 - portfolio 视图
 
 ### Team
 - team init
-- team publish
+- Team publish preview，review，publish with hash
 - team overview
 - team management summary
 - Team Project Summary
@@ -59,7 +61,20 @@ irm https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/install
 
 OpenCode 也可以通过其插件路径使用。安装说明见 [`.opencode/INSTALL.md`](.opencode/INSTALL.md)。
 
-当前文档化限制仍然成立，OpenCode 没有已文档化的逐次用户提示词自动注入回调，因此不会注册不受支持的 `UserPromptSubmit` 自动注入。OpenCode 侧的 task recall 仍以手动 `/sybermem-search` 和受支持的 compaction 流程为主。
+当前文档化限制仍然成立，OpenCode 没有已文档化的逐次用户提示词自动注入回调，因此不会注册不受支持的 `UserPromptSubmit` 自动注入。OpenCode 侧的显式历史检索以手动 `/sybermem-search` 为主，自动记忆承接只依赖受支持的 compaction 生命周期。
+
+`/sybermem-resume` 在 OpenCode 上同样可手动使用，但它仍是只读续接视图，不会自动执行建议动作，也不会声称存在隐藏 auto-resume、后台执行或不受支持的逐次注入。
+
+### 安装 / 升级顺序
+
+1. 先做全局安装或全局刷新。
+   - 脚本安装会刷新 Claude Code skills、OpenCode skills、OpenCode plugin，以及 CLI / Core runtime。
+   - 重新运行远程安装命令，就是受支持的全局 runtime 刷新路径。
+2. 再进入目标项目执行 `/sybermem-update`。
+   - 这一步才会刷新项目本地的 hooks、模板、说明文件和受管设置补丁。
+3. 如果项目还没初始化，再运行 `/sybermem-init-project`。
+
+也就是说：先全局，再项目内。旧项目想拿到新行为，只做全局更新不够。
 
 ## 初始化项目
 
@@ -91,28 +106,46 @@ OpenCode 也可以通过其插件路径使用。安装说明见 [`.opencode/INST
 ## 日常使用
 
 ### 项目 owner
+- `/sybermem-resume` — 用自然语言拿到有边界的只读续接视图，返回当前状态、风险和建议下一步
 - `/sybermem-record` — 完成一轮有价值工作后记录
 - `/sybermem-summary` — 查看当前项目状态
 - `/sybermem-digest` — 在阶段稳定后沉淀阶段摘要
 - `/sybermem-theme-digest` — 在主题跨阶段稳定后沉淀主题摘要
-- `/sybermem-team-publish` — 将当前项目同步到 Team memory
+- `/sybermem-team-publish` — 先预览，再审核，再用 preview hash 发布到 Team memory
 
 ### 管理者 / 管理 agent
 - `/sybermem-team-summary` — 生成 Team 管理摘要
 - 直接阅读 `dashboards/current-overview.md` / `latest-management-summary.md`
 
 ### 不确定下一步时
+- `/sybermem-resume` — 先拿到只读续接视图，再决定是否继续执行下一步
 - `/using-sybermem` — 检查当前项目状态，并获得推荐命令
+
+## Resume 与信任说明
+
+`/sybermem-resume` 是自然语言优先的续接入口，适合“继续这个项目”、“我刚刚做到哪了”、“下一步最安全是什么”这类请求。
+
+- `fast`：给短版续接，只显示当前 phase、最近进展、主要风险、建议下一步和原因
+- `standard`：默认续接，补充当前 digest 覆盖或最关键未决问题这类信任信息
+- `deep`：仍然是有边界的续接，只额外指出应该继续读哪些 records 或 digests，不会自动展开整段历史
+
+续接结果应明确展示：current phase、recent progress、risks、next action、confidence、freshness、reason。
+
+`/sybermem-resume` 只读，不会自动执行建议动作，也不会写 record、digest 或设置。信任字段会尽量说明信息来自当前 authoritative record、digest，还是仅作为辅助证据的历史材料。它使用现有的 resume / status / search / next-step 路径，不会创建第二套 memory store。
+
+当你需要显式历史证据时，运行 `/sybermem-search`。项目内搜索和 workspace search 都会尽量标明 authority、lifecycle、freshness、successor guidance。workspace search 依赖 `sybermem index build` 生成的索引；如果索引缺失、schema 过期或 FTS 不可用，系统会给出安全恢复提示或降级路径，而不是伪造结果。
 
 ## Team workflow
 
 当前 Team workflow 的推荐使用路径是：
 
 1. 项目内记录 / digest
-2. `/sybermem-team-publish` 同步到 Team repo
-3. 自动更新 `dashboards/current-overview.md`
-4. `/sybermem-team-summary` 生成管理摘要
-5. 需要时下钻到完整 digest 历史
+2. `/sybermem-team-publish` 先生成只读 preview
+3. review preview 的 source revision、source hash、freshness、conflicts、review-required
+4. 使用 preview hash 发布到 Team repo
+5. 自动更新 `dashboards/current-overview.md`
+6. `/sybermem-team-summary` 生成管理摘要
+7. 需要时下钻到完整 digest 历史
 
 也就是：
 
@@ -123,14 +156,15 @@ OpenCode 也可以通过其插件路径使用。安装说明见 [`.opencode/INST
 
 ### Team 当前支持
 - **Phase A**：`sybermem team init` —— 创建 Team repo 骨架、写 `team.yaml`、绑定远程 Git
-- **Phase B**：`sybermem publish status` —— 发布 `project.md` + Team Project Summary 风格的 `current-status.md` + `meta.json`
-- **Phase C**：每次 `publish status` 后自动重建 `dashboards/current-overview.md`
-- **Phase D**：`publish status` 自动记住 Team 关联，无需每次传 `--team-path`
-- **Phase E**：`sybermem team summary` —— 生成低成本管理摘要（markdown + json）
-- **Phase F**：同步完整 phase / theme digest 历史到 Team repo
+- **Phase B**：`sybermem publish status --preview --format json` —— 生成只读 preview，供发布前 review
+- **Phase C**：`sybermem publish status --preview-source-hash <source_hash> --format json` —— 使用刚审核过的 preview hash 执行真实发布
+- **Phase D**：每次 `publish status` 后自动重建 `dashboards/current-overview.md`
+- **Phase E**：`publish status` 自动记住 Team 关联，无需每次传 `--team-path`
+- **Phase F**：`sybermem team summary` —— 生成低成本管理摘要（markdown + json）
+- **Phase G**：同步完整 phase / theme digest 历史到 Team repo
 - **Team Skills**：`/sybermem-team-publish` 与 `/sybermem-team-summary`
 
-> `sybermem publish status` 是 Team 发布的唯一入口。不要再记多个 team push / bootstrap 命令；系统会在 publish 流程中自动补齐低风险前置条件，并在高影响动作前提示你确认。
+> Team publish 的安全路径是 preview → review → publish with hash。preview 是只读视图，不会写 Team repo；真正发布时如果返回 `stale_preview`，必须先重新预览，不能重用旧 hash。
 
 ## 模式与提醒
 
@@ -193,6 +227,7 @@ sybermem project uninstall
 
 - `.sybermem/` 是规范目录
 - 如果项目里仍是旧的 `ADR/`，首次运行相关命令时会自动迁移为 `.sybermem/`
+- Claude 项目里的 `UserPromptSubmit` 修复只适用于受管 Claude hooks，OpenCode 不支持也不会声称支持同类逐次注入
 - 更多升级与兼容细节见 `INSTALL.md`
 
 ## License
