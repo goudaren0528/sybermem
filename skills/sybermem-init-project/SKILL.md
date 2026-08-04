@@ -133,6 +133,7 @@ Read `codebase-scan-rules.md` for the existing codebase scan and record detectio
 - Create missing project-level `.claude/settings.json` from the template file when the project does not already define its own hook settings.
 - Create missing `.sybermem/hooks/record_change_on_stop.py` from the template file when automatic mode is being installed.
 - Create missing `.sybermem/hooks/detect_record_intent.py` from the template file when reminder-first record-intent capture is being installed.
+- Create missing `.sybermem/hooks/task_recall.py` from the template file when read-only task recall is being installed for prompt-time hook support.
 - Ensure the global launcher `~/.claude/sybermem/launch_record_change_on_stop.py` exists; if not, instruct the user to refresh global skills first or run `/sybermem-update`.
 - Create missing `.sybermem/hooks/session_start_context.py` from the template file when startup context injection is being installed.
 - Create missing `.sybermem/hooks/check_project_health.py` from the template file to enable fast-path updates on subsequent runs.
@@ -142,7 +143,8 @@ Read `codebase-scan-rules.md` for the existing codebase scan and record detectio
 - Create missing `.sybermem/hooks/launch_record_change_on_stop.py` from the template file.
 - If the project uses the SyberMem-managed Stop hook entry, rewrite `.claude/settings.json` to call the global absolute launcher path instead of any project-local relative hook path.
 - Even if `.claude/settings.json` is otherwise custom, if the Stop hook contains a recognized old SyberMem hook command, replace just that command with the global launcher path and leave the rest of the file unchanged.
-- The generated `.claude/settings.json` must set `SYBERMEM_RECORD_MODE`, install the default SessionStart hook for startup context injection, install the default `UserPromptSubmit` hook for natural-language record-intent capture, and install the default Stop hook for automatic `change` records / reminder-first nudges.
+- If `.claude/settings.json` is otherwise custom, patch only the recognized SyberMem-managed `UserPromptSubmit`, `SessionStart`, and `Stop` hook entries that are missing or stale. Do not overwrite unrelated custom hooks, env, or instructions.
+- The generated `.claude/settings.json` must set `SYBERMEM_RECORD_MODE`, install the default SessionStart hook for startup context injection, install the default `UserPromptSubmit` hook for both natural-language record-intent capture and read-only task recall, and install the default Stop hook for automatic `change` records / reminder-first nudges.
 - If the user approved a refresh in Step 1.1, back up and overwrite the stale SyberMem-managed files.
 - Treat an existing `.claude/settings.json` as custom unless it clearly matches the SyberMem-managed template. Do not overwrite unrelated custom hook settings automatically.
 - Keep custom files unless the user explicitly approves replacement.
@@ -167,10 +169,12 @@ Read `codebase-scan-rules.md` for the existing codebase scan and record detectio
 - `INDEX.md` archived conclusions section when missing
 - `.sybermem/hooks/record_change_on_stop.py` when auto mode is installed
 - `.sybermem/hooks/detect_record_intent.py` when reminder-first record-intent capture is installed
+- `.sybermem/hooks/task_recall.py` when read-only task recall support is installed
 - `.sybermem/hooks/launch_record_change_on_stop.py` when root-resolving launcher support is installed
 - managed Stop hook command updated to the launcher form when needed
 - `.sybermem/hooks/session_start_context.py` when startup context injection is installed
 - `.sybermem/hooks/check_project_health.py` for fast-path update detection
+- managed `UserPromptSubmit` hook entries repaired when missing or stale, without overwriting unrelated custom hooks, env, or instructions
 - `.sybermem/project.yaml` project identity when missing
 - `~/.sybermem/projects.yaml` user Hub registry entry
 - managed SessionStart hook command updated to the launcher form when needed
@@ -194,6 +198,7 @@ If you catch yourself doing any of these, STOP:
 - Reporting "kept local version" for a file that does not actually exist
 - Skipping the launcher file creation because "the hook file already exists"
 - Treating a pre-digest or pre-analysis managed file as `fresh` when it is missing newly required behavior
+- Repairing a stale `UserPromptSubmit` hook by overwriting the whole `.claude/settings.json` file instead of patching only the recognized SyberMem-managed entry
 
 **All of these mean: go back to Step 1.1, re-verify with filesystem tools, and re-classify.**
 
@@ -205,6 +210,7 @@ If you catch yourself doing any of these, STOP:
 | "The project was just initialized, everything must be fine" | New features may have been added since initialization. Always verify against current templates. |
 | "I'll skip the backup, the old file wasn't important" | The user may have custom content. Always backup stale files before replacing. |
 | "This settings.json is custom, I'll overwrite it with the template" | Only replace SyberMem-owned entries. Preserve all other user configuration. |
+| "The new task recall hook needs a full settings rewrite" | It does not. Repair only the recognized SyberMem-managed `UserPromptSubmit` entry and preserve unrelated custom hooks, env, and instructions. |
 
 ## Terminal State
 

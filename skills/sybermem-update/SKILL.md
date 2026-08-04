@@ -58,11 +58,13 @@ That second step is responsible for:
 - checking whether local `AGENTS.md` / `CLAUDE.md` are stale, including pre-digest SyberMem-managed files that still need the digest-aware guidance refresh
 - enabling digest support by creating `.sybermem/digests/`, creating the digest template, and inserting the `Stage Digests` section when missing
 - enabling analysis support by creating `.sybermem/analysis/` and `.sybermem/analysis/phase-index.md` from the starter template when missing
-- creating or refreshing the default project-level `.claude/settings.json` and `.sybermem/hooks/record_change_on_stop.py` when the project uses the SyberMem-managed hook template
+- creating or refreshing the default project-level `.claude/settings.json`, `.sybermem/hooks/record_change_on_stop.py`, `.sybermem/hooks/detect_record_intent.py`, and `.sybermem/hooks/task_recall.py` when the project uses the SyberMem-managed hook template
 - ensuring the global stop hook launcher exists at `~/.claude/sybermem/launch_record_change_on_stop.py`
 - enabling the root-resolving stop-hook launcher by creating `.sybermem/hooks/launch_record_change_on_stop.py` when missing
 - auto-migrating existing projects from old relative Stop hook commands to the global absolute launcher command
 - applying that migration even when `.claude/settings.json` is otherwise custom, as long as the old Stop hook command is recognizably SyberMem-managed
+- repairing missing or stale SyberMem-managed `UserPromptSubmit` hook wiring so the same hook performs both natural-language record-intent capture and read-only task recall
+- applying that `UserPromptSubmit` repair surgically even when `.claude/settings.json` is otherwise custom, without overwriting unrelated custom hooks, env, or instructions
 - inserting or refreshing the marker-bounded `using-sybermem` session-entry protocol block in managed instruction files
 - ensuring existing projects receive both the marker-bounded `using-sybermem` protocol block and the visible `/using-sybermem` skill after upgrade
 - refreshing stale SyberMem-managed project instructions with backups
@@ -81,6 +83,7 @@ Before declaring an upgrade complete, verify for the current project:
 - whether custom files will be preserved unless the user explicitly approves replacement
 - whether the `using-sybermem` protocol block was inserted or refreshed non-destructively when applicable
 - whether recognized old SyberMem Stop hook commands were surgically replaced with the global launcher path when present in otherwise custom settings files.
+- whether recognized SyberMem-managed `UserPromptSubmit` entries were added or repaired surgically when missing or stale, while leaving unrelated custom hooks, env, and instructions untouched.
 
 ## Red Flags — STOP and Re-check
 
@@ -116,6 +119,7 @@ This skill is complete when:
 - If the update command fails, stop and report the failure instead of pretending the project was refreshed.
 - Do not silently enable digest support by overwriting user-owned files; only create missing digest capability structure.
 - Do not rewrite unrelated custom settings; only surgically replace recognized old SyberMem Stop hook commands.
+- Do not rewrite unrelated custom settings; only surgically add or repair recognized SyberMem-managed `UserPromptSubmit` entries.
 - Do not rewrite the rest of `CLAUDE.md` / `AGENTS.md` when the `using-sybermem` markers already exist; only refresh the bounded protocol block.
 
 ## Integration

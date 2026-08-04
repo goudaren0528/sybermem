@@ -63,11 +63,17 @@ def parse_conclusions(index_text: str) -> list[str]:
     )
     if not match:
         return []
-    return [
+    lines = [
         line.strip()
         for line in match.group(1).splitlines()
         if line.strip().startswith("- [")
     ]
+    # Sort by date extracted from conclusion (YYYY-MM-DD) so most recent comes last
+    def _date_key(line: str) -> str:
+        m = re.search(r"\((\d{4}-\d{2}-\d{2})\)", line)
+        return m.group(1) if m else ""
+    lines.sort(key=_date_key)
+    return lines
 
 
 def parse_topic_index(index_text: str) -> dict[str, list[str]]:
@@ -212,25 +218,9 @@ def build_context(root: Path) -> str:
     if conclusions:
         lines.append("")
         lines.append("Key Conclusions:")
-        for c in conclusions:
+        # Only inject the most recent 5 conclusions to keep context lean
+        for c in conclusions[-5:]:
             lines.append(c)
-
-    if topics:
-        lines.append("")
-        lines.append("Topic Index:")
-        for topic, records in sorted(topics.items()):
-            lines.append(f"- {topic}: {', '.join(records)}")
-
-    lines.extend([
-        "",
-        "SyberMem skills available:",
-        "- /sybermem:record — create a project record after meaningful work",
-        "- /sybermem:summary — view current phase status",
-        "- /sybermem:digest — create a durable phase digest",
-        "- /sybermem:phase-analyze — refresh phase index",
-        "- /sybermem:update — refresh project managed files",
-        "- /sybermem:using-sybermem — full diagnostic",
-    ])
 
     return "\n".join(lines)
 
