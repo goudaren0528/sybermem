@@ -57,7 +57,8 @@ irm https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/install
 ```
 
 After install, open your target project and run `/sybermem-init-project`.
-That step will also create the default project-level `.claude/settings.json` for SyberMem `auto` / `remind` mode and the default `.sybermem/hooks/record_change_on_stop.py` helper for automatic `change` records.
+That step will also create the default project-level `.claude/settings.json` for SyberMem `auto` / `remind` mode, `.sybermem/hooks/record_change_on_stop.py` for automatic `change` records, `.sybermem/hooks/detect_record_intent.py` for reminder-first record-intent capture, and `.sybermem/hooks/task_recall.py` for read-only task recall.
+In Claude Code projects, the managed `UserPromptSubmit` hook performs both natural-language record-intent capture and read-only task recall.
 
 #### Clone and install
 
@@ -88,6 +89,7 @@ Project initialization still uses `/sybermem-init-project` after the global inst
 Re-run the one-liner install command — it refreshes the globally installed skills with the latest version.
 
 After the global refresh, open the target project and run `/sybermem-update`.
+That project-local step repairs missing or stale managed hook files, including `.sybermem/hooks/task_recall.py`, and patches only recognized SyberMem-managed settings entries when `.claude/settings.json` is otherwise custom.
 
 ### Clone-based update
 
@@ -102,6 +104,7 @@ cd sybermem; git pull; .\scripts\update.ps1
 ```
 
 After the script finishes, open the target project and run `/sybermem-update`.
+That follow-up is where project-local hook files and settings entries are actually created, refreshed, or migrated.
 
 ## Subdirectory Hook Fix
 
@@ -113,6 +116,8 @@ For existing projects, upgrading the global skills is only half of the rollout. 
 
 For existing projects, `/sybermem-update` now performs a Stop hook command migration to the global launcher path. This is the repair step that fixes file-not-found hook failures when Claude is working from a subdirectory.
 
+For existing projects, `/sybermem-update` should also repair missing or stale `.sybermem/hooks/detect_record_intent.py` and `.sybermem/hooks/task_recall.py` files, and surgically patch recognized SyberMem-managed `UserPromptSubmit` settings entries instead of replacing the whole `.claude/settings.json` file.
+
 For existing projects, `/sybermem-update` should also insert or refresh the marker-bounded `using-sybermem` protocol block in managed instruction files. This is how the new session-entry rules reach old projects without requiring full document replacement.
 
 For existing projects, `/sybermem-update` should now deliver both parts of `using-sybermem`: the marker-bounded protocol block in instruction files and the visible `/using-sybermem` skill in the global install.
@@ -120,3 +125,5 @@ For existing projects, `/sybermem-update` should now deliver both parts of `usin
 ## Verify Installation
 
 Type `/sybermem-init-project` or `/sybermem-update` in Claude Code or OpenCode. If the project gets the `.sybermem/` directory structure, reports that an existing `ADR/` directory will be auto-migrated, or offers to refresh stale `AGENTS.md` / `CLAUDE.md`, the installation was successful.
+
+For Claude Code specifically, a successful refresh also means the project can receive `.sybermem/hooks/task_recall.py` plus the managed `UserPromptSubmit` wiring without losing unrelated custom settings. For OpenCode, success still does not imply unsupported prompt-time automatic injection.
