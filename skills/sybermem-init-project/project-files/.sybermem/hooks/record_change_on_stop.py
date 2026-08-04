@@ -114,8 +114,13 @@ def run_git(*args: str) -> str:
     return result.stdout.strip()
 
 
+def record_mode() -> str:
+    mode = os.environ.get("SYBERMEM_RECORD_MODE", "auto").strip().lower()
+    return mode if mode in {"auto", "remind"} else "auto"
+
+
 def should_auto_record() -> bool:
-    return os.environ.get("SYBERMEM_RECORD_MODE", "auto") == "auto"
+    return record_mode() == "auto"
 
 
 def list_changed_files() -> list[str]:
@@ -192,9 +197,45 @@ def save_nudge_state(state: dict) -> None:
     NUDGE_STATE_PATH.write_text(json.dumps(state, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
+RECORD_INTENT_PATH = SYBERMEM_DIR / ".record-intent.json"
+
+
+def load_record_intent() -> dict:
+    if not RECORD_INTENT_PATH.exists():
+        return {}
+    try:
+        return json.loads(RECORD_INTENT_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def save_record_intent(intent: dict) -> None:
+    RECORD_INTENT_PATH.write_text(json.dumps(intent, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def clear_record_intent() -> None:
+    try:
+        RECORD_INTENT_PATH.unlink()
+    except FileNotFoundError:
+        pass
+
+
 def slugify(text: str) -> str:
     slug = re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
     return slug or "workspace-change"
+
+
+INTENT_PATTERNS = [
+    re.compile(r"这轮.*提醒我.*记录"),
+    re.compile(r"这次.*要记.*record", re.IGNORECASE),
+    re.compile(r"做完.*沉淀一下"),
+    re.compile(r"完成后.*提醒我.*/sybermem-record"),
+    re.compile(r"这轮工作.*记录到.*sybermem", re.IGNORECASE),
+]
+
+
+def detect_record_intent_from_text(text: str) -> bool:
+    return any(pattern.search(text) for pattern in INTENT_PATTERNS)
 
 
 def matches_high_signal(file_path: str) -> bool:
@@ -210,7 +251,7 @@ def detect_high_level_areas(files: list[str]) -> set[str]:
     return matched
 
 
-COMMIT_GAP_THRESHOLD = 10
+COMMIT_GAP_THRESHOLD = 5
 
 
 def count_commits_since_last_record() -> int:
@@ -461,25 +502,55 @@ def insert_before_marker(path: Path, marker: str, addition: str) -> None:
 
 def update_index(record_date: str, number: str, title: str, slug: str) -> None:
     link_name = f"{record_date}-{number}-{slug}.md"
-    conclusion = f"- [change-{number}] Auto-recorded workspace file changes at session stop so the project keeps a lightweight change trail without manual recording ({record_date})\n"
     row = f"| {number} | {record_date} | Auto-record workspace file changes on stop | implemented | [link](changes/{link_name}) |\n"
-    insert_before_marker(INDEX_PATH, "<!-- add new conclusions here -->", conclusion)
+    # Auto-trail records only go into the Feature Changes table, NOT Key Conclusions.
+    # Key Conclusions should only contain meaningful manually-created records.
     insert_before_marker(INDEX_PATH, "<!-- add new records here -->", row)
 
 
 def main() -> int:
-    if not should_auto_record():
+    mode = record_mode()
+    if mode not in {"auto", "remind"}:
         return 0
     if not INDEX_PATH.exists() or not CHANGES_DIR.exists():
         return 0
 
     all_files = list_changed_files()
+    record_intent = load_record_intent()
+    intent_active = bool(record_intent.get("record_intent"))
+
+    # Even with no changed files, honor explicit record intent
     if not all_files:
+        if intent_active:
+            print("You marked this work as worth recording earlier. If this round is complete, run /sybermem-record now.")
+            clear_record_intent()
         return 0
 
     files = trail_files(all_files)
     nudge_state = load_nudge_state()
     followup_hint, theme_key, nudge_message = classify_followup(all_files, nudge_state)
+    try:
+        import sys
+        from pathlib import Path as _Path
+        for p in [
+            _Path.home() / '.claude' / 'sybermem' / 'cli' / 'venv' / 'Lib' / 'site-packages',
+            _Path.home() / '.claude' / 'sybermem' / 'cli' / 'venv' / 'lib' / 'python3.10' / 'site-packages',
+        ]:
+            if p.exists() and str(p) not in sys.path:
+                sys.path.insert(0, str(p))
+        from sybermem_core.next_step_router import recommend_next_step
+        router_hint = recommend_next_step(ROOT)
+    except Exception:
+        router_hint = None
+
+    def emit_reminder() -> None:
+        if intent_active:
+            print("You marked this work as worth recording earlier. If this round is complete, run /sybermem-record now.")
+            clear_record_intent()
+        elif router_hint:
+            print(f"Recommended next step: {router_hint['action']} — {router_hint['reason']}")
+        elif nudge_message:
+            print(nudge_message)
 
     if not files:
         updated_nudge_state = {
@@ -498,20 +569,20 @@ def main() -> int:
             digest_nudged_at[theme_key] = len(get_theme_recent_stops(theme_key, nudge_state))
             updated_nudge_state["digest_nudged_at_window_len"] = digest_nudged_at
         save_nudge_state(updated_nudge_state)
-        if nudge_message:
-            print(nudge_message)
+        emit_reminder()
         return 0
 
     fingerprint = json.dumps(files, ensure_ascii=False)
     state = load_state()
     if state.get("last_fingerprint") == fingerprint:
+        if intent_active:
+            emit_reminder()
         return 0
 
     # Auto-trail dedup: skip if >80% overlap with recent auto trails
     if overlaps_recent_auto_trails(files):
         save_state({"last_fingerprint": fingerprint, "last_record": state.get("last_record", "")})
-        if nudge_message:
-            print(nudge_message)
+        emit_reminder()
         return 0
 
     record_date = date.today().isoformat()
@@ -519,9 +590,12 @@ def main() -> int:
     slug = make_title(files)
     author = run_git("config", "user.name") or "Claude"
     record_path = CHANGES_DIR / f"{record_date}-{number}-{slug}.md"
-    record_path.write_text(render_record(record_date, number, slug.replace("-", " "), files, author, followup_hint), encoding="utf-8")
-    update_index(record_date, number, slug.replace("-", " "), slug)
-    save_state({"last_fingerprint": fingerprint, "last_record": record_path.name})
+    if mode == "auto":
+        record_path.write_text(render_record(record_date, number, slug.replace("-", " "), files, author, followup_hint), encoding="utf-8")
+        update_index(record_date, number, slug.replace("-", " "), slug)
+        save_state({"last_fingerprint": fingerprint, "last_record": record_path.name})
+    else:
+        save_state({"last_fingerprint": fingerprint, "last_record": state.get("last_record", "")})
 
     today = record_date
     nudge_state = append_theme_recent_stop(theme_key, nudge_state, today)
@@ -542,8 +616,7 @@ def main() -> int:
         digest_nudged_at[theme_key] = len(get_theme_recent_stops(theme_key, nudge_state))
         updated_nudge_state["digest_nudged_at_window_len"] = digest_nudged_at
     save_nudge_state(updated_nudge_state)
-    if nudge_message:
-        print(nudge_message)
+    emit_reminder()
     return 0
 
 
