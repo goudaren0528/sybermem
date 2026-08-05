@@ -44,6 +44,15 @@ def write_hook_project(root: Path) -> None:
     (root / ".sybermem" / "hooks").mkdir()
 
 
+def isolated_hook_env(tmp_path: Path) -> dict[str, str]:
+    env = os.environ.copy()
+    env["HOME"] = str(tmp_path / "home")
+    env["USERPROFILE"] = str(tmp_path / "home")
+    env["PYTHONNOUSERSITE"] = "1"
+    env.pop("PYTHONPATH", None)
+    return env
+
+
 def write_record(root: Path, subdir: str, filename: str, record_type: str, title: str, body: str) -> None:
     (root / ".sybermem" / subdir / filename).write_text(
         "\n".join(
@@ -194,6 +203,7 @@ def test_detect_record_intent_project_copy_fails_open_when_core_unavailable_unde
         cwd=project_root,
         input=json.dumps({"prompt": "remind me to record this password=hunter2"}).encode("utf-8"),
         capture_output=True,
+        env=isolated_hook_env(tmp_path),
         check=False,
     )
 
@@ -217,6 +227,7 @@ def test_detect_record_intent_project_copy_emits_bounded_manual_diagnostic_when_
         cwd=project_root,
         input=json.dumps({"prompt": "remind me to record this password=hunter2"}).encode("utf-8"),
         capture_output=True,
+        env=isolated_hook_env(tmp_path),
         check=False,
     )
 

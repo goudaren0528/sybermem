@@ -13,6 +13,16 @@
             "statusMessage": "SyberMem checking whether this round should be recorded..."
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .sybermem/hooks/task_recall.py",
+            "timeout": 10,
+            "statusMessage": "SyberMem gathering related task context..."
+          }
+        ]
       }
     ],
     "SessionStart": [

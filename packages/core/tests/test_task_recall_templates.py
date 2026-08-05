@@ -9,6 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 ROOT = Path(__file__).resolve().parents[3]
 ROOT_HOOK = ROOT / ".sybermem" / "hooks" / "task_recall.py"
+HEALTH_CHECK = ROOT / ".sybermem" / "hooks" / "check_project_health.py"
 TEMPLATE_HOOKS = [
     ROOT / "packages" / "claude-skills" / "sybermem-init-project" / "project-files" / ".sybermem" / "hooks" / "task_recall.py",
     ROOT / "skills" / "sybermem-init-project" / "project-files" / ".sybermem" / "hooks" / "task_recall.py",
@@ -89,6 +90,18 @@ def test_distributed_task_recall_templates_keep_identical_production_behavior() 
     for template in TEMPLATE_HOOKS:
         text = template.read_text(encoding="utf-8")
         assert text == root_text
+
+
+def test_project_health_accepts_current_task_recall_contract() -> None:
+    spec = util.spec_from_file_location("project_health", HEALTH_CHECK)
+    assert spec is not None
+    assert spec.loader is not None
+    module = util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    result = module.check_task_recall_hook(ROOT)
+
+    assert result == {"status": "fresh"}
 
 
 def test_task_recall_rejects_target_project_core_by_default(tmp_path: Path) -> None:

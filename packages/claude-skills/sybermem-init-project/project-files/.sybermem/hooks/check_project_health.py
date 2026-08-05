@@ -166,7 +166,7 @@ def check_task_recall_hook(root: Path) -> dict:
     content = read_text(path)
     if content is None:
         return {"status": "missing"}
-    has_task_context_banner = "SyberMem related context for this task:" in content
+    has_task_context_banner = "SyberMem retrieval hints for this task (maximum 3):" in content
     has_user_prompt_submit_contract = '"hookEventName": "UserPromptSubmit"' in content
     return {"status": "fresh" if has_task_context_banner and has_user_prompt_submit_contract else "stale"}
 
