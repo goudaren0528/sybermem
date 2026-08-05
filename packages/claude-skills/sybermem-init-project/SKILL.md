@@ -9,6 +9,29 @@ description: Use when initializing SyberMem project records for a new or existin
 
 Initialize or refresh the SyberMem project record system in the current project. `.sybermem/` is the canonical project data directory.
 
+## Quick guide (for humans)
+
+> This section is a plain-language overview for people. It is **not** the execution
+> contract — the authoritative rules the agent must follow are the `<HARD-GATE>`,
+> `## Flow`, and `## Red Flags` sections below. If anything here seems to conflict
+> with those, the sections below win.
+
+**What it does:** sets up (or refreshes) `.sybermem/` in your project — the record
+directories, `INDEX.md`, hooks, templates, project identity, and the managed
+instruction blocks in `CLAUDE.md` / `AGENTS.md`.
+
+**When to run:** on a new project, on an existing project that has no SyberMem yet,
+or to refresh an older project after upgrading SyberMem.
+
+**What happens (typical):**
+1. Finds your project root (won't nest inside an existing SyberMem project without asking).
+2. On an already-set-up project, runs a fast health check and only fixes what's missing/stale.
+3. On a fresh project, creates the full `.sybermem/` structure and instruction files.
+4. Prints a summary of what it created or updated, and the commands you can use next.
+
+**Safe by design:** existing records and your custom config are preserved; stale
+managed files are backed up before refresh; repeated runs won't destroy valid data.
+
 ## Core Invariants
 
 - **No file classification without file-system verification.**
