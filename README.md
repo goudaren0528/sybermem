@@ -37,6 +37,19 @@ SyberMem 是一个面向 AI 工作流的项目 / 团队工程记忆系统。
 - Team Project Summary
 - 完整 phase / theme digest 历史同步
 
+## 平台支持级别
+
+不同平台的集成完整度不同，请按实际支持级别选择：
+
+| 平台 | 支持级别 | 说明 |
+|---|---|---|
+| **Claude Code** | 完整 | plugin manifest + marketplace + hooks 全 wired，`claude plugins validate` 校验 |
+| **OpenCode** | 完整 | 真实 TypeScript runtime（`packages/opencode-plugin/sybermem.ts`），脚本安装 |
+| **Gemini** | 入口集成 | `gemini-extension.json` + `GEMINI.md` 入口，未做深度 runtime 验证 |
+| **Codex / Cursor / Kimi** | 元数据占位 | 仅有统一 manifest 元数据，暂无平台 runtime hook |
+
+> Codex / Cursor / Kimi 目前是元数据占位，尚未提供各自平台的运行时集成。
+
 ## 安装
 
 ### Claude Code 插件安装（推荐）

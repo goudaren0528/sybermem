@@ -37,6 +37,19 @@ as structured memory so project owners, managers, and management agents can keep
 - Team Project Summary
 - full phase / theme digest history sync
 
+## Platform support levels
+
+Integration completeness varies by platform. Choose based on the actual level:
+
+| Platform | Support level | Notes |
+|---|---|---|
+| **Claude Code** | Full | plugin manifest + marketplace + hooks fully wired, validated by `claude plugins validate` |
+| **OpenCode** | Full | real TypeScript runtime (`packages/opencode-plugin/sybermem.ts`), script install |
+| **Gemini** | Entry integration | `gemini-extension.json` + `GEMINI.md` entry; no deep runtime validation |
+| **Codex / Cursor / Kimi** | Metadata placeholder | unified manifest metadata only; no platform runtime hook yet |
+
+> Codex / Cursor / Kimi are metadata placeholders today — they do not yet ship a platform-specific runtime integration.
+
 ## Install
 
 ### Claude Code plugin install (recommended)

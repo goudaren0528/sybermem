@@ -1,6 +1,10 @@
 {
   "name": "sybermem",
-  "description": "project memory and decision tracking",
+  "description": "Project memory and decision tracking system for Claude Code and OpenCode",
   "version": "0.1.0",
-  "author": "goudaren0528"
+  "author": { "name": "goudaren0528" },
+  "homepage": "https://github.com/goudaren0528/sybermem",
+  "repository": "https://github.com/goudaren0528/sybermem",
+  "license": "MIT",
+  "keywords": ["skills", "memory", "project-history", "adr", "hooks", "opencode"]
 }
