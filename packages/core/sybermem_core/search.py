@@ -12,7 +12,7 @@ from .retrieval import (
     derive_continuity_metadata,
 )
 from .search_query import QueryTerms, query_terms, score_row
-from .workspace_search import WorkspaceIndexIncompatibleError, search_workspace
+from .workspace_search import WorkspaceIndexIncompatibleError, search_workspace, workspace_index_staleness
 
 
 SearchValue: TypeAlias = str | float

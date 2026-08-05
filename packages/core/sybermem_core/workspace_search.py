@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TypeAlias
 import sqlite3
 
-from .index import index_db_path
+from .index import current_head, index_db_path
+from .registry import load_registry
 from .retrieval import apply_successor_guidance, derive_continuity_metadata
 from .search_query import score_row, query_terms
 from .workspace_query import WorkspaceFilters, apply_workspace_filters, workspace_fts_query, workspace_guidance_query, workspace_like_query
@@ -114,3 +116,38 @@ def _text(row: SearchRow, key: str) -> str:
 
 def _score_input(row: SearchRow) -> dict[str, str]:
     return {key: _text(row, key) for key in ("record_id", "title", "content", "topics", "fixes", "implements", "related")}
+
+
+def workspace_index_staleness() -> list[dict]:  # noqa: DICT_OK
+    """Return registered projects whose indexed HEAD differs from their current HEAD.
+
+    Read-only and fail-open: projects without a resolvable path or current HEAD
+    are skipped. Only entries that are genuinely stale (indexed commit present,
+    current commit present, and the two differ) are returned. This lets callers
+    warn that workspace search may be serving results from an out-of-date index
+    without mutating anything or auto-rebuilding.
+    """
+    stale: list[dict] = []
+    for entry in load_registry():
+        path_str = entry.get("path", "")
+        if not path_str:
+            continue
+        indexed = entry.get("last_seen_commit", "") or ""
+        try:
+            root = Path(path_str)
+        except Exception:
+            continue
+        if not root.is_dir():
+            continue
+        current = current_head(root)
+        if not current or not indexed:
+            continue
+        if indexed != current:
+            stale.append({
+                "slug": entry.get("slug", root.name),
+                "project_id": entry.get("project_id", ""),
+                "indexed_commit": indexed,
+                "current_commit": current,
+                "stale": True,
+            })
+    return stale
