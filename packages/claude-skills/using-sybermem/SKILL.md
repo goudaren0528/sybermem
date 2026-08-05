@@ -13,6 +13,22 @@ description: Use when you want a visible SyberMem entrypoint that diagnoses the 
 If you were dispatched as a subagent to execute a specific task, skip this skill unless the task explicitly asks for SyberMem diagnostics.
 </SUBAGENT-STOP>
 
+## Quick guide (for humans)
+
+> Plain-language overview for people. **Not** the execution contract — the
+> `<HARD-GATE>`, `## Flow`, and the routing rules below are authoritative and win
+> on any conflict.
+
+**What it does:** a "where am I / what next" entrypoint. It checks the current
+project's SyberMem state and tells you the single recommended next command — it
+does not do the downstream work itself.
+
+**When to run:** when you're unsure what to do next, or want a quick read on
+whether the project is initialized, up to date, and what command fits now.
+
+**What you get:** the resolved project root, a short state summary, and one
+recommended next command with the reason — never a silent record/digest/analyze.
+
 ## Core Invariant
 
 - **`using-sybermem` reports and routes; it does not silently perform downstream business actions.**

@@ -9,6 +9,22 @@ description: Use when creating SyberMem project records for changes, decisions, 
 
 Unified SyberMem record entry point. AI auto-detects the record type from context.
 
+## Quick guide (for humans)
+
+> Plain-language overview for people. **Not** the execution contract — the
+> `<HARD-GATE>`, `## Flow`, and `## Verification` sections below are authoritative
+> and win on any conflict.
+
+**What it does:** writes one durable project record (change / decision /
+requirement / bug), auto-picking the type from context, then wires it into
+`INDEX.md` (table row + a one-line Key Conclusion + topic tags).
+
+**When to run:** after a meaningful piece of work whose reason and impact are
+worth preserving across sessions — not for formatting-only or trivial edits.
+
+**What you get:** a new file under `.sybermem/<type>/`, an INDEX table row, and a
+Key Conclusion line. The record isn't "done" until all three exist.
+
 ## Core Invariant
 
 - **No record is complete until the file is created, the correct table row is inserted, and the Key Conclusion is updated.**
