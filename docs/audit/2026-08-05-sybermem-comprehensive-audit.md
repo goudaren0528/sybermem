@@ -18,6 +18,9 @@
 | **P0-§1 双轨对齐** | 新增 `sybermem resume` CLI（fast/standard/deep×text/json）；`search_project` 无项目根改显式报错（hook 路径仍静默）；README/README.en 加「命令 vs Skill 编排」表 | pytest core 83 + cli 11 绿；resume 三模式真终端跑通；无根 exit 1；hook 未受影响 |
 | **P0-§2 效率（批次 A）** | 项目搜索进程内缓存（消除二次全扫）；合并 `detect_record_intent`+`task_recall` 为单进程 `user_prompt.py`（3 副本+3 settings+插件委托器+包校验同步）；stop hook commit-gap 去重 | **合并 hook 实测 297ms vs 旧 491ms，降 39%**；check-plugin-package `OK` |
 | **P1-§5 开源运营** | 根 `LICENSE`(MIT)+两包 license 声明；cli 依赖 core + 元数据；`VERSION` 单源+`sync-version.py`+一致性校验；`.github/workflows/ci.yml`；CONTRIBUTING/SECURITY/CODE_OF_CONDUCT/issue·PR 模板 | 两包 `python -m build` 成功（License-Expression+Requires-Dist）；version sync 幂等覆盖 8 处；校验反例生效；CI YAML 合法 |
+| **批次 D-§4 分发一致性** | 统一 Codex/Cursor/Kimi manifest 元数据；CI 加 version-skew + skill-drift 双 gate；README/README.en 加平台支持级别矩阵（诚实降级） | manifest 合法 JSON；sync-version 幂等；pytest 83+11 绿；check-plugin-package `OK` |
+| **批次 E-§3 体验** | digest 术语全项目统一 `Stage Digests → Phase Digests`（安全：health check 用锚点非标题）；安装文档纠正（remote install 推荐给用户、plugin-dir 给开发者）；CONTRIBUTING 加 Key Conclusions 治理原则 | health check 锚点完好；skill 镜像无 drift；pytest 83+11 绿；check-plugin-package `OK` |
+| **批次 F-§2-e 效率补漏** | `search_workspace` 查询时陈旧检测：`workspace_index_staleness()` 比对 indexed HEAD vs current HEAD，CLI 打印 stderr 提示 + json `index_staleness` 字段（不自动重建、不改结果） | 3 新单测（fresh/stale/skip）；CLI 端到端 stale 时提示、exit code 不变；pytest core 86 + cli 11 绿 |
 
 **Spec/Plan 落盘：**
 - `docs/superpowers/specs/2026-08-05-sybermem-dual-track-alignment-design.md`

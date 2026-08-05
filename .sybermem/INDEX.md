@@ -19,6 +19,7 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 - [change-010] #lifecycle #search #relations #digest #distribution — Transformed SyberMem from v1 (record+group+compress) to v2 (lifecycle-aware, retrieval-capable, relation-linked, topic-compressible, multi-platform) in a single session covering 6 capability rounds (2026-06-22)
 - [change-045] #quality #distribution #search #hooks — Executed audit-driven P0/P1: exposed `sybermem resume` CLI (was implemented but unreachable), made search no-root failure explicit while keeping the hook path silent, merged the two prompt hooks into one process (~491ms→~297ms), and added LICENSE + CI + cli→core dependency + single-source VERSION so the repo reaches an OSS-trust baseline (2026-08-05)
 - [change-047] #hooks #quality — Stopped the auto stop-hook from writing per-stop markdown records + INDEX rows; auto-trails now go to a bounded rolling `.auto-trail.jsonl` journal so low-signal noise stays out of the canonical corpus, while the existing 26 records stay untouched to preserve digest/publish/status semantics (2026-08-05)
+- [change-048] #distribution #search #quality — Second-tier audit follow-ups: unified Codex/Cursor/Kimi manifests + CI drift gates + honest platform matrix (§4), unified `Stage→Phase Digests` terminology + install-order doc fix (§3), and query-time workspace stale detection warning when indexed HEAD lags current HEAD (§2-e) (2026-08-05)
 <!-- add new conclusions here -->
 
 ---
@@ -140,6 +141,7 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 | 045 | 2026-08-05 | Audit-driven P0/P1 — dual-track alignment, hot-path efficiency, OSS readiness | implemented | [link](changes/2026-08-05-045-audit-driven-p0-p1-dual-track-efficiency-oss-readiness.md) |
 | 046 | 2026-08-05 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-08-05-046-gitignore-readme-en-readme-and-more.md) |
 | 047 | 2026-08-05 | Auto-trail rolling journal — stop writing per-stop markdown records (batch B) | implemented | [link](changes/2026-08-05-047-auto-trail-rolling-journal-batch-b.md) |
+| 048 | 2026-08-05 | Distribution consistency, UX terminology, and workspace stale detection (batches D/E/F) | implemented | [link](changes/2026-08-05-048-distribution-ux-workspace-stale-batches-def.md) |
 <!-- add new records here -->
 
 ---
@@ -197,7 +199,7 @@ When adding records, update this index file accordingly.
 - collaboration: requirement-003, decision-001, change-023, change-026
 - compression: requirement-002
 - digest: requirement-002, change-010, change-023
-- distribution: change-001, change-002, change-008, change-010, change-032, change-045
+- distribution: change-001, change-002, change-008, change-010, change-032, change-045, change-048
 - framework: change-006
 - hooks: change-003, change-005, bug-001, change-008, change-030, change-036, change-041, change-045, change-047
 - hub: requirement-003, change-040, change-041
@@ -206,9 +208,9 @@ When adding records, update this index file accordingly.
 - install: change-001
 - foundation: requirement-001
 - lifecycle: change-010
-- quality: change-032, change-033, decision-002, change-036, change-037, bug-002, change-039, bug-003, change-040, change-041, change-045, change-047
+- quality: change-032, change-033, decision-002, change-036, change-037, bug-002, change-039, bug-003, change-040, change-041, change-045, change-047, change-048
 - relations: change-010
-- search: change-010, change-033, decision-002, change-036, change-039, change-040, change-041, change-045
+- search: change-010, change-033, decision-002, change-036, change-039, change-040, change-041, change-045, change-048
 - skills: change-002, change-006, change-026, bug-003, change-041
 - team: requirement-003, decision-001, decision-002, change-023, change-026, change-030, change-037, bug-002, change-039, bug-003, change-041
 - uninstall: change-032
