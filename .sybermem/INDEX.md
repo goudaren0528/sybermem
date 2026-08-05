@@ -21,6 +21,7 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 - [change-047] #hooks #quality — Stopped the auto stop-hook from writing per-stop markdown records + INDEX rows; auto-trails now go to a bounded rolling `.auto-trail.jsonl` journal so low-signal noise stays out of the canonical corpus, while the existing 26 records stay untouched to preserve digest/publish/status semantics (2026-08-05)
 - [change-048] #distribution #search #quality — Second-tier audit follow-ups: unified Codex/Cursor/Kimi manifests + CI drift gates + honest platform matrix (§4), unified `Stage→Phase Digests` terminology + install-order doc fix (§3), and query-time workspace stale detection warning when indexed HEAD lags current HEAD (§2-e) (2026-08-05)
 - [decision-003] #architecture #quality — Consciously deferred 3 of 4 remaining audit follow-ups (real CI green, batch-C auto-trail cleanup, non-core platform runtime) with documented revisit triggers, and did the low-risk skill-slimming variant (human quick-guide layer over the preserved machine contract, piloted on init-project) (2026-08-05)
+- [change-049] #skills #quality — Extended the human quick-guide layer to search/using-sybermem/record/update so all five ceremony-heavy skills now open with a plain-language overview marked "not the execution contract", lowering human cognitive load without changing the authoritative machine contracts (2026-08-05)
 <!-- add new conclusions here -->
 
 ---
@@ -143,6 +144,7 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 | 046 | 2026-08-05 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-08-05-046-gitignore-readme-en-readme-and-more.md) |
 | 047 | 2026-08-05 | Auto-trail rolling journal — stop writing per-stop markdown records (batch B) | implemented | [link](changes/2026-08-05-047-auto-trail-rolling-journal-batch-b.md) |
 | 048 | 2026-08-05 | Distribution consistency, UX terminology, and workspace stale detection (batches D/E/F) | implemented | [link](changes/2026-08-05-048-distribution-ux-workspace-stale-batches-def.md) |
+| 049 | 2026-08-05 | Extend human quick-guide layer to the remaining ceremony-heavy skills | implemented | [link](changes/2026-08-05-049-extend-skill-quick-guide-layer.md) |
 <!-- add new records here -->
 
 ---
@@ -210,9 +212,9 @@ When adding records, update this index file accordingly.
 - install: change-001
 - foundation: requirement-001
 - lifecycle: change-010
-- quality: change-032, change-033, decision-002, change-036, change-037, bug-002, change-039, bug-003, change-040, change-041, change-045, change-047, change-048, decision-003
+- quality: change-032, change-033, decision-002, change-036, change-037, bug-002, change-039, bug-003, change-040, change-041, change-045, change-047, change-048, decision-003, change-049
 - relations: change-010
 - search: change-010, change-033, decision-002, change-036, change-039, change-040, change-041, change-045, change-048
-- skills: change-002, change-006, change-026, bug-003, change-041
+- skills: change-002, change-006, change-026, bug-003, change-041, change-049
 - team: requirement-003, decision-001, decision-002, change-023, change-026, change-030, change-037, bug-002, change-039, bug-003, change-041
 - uninstall: change-032
