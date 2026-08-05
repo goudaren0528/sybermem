@@ -157,6 +157,7 @@ Read `codebase-scan-rules.md` for the existing codebase scan and record detectio
 - Create missing `.sybermem/hooks/record_change_on_stop.py` from the template file when automatic mode is being installed.
 - Create missing `.sybermem/hooks/user_prompt.py` from the template file: this is the merged UserPromptSubmit hook that runs record-intent capture and read-only task recall in a single process. Prefer wiring `.claude/settings.json` UserPromptSubmit to this single hook.
 - Keep `.sybermem/hooks/detect_record_intent.py` and `.sybermem/hooks/task_recall.py` available from the template as backward-compatible modules that `user_prompt.py` reuses; do not delete them.
+- If `.claude/settings.json` still wires the legacy dual UserPromptSubmit hooks (separate `detect_record_intent.py` + `task_recall.py` entries), migrate them to a single `user_prompt.py` entry surgically: replace only those two SyberMem-managed entries and preserve unrelated custom hooks, env, and instructions.
 - Ensure the global launcher `~/.claude/sybermem/launch_record_change_on_stop.py` exists; if not, instruct the user to refresh global skills first or run `/sybermem-update`.
 - Create missing `.sybermem/hooks/session_start_context.py` from the template file when startup context injection is being installed.
 - Create missing `.sybermem/hooks/check_project_health.py` from the template file to enable fast-path updates on subsequent runs.

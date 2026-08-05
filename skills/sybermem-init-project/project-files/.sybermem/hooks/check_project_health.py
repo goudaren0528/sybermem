@@ -114,6 +114,7 @@ def check_settings_json(root: Path) -> dict:
             "status": "missing",
             "has_session_start_hook": False,
             "has_stop_hook": False,
+            "has_user_prompt_hook": False,
             "has_record_intent_hook": False,
             "has_task_recall_hook": False,
             "has_auto_mode": False,
@@ -121,15 +122,20 @@ def check_settings_json(root: Path) -> dict:
 
     has_session_start = "launch_session_start_context" in content
     has_stop = "launch_record_change_on_stop" in content
+    # Merged UserPromptSubmit hook (batch A): a single user_prompt.py entry is the
+    # target state. The legacy detect_record_intent.py + task_recall.py pair is
+    # still recognized so we can offer a non-destructive migration.
+    has_user_prompt_hook = "user_prompt.py" in content
     has_record_intent_hook = "detect_record_intent.py" in content
     has_task_recall_hook = "task_recall.py" in content
     has_auto_mode = "SYBERMEM_RECORD_MODE" in content
 
-    all_present = has_session_start and has_stop and has_record_intent_hook and has_task_recall_hook and has_auto_mode
+    all_present = has_session_start and has_stop and has_user_prompt_hook and has_auto_mode
     return {
         "status": "fresh" if all_present else "stale",
         "has_session_start_hook": has_session_start,
         "has_stop_hook": has_stop,
+        "has_user_prompt_hook": has_user_prompt_hook,
         "has_record_intent_hook": has_record_intent_hook,
         "has_task_recall_hook": has_task_recall_hook,
         "has_auto_mode": has_auto_mode,
@@ -169,6 +175,19 @@ def check_task_recall_hook(root: Path) -> dict:
     has_task_context_banner = "SyberMem retrieval hints for this task (maximum 3):" in content
     has_user_prompt_submit_contract = '"hookEventName": "UserPromptSubmit"' in content
     return {"status": "fresh" if has_task_context_banner and has_user_prompt_submit_contract else "stale"}
+
+
+def check_user_prompt_hook(root: Path) -> dict:
+    """Check user_prompt.py status — the merged record-intent + task-recall hook (batch A)."""
+    path = root / ".sybermem" / "hooks" / "user_prompt.py"
+    content = read_text(path)
+    if content is None:
+        return {"status": "missing"}
+    # Fresh copies orchestrate both legacy modules in one process.
+    has_merged_contract = "Merged UserPromptSubmit hook" in content or (
+        "detect_record_intent" in content and "task_recall" in content
+    )
+    return {"status": "fresh" if has_merged_contract else "stale"}
 
 
 def check_file_exists(path: Path) -> dict:
@@ -243,10 +262,11 @@ def generate_actions(files: dict) -> list[str]:
             actions.append("add SessionStart hook entry to .claude/settings.json (preserve other hooks)")
         if not sj.get("has_stop_hook"):
             actions.append("add Stop hook entry to .claude/settings.json (preserve other hooks)")
-        if not sj.get("has_record_intent_hook"):
-            actions.append("add UserPromptSubmit hook entry to .claude/settings.json (preserve other hooks)")
-        if not sj.get("has_task_recall_hook"):
-            actions.append("add task_recall UserPromptSubmit entry to .claude/settings.json (preserve other hooks)")
+        if not sj.get("has_user_prompt_hook"):
+            if sj.get("has_record_intent_hook") or sj.get("has_task_recall_hook"):
+                actions.append("migrate UserPromptSubmit to the merged user_prompt.py hook in .claude/settings.json (replace the detect_record_intent + task_recall entries with a single user_prompt.py entry; preserve other hooks)")
+            else:
+                actions.append("wire UserPromptSubmit to .sybermem/hooks/user_prompt.py in .claude/settings.json (preserve other hooks)")
         if not sj.get("has_auto_mode"):
             actions.append("add SYBERMEM_RECORD_MODE to .claude/settings.json (preserve other env)")
 
@@ -273,6 +293,12 @@ def generate_actions(files: dict) -> list[str]:
         actions.append("create .sybermem/hooks/task_recall.py from template")
     elif trh.get("status") == "stale":
         actions.append("replace .sybermem/hooks/task_recall.py from template")
+
+    uph = files.get(".sybermem/hooks/user_prompt.py", {})
+    if uph.get("status") == "missing":
+        actions.append("create .sybermem/hooks/user_prompt.py from template")
+    elif uph.get("status") == "stale":
+        actions.append("replace .sybermem/hooks/user_prompt.py from template")
 
     # INDEX.md — insert missing sections only
     idx = files.get(".sybermem/INDEX.md", {})
@@ -356,6 +382,7 @@ def main() -> int:
     files[".sybermem/hooks/record_change_on_stop.py"] = check_stop_hook(root)
     files[".sybermem/hooks/session_start_context.py"] = check_session_start_hook(root)
     files[".sybermem/hooks/task_recall.py"] = check_task_recall_hook(root)
+    files[".sybermem/hooks/user_prompt.py"] = check_user_prompt_hook(root)
     files[".sybermem/hooks/launch_record_change_on_stop.py"] = check_file_exists(root / ".sybermem" / "hooks" / "launch_record_change_on_stop.py")
     files[".sybermem/INDEX.md"] = check_index_md(root)
     files[".sybermem/digests/"] = check_dir_exists(root / ".sybermem" / "digests")
