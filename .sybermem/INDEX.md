@@ -22,6 +22,7 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 - [change-048] #distribution #search #quality — Second-tier audit follow-ups: unified Codex/Cursor/Kimi manifests + CI drift gates + honest platform matrix (§4), unified `Stage→Phase Digests` terminology + install-order doc fix (§3), and query-time workspace stale detection warning when indexed HEAD lags current HEAD (§2-e) (2026-08-05)
 - [decision-003] #architecture #quality — Consciously deferred 3 of 4 remaining audit follow-ups (real CI green, batch-C auto-trail cleanup, non-core platform runtime) with documented revisit triggers, and did the low-risk skill-slimming variant (human quick-guide layer over the preserved machine contract, piloted on init-project) (2026-08-05)
 - [change-049] #skills #quality — Extended the human quick-guide layer to search/using-sybermem/record/update so all five ceremony-heavy skills now open with a plain-language overview marked "not the execution contract", lowering human cognitive load without changing the authoritative machine contracts (2026-08-05)
+- [bug-004] #hooks #distribution — Fixed a batch-A propagation gap where check_project_health.py still keyed on the legacy dual UserPromptSubmit hooks, so `/sybermem-update` would drag already-merged projects back to dual-hook; health check now treats a single user_prompt.py entry as fresh and offers a non-destructive dual→single migration (2026-08-05)
 <!-- add new conclusions here -->
 
 ---
@@ -178,6 +179,7 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 | 001 | 2026-06-09 | init-project misclassifies missing hook file as custom/kept | medium | [link](bugs/2026-06-09-001-init-project-misclassifies-missing-hook-file.md) |
 | 002 | 2026-08-04 | Publish preview bootstrap and JSON output leaks | high | [link](bugs/2026-08-04-002-publish-preview-bootstrap-json-output.md) |
 | 003 | 2026-08-04 | Publish trust summary and skill flow gaps | high | [link](bugs/2026-08-04-003-publish-trust-summary-and-skill-flow-gaps.md) |
+| 004 | 2026-08-05 | Merged user_prompt hook not propagated by health check (update regressed to dual-hook) | high | [link](bugs/2026-08-05-004-merged-hook-not-propagated-by-health-check.md) |
 <!-- add new records here -->
 
 ---
@@ -203,9 +205,9 @@ When adding records, update this index file accordingly.
 - collaboration: requirement-003, decision-001, change-023, change-026
 - compression: requirement-002
 - digest: requirement-002, change-010, change-023
-- distribution: change-001, change-002, change-008, change-010, change-032, change-045, change-048
+- distribution: change-001, change-002, change-008, change-010, change-032, change-045, change-048, bug-004
 - framework: change-006
-- hooks: change-003, change-005, bug-001, change-008, change-030, change-036, change-041, change-045, change-047
+- hooks: change-003, change-005, bug-001, change-008, change-030, change-036, change-041, change-045, change-047, bug-004
 - hub: requirement-003, change-040, change-041
 - init: change-005, bug-001, change-030
 - injection: change-032
