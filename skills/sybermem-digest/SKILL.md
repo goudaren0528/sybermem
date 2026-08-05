@@ -9,7 +9,7 @@ description: Use when creating a durable phase digest from existing SyberMem rec
 
 Create a durable phase digest in `.sybermem/digests/` so future project understanding does not require re-reading every raw record.
 
-In this skill, the artifact is a phase digest. The required `## Stage Digests` heading in `INDEX.md` is the index section name that lists these phase digests.
+In this skill, the artifact is a phase digest. The required `## Phase Digests` heading in `INDEX.md` is the index section name that lists these phase digests.
 
 ## Core Invariants
 
@@ -34,7 +34,7 @@ Resolve project root by walking up from cwd to find `.sybermem/` + `.claude/sett
 Before creating a digest, verify all of the following:
 
 - `.sybermem/digests/` exists
-- `.sybermem/INDEX.md` contains a `## Stage Digests` section
+- `.sybermem/INDEX.md` contains a `## Phase Digests` section
 - `.sybermem/INDEX.md` contains the exact insertion anchor `<!-- add new digest records here -->` within that section
 - `.sybermem/templates/digest-template.md` exists
 
@@ -45,7 +45,7 @@ If any of these are missing, explain that digest support has not been enabled in
 You MUST complete these steps in order:
 
 1. **Resolve project root** — apply Step 0 directory resolution rules above
-2. **Verify preconditions** — `.sybermem/digests/` exists, `INDEX.md` has `## Stage Digests` with `<!-- add new digest records here -->`, `.sybermem/templates/digest-template.md` exists. If any missing, ask user to run `/sybermem-update`.
+2. **Verify preconditions** — `.sybermem/digests/` exists, `INDEX.md` has `## Phase Digests` with `<!-- add new digest records here -->`, `.sybermem/templates/digest-template.md` exists. If any missing, ask user to run `/sybermem-update`.
 3. **Determine digest input mode**:
    - If explicit source records specified → use them directly, skip phase-index dependency
    - If no explicit source records:
@@ -66,7 +66,7 @@ For each phase, run Steps 4–10 independently. This is the normal batch path �
    - **Partial overlap** → warn, recommend extending existing digest, only continue if user confirms
 7. **Generate metadata** — set `type: digest`, `kind: phase`, `date`, `number`, `title`, `status: completed` (default), `source_records`, `coverage.from/to`, `fingerprint`
 8. **Write the digest file** — path: `.sybermem/digests/{YYYY-MM-DD}-{NNN}-{title}.md`. Use `.sybermem/templates/digest-template.md`.
-9. **Update INDEX.md** — insert row above `<!-- add new digest records here -->` in `## Stage Digests` table: `| NNN | YYYY-MM-DD | Title | <status> | X records | [link](digests/file.md) |`
+9. **Update INDEX.md** — insert row above `<!-- add new digest records here -->` in `## Phase Digests` table: `| NNN | YYYY-MM-DD | Title | <status> | X records | [link](digests/file.md) |`
 10. **Preserve Key Conclusions signal quality** — do not add to `## Key Conclusions` by default. Only add if the digest introduces a truly global project conclusion.
 11. **Archive source record conclusions** — after writing the digest, move the Key Conclusions of the source records to `## Archived Conclusions` in INDEX.md. Append `[compressed in digest-NNN]` to each archived line. This keeps Key Conclusions focused on current undigested work. Only move conclusions whose record ID is in the `source_records` list; leave other conclusions untouched.
 
@@ -94,7 +94,7 @@ If you catch yourself doing any of these, STOP:
 
 This skill is complete when:
 - the digest file is written to `.sybermem/digests/`
-- the `INDEX.md` Stage Digests table has a new row
+- the `INDEX.md` Phase Digests table has a new row
 - the source records are explicitly listed in the digest
 - the user has been shown the digest path and coverage
 

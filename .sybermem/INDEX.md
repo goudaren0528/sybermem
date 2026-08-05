@@ -66,7 +66,7 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 
 ---
 
-## Stage Digests
+## Phase Digests
 
 | Number | Date | Title | Status | Coverage | Link |
 |--------|------|-------|--------|----------|------|

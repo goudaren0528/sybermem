@@ -52,15 +52,7 @@ Integration completeness varies by platform. Choose based on the actual level:
 
 ## Install
 
-### Claude Code plugin install (recommended)
-
-```bash
-claude --plugin-dir .
-```
-
-This is the recommended path for Claude Code users who want hooks and skills managed through the plugin runtime.
-
-### Claude Code / OpenCode script install (compatibility mode)
+### One-line install (recommended for users)
 
 ```bash
 # macOS / Linux
@@ -69,6 +61,16 @@ curl -sSL https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/i
 # Windows (PowerShell)
 irm https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/install-remote.ps1 | iex
 ```
+
+The most intuitive path — no clone needed. One command refreshes Claude Code / OpenCode skills, the OpenCode plugin, and the CLI / Core runtime.
+
+### Claude Code plugin install (developers / local validation)
+
+```bash
+claude --plugin-dir .
+```
+
+Best for loading hooks and skills as a plugin directly inside a local checkout for development or validation.
 
 ### OpenCode
 
