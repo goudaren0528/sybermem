@@ -9,8 +9,9 @@ from sybermem_core.project import resolve_project_root, ensure_project_yaml
 from sybermem_core.registry import register_project
 from sybermem_core.identity import git_remote
 from sybermem_core.index import rebuild_index
-from sybermem_core.search import WorkspaceIndexIncompatibleError, search_project, search_workspace
+from sybermem_core.search import ProjectRootNotFoundError, WorkspaceIndexIncompatibleError, search_project, search_workspace
 from sybermem_core.status import project_status
+from sybermem_core.resume import build_resume_checkpoint
 from sybermem_core.portfolio import build_portfolio
 from sybermem_core.team import init_team_repo
 from sybermem_core.publish_bootstrap import bootstrap_publish_status
@@ -59,7 +60,11 @@ def cmd_search(args: argparse.Namespace) -> int:
             print(str(exc), file=sys.stderr)
             return 1
     else:
-        results = search_project(args.query)
+        try:
+            results = search_project(args.query)
+        except ProjectRootNotFoundError as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
 
     payload = {
         "query": args.query,
@@ -75,6 +80,45 @@ def cmd_search(args: argparse.Namespace) -> int:
         print(dump_json(payload))
     else:
         render_search_text(results)
+    return 0
+
+
+def cmd_resume(args: argparse.Namespace) -> int:
+    root = resolve_project_root()
+    if root is None:
+        print("No SyberMem project root found.", file=sys.stderr)
+        return 1
+    checkpoint = build_resume_checkpoint(root, mode=args.mode)
+    if args.format == "json":
+        print(dump_json(checkpoint))
+        return 0
+
+    phase = checkpoint["active_phase"]
+    phase_label = phase.get("id") or phase.get("name") or "(no phase)"
+    project = checkpoint["project"]
+    print(f"[{project['slug']}] resume ({checkpoint['mode']})")
+    print(f"- current phase: {phase_label} {phase.get('name', '')}".rstrip())
+    print(f"- confidence: {checkpoint['confidence']}  freshness: {checkpoint['freshness']}")
+
+    progress = checkpoint["progress"]
+    if progress:
+        print("- recent progress:")
+        for item in progress:
+            print(f"  - [{item['record_id']}] {item['title']}")
+
+    risks = checkpoint["risks"]
+    if risks:
+        print("- risks:")
+        for risk in risks:
+            print(f"  - {risk.get('summary', risk)}")
+
+    action = checkpoint["next_action"]
+    print(f"- next action: {action['action']} — {action['reason']}")
+
+    if checkpoint.get("read_targets"):
+        print("- read targets:")
+        for target in checkpoint["read_targets"]:
+            print(f"  - {target}")
     return 0
 
 
@@ -238,6 +282,11 @@ def main() -> int:
     portfolio = sub.add_parser("portfolio")
     portfolio.add_argument("--format", choices=["text", "json"], default="text")
     portfolio.set_defaults(func=cmd_portfolio)
+
+    resume = sub.add_parser("resume")
+    resume.add_argument("--mode", choices=["fast", "standard", "deep"], default="fast")
+    resume.add_argument("--format", choices=["text", "json"], default="text")
+    resume.set_defaults(func=cmd_resume)
 
     team = sub.add_parser("team")
     team_sub = team.add_subparsers(dest="team_command", required=True)

@@ -121,6 +121,18 @@ Where:
 - `/sybermem-resume` — get the read-only restart brief before choosing whether to run the next step
 - `/using-sybermem` — inspect the current state and get the recommended command
 
+## Commands vs Skill orchestration
+
+SyberMem capabilities run through two execution paths with different reliability. Know which is which:
+
+| Category | Capabilities | How it runs | Characteristics |
+|---|---|---|---|
+| **CLI commands** (program-verified) | `sybermem resume` / `search` / `project status` / `portfolio` / `team init` / `team summary` / `publish status` | Executed directly by the `sybermem` CLI + core | Deterministic, scriptable, stable output |
+| **Skill orchestration** (AI-executed) | `/sybermem-record` / `/sybermem-link` / `/sybermem-digest` / `/sybermem-theme-digest` / `/sybermem-phase-analyze` / `/sybermem-phase-confirm` | The AI edits `.sybermem/` markdown per skill instructions | Depends on AI judgement, not a deterministic command |
+
+- `sybermem resume` now provides a **programmatic** restart brief (`--mode fast|standard|deep`, `--format text|json`) alongside the natural-language `/sybermem-resume` skill.
+- record / link / digest and similar are skill orchestration: they have no CLI command and rely on the AI following skill instructions to edit markdown records, so their reliability depends on the AI doing so correctly.
+
 ## Resume and trust UX
 
 `/sybermem-resume` is the natural-language-first restart entrypoint for requests like "resume this project", "what was I doing", or "what should I do next".
