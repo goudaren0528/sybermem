@@ -94,6 +94,7 @@ def check_hook_wiring(root: Path) -> None:
     hook_text = hook_path.read_text(encoding="utf-8")
     required_fragments = [
         "CLAUDE_PROJECT_DIR:-$(pwd)",
+        "$root/.sybermem/hooks/user_prompt.py",
         "$root/.sybermem/hooks/task_recall.py",
         'python "$script" "$@"',
         "2>/dev/null || exit 0",
@@ -254,10 +255,55 @@ def claude_validate(root: Path, target: Path) -> None:
         fail(f"claude plugins validate failed for {rel(target, root)}:\n{result.stdout}{result.stderr}")
 
 
+VERSION_PYPROJECT_FILES: Final = [
+    Path("packages/core/pyproject.toml"),
+    Path("packages/cli/pyproject.toml"),
+]
+VERSION_JSON_FILES: Final = [
+    Path(".claude-plugin/plugin.json"),
+    Path(".claude-plugin/marketplace.json"),
+    Path(".codex-plugin/plugin.json"),
+    Path(".cursor-plugin/plugin.json"),
+    Path(".kimi-plugin/plugin.json"),
+    Path("gemini-extension.json"),
+]
+
+
+def check_version_consistency(root: Path) -> None:
+    import re
+
+    version_file = root / "VERSION"
+    if not version_file.is_file():
+        fail("Missing file: VERSION (single-source version). Run scripts/sync-version.py.")
+    expected = version_file.read_text(encoding="utf-8").strip()
+    if not expected:
+        fail("VERSION file is empty")
+
+    pyproject_re = re.compile(r'(?m)^version\s*=\s*"([^"]*)"')
+    for rel_path in VERSION_PYPROJECT_FILES:
+        text = (root / rel_path).read_text(encoding="utf-8")
+        match = pyproject_re.search(text)
+        if not match or match.group(1) != expected:
+            found = match.group(1) if match else "(none)"
+            fail(f"{rel_path.as_posix()} version {found} != VERSION {expected}; run scripts/sync-version.py")
+
+    for rel_path in VERSION_JSON_FILES:
+        data = json.loads((root / rel_path).read_text(encoding="utf-8"))
+        # marketplace.json nests the version under plugins[*]; others have it top-level.
+        if "plugins" in data and isinstance(data["plugins"], list):
+            versions = [p.get("version") for p in data["plugins"]]
+            bad = [v for v in versions if v != expected]
+            if bad or not versions:
+                fail(f"{rel_path.as_posix()} plugin version {bad or '(none)'} != VERSION {expected}; run scripts/sync-version.py")
+        elif data.get("version") != expected:
+            fail(f"{rel_path.as_posix()} version {data.get('version')} != VERSION {expected}; run scripts/sync-version.py")
+
+
 def main(root: Path = ROOT) -> int:
     check_required_files(root)
     check_hook_wiring(root)
     check_no_python_cache_artifacts(root)
+    check_version_consistency(root)
     names = check_skill_tree_parity(root)
     check_distribution_script_coverage(root, names)
     check_opencode_plugin_update_wiring(root)

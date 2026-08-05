@@ -121,6 +121,19 @@ OpenCode 也可以通过其插件路径使用。安装说明见 [`.opencode/INST
 - `/sybermem-resume` — 先拿到只读续接视图，再决定是否继续执行下一步
 - `/using-sybermem` — 检查当前项目状态，并获得推荐命令
 
+## 命令 vs Skill 编排
+
+SyberMem 的能力分两类执行路径，可靠性不同，使用时请区分：
+
+| 类别 | 能力 | 执行方式 | 特性 |
+|---|---|---|---|
+| **CLI 命令**（程序校验） | `sybermem resume` / `search` / `project status` / `portfolio` / `team init` / `team summary` / `publish status` | 由 `sybermem` CLI + core 直接执行 | 确定性、可脚本化、结果稳定 |
+| **Skill 编排**（AI 执行） | `/sybermem-record` / `/sybermem-link` / `/sybermem-digest` / `/sybermem-theme-digest` / `/sybermem-phase-analyze` / `/sybermem-phase-confirm` | 由 AI 按 skill 指令编辑 `.sybermem/` markdown | 依赖 AI 判断，非确定性命令 |
+
+- `sybermem resume` 现在提供**程序化**续接（`--mode fast|standard|deep`、`--format text|json`），与自然语言的 `/sybermem-resume` skill 并存。
+- record / link / digest 等属于 Skill 编排：它们没有对应的 CLI 命令，是让 AI 依据 skill 指令直接编辑 markdown 记录，因此可靠性取决于 AI 是否正确遵循 skill。
+
+
 ## Resume 与信任说明
 
 `/sybermem-resume` 是自然语言优先的续接入口，适合“继续这个项目”、“我刚刚做到哪了”、“下一步最安全是什么”这类请求。

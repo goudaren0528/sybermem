@@ -19,6 +19,52 @@ SearchValue: TypeAlias = str | float
 SearchRow: TypeAlias = dict[str, SearchValue]
 
 
+class ProjectRootNotFoundError(RuntimeError):
+    """Raised when project-scope search runs outside a SyberMem project root."""
+
+    def __init__(self) -> None:
+        super().__init__("No SyberMem project root found.")
+
+
+# Process-local parsed-record cache: root -> (fingerprint, rows).
+# Transparent: results are identical to re-parsing; only avoids redundant work
+# within a single process (e.g. search_project + its compact fallback).
+_ROW_CACHE: dict[str, tuple[float, list[SearchRow]]] = {}
+
+
+def _records_fingerprint(root: Path) -> float:
+    latest = 0.0
+    for subdir in ("changes", "decisions", "requirements", "bugs", "digests", "theme-digests"):
+        record_dir = root / ".sybermem" / subdir
+        if not record_dir.is_dir():
+            continue
+        try:
+            latest = max(latest, record_dir.stat().st_mtime)
+            for path in record_dir.glob("*.md"):
+                latest = max(latest, path.stat().st_mtime)
+        except OSError:
+            continue
+    return latest
+
+
+def _load_all_rows(root: Path, project_id: str, slug: str) -> list[SearchRow]:
+    """Return freshly-copied parsed record rows, reusing a cached parse when unchanged.
+
+    Callers mutate the returned rows (score/matched_fields), so we always hand out
+    shallow copies of each row dict. The cache holds pristine parses keyed by the
+    record directories' mtime fingerprint, making it transparent to results.
+    """
+    key = str(root)
+    fingerprint = _records_fingerprint(root)
+    cached = _ROW_CACHE.get(key)
+    if cached is not None and cached[0] == fingerprint:
+        pristine = cached[1]
+    else:
+        pristine = [_search_row(parse_record_file(rf, project_id, slug)) for rf in iter_record_files(root)]
+        _ROW_CACHE[key] = (fingerprint, pristine)
+    return [dict(row) for row in pristine]
+
+
 def _with_retrieval_metadata(
     row: SearchRow,
     *,
@@ -166,14 +212,14 @@ def _compact_match_allowed(score: float, match: str, matched_fields: int) -> boo
 def search_project(query: str) -> list[SearchRow]:
     root = resolve_project_root()
     if root is None:
-        return []
+        raise ProjectRootNotFoundError()
     meta = parse_project_yaml(root)
     project_id = meta.get("project_id", "")
     slug = meta.get("slug", root.name)
     results: list[SearchRow] = []
     q = query.lower()
     terms = query_terms(query)
-    all_rows = [_search_row(parse_record_file(rf, project_id, slug)) for rf in iter_record_files(root)]
+    all_rows = _load_all_rows(root, project_id, slug)
     digest_coverage = _digest_coverage(all_rows)
     archived_ids = _archived_record_ids(root)
     guidance_rows = [_with_retrieval_metadata(row, match_reason="", related_digest=_related_digest(row, digest_coverage), archived=_text(row, "record_id") in archived_ids) for row in all_rows]
@@ -202,7 +248,11 @@ def search_project(query: str) -> list[SearchRow]:
 
 
 def compact_project_search(query: str, limit: int = 3, *, include_abstention: bool = False) -> list[SearchRow]:
-    rows = search_project(query)
+    try:
+        rows = search_project(query)
+    except ProjectRootNotFoundError:
+        # Hot-path hook caller: degrade silently when outside a project root.
+        return []
     if not rows:
         root = resolve_project_root()
         if root is None:
@@ -215,7 +265,7 @@ def compact_project_search(query: str, limit: int = 3, *, include_abstention: bo
             return []
 
         fallback_rows: list[SearchRow] = []
-        all_rows = [_search_row(parse_record_file(rf, project_id, slug)) for rf in iter_record_files(root)]
+        all_rows = _load_all_rows(root, project_id, slug)
         digest_coverage = _digest_coverage(all_rows)
         archived_ids = _archived_record_ids(root)
         for row in all_rows:

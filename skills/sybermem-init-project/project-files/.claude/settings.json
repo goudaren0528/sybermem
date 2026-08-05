@@ -8,19 +8,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .sybermem/hooks/detect_record_intent.py",
+            "command": "python .sybermem/hooks/user_prompt.py",
             "timeout": 10,
-            "statusMessage": "SyberMem checking whether this round should be recorded..."
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python .sybermem/hooks/task_recall.py",
-            "timeout": 10,
-            "statusMessage": "SyberMem gathering related task context..."
+            "statusMessage": "SyberMem checking record intent and gathering task context..."
           }
         ]
       }

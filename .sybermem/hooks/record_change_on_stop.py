@@ -421,9 +421,10 @@ def classify_followup(files: list[str], nudge_state: dict) -> tuple[str, str | N
     cross_area = len(areas) >= 2
     strong_signal = bool(high_signal_hits)
     large_change = file_count >= RECORD_FILE_THRESHOLD
-    commit_gap = count_commits_since_last_record() >= COMMIT_GAP_THRESHOLD
+    commit_count = count_commits_since_last_record()
+    commit_gap = commit_count >= COMMIT_GAP_THRESHOLD
     if (strong_signal or cross_area or large_change or commit_gap) and not (last_type == "record" and last_theme == theme_key):
-        gap_note = f" ({count_commits_since_last_record()} commits since last record)" if commit_gap else ""
+        gap_note = f" ({commit_count} commits since last record)" if commit_gap else ""
         return "record", theme_key, f"SyberMem note: this change looks important enough for a manual /sybermem-record so the reason and impact are preserved more clearly.{gap_note}"
 
     return "none", theme_key, None

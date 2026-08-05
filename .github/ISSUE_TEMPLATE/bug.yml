@@ -1,0 +1,52 @@
+name: Bug report
+description: Report a problem with SyberMem
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for reporting a bug. Please fill in the details below.
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      description: Where did you hit this?
+      options:
+        - Claude Code (plugin install)
+        - Claude Code / OpenCode (script install)
+        - OpenCode
+        - Gemini
+        - Codex
+        - Cursor
+        - Kimi
+        - Other / not sure
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: SyberMem version
+      description: Contents of the root VERSION file, or the installed version.
+      placeholder: "0.1.0"
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Describe the bug and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Minimal steps or commands to reproduce.
+      placeholder: |
+        1. Run `sybermem ...`
+        2. ...
+    validations:
+      required: true
+  - type: textarea
+    id: env
+    attributes:
+      label: Environment
+      description: OS, Python version, and anything else relevant.

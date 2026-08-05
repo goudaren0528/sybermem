@@ -132,8 +132,8 @@ Read `codebase-scan-rules.md` for the existing codebase scan and record detectio
 - Create missing `CLAUDE.md` / `AGENTS.md` from the template files.
 - Create missing project-level `.claude/settings.json` from the template file when the project does not already define its own hook settings.
 - Create missing `.sybermem/hooks/record_change_on_stop.py` from the template file when automatic mode is being installed.
-- Create missing `.sybermem/hooks/detect_record_intent.py` from the template file when reminder-first record-intent capture is being installed.
-- Create missing `.sybermem/hooks/task_recall.py` from the template file when read-only task recall is being installed for prompt-time hook support.
+- Create missing `.sybermem/hooks/user_prompt.py` from the template file: this is the merged UserPromptSubmit hook that runs record-intent capture and read-only task recall in a single process. Prefer wiring `.claude/settings.json` UserPromptSubmit to this single hook.
+- Keep `.sybermem/hooks/detect_record_intent.py` and `.sybermem/hooks/task_recall.py` available from the template as backward-compatible modules that `user_prompt.py` reuses; do not delete them.
 - Ensure the global launcher `~/.claude/sybermem/launch_record_change_on_stop.py` exists; if not, instruct the user to refresh global skills first or run `/sybermem-update`.
 - Create missing `.sybermem/hooks/session_start_context.py` from the template file when startup context injection is being installed.
 - Create missing `.sybermem/hooks/check_project_health.py` from the template file to enable fast-path updates on subsequent runs.
@@ -168,8 +168,8 @@ Read `codebase-scan-rules.md` for the existing codebase scan and record detectio
 - `INDEX.md` theme digest navigation when missing
 - `INDEX.md` archived conclusions section when missing
 - `.sybermem/hooks/record_change_on_stop.py` when auto mode is installed
-- `.sybermem/hooks/detect_record_intent.py` when reminder-first record-intent capture is installed
-- `.sybermem/hooks/task_recall.py` when read-only task recall support is installed
+- `.sybermem/hooks/user_prompt.py` (merged record-intent + task-recall UserPromptSubmit hook) when prompt-time hook support is installed
+- `.sybermem/hooks/detect_record_intent.py` and `.sybermem/hooks/task_recall.py` kept as backward-compatible modules reused by `user_prompt.py`
 - `.sybermem/hooks/launch_record_change_on_stop.py` when root-resolving launcher support is installed
 - managed Stop hook command updated to the launcher form when needed
 - `.sybermem/hooks/session_start_context.py` when startup context injection is installed

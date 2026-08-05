@@ -1,0 +1,36 @@
+name: Feature request
+description: Suggest an improvement or new capability
+title: "[feature] "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / motivation
+      description: What are you trying to do, and what is blocking you today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the capability or change you'd like.
+    validations:
+      required: true
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Scope
+      options:
+        - Project (records / resume / search / digest)
+        - Hub (registry / portfolio / workspace search)
+        - Team (publish / summary)
+        - CLI
+        - Hooks
+        - Distribution / install
+        - Docs
+        - Other
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered

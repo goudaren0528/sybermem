@@ -23,9 +23,14 @@ if ! root="$(resolve_project_root)"; then
   exit 0
 fi
 
-script="$root/.sybermem/hooks/task_recall.py"
+script="$root/.sybermem/hooks/user_prompt.py"
 if [ ! -f "$script" ]; then
-  exit 0
+  # Backward-compat: fall back to the legacy recall-only hook if a project
+  # has not yet been updated to the merged user_prompt.py entry.
+  script="$root/.sybermem/hooks/task_recall.py"
+  if [ ! -f "$script" ]; then
+    exit 0
+  fi
 fi
 
 if ! cd "$root"; then
