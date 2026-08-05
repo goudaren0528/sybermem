@@ -9,7 +9,7 @@ from sybermem_core.project import resolve_project_root, ensure_project_yaml
 from sybermem_core.registry import register_project
 from sybermem_core.identity import git_remote
 from sybermem_core.index import rebuild_index
-from sybermem_core.search import ProjectRootNotFoundError, WorkspaceIndexIncompatibleError, search_project, search_workspace
+from sybermem_core.search import ProjectRootNotFoundError, WorkspaceIndexIncompatibleError, search_project, search_workspace, workspace_index_staleness
 from sybermem_core.status import project_status
 from sybermem_core.resume import build_resume_checkpoint
 from sybermem_core.portfolio import build_portfolio
@@ -53,12 +53,14 @@ def cmd_index_build(args: argparse.Namespace) -> int:
 
 
 def cmd_search(args: argparse.Namespace) -> int:
+    stale: list[dict] = []
     if args.scope == "workspace":
         try:
             results = search_workspace(args.query, project=args.project, type_=args.type, project_status=args.project_status)
         except (FileNotFoundError, WorkspaceIndexIncompatibleError) as exc:
             print(str(exc), file=sys.stderr)
             return 1
+        stale = workspace_index_staleness()
     else:
         try:
             results = search_project(args.query)
@@ -76,10 +78,19 @@ def cmd_search(args: argparse.Namespace) -> int:
         },
         "results": results,
     }
+    if args.scope == "workspace":
+        payload["index_staleness"] = stale
     if args.format == "json":
         print(dump_json(payload))
     else:
         render_search_text(results)
+        if stale:
+            slugs = ", ".join(entry.get("slug", entry.get("project_id", "")) for entry in stale)
+            print(
+                f"note: {len(stale)} project(s) have a stale workspace index "
+                f"(indexed HEAD != current HEAD); run 'sybermem index build' to refresh: {slugs}",
+                file=sys.stderr,
+            )
     return 0
 
 
