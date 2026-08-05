@@ -54,7 +54,13 @@ jobs:
         with:
           python-version: "3.12"
       - name: Version single-source is consistent
-        run: python scripts/sync-version.py
+        run: |
+          python scripts/sync-version.py
+          git diff --exit-code -- '**/pyproject.toml' '*-plugin/*.json' '.claude-plugin/*.json' gemini-extension.json
+      - name: Skill mirror is in sync (no drift)
+        run: |
+          python scripts/sync-plugin-skills.py
+          git diff --exit-code -- skills/
       - name: Plugin package integrity check
         run: python scripts/check-plugin-package.py
 
