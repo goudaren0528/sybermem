@@ -25,8 +25,10 @@
 - `docs/superpowers/specs/2026-08-05-sybermem-oss-readiness-design.md`
 - 对应 plan 在 `docs/superpowers/plans/`（该目录被 .gitignore 忽略，属本地工作产物约定）
 
+**P0-§2 批次 B（已完成 2026-08-05）：** auto-trail 改有界滚动 journal。经下游依赖调研（auto-trail 深嵌 canonical 枚举、8 个文件被 digest 引用）+ 用户确认，采取**最低风险路径**：stop hook 的 auto 模式不再写 `.sybermem/changes/` markdown 与 INDEX 行，改 append `.sybermem/.auto-trail.jsonl`（有界 200 条）；**既有 26 条零改动**（不碰 digest provenance / publish hash / status 计数 / search archived）；去重改从 journal 读；reminder/nudge 信号不变。验证：stop hook 实测写 journal 不写 markdown、去重+有界生效、既有记录零改动、pytest core 83 + cli 11 绿（更新 1 个编码旧契约的 stop-hook 测试）、check-plugin-package `OK`。spec: `docs/superpowers/specs/2026-08-05-sybermem-auto-trail-journal-design.md`。
+
 **范围内明确延后（需用户/独立决策）：**
-- **P0-§2 批次 B**：auto-trail 改滚动 journal —— 改变 `.sybermem/changes/` 存储结构、需迁移 26+ 条记录、影响 INDEX/Team/digest 下游，风险高，留独立 spec。
+- **批次 C（更大范围）**：真正清理既有 26 条 + 让 status/publish 从 journal 重算 —— 会改 publish source_hash 语义，独立决策。
 - **P0-§2 stop hook next-id 持久化**：state 与 changes/ 目录可能不一致导致编号冲突，保守保留 glob。
 - **P1-§5 CI 真实绿灯**：本地已跑通 pytest/build/package-check 步骤，矩阵/多 OS 并行需 push 到 GitHub 才能确认。
 - **§3 体验瘦身 / §4 平台补全**：第二梯队，根因修复后跟进。

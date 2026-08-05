@@ -268,14 +268,20 @@ def test_stop_hook_nested_cwd_records_root_relative_paths_and_skips_sybermem(tmp
         check=False,
     )
 
-    # Then: auto records use repo-root-relative paths and continue skipping .sybermem files
-    records = list((project_root / ".sybermem" / "changes").glob("*.md"))
+    # Then: auto stops append a bounded journal entry (Batch B) instead of a
+    # Markdown record, still using repo-root-relative paths and skipping
+    # .sybermem files.
     assert proc.returncode == 0
-    assert len(records) == 1
-    content = records[0].read_text(encoding="utf-8")
-    assert "packages/core/smoke.py" in content
-    assert "`smoke.py`" not in content
-    assert "scratch.md" not in content
+    records = list((project_root / ".sybermem" / "changes").glob("*.md"))
+    assert len(records) == 0
+    journal = project_root / ".sybermem" / ".auto-trail.jsonl"
+    assert journal.is_file()
+    entries = [json.loads(line) for line in journal.read_text(encoding="utf-8").splitlines() if line.strip()]
+    assert len(entries) == 1
+    files = entries[0]["files"]
+    assert "packages/core/smoke.py" in files
+    assert "smoke.py" not in files
+    assert not any("scratch.md" in f for f in files)
 
 
 def test_stop_hook_remind_mode_does_not_write_auto_record(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

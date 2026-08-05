@@ -282,31 +282,63 @@ DIGEST_SIGNAL_FILE_FLOOR = 3
 AUTO_TRAIL_DEDUP_WINDOW = 3
 AUTO_TRAIL_OVERLAP_THRESHOLD = 0.8
 
+# Batch B: auto-mode stops now append to a bounded rolling journal instead of
+# writing one Markdown record per stop into .sybermem/changes/ + INDEX.md.
+# This keeps low-signal change trails out of the canonical record corpus.
+AUTO_TRAIL_JOURNAL_PATH = SYBERMEM_DIR / ".auto-trail.jsonl"
+AUTO_TRAIL_JOURNAL_MAX = 200
 
-def overlaps_recent_auto_trails(files: list[str]) -> bool:
-    """Check if the current file set overlaps >80% with any of the last 3 auto trails."""
-    if not CHANGES_DIR.is_dir():
-        return False
-    trails = sorted(CHANGES_DIR.glob("*.md"), key=lambda p: p.name, reverse=True)
-    current_set = set(files)
-    checked = 0
-    for trail_path in trails:
-        if checked >= AUTO_TRAIL_DEDUP_WINDOW:
-            break
+
+def read_recent_auto_trail(limit: int) -> list[dict]:
+    """Return the last ``limit`` journal entries, newest last. Fail open."""
+    if not AUTO_TRAIL_JOURNAL_PATH.is_file():
+        return []
+    try:
+        lines = AUTO_TRAIL_JOURNAL_PATH.read_text(encoding="utf-8").splitlines()
+    except Exception:
+        return []
+    entries: list[dict] = []
+    for line in lines[-limit:]:
+        line = line.strip()
+        if not line:
+            continue
         try:
-            content = trail_path.read_text(encoding="utf-8")
+            parsed = json.loads(line)
         except Exception:
             continue
-        # Only check auto-generated trails (they have the "Auto-generated" marker)
-        if "Auto-generated from workspace changes" not in content:
-            continue
-        checked += 1
-        # Extract related_files from frontmatter
-        fm_match = re.search(r"^related_files:\s*(.+)$", content, re.MULTILINE)
-        if not fm_match:
-            continue
-        trail_files = {f.strip() for f in fm_match.group(1).split(",")}
-        if not trail_files or not current_set:
+        if isinstance(parsed, dict):
+            entries.append(parsed)
+    return entries
+
+
+def append_auto_trail_journal(record_date: str, files: list[str], areas: set[str], followup_hint: str) -> None:
+    """Append one bounded journal entry; never raise out of the hook."""
+    try:
+        entry = {
+            "date": record_date,
+            "files": list(files),
+            "areas": sorted(areas),
+            "followup_hint": followup_hint,
+        }
+        existing: list[str] = []
+        if AUTO_TRAIL_JOURNAL_PATH.is_file():
+            existing = AUTO_TRAIL_JOURNAL_PATH.read_text(encoding="utf-8").splitlines()
+        existing = [line for line in existing if line.strip()]
+        existing.append(json.dumps(entry, ensure_ascii=False))
+        bounded = existing[-AUTO_TRAIL_JOURNAL_MAX:]
+        AUTO_TRAIL_JOURNAL_PATH.write_text("\n".join(bounded) + "\n", encoding="utf-8")
+    except Exception:
+        return
+
+
+def overlaps_recent_auto_trails(files: list[str]) -> bool:
+    """Check if the current file set overlaps >80% with any of the last 3 journal trails."""
+    current_set = set(files)
+    if not current_set:
+        return False
+    for entry in reversed(read_recent_auto_trail(AUTO_TRAIL_DEDUP_WINDOW)):
+        trail_files = {str(f).strip() for f in entry.get("files", []) if str(f).strip()}
+        if not trail_files:
             continue
         overlap = len(current_set & trail_files) / max(len(current_set), len(trail_files))
         if overlap >= AUTO_TRAIL_OVERLAP_THRESHOLD:
@@ -595,14 +627,13 @@ def main() -> int:
         return 0
 
     record_date = date.today().isoformat()
-    number = next_change_id()
-    slug = make_title(files)
-    author = run_git("config", "user.name") or "Claude"
-    record_path = CHANGES_DIR / f"{record_date}-{number}-{slug}.md"
     if mode == "auto":
-        record_path.write_text(render_record(record_date, number, slug.replace("-", " "), files, author, followup_hint), encoding="utf-8")
-        update_index(record_date, number, slug.replace("-", " "), slug)
-        save_state({"last_fingerprint": fingerprint, "last_record": record_path.name})
+        # Batch B: append a bounded journal entry instead of writing a Markdown
+        # record + INDEX.md row. Keeps low-signal auto-trails out of the
+        # canonical record corpus while preserving the change trail.
+        areas = detect_high_level_areas(files)
+        append_auto_trail_journal(record_date, files, areas, followup_hint)
+        save_state({"last_fingerprint": fingerprint, "last_record": state.get("last_record", "")})
     else:
         save_state({"last_fingerprint": fingerprint, "last_record": state.get("last_record", "")})
 
@@ -618,7 +649,7 @@ def main() -> int:
         },
         "last_theme": theme_key,
         "last_nudge_type": followup_hint if followup_hint in RECORD_COOLDOWN_KEYS else "none",
-        "last_record": record_path.name,
+        "last_record": state.get("last_record", ""),
     }
     if followup_hint == "digest":
         digest_nudged_at: dict = dict(nudge_state.get("digest_nudged_at_window_len", {}))
