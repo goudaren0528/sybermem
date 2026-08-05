@@ -8,12 +8,12 @@ For projects that already have `.sybermem/INDEX.md`, check whether digest suppor
 
 - `.sybermem/digests/`
 - `.sybermem/templates/digest-template.md`
-- `## Stage Digests` section in `.sybermem/INDEX.md`
+- `## Phase Digests` section in `.sybermem/INDEX.md`
 
 If any are missing:
 - create the missing `digests/` directory
 - create the missing `digest-template.md` from `project-files/.sybermem/templates/digest-template.md`
-- insert the missing `## Stage Digests` section into `INDEX.md`
+- insert the missing `## Phase Digests` section into `INDEX.md`
 
 Do this idempotently. Never duplicate the section, never overwrite an existing digest template without asking, and never treat the absence of digest support as a reason to reinitialize the whole project.
 
@@ -53,4 +53,4 @@ For projects that already have `.sybermem/INDEX.md`, check whether the Archived 
 - `## Archived Conclusions` in `.sybermem/INDEX.md`
 - `<!-- add new archived conclusions here -->` anchor
 
-If missing, insert the section between `## Key Conclusions` (after its closing `---`) and `## Stage Digests`. Do this idempotently. Never duplicate the section, and never move or rewrite existing conclusions when inserting this block.
+If missing, insert the section between `## Key Conclusions` (after its closing `---`) and `## Phase Digests`. Do this idempotently. Never duplicate the section, and never move or rewrite existing conclusions when inserting this block.

@@ -55,7 +55,7 @@ You MUST complete these steps in order:
 3. **Identify the topic scope** — the user provides one topic slug (e.g. `hooks`). Do not merge topics in this first version.
 4. **Collect candidate records** — read `## Topic Index` in `.sybermem/INDEX.md` for that topic. If the topic is missing, refuse and explain.
 5. **Enrich with phase coverage** — read `.sybermem/analysis/phase-index.md` coverage map and determine which confirmed phases cover those records.
-6. **Prefer phase digests first** — if any of those phases already have digests listed in `## Stage Digests`, use them as primary compressed sources.
+6. **Prefer phase digests first** — if any of those phases already have digests listed in `## Phase Digests`, use them as primary compressed sources.
 7. **Fill gaps with raw records** — for records not covered by any existing phase digest, include the raw record file as a direct source.
 8. **Deduplicate** — deduplicate `source_phases`, `source_digests`, and `source_records` by ID or path.
 9. **Write the theme digest file** — path: `.sybermem/theme-digests/{YYYY-MM-DD}-{NNN}-{topic}.md`. Use `.sybermem/templates/theme-digest-template.md`. Set `coverage_strategy: phase-digests-first-then-records`.

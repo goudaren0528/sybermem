@@ -278,7 +278,7 @@ def generate_actions(files: dict) -> list[str]:
     idx = files.get(".sybermem/INDEX.md", {})
     if idx.get("status") == "stale":
         if not idx.get("has_digest_anchor"):
-            actions.append("insert Stage Digests section into INDEX.md (preserve existing content)")
+            actions.append("insert Phase Digests section into INDEX.md (preserve existing content)")
         if not idx.get("has_theme_digests") or not idx.get("has_theme_digest_anchor"):
             actions.append("insert Theme Digests section into INDEX.md (preserve existing content)")
         if not idx.get("has_archived_conclusions") or not idx.get("has_archived_anchor"):

@@ -122,7 +122,7 @@ Only if initialization has not happened yet, check for code files (excluding nod
 
 Use the standard format, including:
 - `## Key Conclusions` section + `<!-- add new conclusions here -->` placeholder
-- `## Stage Digests` section + `<!-- add new digest records here -->` placeholder
+- `## Phase Digests` section + `<!-- add new digest records here -->` placeholder
 - 4 type tables + `<!-- add new records here -->` placeholder
 
 Read `codebase-scan-rules.md` for the existing codebase scan and record detection logic.

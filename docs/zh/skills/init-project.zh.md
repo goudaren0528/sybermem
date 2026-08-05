@@ -58,13 +58,13 @@ description: 为新项目或已有代码项目初始化 SyberMem 记录系统，
 
 - `.sybermem/digests/`
 - `.sybermem/templates/digest-template.md`
-- `.sybermem/INDEX.md` 中的 `## Stage Digests` 区段
+- `.sybermem/INDEX.md` 中的 `## Phase Digests` 区段
 
 如果缺少其中任何一项：
 
 - 创建缺失的 `digests/` 目录
 - 从标准模板创建缺失的 `digest-template.md`
-- 在 `INDEX.md` 中插入缺失的 `## Stage Digests` 区段
+- 在 `INDEX.md` 中插入缺失的 `## Phase Digests` 区段
 
 这个补齐过程必须是幂等的：不要重复插入区段，不要在未确认的情况下覆盖已有的 digest 模板，也不要因为缺少 digest 支持就重新初始化整个项目。
 
@@ -78,7 +78,7 @@ description: 为新项目或已有代码项目初始化 SyberMem 记录系统，
 
 ### Step 4: 生成 INDEX.md
 
-包含关键结论区、`## Stage Digests` 区段和四类记录表格。
+包含关键结论区、`## Phase Digests` 区段和四类记录表格。
 
 ### Step 5: 扫描已有代码项目
 

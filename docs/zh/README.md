@@ -52,7 +52,7 @@ phase-index stale     → /sybermem-phase-analyze
 - `.sybermem/hooks/check_project_health.py` — update fast-path 健康检查脚本
 - `.sybermem/hooks/launch_record_change_on_stop.py` — root-resolving stop-hook launcher helper
 - `.sybermem/templates/theme-digest-template.md` — theme digest 模板
-- `INDEX.md` 含 `Key Conclusions` / `Archived Conclusions` / `Stage Digests` / `Theme Digests` / `Topic Index`
+- `INDEX.md` 含 `Key Conclusions` / `Archived Conclusions` / `Phase Digests` / `Theme Digests` / `Topic Index`
 
 ## 文件列表
 

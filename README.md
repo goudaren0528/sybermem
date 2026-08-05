@@ -52,15 +52,7 @@ SyberMem 是一个面向 AI 工作流的项目 / 团队工程记忆系统。
 
 ## 安装
 
-### Claude Code 插件安装（推荐）
-
-```bash
-claude --plugin-dir .
-```
-
-适合希望通过插件统一加载 hooks 与 skills 的 Claude Code 用户。
-
-### Claude Code / OpenCode 脚本安装（兼容模式）
+### 一行式安装（推荐，普通用户）
 
 ```bash
 # macOS / Linux
@@ -69,6 +61,16 @@ curl -sSL https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/i
 # Windows (PowerShell)
 irm https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/install-remote.ps1 | iex
 ```
+
+最直观的安装方式，无需 clone 仓库，一条命令刷新 Claude Code / OpenCode skills、OpenCode 插件与 CLI / Core runtime。
+
+### Claude Code 插件安装（开发者 / 本地验证）
+
+```bash
+claude --plugin-dir .
+```
+
+适合在本地仓库内直接以插件形式加载 hooks 与 skills 做开发或验证。
 
 ### OpenCode
 

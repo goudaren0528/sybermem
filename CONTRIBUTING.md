@@ -73,6 +73,15 @@ Also ensure:
 - Dual-language docs (`README.md` / `README.en.md`) are kept in sync when you
   change user-facing behavior.
 
+## Key Conclusions governance (`.sybermem/INDEX.md`)
+
+The `## Key Conclusions` section is injected at session start, so keep it high-signal:
+
+- Record only **current operational truths and active constraints** — what matters now.
+- Release history and implementation trivia belong in **archived conclusions** or a **phase/theme digest**, not in the active Key Conclusions list.
+- Do not rewrite or reorder existing conclusions when adding a new one; append above the `<!-- add new conclusions here -->` marker.
+- Auto-trail entries never go into Key Conclusions.
+
 ## Commit and PR style
 
 - Keep changes focused and minimal.
