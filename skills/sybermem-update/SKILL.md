@@ -75,7 +75,8 @@ That second step is responsible for:
 - checking whether local `AGENTS.md` / `CLAUDE.md` are stale, including pre-digest SyberMem-managed files that still need the digest-aware guidance refresh
 - enabling digest support by creating `.sybermem/digests/`, creating the digest template, and inserting the `Phase Digests` section when missing
 - enabling analysis support by creating `.sybermem/analysis/` and `.sybermem/analysis/phase-index.md` from the starter template when missing
-- creating or refreshing the default project-level `.claude/settings.json`, `.sybermem/hooks/record_change_on_stop.py`, `.sybermem/hooks/detect_record_intent.py`, and `.sybermem/hooks/task_recall.py` when the project uses the SyberMem-managed hook template
+- creating or refreshing the default project-level `.claude/settings.json`, `.sybermem/hooks/record_change_on_stop.py`, and `.sybermem/hooks/user_prompt.py` (the merged UserPromptSubmit hook), keeping `.sybermem/hooks/detect_record_intent.py` and `.sybermem/hooks/task_recall.py` as the backward-compatible modules `user_prompt.py` reuses, when the project uses the SyberMem-managed hook template
+- migrating a legacy dual-hook `.claude/settings.json` (separate `detect_record_intent.py` + `task_recall.py` UserPromptSubmit entries) to the single merged `user_prompt.py` entry, surgically and preserving unrelated custom hooks
 - ensuring the global stop hook launcher exists at `~/.claude/sybermem/launch_record_change_on_stop.py`
 - enabling the root-resolving stop-hook launcher by creating `.sybermem/hooks/launch_record_change_on_stop.py` when missing
 - auto-migrating existing projects from old relative Stop hook commands to the global absolute launcher command
