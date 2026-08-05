@@ -20,6 +20,7 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 - [change-045] #quality #distribution #search #hooks — Executed audit-driven P0/P1: exposed `sybermem resume` CLI (was implemented but unreachable), made search no-root failure explicit while keeping the hook path silent, merged the two prompt hooks into one process (~491ms→~297ms), and added LICENSE + CI + cli→core dependency + single-source VERSION so the repo reaches an OSS-trust baseline (2026-08-05)
 - [change-047] #hooks #quality — Stopped the auto stop-hook from writing per-stop markdown records + INDEX rows; auto-trails now go to a bounded rolling `.auto-trail.jsonl` journal so low-signal noise stays out of the canonical corpus, while the existing 26 records stay untouched to preserve digest/publish/status semantics (2026-08-05)
 - [change-048] #distribution #search #quality — Second-tier audit follow-ups: unified Codex/Cursor/Kimi manifests + CI drift gates + honest platform matrix (§4), unified `Stage→Phase Digests` terminology + install-order doc fix (§3), and query-time workspace stale detection warning when indexed HEAD lags current HEAD (§2-e) (2026-08-05)
+- [decision-003] #architecture #quality — Consciously deferred 3 of 4 remaining audit follow-ups (real CI green, batch-C auto-trail cleanup, non-core platform runtime) with documented revisit triggers, and did the low-risk skill-slimming variant (human quick-guide layer over the preserved machine contract, piloted on init-project) (2026-08-05)
 <!-- add new conclusions here -->
 
 ---
@@ -152,6 +153,7 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 |--------|------|-------|--------|------|
 | 001 | 2026-06-30 | Team MVP should precede full Hub experience for Requirement-003 | decided | [link](decisions/2026-06-30-001-team-mvp-before-full-hub-experience.md) |
 | 002 | 2026-08-04 | Adopt a lightweight continuity and trust experience layer | accepted | [link](decisions/2026-08-04-002-sybermem-continuity-trust-experience.md) |
+| 003 | 2026-08-05 | Deferral decisions for the four remaining audit follow-ups + skill quick-guide pilot | decided | [link](decisions/2026-08-05-003-audit-followup-deferral-decisions.md) |
 <!-- add new records here -->
 
 ---
@@ -194,7 +196,7 @@ When adding records, update this index file accordingly.
 
 <!-- Auto-maintained: maps topic tags to record IDs for fast lookup -->
 <!-- Optional suffix: [active] [low] [deprecated → <new-topic>] -->
-- architecture: requirement-001, requirement-003, decision-001, decision-002
+- architecture: requirement-001, requirement-003, decision-001, decision-002, decision-003
 - automation: change-003, change-008
 - collaboration: requirement-003, decision-001, change-023, change-026
 - compression: requirement-002
@@ -208,7 +210,7 @@ When adding records, update this index file accordingly.
 - install: change-001
 - foundation: requirement-001
 - lifecycle: change-010
-- quality: change-032, change-033, decision-002, change-036, change-037, bug-002, change-039, bug-003, change-040, change-041, change-045, change-047, change-048
+- quality: change-032, change-033, decision-002, change-036, change-037, bug-002, change-039, bug-003, change-040, change-041, change-045, change-047, change-048, decision-003
 - relations: change-010
 - search: change-010, change-033, decision-002, change-036, change-039, change-040, change-041, change-045, change-048
 - skills: change-002, change-006, change-026, bug-003, change-041
