@@ -9,6 +9,23 @@ description: Use when refreshing installed SyberMem skills in an existing projec
 
 Refresh the installed SyberMem skills, then re-check the current project with `/sybermem-init-project`.
 
+## Quick guide (for humans)
+
+> Plain-language overview for people. **Not** the execution contract — the
+> `<HARD-GATE>`, `## When to Use`, and `## Flow` sections below are authoritative
+> and win on any conflict.
+
+**What it does:** one maintenance command — refreshes the globally installed
+SyberMem skills, then re-runs the project check so this project picks up the
+newest managed-file behavior.
+
+**When to run:** after upgrading SyberMem, or when the project still shows old
+`ADR/` wording or stale managed files.
+
+**What you get:** up-to-date global skills plus a project re-check that creates,
+refreshes, or migrates only the local files that actually need to change (and
+says so explicitly when nothing needs changing).
+
 ## Core Invariant
 
 - **No behavior change is complete unless `/sybermem-update` can carry an existing managed project to that behavior in operational terms: by re-running the project check, classifying each relevant local managed file, and then creating, refreshing, or migrating only the files that actually need a project-local change. If the new behavior is classification-only or otherwise requires no project-local file change, the update flow must say so explicitly.**

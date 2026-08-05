@@ -9,6 +9,22 @@ description: Use when searching or querying SyberMem project records by keyword,
 
 AI-driven retrieval over SyberMem records. Searches Key Conclusions, Topic Index, phase coverage, and record bodies using file-system tools. Zero dependencies, no index files.
 
+## Quick guide (for humans)
+
+> Plain-language overview for people. **Not** the execution contract — the
+> `<HARD-GATE>`, `## Query Syntax`, and `## Flow` sections below are authoritative
+> and win on any conflict.
+
+**What it does:** finds relevant SyberMem records for a query — by keyword, topic,
+phase/date range, record ID, or "what references record X" — and reports them
+read-only. It never writes anything.
+
+**When to run:** when you want to recall what the project already decided, changed,
+or discussed, or to check whether something was already recorded.
+
+**What you get:** a ranked list of matching records with their type, date, and a
+short reason they matched. Nothing is created or modified.
+
 ## Core Invariant
 
 - **Search is read-only. It never creates, modifies, or deletes records.**
