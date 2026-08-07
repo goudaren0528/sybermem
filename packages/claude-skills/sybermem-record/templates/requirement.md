@@ -1,13 +1,15 @@
 ---
 type: requirement
+record_id: {{record_id}}
 date: {{date}}
-number: {{number}}
 title: {{title}}
 source: {{source}}
 priority: {{priority}}
+key_conclusion: {{key_conclusion}}
+topics: {{topics}}
 # Optional relations (forward-only, values are existing record IDs):
-# related: [type-NNN]              # weak association with another record
-# superseded_by: requirement-NNN   # this requirement has been replaced by a newer one
+# related: [type-<record-id>]              # weak association with another record
+# superseded_by: requirement-<record-id>   # this requirement has been replaced by a newer one
 ---
 
 ## Requirement Source
