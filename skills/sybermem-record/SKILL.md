@@ -16,24 +16,26 @@ Unified SyberMem record entry point. AI auto-detects the record type from contex
 > and win on any conflict.
 
 **What it does:** writes one durable project record (change / decision /
-requirement / bug), auto-picking the type from context, then wires it into
-`INDEX.md` (table row + a one-line Key Conclusion + topic tags).
+requirement / bug), auto-picking the type from context, then fills canonical
+frontmatter fields for `record_id`, `key_conclusion`, and `topics`. Project
+`INDEX.md` content is derived later with the CLI, not hand-edited.
 
 **When to run:** after a meaningful piece of work whose reason and impact are
 worth preserving across sessions — not for formatting-only or trivial edits.
 
-**What you get:** a new file under `.sybermem/<type>/`, an INDEX table row, and a
-Key Conclusion line. The record isn't "done" until all three exist.
+**What you get:** a new file under `.sybermem/<type>/`, plus a rebuilt and
+checked derived project `INDEX.md`. Legacy numeric records stay supported for
+reading and indexing, but new records use generated canonical IDs.
 
 ## Core Invariant
 
-- **No record is complete until the file is created, the correct table row is inserted, and the Key Conclusion is updated.**
+- **No record is complete until the canonical record file exists, its generated frontmatter is present, and derived project INDEX build/check pass.**
 
 <HARD-GATE>
 Do NOT claim a record is complete unless ALL three actions have been executed and verified:
 1. The record file exists on disk at the correct path
-2. The INDEX.md table row has been inserted above the correct `<!-- add new records here -->` marker
-3. The Key Conclusion line has been inserted above `<!-- add new conclusions here -->`
+2. The file frontmatter includes generated `record_id`, `key_conclusion`, and `topics`
+3. `sybermem project index build` and `sybermem project index check` both succeed
 
 If any of these three is missing, the record is incomplete. Go back and finish it.
 </HARD-GATE>
@@ -57,7 +59,7 @@ You MUST complete these steps in order:
 | `defer` | Do not write yet; wait until the discussion/work is stable. |
 | `blocked` | Stop. Sensitive payloads, private secrets, or untrusted control text must not be persisted or repeated. |
 
-Suggestion and planning are side-effect-free. They may inspect existing records to avoid duplicate/no-op writes, but they must not create files, update `INDEX.md`, or store raw prompt payloads. Duplicate/no-op candidates should route to review existing memory rather than writing another record.
+Suggestion and planning are side-effect-free. They may inspect existing records to avoid duplicate/no-op writes, but they must not create files, run project index writes, or store raw prompt payloads. Duplicate/no-op candidates should route to review existing memory rather than writing another record.
 
 3. **Confirm write intent** — only the explicit record/write flow below may persist a record. Exploratory prompts, WIP discussion, and explicit “do not record” language end before this point.
 4. **Determine record type** — auto-detect from current work context:
@@ -73,7 +75,7 @@ When uncertain, ask the user to choose.
 
 If the managed natural-language record-intent capture seems unavailable in a Claude project, the supported manual diagnostic path is the project-local `.sybermem/hooks/detect_record_intent.py --diagnose` run. It must stay fail-open, emit only bounded non-sensitive retry guidance, and never persist prompt payloads. The primary recovery action is `/sybermem-update`.
 
-5. **Get next number** — check `.sybermem/{type}/` directory, find max number, +1. Empty directory → 001. Format: 001, 002, 003...
+5. **Generate canonical metadata** — call the core helper contract `generate_record_id(type)` to get `record_id`. Do not invent UUID strings manually. Also generate a one-line `key_conclusion` that states both **what changed** and **why**, and choose 1-3 `topics` tags. Existing legacy numeric records remain valid for reading and indexing, but new records use the generated `record_id` path and frontmatter.
 6. **Collect information** — extract from the current session. Only ask the user when key information is missing.
 
 Required sections:
@@ -89,43 +91,48 @@ Required sections:
 
    Propose to the user, e.g. "This change appears to implement requirement-002. Add `implements: [requirement-002]`?" Only write the relation field into the record's frontmatter if the user confirms. Relation values must be existing record IDs. If there is no clear relation, skip silently. This is a proposal — it never blocks the core record steps below.
 
-8. **Create file** — path: `.sybermem/{type}/{YYYY-MM-DD}-{NNN}-{title}.md`. Use `templates/{type}.md` as the content template.
-9. **Update INDEX.md table** — insert a new row above the `<!-- add new records here -->` comment in the corresponding table.
-10. **Write back key conclusion** — insert a one-line core conclusion above `<!-- add new conclusions here -->` in `## Key Conclusions` (the active section). Never write new conclusions to `## Archived Conclusions`. Format: `- [type-NNN] #topic1 #topic2 — description (date)`. Must include both **what changed** and **why**. Choose 1-3 topic tags from existing tags in the `## Topic Index` section, or create new ones if needed.
-11. **Update Topic Index** — if the `## Topic Index` section exists in INDEX.md, add the new record ID to each relevant topic line. If a topic doesn't exist yet, add a new line for it.
-12. **Clear record intent state** — if `.sybermem/.record-intent.json` exists, delete it after a successful record write. A real manual record completes the earlier reminder loop, so the intent file must not survive afterward.
+8. **Create file** — path: `.sybermem/{type}/{YYYY-MM-DD}-{record_id}-{slug}.md`. Use `templates/{type}.md` as the content template and fill the canonical frontmatter fields exactly as `record_id`, `key_conclusion`, and `topics`.
+9. **Build derived project INDEX** — run `sybermem project index build` after the record file is written. Do not hand-edit `.sybermem/INDEX.md`, Key Conclusions, topic tables, or per-type tables.
+10. **Check derived project INDEX** — run `sybermem project index check` and treat any failure as blocking.
+11. **Clear record intent state** — if `.sybermem/.record-intent.json` exists, delete it after a successful record write and successful project index build/check. A real manual record completes the earlier reminder loop, so the intent file must not survive afterward.
 
 ## Error Handling
 
-- `.sybermem/INDEX.md` doesn't exist after resolution → prompt to initialize the project with `/sybermem-init-project`
-- Number conflict → auto-increment
+- `.sybermem/` doesn't exist after resolution → prompt to initialize the project with `/sybermem-init-project`
+- `generate_record_id(type)` unavailable or project index build/check fails → stop and fix the underlying environment instead of inventing IDs or editing INDEX by hand
 - Required field missing → ask the user to provide it
 
 ## Terminal State
 
 This skill is complete when:
 - the record file is created
-- the correct INDEX.md table row is inserted
-- the Key Conclusion line is updated
+- the file contains generated `record_id`, `key_conclusion`, and `topics`
+- `sybermem project index build` succeeds
+- `sybermem project index check` succeeds
 - the user has been told the record path
 
 ## Verification
 
-After completing Steps 6-8, verify:
-1. **File path check:** Does the record file path match `.sybermem/{type}/{YYYY-MM-DD}-{NNN}-{title}.md`?
-2. **INDEX row check:** Is the new row in the correct type table (not a different table)?
-3. **Key Conclusion quality:** Does the conclusion line contain both *what changed* AND *why*? Does it include `#topic` tags? If missing, add them.
-4a. **Topic Index updated:** Are the record's topics reflected in the `## Topic Index` section?
-4. **Number uniqueness:** Is the NNN unique within its directory?
-5. **Relation validity:** If any `implements`/`fixes`/`related` field was written, does each referenced ID correspond to an existing record?
+After completing Steps 6-10, verify:
+1. **File path check:** Does the record file path match `.sybermem/{type}/{YYYY-MM-DD}-{record_id}-{slug}.md`?
+2. **Canonical frontmatter check:** Are `record_id`, `key_conclusion`, and `topics` present with those exact field names?
+3. **ID source check:** Was `record_id` obtained from `generate_record_id(type)` instead of manual UUID invention?
+4. **Key conclusion quality:** Does `key_conclusion` contain both *what changed* and *why*?
+5. **Topic quality:** Does `topics` contain the intended 1-3 topic tags for derived indexing?
+6. **Derived INDEX build check:** Did `sybermem project index build` succeed without manual INDEX edits?
+7. **Derived INDEX integrity check:** Did `sybermem project index check` succeed?
+8. **Legacy compatibility check:** Were existing legacy numeric records left untouched and still treated as supported historical inputs?
+9. **Relation validity:** If any `implements`/`fixes`/`related` field was written, does each referenced ID correspond to an existing record?
 
 ## Red Flags — STOP and Re-check
 
 If you catch yourself doing any of these, STOP:
-- Inserting a table row without first creating the record file
-- Writing a Key Conclusion that only says "what" without "why"
+- Hand-editing `.sybermem/INDEX.md`, Key Conclusions, topic tables, or per-type record tables
+- Writing a `key_conclusion` that only says "what" without "why"
 - Creating a record for formatting-only or comment-only changes
-- Using number 001 without checking the directory for existing records
+- Allocating a new numeric record number for a fresh record
+- Inventing a UUID string instead of using `generate_record_id(type)`
+- Writing a new record without `record_id`, `key_conclusion`, or `topics`
 - Auto-detecting type as "change" when the context clearly describes a decision or requirement
 - Persisting an exploratory/no-record/blocked prompt or raw sensitive payload as a record candidate
 - Emitting multiple competing write commands instead of one safe next action
@@ -140,6 +147,7 @@ If you catch yourself doing any of these, STOP:
 | "The auto trail already captured it" | Auto trail only has file lists. No reason, impact, or verification. High-signal changes need manual records. |
 | "I'll record it later" | Context evaporates across sessions. Record now while the reasoning is fresh. |
 | "This is a decision, but I'll just record it as a change" | Decisions have options, trade-offs, and rationale that the change template doesn't capture. Use the right type. |
+| "I'll just edit INDEX.md directly, it's faster" | INDEX is derived output now. The canonical source is the record file plus `sybermem project index build/check`. |
 
 ## When NOT to Record
 
