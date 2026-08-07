@@ -51,7 +51,7 @@ if [ -d "$HOME/.claude" ]; then
     mkdir -p "$CLI_DIR"
     python -m venv "$CLI_VENV"
     "$CLI_VENV/bin/python" -m pip install --upgrade pip
-    "$CLI_VENV/bin/pip" install "$ADR_PATH/packages/core" "$ADR_PATH/packages/cli"
+    "$CLI_VENV/bin/pip" install --upgrade --force-reinstall "$ADR_PATH/packages/core" "$ADR_PATH/packages/cli"
     cat > "$CLI_WRAPPER" <<'EOF'
 #!/bin/bash
 SYBERMEM_HOME="$HOME/.claude/sybermem/cli"
