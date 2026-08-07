@@ -148,6 +148,14 @@ SyberMem 的能力分两类执行路径，可靠性不同，使用时请区分�
 - `sybermem resume` 现在提供**程序化**续接（`--mode fast|standard|deep`、`--format text|json`），与自然语言的 `/sybermem-resume` skill 并存。
 - record / link / digest 等属于 Skill 编排：它们没有对应的 CLI 命令，是让 AI 依据 skill 指令直接编辑 markdown 记录，因此可靠性取决于 AI 是否正确遵循 skill。
 
+## 索引与 record_id
+
+- `sybermem index build` 用来构建 workspace 级 SQLite 搜索索引，服务于 Hub / workspace search。
+- `sybermem project index build` 用来从 canonical record 文件派生重建 `.sybermem/INDEX.md`，`sybermem project index check` 用来校验该派生文件是否最新。
+- `.sybermem/INDEX.md` 是派生产物，正常 record workflow 不应手工编辑它。
+- 新 records 使用自动生成、UUID-backed 的 `record_id`；旧的 numeric records 仍然可读。
+- record 创建仍然通过 `/sybermem-record` skill 编排完成，不存在单独的 record-create CLI。
+
 
 ## Resume 与信任说明
 
@@ -161,7 +169,7 @@ SyberMem 的能力分两类执行路径，可靠性不同，使用时请区分�
 
 `/sybermem-resume` 只读，不会自动执行建议动作，也不会写 record、digest 或设置。信任字段会尽量说明信息来自当前 authoritative record、digest，还是仅作为辅助证据的历史材料。它使用现有的 resume / status / search / next-step 路径，不会创建第二套 memory store。
 
-当你需要显式历史证据时，运行 `/sybermem-search`。项目内搜索和 workspace search 都会尽量标明 authority、lifecycle、freshness、successor guidance。workspace search 依赖 `sybermem index build` 生成的索引；如果索引缺失、schema 过期或 FTS 不可用，系统会给出安全恢复提示或降级路径，而不是伪造结果。
+当你需要显式历史证据时，运行 `/sybermem-search`。项目内搜索和 workspace search 都会尽量标明 authority、lifecycle、freshness、successor guidance。workspace search 依赖 `sybermem index build` 生成的 workspace SQLite 索引；`.sybermem/INDEX.md` 则由 `sybermem project index build` 从 canonical records 派生。如果前者缺失、schema 过期或 FTS 不可用，系统会给出安全恢复提示或降级路径，而不是伪造结果。
 
 ## Team workflow
 
