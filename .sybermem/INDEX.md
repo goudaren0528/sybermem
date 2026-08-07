@@ -130,19 +130,12 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 | change-031 | 2026-07-10 | init cpython 310 uninstall cpython 310 | implemented | [link](changes/2026-07-10-031-init-cpython-310-uninstall-cpython-310.md) |
 | change-032 | 2026-07-10 | Injection slimming, core quality fixes, and distribution chain hardening | implemented | [link](changes/2026-07-10-032-injection-slimming-core-quality-and-distribution-hardening.md) |
 | change-033 | 2026-08-04 | Improve natural-language search matching | implemented | [link](changes/2026-08-04-033-improve-natural-language-search-matching.md) |
-| change-034 | 2026-08-04 | ses 033df0fbcffeqyba0s73awy2uf | implemented | [link](changes/2026-08-04-034-ses-033df0fbcffeqyba0s73awy2uf.md) |
-| change-035 | 2026-08-04 | ses 0336c3bd8ffetz577almie35yc ses 0336eef75ffe1ilmviizik84kc ses 0336fc40fffebm7dwdusugh7wk and more | implemented | [link](changes/2026-08-04-035-ses-0336c3bd8ffetz577almie35yc-ses-0336eef75ffe1ilmviizik84kc-ses-0336fc40fffebm7dwdusugh7wk-and-more.md) |
 | change-036 | 2026-08-04 | Upgrade source-aware task recall packets | implemented | [link](changes/2026-08-04-036-upgrade-source-aware-task-recall-packets.md) |
 | change-037 | 2026-08-04 | Add Team publish preview trust envelope | implemented | [link](changes/2026-08-04-037-add-team-publish-preview-trust-envelope.md) |
-| change-038 | 2026-08-04 | install install readme en and more | implemented | [link](changes/2026-08-04-038-install-install-readme-en-and-more.md) |
 | change-039 | 2026-08-04 | Implement continuity and trust experience | implemented | [link](changes/2026-08-04-039-implement-continuity-trust-experience.md) |
 | change-040 | 2026-08-04 | Fix workspace search completeness | implemented | [link](changes/2026-08-04-040-fix-workspace-search-completeness.md) |
 | change-041 | 2026-08-04 | Close continuity and trust review findings | implemented | [link](changes/2026-08-04-041-close-continuity-trust-review-findings.md) |
-| change-042 | 2026-08-04 | install install readme en and more | implemented | [link](changes/2026-08-04-042-install-install-readme-en-and-more.md) |
-| change-043 | 2026-08-05 | agents md claude md | implemented | [link](changes/2026-08-05-043-agents-md-claude-md.md) |
-| change-044 | 2026-08-05 | agents md claude md 2026 08 05 sybermem comprehensive audit | implemented | [link](changes/2026-08-05-044-agents-md-claude-md-2026-08-05-sybermem-comprehensive-audit.md) |
 | change-045 | 2026-08-05 | Audit-driven P0/P1 — dual-track alignment, hot-path efficiency, OSS readiness | implemented | [link](changes/2026-08-05-045-audit-driven-p0-p1-dual-track-efficiency-oss-readiness.md) |
-| change-046 | 2026-08-05 | gitignore readme en readme and more | implemented | [link](changes/2026-08-05-046-gitignore-readme-en-readme-and-more.md) |
 | change-047 | 2026-08-05 | Auto-trail rolling journal — stop writing per-stop markdown records \(batch B\) | implemented | [link](changes/2026-08-05-047-auto-trail-rolling-journal-batch-b.md) |
 | change-048 | 2026-08-05 | Distribution consistency, UX terminology, and workspace stale detection \(batches D/E/F\) | implemented | [link](changes/2026-08-05-048-distribution-ux-workspace-stale-batches-def.md) |
 | change-049 | 2026-08-05 | Extend human quick-guide layer to the remaining ceremony-heavy skills | implemented | [link](changes/2026-08-05-049-extend-skill-quick-guide-layer.md) |
