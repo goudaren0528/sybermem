@@ -148,6 +148,14 @@ SyberMem capabilities run through two execution paths with different reliability
 - `sybermem resume` now provides a **programmatic** restart brief (`--mode fast|standard|deep`, `--format text|json`) alongside the natural-language `/sybermem-resume` skill.
 - record / link / digest and similar are skill orchestration: they have no CLI command and rely on the AI following skill instructions to edit markdown records, so their reliability depends on the AI doing so correctly.
 
+## Indexes and record IDs
+
+- `sybermem index build` builds the workspace-level SQLite search index used by Hub and workspace search.
+- `sybermem project index build` rebuilds the derived `.sybermem/INDEX.md` from canonical record files, and `sybermem project index check` verifies that derived file is up to date.
+- `.sybermem/INDEX.md` is a derived artifact, so the normal record workflow should not hand-edit it.
+- New records use generated, UUID-backed `record_id` values. Legacy numeric records remain readable.
+- Record creation still happens through `/sybermem-record` skill orchestration. There is no separate record-creation CLI.
+
 ## Resume and trust UX
 
 `/sybermem-resume` is the natural-language-first restart entrypoint for requests like "resume this project", "what was I doing", or "what should I do next".
@@ -160,7 +168,7 @@ The restart brief should show current phase, recent progress, risks, next action
 
 `/sybermem-resume` is read-only. It never auto-executes the suggested action, and it never writes records, digests, or settings. Trust fields should make it clear whether the result is grounded in a current authoritative record, a digest, or lower-confidence supporting evidence. It uses the existing resume, status, search, and next-step path, not a second memory store.
 
-When you need explicit historical evidence, run `/sybermem-search`. Project search and workspace search aim to surface authority, lifecycle, freshness, and successor guidance clearly. Workspace search depends on a `sybermem index build` cache. If that index is missing, stale, or FTS falls back, the system should guide recovery safely instead of inventing recall.
+When you need explicit historical evidence, run `/sybermem-search`. Project search and workspace search aim to surface authority, lifecycle, freshness, and successor guidance clearly. Workspace search depends on the workspace SQLite index built by `sybermem index build`. `.sybermem/INDEX.md`, by contrast, is derived from canonical records via `sybermem project index build`. If the workspace index is missing, stale, or FTS falls back, the system should guide recovery safely instead of inventing recall.
 
 ## Team Workflow
 

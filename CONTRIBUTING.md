@@ -73,14 +73,15 @@ Also ensure:
 - Dual-language docs (`README.md` / `README.en.md`) are kept in sync when you
   change user-facing behavior.
 
-## Key Conclusions governance (`.sybermem/INDEX.md`)
+## Project INDEX workflow (`.sybermem/INDEX.md`)
 
-The `## Key Conclusions` section is injected at session start, so keep it high-signal:
+`.sybermem/INDEX.md` is a derived file, not a canonical source file for normal record work.
 
-- Record only **current operational truths and active constraints** — what matters now.
-- Release history and implementation trivia belong in **archived conclusions** or a **phase/theme digest**, not in the active Key Conclusions list.
-- Do not rewrite or reorder existing conclusions when adding a new one; append above the `<!-- add new conclusions here -->` marker.
-- Auto-trail entries never go into Key Conclusions.
+- Canonical record content lives in the record markdown files under `.sybermem/changes/`, `.sybermem/decisions/`, `.sybermem/requirements/`, and `.sybermem/bugs/`.
+- New records should use generated UUID-backed `record_id` values. Legacy numeric records remain readable.
+- Record creation is still handled by `/sybermem-record` skill orchestration. Do not document or add a separate record-creation CLI in PRs.
+- In PRs, merge the canonical record files first, then rebuild the derived project index with `sybermem project index build` or verify it with `sybermem project index check`.
+- Do not hand-edit `.sybermem/INDEX.md` as part of the normal record workflow.
 
 ## Commit and PR style
 
