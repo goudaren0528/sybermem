@@ -66,6 +66,9 @@ def parse_record_file(path: Path, project_id: str, slug: str) -> dict[str, str]:
     record_id = ""
     key_conclusion = ""
     status = ""
+    source = ""
+    priority = ""
+    severity = ""
     superseded_by = ""
     fixes = ""
     implements = ""
@@ -102,6 +105,12 @@ def parse_record_file(path: Path, project_id: str, slug: str) -> dict[str, str]:
                 index = next_index - 1
         elif line.startswith("status:"):
             status = line.split(":", 1)[1].strip()
+        elif line.startswith("source:"):
+            source = line.split(":", 1)[1].strip()
+        elif line.startswith("priority:"):
+            priority = line.split(":", 1)[1].strip()
+        elif line.startswith("severity:"):
+            severity = line.split(":", 1)[1].strip()
         elif line.startswith("superseded_by:"):
             superseded_by = line.split(":", 1)[1].strip()
         elif line.startswith("fixes:"):
@@ -129,6 +138,9 @@ def parse_record_file(path: Path, project_id: str, slug: str) -> dict[str, str]:
         "path": str(path).replace('\\', '/'),
         "created_at": date,
         "status": status,
+        "source": source,
+        "priority": priority,
+        "severity": severity,
         "superseded_by": superseded_by,
         "fixes": fixes,
         "implements": implements,

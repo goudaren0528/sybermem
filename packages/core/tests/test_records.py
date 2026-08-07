@@ -90,3 +90,52 @@ def test_parse_record_file_preserves_legacy_filename_record_id_and_optional_meta
     assert record["topics"] == "hooks,compatibility"
     assert record["key_conclusion"] == ""
     assert record["status"] == "resolved"
+
+
+def test_parse_record_file_reads_canonical_requirement_and_bug_metadata(tmp_path: Path) -> None:
+    # Given: canonical requirement and bug records with new frontmatter fields
+    requirement_path = tmp_path / "2026-08-07-001-requirement.md"
+    requirement_path.write_text(
+        "\n".join(
+            [
+                "---",
+                "type: requirement",
+                "date: 2026-08-07",
+                "title: Capture canonical requirement metadata",
+                "source: Product review",
+                "priority: high",
+                "---",
+                "",
+                "Requirement body.",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    bug_path = tmp_path / "2026-08-07-002-bug.md"
+    bug_path.write_text(
+        "\n".join(
+            [
+                "---",
+                "type: bug",
+                "date: 2026-08-07",
+                "title: Capture canonical bug metadata",
+                "severity: critical",
+                "status: fixed",
+                "---",
+                "",
+                "Bug body.",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    # When: each canonical record is parsed
+    requirement = parse_record_file(requirement_path, "project-1", "demo")
+    bug = parse_record_file(bug_path, "project-1", "demo")
+
+    # Then: exact frontmatter keys are preserved for downstream rendering
+    assert requirement["source"] == "Product review"
+    assert requirement["priority"] == "high"
+    assert bug["severity"] == "critical"
