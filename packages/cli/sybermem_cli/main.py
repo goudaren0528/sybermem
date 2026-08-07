@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 from sybermem_core.formats import dump_json
 from sybermem_core.project import resolve_project_root, ensure_project_yaml
-from sybermem_core.project_index import check_project_index, write_project_index
+from sybermem_core.project_index import DuplicateRecordIdError, InvalidRecordMetadataError, check_project_index, write_project_index
 from sybermem_core.registry import register_project
 from sybermem_core.identity import git_remote
 from sybermem_core.index import rebuild_index
@@ -270,7 +270,11 @@ def cmd_project_index_build(args: argparse.Namespace) -> int:
         print("No SyberMem project root found.", file=sys.stderr)
         return 1
 
-    updated = write_project_index(root)
+    try:
+        updated = write_project_index(root)
+    except (DuplicateRecordIdError, InvalidRecordMetadataError) as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
     payload = _project_index_payload(root, "updated" if updated else "unchanged")
     if args.format == "json":
         print(dump_json(payload))
@@ -286,7 +290,11 @@ def cmd_project_index_check(args: argparse.Namespace) -> int:
         return 1
 
     index_path = root / ".sybermem" / "INDEX.md"
-    is_current = check_project_index(root)
+    try:
+        is_current = check_project_index(root)
+    except (DuplicateRecordIdError, InvalidRecordMetadataError) as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
     status = "current" if is_current else ("missing" if not index_path.is_file() else "stale")
     payload = _project_index_payload(root, status)
     if args.format == "json":

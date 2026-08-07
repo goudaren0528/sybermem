@@ -10,6 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "core"))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from sybermem_cli.main import cmd_publish_status
+import sybermem_core.publish_bootstrap as publish_bootstrap
 
 
 def init_team_repo(team_root: Path) -> None:
@@ -93,6 +94,7 @@ def test_cli_preview_without_project_reports_invoked_path(tmp_path: Path, monkey
     invoked_path = tmp_path / "standalone" / "child"
     invoked_path.mkdir(parents=True)
     monkeypatch.chdir(invoked_path)
+    monkeypatch.setattr(publish_bootstrap, "resolve_project_root", lambda: None)
 
     # When: JSON preview is requested
     exit_code = cmd_publish_status(
