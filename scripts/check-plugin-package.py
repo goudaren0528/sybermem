@@ -34,9 +34,13 @@ OPENCODE_PLUGIN_UPDATE_SCRIPTS: Final = [
     Path("scripts/update.sh"),
     Path("scripts/update.ps1"),
 ]
-REMOTE_INSTALL_SCRIPTS: Final = [
+RUNTIME_REFRESH_SCRIPTS: Final = [
+    Path("scripts/install.sh"),
+    Path("scripts/install.ps1"),
     Path("scripts/install-remote.sh"),
     Path("scripts/install-remote.ps1"),
+    Path("scripts/update.sh"),
+    Path("scripts/update.ps1"),
 ]
 NO_CACHE_ROOTS: Final = [
     Path("packages/claude-skills"),
@@ -204,8 +208,8 @@ def check_opencode_plugin_update_wiring(root: Path) -> None:
             fail(f"{script.as_posix()} is missing OpenCode plugin update wiring: {', '.join(missing)}")
 
 
-def check_remote_runtime_refresh_wiring(root: Path) -> None:
-    for script in REMOTE_INSTALL_SCRIPTS:
+def check_runtime_refresh_wiring(root: Path) -> None:
+    for script in RUNTIME_REFRESH_SCRIPTS:
         script_text = (root / script).read_text(encoding="utf-8")
         required_fragments = [
             "packages/core" if script.suffix == ".sh" else "packages\\core",
@@ -215,7 +219,7 @@ def check_remote_runtime_refresh_wiring(root: Path) -> None:
         ]
         missing = [fragment for fragment in required_fragments if fragment not in script_text]
         if missing:
-            fail(f"{script.as_posix()} is missing remote runtime refresh wiring: {', '.join(missing)}")
+            fail(f"{script.as_posix()} is missing runtime refresh wiring: {', '.join(missing)}")
 
 
 def check_no_python_cache_artifacts(root: Path) -> None:
@@ -307,7 +311,7 @@ def main(root: Path = ROOT) -> int:
     names = check_skill_tree_parity(root)
     check_distribution_script_coverage(root, names)
     check_opencode_plugin_update_wiring(root)
-    check_remote_runtime_refresh_wiring(root)
+    check_runtime_refresh_wiring(root)
 
     claude_cli = shutil.which("claude")
     if claude_cli:
