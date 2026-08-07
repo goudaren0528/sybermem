@@ -37,7 +37,7 @@ Parallel branches previously allocated the same per-type numeric ID and edited t
 
 ## Test Verification
 
-- `uv run pytest packages/core packages/cli` -> 112 passed.
+- `uv run pytest packages/core packages/cli` -> 114 passed.
 - `uv run pytest packages/cli -q` -> 17 passed.
 - `python scripts/check-plugin-package.py` -> OK.
 - `python scripts/sync-plugin-skills.py` -> source and mirror synchronized.
