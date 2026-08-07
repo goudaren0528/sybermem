@@ -7,25 +7,23 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 ## Key Conclusions
 
 <!-- One-line core conclusion per record. Format: [id] #topic1 #topic2 — description (date) -->
-- [requirement-001] #architecture #foundation — Adopted ADR system: four category directories + INDEX master index + templates + skill automation (2026-05-08)
+- [bug-001] #hooks #init — Fixed init-project misclassifying missing hook files; exposed need for project-root resolution from subdirectories (2026-06-09)
+- [bug-004] #distribution #hooks — Fixed a batch-A propagation gap where check_project_health.py still keyed on the legacy dual UserPromptSubmit hooks, so `/sybermem-update` would drag already-merged projects back to dual-hook; health check now treats a single user_prompt.py entry as fresh and offers a non-destructive dual→single migration (2026-08-05)
 - [change-001] #distribution #install — Added one-liner remote install scripts (curl/irm) to simplify new user onboarding, no clone needed (2026-05-12)
 - [change-002] #distribution #skills — Moved SyberMem skill source to packages/claude-skills; eliminates duplicate skill loading from global installs (2026-05-12)
-- [change-003] #hooks #automation — Added default project-level auto/remind hook template with stop-hook helper for lightweight change records (2026-05-13)
-- [bug-001] #hooks #init — Fixed init-project misclassifying missing hook files; exposed need for project-root resolution from subdirectories (2026-06-09)
-- [change-005] #init #hooks — Refreshed project instruction files to auto/remind mode and added project-level settings + stop-hook helper (2026-05-13)
-- [requirement-002] #digest #compression — Identified need for persistent phase summary/compression layer to prevent understanding cost from growing linearly with records (2026-06-05)
-- [change-006] #skills #framework — Repaired missing .claude/settings.json, fixed INDEX.md omissions, refreshed phase index, upgraded all 8 skills with HARD-GATE + numbered checklist (2026-06-16)
-- [change-008] #distribution #hooks #automation — Added Claude Code plugin metadata and lifecycle hook delegators so SyberMem can install as a plugin without breaking existing project-managed hook files (2026-06-18)
-- [change-010] #lifecycle #search #relations #digest #distribution — Transformed SyberMem from v1 (record+group+compress) to v2 (lifecycle-aware, retrieval-capable, relation-linked, topic-compressible, multi-platform) in a single session covering 6 capability rounds (2026-06-22)
-- [change-045] #quality #distribution #search #hooks — Executed audit-driven P0/P1: exposed `sybermem resume` CLI (was implemented but unreachable), made search no-root failure explicit while keeping the hook path silent, merged the two prompt hooks into one process (~491ms→~297ms), and added LICENSE + CI + cli→core dependency + single-source VERSION so the repo reaches an OSS-trust baseline (2026-08-05)
+- [change-003] #automation #hooks — Added default project-level auto/remind hook template with stop-hook helper for lightweight change records (2026-05-13)
+- [change-005] #hooks #init — Refreshed project instruction files to auto/remind mode and added project-level settings + stop-hook helper (2026-05-13)
+- [change-006] #framework #skills — Repaired missing .claude/settings.json, fixed INDEX.md omissions, refreshed phase index, upgraded all 8 skills with HARD-GATE + numbered checklist (2026-06-16)
+- [change-008] #automation #distribution #hooks — Added Claude Code plugin metadata and lifecycle hook delegators so SyberMem can install as a plugin without breaking existing project-managed hook files (2026-06-18)
+- [change-010] #digest #distribution #lifecycle #relations #search — Transformed SyberMem from v1 (record+group+compress) to v2 (lifecycle-aware, retrieval-capable, relation-linked, topic-compressible, multi-platform) in a single session covering 6 capability rounds (2026-06-22)
+- [change-045] #distribution #hooks #quality #search — Executed audit-driven P0/P1: exposed `sybermem resume` CLI (was implemented but unreachable), made search no-root failure explicit while keeping the hook path silent, merged the two prompt hooks into one process (~491ms→~297ms), and added LICENSE + CI + cli→core dependency + single-source VERSION so the repo reaches an OSS-trust baseline (2026-08-05)
 - [change-047] #hooks #quality — Stopped the auto stop-hook from writing per-stop markdown records + INDEX rows; auto-trails now go to a bounded rolling `.auto-trail.jsonl` journal so low-signal noise stays out of the canonical corpus, while the existing 26 records stay untouched to preserve digest/publish/status semantics (2026-08-05)
-- [change-048] #distribution #search #quality — Second-tier audit follow-ups: unified Codex/Cursor/Kimi manifests + CI drift gates + honest platform matrix (§4), unified `Stage→Phase Digests` terminology + install-order doc fix (§3), and query-time workspace stale detection warning when indexed HEAD lags current HEAD (§2-e) (2026-08-05)
+- [change-048] #distribution #quality #search — Second-tier audit follow-ups: unified Codex/Cursor/Kimi manifests + CI drift gates + honest platform matrix (§4), unified `Stage→Phase Digests` terminology + install-order doc fix (§3), and query-time workspace stale detection warning when indexed HEAD lags current HEAD (§2-e) (2026-08-05)
+- [change-049] #quality #skills — Extended the human quick-guide layer to search/using-sybermem/record/update so all five ceremony-heavy skills now open with a plain-language overview marked "not the execution contract", lowering human cognitive load without changing the authoritative machine contracts (2026-08-05)
+- [change-6a3ab8a0e44e4c41843b66bde8b7134a] #architecture #collaboration #quality — Added UUID-backed canonical record IDs and derived INDEX build/check commands so parallel record creation merges safely while legacy numeric records remain readable. (2026-08-07)
 - [decision-003] #architecture #quality — Consciously deferred 3 of 4 remaining audit follow-ups (real CI green, batch-C auto-trail cleanup, non-core platform runtime) with documented revisit triggers, and did the low-risk skill-slimming variant (human quick-guide layer over the preserved machine contract, piloted on init-project) (2026-08-05)
-- [change-049] #skills #quality — Extended the human quick-guide layer to search/using-sybermem/record/update so all five ceremony-heavy skills now open with a plain-language overview marked "not the execution contract", lowering human cognitive load without changing the authoritative machine contracts (2026-08-05)
-- [bug-004] #hooks #distribution — Fixed a batch-A propagation gap where check_project_health.py still keyed on the legacy dual UserPromptSubmit hooks, so `/sybermem-update` would drag already-merged projects back to dual-hook; health check now treats a single user_prompt.py entry as fresh and offers a non-destructive dual→single migration (2026-08-05)
-<!-- add new conclusions here -->
-
----
+- [requirement-001] #architecture #foundation — Adopted ADR system: four category directories + INDEX master index + templates + skill automation (2026-05-08)
+- [requirement-002] #compression #digest — Identified need for persistent phase summary/compression layer to prevent understanding cost from growing linearly with records (2026-06-05)
 
 ## Archived Conclusions
 
@@ -95,94 +93,82 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 
 ## Feature Changes
 
-| Number | Date | Title | Status | Link |
-|--------|------|-------|--------|------|
-| 001 | 2026-05-12 | Add remote install scripts for one-liner installation | implemented | [link](changes/2026-05-12-001-add-remote-install-scripts.md) |
-| 002 | 2026-05-12 | Migrate global skill source to packages directory | implemented | [link](changes/2026-05-12-002-migrate-global-skill-source-to-packages.md) |
-| 003 | 2026-05-13 | Add auto change hook template | implemented | [link](changes/2026-05-13-003-add-auto-change-hook-template.md) |
-| 005 | 2026-05-13 | Refresh project instructions and add auto record hook files | implemented | [link](changes/2026-05-13-005-refresh-project-instructions-and-add-auto-record-hook-files.md) |
-| 006 | 2026-06-16 | SyberMem framework hardening and project repair | implemented | [link](changes/2026-06-16-006-sybermem-framework-hardening-and-project-repair.md) |
-| 007 | 2026-06-18 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-06-18-007-marketplace-plugin-hooks-and-more.md) |
-| 008 | 2026-06-18 | Add Claude Code plugin skeleton | implemented | [link](changes/2026-06-18-008-add-claude-code-plugin-skeleton.md) |
-| 009 | 2026-06-19 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-06-19-009-marketplace.md) |
-| 010 | 2026-06-22 | SyberMem v2 — lifecycle, search, relations, theme digest, platform | implemented | [link](changes/2026-06-22-010-sybermem-v2-lifecycle-search-relations-theme-digest-platform.md) |
-| 011 | 2026-06-29 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-06-29-011-skill-skill.md) |
-| 012 | 2026-06-30 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-06-30-012-skill-skill-superpowers-skill-design-analysis.md) |
-| 013 | 2026-06-30 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-06-30-013-skill-superpowers-skill-design-analysis.md) |
-| 014 | 2026-06-30 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-06-30-014-init-cpython-310-main-cpython-310-init-cpython-310-and-more.md) |
-| 015 | 2026-06-30 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-06-30-015-readme-en-readme-2026-06-30-sybermem-core-phase1-and-more.md) |
-| 016 | 2026-06-30 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-06-30-016-init-main-pkg-info-and-more.md) |
-| 017 | 2026-07-01 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-07-01-017-init-cpython-310-main-cpython-310-init-cpython-310-and-more.md) |
-| 018 | 2026-07-01 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-07-01-018-publish.md) |
-| 019 | 2026-07-02 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-07-02-019-init-main-pkg-info-and-more.md) |
-| 020 | 2026-07-02 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-07-02-020-main-project-publish-and-more.md) |
-| 021 | 2026-07-02 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-07-02-021-main-project-publish-and-more.md) |
-| 022 | 2026-07-02 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-07-02-022-init-cpython-310-main-cpython-310-init-cpython-310-and-more.md) |
-| 023 | 2026-07-02 | Build Team memory publication and management layer | implemented | [link](changes/2026-07-02-023-build-team-memory-publication-and-management-layer.md) |
-| 024 | 2026-07-02 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-07-02-024-init-main-pkg-info-and-more.md) |
-| 025 | 2026-07-03 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-07-03-025-init-main-pkg-info-and-more.md) |
-| 026 | 2026-07-03 | Expose Team workflows as first-class SyberMem skills | implemented | [link](changes/2026-07-03-026-expose-team-workflows-as-first-class-sybermem-skills.md) |
-| 027 | 2026-07-03 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-07-03-027-detect-record-intent.md) |
-| 028 | 2026-07-07 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-07-07-028-init-cpython-310-identity-cpython-310-next-step-router-cpython-310-and-more.md) |
-| 029 | 2026-07-07 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-07-07-029-init-cpython-310-main-cpython-310-init-cpython-310-and-more.md) |
-| 030 | 2026-07-07 | Align init-project propagation with Team and reminder workflows | implemented | [link](changes/2026-07-07-030-align-init-project-propagation-with-team-and-reminder-workflows.md) |
-| 031 | 2026-07-10 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-07-10-031-init-cpython-310-uninstall-cpython-310.md) |
-| 032 | 2026-07-10 | Injection slimming, core quality fixes, and distribution chain hardening | implemented | [link](changes/2026-07-10-032-injection-slimming-core-quality-and-distribution-hardening.md) |
-| 033 | 2026-08-04 | Improve natural-language search matching | implemented | [link](changes/2026-08-04-033-improve-natural-language-search-matching.md) |
-| 034 | 2026-08-04 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-08-04-034-ses-033df0fbcffeqyba0s73awy2uf.md) |
-| 035 | 2026-08-04 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-08-04-035-ses-0336c3bd8ffetz577almie35yc-ses-0336eef75ffe1ilmviizik84kc-ses-0336fc40fffebm7dwdusugh7wk-and-more.md) |
-| 036 | 2026-08-04 | Upgrade source-aware task recall packets | implemented | [link](changes/2026-08-04-036-upgrade-source-aware-task-recall-packets.md) |
-| 037 | 2026-08-04 | Add Team publish preview trust envelope | implemented | [link](changes/2026-08-04-037-add-team-publish-preview-trust-envelope.md) |
-| 038 | 2026-08-04 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-08-04-038-install-install-readme-en-and-more.md) |
-| 039 | 2026-08-04 | Implement continuity and trust experience | implemented | [link](changes/2026-08-04-039-implement-continuity-trust-experience.md) |
-| 040 | 2026-08-04 | Fix workspace search completeness | implemented | [link](changes/2026-08-04-040-fix-workspace-search-completeness.md) |
-| 041 | 2026-08-04 | Close continuity and trust review findings | implemented | [link](changes/2026-08-04-041-close-continuity-trust-review-findings.md) |
-| 042 | 2026-08-04 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-08-04-042-install-install-readme-en-and-more.md) |
-| 043 | 2026-08-04 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-08-04-043-gitignore-install-install-and-more.md) |
-| 043 | 2026-08-05 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-08-05-043-agents-md-claude-md.md) |
-| 044 | 2026-08-05 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-08-05-044-agents-md-claude-md-2026-08-05-sybermem-comprehensive-audit.md) |
-| 045 | 2026-08-05 | Audit-driven P0/P1 — dual-track alignment, hot-path efficiency, OSS readiness | implemented | [link](changes/2026-08-05-045-audit-driven-p0-p1-dual-track-efficiency-oss-readiness.md) |
-| 046 | 2026-08-05 | Auto-record workspace file changes on stop | implemented | [link](changes/2026-08-05-046-gitignore-readme-en-readme-and-more.md) |
-| 047 | 2026-08-05 | Auto-trail rolling journal — stop writing per-stop markdown records (batch B) | implemented | [link](changes/2026-08-05-047-auto-trail-rolling-journal-batch-b.md) |
-| 048 | 2026-08-05 | Distribution consistency, UX terminology, and workspace stale detection (batches D/E/F) | implemented | [link](changes/2026-08-05-048-distribution-ux-workspace-stale-batches-def.md) |
-| 049 | 2026-08-05 | Extend human quick-guide layer to the remaining ceremony-heavy skills | implemented | [link](changes/2026-08-05-049-extend-skill-quick-guide-layer.md) |
-<!-- add new records here -->
-
----
+| ID | Date | Title | Status | Link |
+|----|------|-------|--------|------|
+| change-001 | 2026-05-12 | Add remote install scripts for one-liner installation | implemented | [link](changes/2026-05-12-001-add-remote-install-scripts.md) |
+| change-002 | 2026-05-12 | Migrate global skill source to packages directory | implemented | [link](changes/2026-05-12-002-migrate-global-skill-source-to-packages.md) |
+| change-003 | 2026-05-13 | Add auto change hook template | implemented | [link](changes/2026-05-13-003-add-auto-change-hook-template.md) |
+| change-005 | 2026-05-13 | Refresh project instructions and add auto record hook files | implemented | [link](changes/2026-05-13-005-refresh-project-instructions-and-add-auto-record-hook-files.md) |
+| change-006 | 2026-06-16 | SyberMem framework hardening and project repair | implemented | [link](changes/2026-06-16-006-sybermem-framework-hardening-and-project-repair.md) |
+| change-007 | 2026-06-18 | marketplace plugin hooks and more | implemented | [link](changes/2026-06-18-007-marketplace-plugin-hooks-and-more.md) |
+| change-008 | 2026-06-18 | Add Claude Code plugin skeleton | implemented | [link](changes/2026-06-18-008-add-claude-code-plugin-skeleton.md) |
+| change-009 | 2026-06-19 | marketplace | implemented | [link](changes/2026-06-19-009-marketplace.md) |
+| change-010 | 2026-06-22 | SyberMem v2 — lifecycle layer, search, relations, theme digest, and platform ecosystem | implemented | [link](changes/2026-06-22-010-sybermem-v2-lifecycle-search-relations-theme-digest-platform.md) |
+| change-011 | 2026-06-29 | skill skill | implemented | [link](changes/2026-06-29-011-skill-skill.md) |
+| change-012 | 2026-06-30 | skill skill superpowers skill design analysis | implemented | [link](changes/2026-06-30-012-skill-skill-superpowers-skill-design-analysis.md) |
+| change-013 | 2026-06-30 | skill superpowers skill design analysis | implemented | [link](changes/2026-06-30-013-skill-superpowers-skill-design-analysis.md) |
+| change-014 | 2026-06-30 | init cpython 310 main cpython 310 init cpython 310 and more | implemented | [link](changes/2026-06-30-014-init-cpython-310-main-cpython-310-init-cpython-310-and-more.md) |
+| change-015 | 2026-06-30 | readme en readme 2026 06 30 sybermem core phase1 and more | implemented | [link](changes/2026-06-30-015-readme-en-readme-2026-06-30-sybermem-core-phase1-and-more.md) |
+| change-016 | 2026-06-30 | init main pkg info and more | implemented | [link](changes/2026-06-30-016-init-main-pkg-info-and-more.md) |
+| change-017 | 2026-07-01 | init cpython 310 main cpython 310 init cpython 310 and more | implemented | [link](changes/2026-07-01-017-init-cpython-310-main-cpython-310-init-cpython-310-and-more.md) |
+| change-018 | 2026-07-01 | publish | implemented | [link](changes/2026-07-01-018-publish.md) |
+| change-019 | 2026-07-02 | init main pkg info and more | implemented | [link](changes/2026-07-02-019-init-main-pkg-info-and-more.md) |
+| change-020 | 2026-07-02 | main project publish and more | implemented | [link](changes/2026-07-02-020-main-project-publish-and-more.md) |
+| change-021 | 2026-07-02 | main project publish and more | implemented | [link](changes/2026-07-02-021-main-project-publish-and-more.md) |
+| change-022 | 2026-07-02 | init cpython 310 main cpython 310 init cpython 310 and more | implemented | [link](changes/2026-07-02-022-init-cpython-310-main-cpython-310-init-cpython-310-and-more.md) |
+| change-023 | 2026-07-02 | Build Team memory publication and management layer | implemented | [link](changes/2026-07-02-023-build-team-memory-publication-and-management-layer.md) |
+| change-024 | 2026-07-02 | init main pkg info and more | implemented | [link](changes/2026-07-02-024-init-main-pkg-info-and-more.md) |
+| change-025 | 2026-07-03 | init main pkg info and more | implemented | [link](changes/2026-07-03-025-init-main-pkg-info-and-more.md) |
+| change-026 | 2026-07-03 | Expose Team workflows as first-class SyberMem skills | implemented | [link](changes/2026-07-03-026-expose-team-workflows-as-first-class-sybermem-skills.md) |
+| change-027 | 2026-07-03 | detect record intent | implemented | [link](changes/2026-07-03-027-detect-record-intent.md) |
+| change-028 | 2026-07-07 | init cpython 310 identity cpython 310 next step router cpython 310 and more | implemented | [link](changes/2026-07-07-028-init-cpython-310-identity-cpython-310-next-step-router-cpython-310-and-more.md) |
+| change-029 | 2026-07-07 | init cpython 310 main cpython 310 init cpython 310 and more | implemented | [link](changes/2026-07-07-029-init-cpython-310-main-cpython-310-init-cpython-310-and-more.md) |
+| change-030 | 2026-07-07 | Align init-project propagation with Team and reminder workflows | implemented | [link](changes/2026-07-07-030-align-init-project-propagation-with-team-and-reminder-workflows.md) |
+| change-031 | 2026-07-10 | init cpython 310 uninstall cpython 310 | implemented | [link](changes/2026-07-10-031-init-cpython-310-uninstall-cpython-310.md) |
+| change-032 | 2026-07-10 | Injection slimming, core quality fixes, and distribution chain hardening | implemented | [link](changes/2026-07-10-032-injection-slimming-core-quality-and-distribution-hardening.md) |
+| change-033 | 2026-08-04 | Improve natural-language search matching | implemented | [link](changes/2026-08-04-033-improve-natural-language-search-matching.md) |
+| change-034 | 2026-08-04 | ses 033df0fbcffeqyba0s73awy2uf | implemented | [link](changes/2026-08-04-034-ses-033df0fbcffeqyba0s73awy2uf.md) |
+| change-035 | 2026-08-04 | ses 0336c3bd8ffetz577almie35yc ses 0336eef75ffe1ilmviizik84kc ses 0336fc40fffebm7dwdusugh7wk and more | implemented | [link](changes/2026-08-04-035-ses-0336c3bd8ffetz577almie35yc-ses-0336eef75ffe1ilmviizik84kc-ses-0336fc40fffebm7dwdusugh7wk-and-more.md) |
+| change-036 | 2026-08-04 | Upgrade source-aware task recall packets | implemented | [link](changes/2026-08-04-036-upgrade-source-aware-task-recall-packets.md) |
+| change-037 | 2026-08-04 | Add Team publish preview trust envelope | implemented | [link](changes/2026-08-04-037-add-team-publish-preview-trust-envelope.md) |
+| change-038 | 2026-08-04 | install install readme en and more | implemented | [link](changes/2026-08-04-038-install-install-readme-en-and-more.md) |
+| change-039 | 2026-08-04 | Implement continuity and trust experience | implemented | [link](changes/2026-08-04-039-implement-continuity-trust-experience.md) |
+| change-040 | 2026-08-04 | Fix workspace search completeness | implemented | [link](changes/2026-08-04-040-fix-workspace-search-completeness.md) |
+| change-041 | 2026-08-04 | Close continuity and trust review findings | implemented | [link](changes/2026-08-04-041-close-continuity-trust-review-findings.md) |
+| change-042 | 2026-08-04 | install install readme en and more | implemented | [link](changes/2026-08-04-042-install-install-readme-en-and-more.md) |
+| change-043 | 2026-08-05 | agents md claude md | implemented | [link](changes/2026-08-05-043-agents-md-claude-md.md) |
+| change-044 | 2026-08-05 | agents md claude md 2026 08 05 sybermem comprehensive audit | implemented | [link](changes/2026-08-05-044-agents-md-claude-md-2026-08-05-sybermem-comprehensive-audit.md) |
+| change-045 | 2026-08-05 | Audit-driven P0/P1 — dual-track alignment, hot-path efficiency, OSS readiness | implemented | [link](changes/2026-08-05-045-audit-driven-p0-p1-dual-track-efficiency-oss-readiness.md) |
+| change-046 | 2026-08-05 | gitignore readme en readme and more | implemented | [link](changes/2026-08-05-046-gitignore-readme-en-readme-and-more.md) |
+| change-047 | 2026-08-05 | Auto-trail rolling journal — stop writing per-stop markdown records (batch B) | implemented | [link](changes/2026-08-05-047-auto-trail-rolling-journal-batch-b.md) |
+| change-048 | 2026-08-05 | Distribution consistency, UX terminology, and workspace stale detection (batches D/E/F) | implemented | [link](changes/2026-08-05-048-distribution-ux-workspace-stale-batches-def.md) |
+| change-049 | 2026-08-05 | Extend human quick-guide layer to the remaining ceremony-heavy skills | implemented | [link](changes/2026-08-05-049-extend-skill-quick-guide-layer.md) |
+| change-6a3ab8a0e44e4c41843b66bde8b7134a | 2026-08-07 | UUID-backed record IDs and derived project index | implemented | [link](changes/2026-08-07-change-6a3ab8a0e44e4c41843b66bde8b7134a-uuid-record-ids-derived-index.md) |
 
 ## Technical Decisions
 
-| Number | Date | Title | Status | Link |
-|--------|------|-------|--------|------|
-| 001 | 2026-06-30 | Team MVP should precede full Hub experience for Requirement-003 | decided | [link](decisions/2026-06-30-001-team-mvp-before-full-hub-experience.md) |
-| 002 | 2026-08-04 | Adopt a lightweight continuity and trust experience layer | accepted | [link](decisions/2026-08-04-002-sybermem-continuity-trust-experience.md) |
-| 003 | 2026-08-05 | Deferral decisions for the four remaining audit follow-ups + skill quick-guide pilot | decided | [link](decisions/2026-08-05-003-audit-followup-deferral-decisions.md) |
-<!-- add new records here -->
-
----
+| ID | Date | Title | Status | Link |
+|----|------|-------|--------|------|
+| decision-001 | 2026-06-30 | Team MVP should precede full Hub experience for Requirement-003 | decided | [link](decisions/2026-06-30-001-team-mvp-before-full-hub-experience.md) |
+| decision-002 | 2026-08-04 | Adopt a lightweight continuity and trust experience layer | accepted | [link](decisions/2026-08-04-002-sybermem-continuity-trust-experience.md) |
+| decision-003 | 2026-08-05 | Deferral decisions for the four remaining audit follow-ups + skill quick-guide pilot | decided | [link](decisions/2026-08-05-003-audit-followup-deferral-decisions.md) |
 
 ## Requirements / Discussions
 
-| Number | Date | Title | Source | Priority | Link |
-|--------|------|-------|--------|----------|------|
-| 001 | 2026-05-08 | Create ADR Project Record System | Internal discussion | high | [link](requirements/2026-05-08-001-创建ADR项目规范系统.md) |
-| 002 | 2026-06-05 | Phase summary and record compression requirements | User feedback | high | [link](requirements/2026-06-05-002-阶段性总结与记录压缩需求.md) |
-| 003 | 2026-06-29 | SyberMem 跨项目与团队记忆扩展方案 | Internal review | high | [link](requirements/2026-06-29-003-sybermem-cross-project-team-memory-extension.md) |
-<!-- add new records here -->
-
----
+| ID | Date | Title | Source | Priority | Link |
+|----|------|-------|--------|----------|------|
+| requirement-001 | 2026-05-08 | 创建ADR项目规范系统 | Internal discussion | high | [link](requirements/2026-05-08-001-创建ADR项目规范系统.md) |
+| requirement-002 | 2026-06-05 | 阶段性总结与记录压缩需求 | User feedback | high | [link](requirements/2026-06-05-002-阶段性总结与记录压缩需求.md) |
+| requirement-003 | 2026-06-29 | SyberMem 跨项目与团队记忆扩展方案 | Internal review | high | [link](requirements/2026-06-29-003-sybermem-cross-project-team-memory-extension.md) |
 
 ## Bug Fix Records
 
-| Number | Date | Title | Severity | Link |
-|--------|------|-------|----------|------|
-| 001 | 2026-06-09 | init-project misclassifies missing hook file as custom/kept | medium | [link](bugs/2026-06-09-001-init-project-misclassifies-missing-hook-file.md) |
-| 002 | 2026-08-04 | Publish preview bootstrap and JSON output leaks | high | [link](bugs/2026-08-04-002-publish-preview-bootstrap-json-output.md) |
-| 003 | 2026-08-04 | Publish trust summary and skill flow gaps | high | [link](bugs/2026-08-04-003-publish-trust-summary-and-skill-flow-gaps.md) |
-| 004 | 2026-08-05 | Merged user_prompt hook not propagated by health check (update regressed to dual-hook) | high | [link](bugs/2026-08-05-004-merged-hook-not-propagated-by-health-check.md) |
-<!-- add new records here -->
-
----
+| ID | Date | Title | Severity | Link |
+|----|------|-------|----------|------|
+| bug-001 | 2026-06-09 | init-project misclassifies missing hook file as custom/kept | medium | [link](bugs/2026-06-09-001-init-project-misclassifies-missing-hook-file.md) |
+| bug-002 | 2026-08-04 | Publish preview bootstrap and JSON output leaks | high | [link](bugs/2026-08-04-002-publish-preview-bootstrap-json-output.md) |
+| bug-003 | 2026-08-04 | Publish trust summary and skill flow gaps | high | [link](bugs/2026-08-04-003-publish-trust-summary-and-skill-flow-gaps.md) |
+| bug-004 | 2026-08-05 |  | high | [link](bugs/2026-08-05-004-merged-hook-not-propagated-by-health-check.md) |
 
 ## Usage
 
@@ -192,31 +178,29 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 - **bugs/**: Record bug analysis and fix approaches
 - **analysis/phase-index.md**: Persistent project phase analysis state used to track candidates, confirmed phases, and incremental analysis progress
 
-When adding records, update this index file accordingly.
+When adding records, create the canonical record file first, then run `sybermem project index build` and `sybermem project index check`.
 
 ---
 
 ## Topic Index
 
 <!-- Auto-maintained: maps topic tags to record IDs for fast lookup -->
-<!-- Optional suffix: [active] [low] [deprecated → <new-topic>] -->
-- architecture: requirement-001, requirement-003, decision-001, decision-002, decision-003
+- architecture: change-6a3ab8a0e44e4c41843b66bde8b7134a, decision-001, decision-002, decision-003, requirement-001, requirement-003
 - automation: change-003, change-008
-- collaboration: requirement-003, decision-001, change-023, change-026
+- collaboration: change-023, change-026, change-6a3ab8a0e44e4c41843b66bde8b7134a, decision-001, requirement-003
 - compression: requirement-002
-- digest: requirement-002, change-010, change-023
-- distribution: change-001, change-002, change-008, change-010, change-032, change-045, change-048, bug-004
-- framework: change-006
-- hooks: change-003, change-005, bug-001, change-008, change-030, change-036, change-041, change-045, change-047, bug-004
-- hub: requirement-003, change-040, change-041
-- init: change-005, bug-001, change-030
-- injection: change-032
-- install: change-001
+- digest: change-010, change-023, requirement-002
+- distribution: bug-004, change-001, change-002, change-008, change-010, change-045, change-048
 - foundation: requirement-001
+- framework: change-006
+- hooks: bug-001, bug-004, change-003, change-005, change-008, change-030, change-036, change-041, change-045, change-047
+- hub: change-040, change-041, requirement-003
+- init: bug-001, change-005, change-030
+- install: change-001
 - lifecycle: change-010
-- quality: change-032, change-033, decision-002, change-036, change-037, bug-002, change-039, bug-003, change-040, change-041, change-045, change-047, change-048, decision-003, change-049
+- quality: bug-002, bug-003, change-033, change-036, change-037, change-039, change-040, change-041, change-045, change-047, change-048, change-049, change-6a3ab8a0e44e4c41843b66bde8b7134a, decision-002, decision-003
 - relations: change-010
-- search: change-010, change-033, decision-002, change-036, change-039, change-040, change-041, change-045, change-048
-- skills: change-002, change-006, change-026, bug-003, change-041, change-049
-- team: requirement-003, decision-001, decision-002, change-023, change-026, change-030, change-037, bug-002, change-039, bug-003, change-041
-- uninstall: change-032
+- search: change-010, change-033, change-036, change-039, change-040, change-041, change-045, change-048, decision-002
+- skills: bug-003, change-002, change-006, change-026, change-041, change-049
+- team: bug-002, bug-003, change-023, change-026, change-030, change-037, change-039, change-041, decision-001, decision-002, requirement-003
+- topic: change-032
