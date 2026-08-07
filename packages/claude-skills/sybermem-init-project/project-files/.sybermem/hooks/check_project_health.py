@@ -10,6 +10,19 @@ import json
 import re
 import subprocess
 from pathlib import Path
+from typing import Final, TypedDict
+
+
+class FileStatus(TypedDict):
+    status: str
+
+
+RECORD_TEMPLATE_REQUIRED_FIELDS: Final[tuple[str, ...]] = (
+    "record_id:",
+    "key_conclusion:",
+    "topics:",
+)
+LEGACY_RECORD_TEMPLATE_MARKERS: Final[tuple[str, ...]] = ("number:",)
 
 
 def resolve_sybermem_root() -> Path | None:
@@ -195,6 +208,25 @@ def check_file_exists(path: Path) -> dict:
     return {"status": "fresh" if path.is_file() else "missing"}
 
 
+def check_record_template(path: Path) -> FileStatus:
+    """Check whether a record template is missing, stale, or fresh."""
+    content = read_text(path)
+    if content is None:
+        return {"status": "missing"}
+
+    has_canonical_fields = all(
+        field in content for field in RECORD_TEMPLATE_REQUIRED_FIELDS
+    )
+    has_legacy_numbering = any(
+        marker in content for marker in LEGACY_RECORD_TEMPLATE_MARKERS
+    )
+    return {
+        "status": (
+            "fresh" if has_canonical_fields and not has_legacy_numbering else "stale"
+        )
+    }
+
+
 def check_dir_exists(path: Path) -> dict:
     """Simple existence check for directories."""
     return {"status": "present" if path.is_dir() else "missing"}
@@ -312,7 +344,20 @@ def generate_actions(files: dict) -> list[str]:
         if not idx.get("has_topic_index"):
             actions.append("insert Topic Index section into INDEX.md (preserve existing content)")
 
-    # Directories and templates — create if missing
+    # Record templates — create if missing, replace if stale
+    for template_path in (
+        ".sybermem/templates/change-template.md",
+        ".sybermem/templates/decision-template.md",
+        ".sybermem/templates/requirement-template.md",
+        ".sybermem/templates/bug-template.md",
+    ):
+        info = files.get(template_path, {})
+        if info.get("status") == "missing":
+            actions.append(f"create {template_path} from template")
+        elif info.get("status") == "stale":
+            actions.append(f"replace {template_path} from template")
+
+    # Directories and non-record templates — create if missing
     for d in (
         ".sybermem/digests/",
         ".sybermem/theme-digests/",
@@ -388,6 +433,10 @@ def main() -> int:
     files[".sybermem/digests/"] = check_dir_exists(root / ".sybermem" / "digests")
     files[".sybermem/theme-digests/"] = check_dir_exists(root / ".sybermem" / "theme-digests")
     files[".sybermem/analysis/phase-index.md"] = check_file_exists(root / ".sybermem" / "analysis" / "phase-index.md")
+    files[".sybermem/templates/change-template.md"] = check_record_template(root / ".sybermem" / "templates" / "change-template.md")
+    files[".sybermem/templates/decision-template.md"] = check_record_template(root / ".sybermem" / "templates" / "decision-template.md")
+    files[".sybermem/templates/requirement-template.md"] = check_record_template(root / ".sybermem" / "templates" / "requirement-template.md")
+    files[".sybermem/templates/bug-template.md"] = check_record_template(root / ".sybermem" / "templates" / "bug-template.md")
     files[".sybermem/templates/digest-template.md"] = check_file_exists(root / ".sybermem" / "templates" / "digest-template.md")
     files[".sybermem/templates/theme-digest-template.md"] = check_file_exists(root / ".sybermem" / "templates" / "theme-digest-template.md")
 
