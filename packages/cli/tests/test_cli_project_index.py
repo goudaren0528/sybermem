@@ -8,6 +8,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "core"))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from sybermem_core.project_index import DuplicateRecordIdError
 from sybermem_cli import main as main_module
 
 
@@ -105,6 +106,56 @@ def test_cli_project_index_build_returns_1_without_project_root(monkeypatch, cap
     assert exit_code == 1
     assert captured.out == ""
     assert captured.err == "No SyberMem project root found.\n"
+
+
+def test_cli_project_index_build_returns_clean_error_for_duplicate_record_id(tmp_path: Path, monkeypatch, capsys) -> None:
+    # Given: project INDEX generation detects duplicate canonical record metadata
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    first = project_root / ".sybermem" / "changes" / "first.md"
+    second = project_root / ".sybermem" / "changes" / "second.md"
+    monkeypatch.setattr(main_module, "resolve_project_root", lambda: project_root)
+
+    def fail_write(root: Path) -> bool:
+        raise DuplicateRecordIdError(record_id="change-001", paths=(first, second))
+
+    monkeypatch.setattr(main_module, "write_project_index", fail_write)
+    monkeypatch.setattr(sys, "argv", ["sybermem", "project", "index", "build"])
+
+    # When: the build command runs through the CLI boundary
+    exit_code = main_module.main()
+
+    # Then: the error is reported concisely without a traceback
+    captured = capsys.readouterr()
+    assert exit_code == 1
+    assert captured.out == ""
+    assert "duplicate SyberMem record_id 'change-001'" in captured.err
+    assert "Traceback" not in captured.err
+
+
+def test_cli_project_index_check_returns_clean_error_for_duplicate_record_id(tmp_path: Path, monkeypatch, capsys) -> None:
+    # Given: project INDEX check detects duplicate canonical record metadata
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    first = project_root / ".sybermem" / "changes" / "first.md"
+    second = project_root / ".sybermem" / "changes" / "second.md"
+    monkeypatch.setattr(main_module, "resolve_project_root", lambda: project_root)
+
+    def fail_check(root: Path) -> bool:
+        raise DuplicateRecordIdError(record_id="change-001", paths=(first, second))
+
+    monkeypatch.setattr(main_module, "check_project_index", fail_check)
+    monkeypatch.setattr(sys, "argv", ["sybermem", "project", "index", "check"])
+
+    # When: the check command runs through the CLI boundary
+    exit_code = main_module.main()
+
+    # Then: the error is reported concisely without a traceback
+    captured = capsys.readouterr()
+    assert exit_code == 1
+    assert captured.out == ""
+    assert "duplicate SyberMem record_id 'change-001'" in captured.err
+    assert "Traceback" not in captured.err
 
 
 def test_cli_top_level_index_build_still_uses_workspace_index(monkeypatch, capsys) -> None:
