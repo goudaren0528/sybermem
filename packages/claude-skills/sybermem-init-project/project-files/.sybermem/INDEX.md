@@ -37,32 +37,32 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 
 ## Feature Changes
 
-| Number | Date | Title | Status | Link |
-|--------|------|-------|--------|------|
+| ID | Date | Title | Status | Link |
+|----|------|-------|--------|------|
 <!-- add new records here -->
 
 ---
 
 ## Technical Decisions
 
-| Number | Date | Title | Status | Link |
-|--------|------|-------|--------|------|
+| ID | Date | Title | Status | Link |
+|----|------|-------|--------|------|
 <!-- add new records here -->
 
 ---
 
 ## Requirements / Discussions
 
-| Number | Date | Title | Source | Priority | Link |
-|--------|------|-------|--------|----------|------|
+| ID | Date | Title | Source | Priority | Link |
+|----|------|-------|--------|----------|------|
 <!-- add new records here -->
 
 ---
 
 ## Bug Fix Records
 
-| Number | Date | Title | Severity | Link |
-|--------|------|-------|----------|------|
+| ID | Date | Title | Severity | Link |
+|----|------|-------|----------|------|
 <!-- add new records here -->
 
 ---
@@ -75,7 +75,7 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 - **bugs/**: Record bug analysis and fix approaches
 - **analysis/phase-index.md**: Persistent project phase analysis state used to track candidates, confirmed phases, and incremental analysis progress
 
-When adding records, update this index file accordingly.
+`.sybermem/INDEX.md` is derived from canonical record files. Use `sybermem project index build` to regenerate it and `sybermem project index check` to verify it is current.
 
 ---
 
