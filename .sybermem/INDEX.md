@@ -7,21 +7,23 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 ## Key Conclusions
 
 <!-- One-line core conclusion per record. Format: [id] #topic1 #topic2 — description (date) -->
+<!-- add new conclusions here -->
 - [bug-001] #hooks #init — Fixed init-project misclassifying missing hook files; exposed need for project-root resolution from subdirectories (2026-06-09)
 - [bug-004] #distribution #hooks — Fixed a batch-A propagation gap where check_project_health.py still keyed on the legacy dual UserPromptSubmit hooks, so `/sybermem-update` would drag already-merged projects back to dual-hook; health check now treats a single user_prompt.py entry as fresh and offers a non-destructive dual→single migration (2026-08-05)
-- [change-001] #distribution #install — Added one-liner remote install scripts (curl/irm) to simplify new user onboarding, no clone needed (2026-05-12)
+- [change-001] #distribution #install — Added one-liner remote install scripts \(curl/irm\) to simplify new user onboarding, no clone needed (2026-05-12)
 - [change-002] #distribution #skills — Moved SyberMem skill source to packages/claude-skills; eliminates duplicate skill loading from global installs (2026-05-12)
 - [change-003] #automation #hooks — Added default project-level auto/remind hook template with stop-hook helper for lightweight change records (2026-05-13)
 - [change-005] #hooks #init — Refreshed project instruction files to auto/remind mode and added project-level settings + stop-hook helper (2026-05-13)
 - [change-006] #framework #skills — Repaired missing .claude/settings.json, fixed INDEX.md omissions, refreshed phase index, upgraded all 8 skills with HARD-GATE + numbered checklist (2026-06-16)
 - [change-008] #automation #distribution #hooks — Added Claude Code plugin metadata and lifecycle hook delegators so SyberMem can install as a plugin without breaking existing project-managed hook files (2026-06-18)
-- [change-010] #digest #distribution #lifecycle #relations #search — Transformed SyberMem from v1 (record+group+compress) to v2 (lifecycle-aware, retrieval-capable, relation-linked, topic-compressible, multi-platform) in a single session covering 6 capability rounds (2026-06-22)
-- [change-045] #distribution #hooks #quality #search — Executed audit-driven P0/P1: exposed `sybermem resume` CLI (was implemented but unreachable), made search no-root failure explicit while keeping the hook path silent, merged the two prompt hooks into one process (~491ms→~297ms), and added LICENSE + CI + cli→core dependency + single-source VERSION so the repo reaches an OSS-trust baseline (2026-08-05)
+- [change-010] #digest #distribution #lifecycle #relations #search — Transformed SyberMem from v1 \(record+group+compress\) to v2 \(lifecycle-aware, retrieval-capable, relation-linked, topic-compressible, multi-platform\) in a single session covering 6 capability rounds (2026-06-22)
+- [change-045] #distribution #hooks #quality #search — Executed audit-driven P0/P1: exposed `sybermem resume` CLI \(was implemented but unreachable\), made search no-root failure explicit while keeping the hook path silent, merged the two prompt hooks into one process \(~491ms→~297ms\), and added LICENSE + CI + cli→core dependency + single-source VERSION so the repo reaches an OSS-trust baseline (2026-08-05)
 - [change-047] #hooks #quality — Stopped the auto stop-hook from writing per-stop markdown records + INDEX rows; auto-trails now go to a bounded rolling `.auto-trail.jsonl` journal so low-signal noise stays out of the canonical corpus, while the existing 26 records stay untouched to preserve digest/publish/status semantics (2026-08-05)
-- [change-048] #distribution #quality #search — Second-tier audit follow-ups: unified Codex/Cursor/Kimi manifests + CI drift gates + honest platform matrix (§4), unified `Stage→Phase Digests` terminology + install-order doc fix (§3), and query-time workspace stale detection warning when indexed HEAD lags current HEAD (§2-e) (2026-08-05)
+- [change-048] #distribution #quality #search — Second-tier audit follow-ups: unified Codex/Cursor/Kimi manifests + CI drift gates + honest platform matrix \(§4\), unified `Stage→Phase Digests` terminology + install-order doc fix \(§3\), and query-time workspace stale detection warning when indexed HEAD lags current HEAD \(§2-e\) (2026-08-05)
 - [change-049] #quality #skills — Extended the human quick-guide layer to search/using-sybermem/record/update so all five ceremony-heavy skills now open with a plain-language overview marked "not the execution contract", lowering human cognitive load without changing the authoritative machine contracts (2026-08-05)
 - [change-6a3ab8a0e44e4c41843b66bde8b7134a] #architecture #collaboration #quality — Added UUID-backed canonical record IDs and derived INDEX build/check commands so parallel record creation merges safely while legacy numeric records remain readable. (2026-08-07)
-- [decision-003] #architecture #quality — Consciously deferred 3 of 4 remaining audit follow-ups (real CI green, batch-C auto-trail cleanup, non-core platform runtime) with documented revisit triggers, and did the low-risk skill-slimming variant (human quick-guide layer over the preserved machine contract, piloted on init-project) (2026-08-05)
+- [change-71c1f4bdc01a4b6cb07731667f1c08c7] #quality #distribution #index — SyberMem derived INDEX generation now validates untrusted record metadata, escapes Markdown safely, and update/install propagation carries the UUID-backed record contract end to end. (2026-08-07)
+- [decision-003] #architecture #quality — Consciously deferred 3 of 4 remaining audit follow-ups \(real CI green, batch-C auto-trail cleanup, non-core platform runtime\) with documented revisit triggers, and did the low-risk skill-slimming variant \(human quick-guide layer over the preserved machine contract, piloted on init-project\) (2026-08-05)
 - [requirement-001] #architecture #foundation — Adopted ADR system: four category directories + INDEX master index + templates + skill automation (2026-05-08)
 - [requirement-002] #compression #digest — Identified need for persistent phase summary/compression layer to prevent understanding cost from growing linearly with records (2026-06-05)
 
@@ -95,6 +97,7 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 
 | ID | Date | Title | Status | Link |
 |----|------|-------|--------|------|
+<!-- add new records here -->
 | change-001 | 2026-05-12 | Add remote install scripts for one-liner installation | implemented | [link](changes/2026-05-12-001-add-remote-install-scripts.md) |
 | change-002 | 2026-05-12 | Migrate global skill source to packages directory | implemented | [link](changes/2026-05-12-002-migrate-global-skill-source-to-packages.md) |
 | change-003 | 2026-05-13 | Add auto change hook template | implemented | [link](changes/2026-05-13-003-add-auto-change-hook-template.md) |
@@ -140,15 +143,17 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 | change-044 | 2026-08-05 | agents md claude md 2026 08 05 sybermem comprehensive audit | implemented | [link](changes/2026-08-05-044-agents-md-claude-md-2026-08-05-sybermem-comprehensive-audit.md) |
 | change-045 | 2026-08-05 | Audit-driven P0/P1 — dual-track alignment, hot-path efficiency, OSS readiness | implemented | [link](changes/2026-08-05-045-audit-driven-p0-p1-dual-track-efficiency-oss-readiness.md) |
 | change-046 | 2026-08-05 | gitignore readme en readme and more | implemented | [link](changes/2026-08-05-046-gitignore-readme-en-readme-and-more.md) |
-| change-047 | 2026-08-05 | Auto-trail rolling journal — stop writing per-stop markdown records (batch B) | implemented | [link](changes/2026-08-05-047-auto-trail-rolling-journal-batch-b.md) |
-| change-048 | 2026-08-05 | Distribution consistency, UX terminology, and workspace stale detection (batches D/E/F) | implemented | [link](changes/2026-08-05-048-distribution-ux-workspace-stale-batches-def.md) |
+| change-047 | 2026-08-05 | Auto-trail rolling journal — stop writing per-stop markdown records \(batch B\) | implemented | [link](changes/2026-08-05-047-auto-trail-rolling-journal-batch-b.md) |
+| change-048 | 2026-08-05 | Distribution consistency, UX terminology, and workspace stale detection \(batches D/E/F\) | implemented | [link](changes/2026-08-05-048-distribution-ux-workspace-stale-batches-def.md) |
 | change-049 | 2026-08-05 | Extend human quick-guide layer to the remaining ceremony-heavy skills | implemented | [link](changes/2026-08-05-049-extend-skill-quick-guide-layer.md) |
 | change-6a3ab8a0e44e4c41843b66bde8b7134a | 2026-08-07 | UUID-backed record IDs and derived project index | implemented | [link](changes/2026-08-07-change-6a3ab8a0e44e4c41843b66bde8b7134a-uuid-record-ids-derived-index.md) |
+| change-71c1f4bdc01a4b6cb07731667f1c08c7 | 2026-08-07 | Close derived INDEX review blockers | implemented | [link](changes/2026-08-07-change-71c1f4bdc01a4b6cb07731667f1c08c7-close-derived-index-review-blockers.md) |
 
 ## Technical Decisions
 
 | ID | Date | Title | Status | Link |
 |----|------|-------|--------|------|
+<!-- add new records here -->
 | decision-001 | 2026-06-30 | Team MVP should precede full Hub experience for Requirement-003 | decided | [link](decisions/2026-06-30-001-team-mvp-before-full-hub-experience.md) |
 | decision-002 | 2026-08-04 | Adopt a lightweight continuity and trust experience layer | accepted | [link](decisions/2026-08-04-002-sybermem-continuity-trust-experience.md) |
 | decision-003 | 2026-08-05 | Deferral decisions for the four remaining audit follow-ups + skill quick-guide pilot | decided | [link](decisions/2026-08-05-003-audit-followup-deferral-decisions.md) |
@@ -157,14 +162,16 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 
 | ID | Date | Title | Source | Priority | Link |
 |----|------|-------|--------|----------|------|
-| requirement-001 | 2026-05-08 | 创建ADR项目规范系统 | Internal discussion | high | [link](requirements/2026-05-08-001-创建ADR项目规范系统.md) |
-| requirement-002 | 2026-06-05 | 阶段性总结与记录压缩需求 | User feedback | high | [link](requirements/2026-06-05-002-阶段性总结与记录压缩需求.md) |
-| requirement-003 | 2026-06-29 | SyberMem 跨项目与团队记忆扩展方案 | Internal review | high | [link](requirements/2026-06-29-003-sybermem-cross-project-team-memory-extension.md) |
+<!-- add new records here -->
+| requirement-001 | 2026-05-08 | 创建ADR项目规范系统 | 内部讨论 | high | [link](requirements/2026-05-08-001-%E5%88%9B%E5%BB%BAADR%E9%A1%B9%E7%9B%AE%E8%A7%84%E8%8C%83%E7%B3%BB%E7%BB%9F.md) |
+| requirement-002 | 2026-06-05 | 阶段性总结与记录压缩需求 | 用户使用反馈 | high | [link](requirements/2026-06-05-002-%E9%98%B6%E6%AE%B5%E6%80%A7%E6%80%BB%E7%BB%93%E4%B8%8E%E8%AE%B0%E5%BD%95%E5%8E%8B%E7%BC%A9%E9%9C%80%E6%B1%82.md) |
+| requirement-003 | 2026-06-29 | SyberMem 跨项目与团队记忆扩展方案 | 内部方案评审 | high | [link](requirements/2026-06-29-003-sybermem-cross-project-team-memory-extension.md) |
 
 ## Bug Fix Records
 
 | ID | Date | Title | Severity | Link |
 |----|------|-------|----------|------|
+<!-- add new records here -->
 | bug-001 | 2026-06-09 | init-project misclassifies missing hook file as custom/kept | medium | [link](bugs/2026-06-09-001-init-project-misclassifies-missing-hook-file.md) |
 | bug-002 | 2026-08-04 | Publish preview bootstrap and JSON output leaks | high | [link](bugs/2026-08-04-002-publish-preview-bootstrap-json-output.md) |
 | bug-003 | 2026-08-04 | Publish trust summary and skill flow gaps | high | [link](bugs/2026-08-04-003-publish-trust-summary-and-skill-flow-gaps.md) |
@@ -190,15 +197,16 @@ When adding records, create the canonical record file first, then run `sybermem 
 - collaboration: change-023, change-026, change-6a3ab8a0e44e4c41843b66bde8b7134a, decision-001, requirement-003
 - compression: requirement-002
 - digest: change-010, change-023, requirement-002
-- distribution: bug-004, change-001, change-002, change-008, change-010, change-045, change-048
+- distribution: bug-004, change-001, change-002, change-008, change-010, change-045, change-048, change-71c1f4bdc01a4b6cb07731667f1c08c7
 - foundation: requirement-001
 - framework: change-006
 - hooks: bug-001, bug-004, change-003, change-005, change-008, change-030, change-036, change-041, change-045, change-047
 - hub: change-040, change-041, requirement-003
+- index: change-71c1f4bdc01a4b6cb07731667f1c08c7
 - init: bug-001, change-005, change-030
 - install: change-001
 - lifecycle: change-010
-- quality: bug-002, bug-003, change-033, change-036, change-037, change-039, change-040, change-041, change-045, change-047, change-048, change-049, change-6a3ab8a0e44e4c41843b66bde8b7134a, decision-002, decision-003
+- quality: bug-002, bug-003, change-033, change-036, change-037, change-039, change-040, change-041, change-045, change-047, change-048, change-049, change-6a3ab8a0e44e4c41843b66bde8b7134a, change-71c1f4bdc01a4b6cb07731667f1c08c7, decision-002, decision-003
 - relations: change-010
 - search: change-010, change-033, change-036, change-039, change-040, change-041, change-045, change-048, decision-002
 - skills: bug-003, change-002, change-006, change-026, change-041, change-049
