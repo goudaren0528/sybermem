@@ -1,9 +1,13 @@
 ---
 type: change
+record_id: GENERATED_RECORD_ID
 date: YYYY-MM-DD
-number: XXX
 title: Change Title
 status: implemented | planned | reverted
+key_conclusion: One sentence that states what changed and why.
+topics:
+  - topic-one
+  - topic-two
 author: Author Name
 related_files: [list of related file paths]
 ---

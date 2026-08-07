@@ -1,10 +1,14 @@
 ---
 type: requirement
+record_id: GENERATED_RECORD_ID
 date: YYYY-MM-DD
-number: XXX
 title: Requirement / Discussion Title
 source: user / customer / internal discussion
 priority: high | medium | low
+key_conclusion: One sentence that states the requirement outcome and why.
+topics:
+  - topic-one
+  - topic-two
 ---
 
 ## Requirement Source

@@ -1,10 +1,14 @@
 ---
 type: decision
+record_id: GENERATED_RECORD_ID
 date: YYYY-MM-DD
-number: XXX
 title: Decision Title
 status: accepted | deprecated | superseded
-supersedes: [superseded decision number, if any]
+key_conclusion: One sentence that states what was decided and why.
+topics:
+  - topic-one
+  - topic-two
+supersedes: [superseded decision record_id, if any]
 ---
 
 ## Context

@@ -1,9 +1,13 @@
 ---
 type: bug
+record_id: GENERATED_RECORD_ID
 date: YYYY-MM-DD
-number: XXX
 title: Bug Title
 severity: critical | high | medium | low
+key_conclusion: One sentence that states what was fixed and why it mattered.
+topics:
+  - topic-one
+  - topic-two
 ---
 
 ## Bug Description
