@@ -60,7 +60,7 @@ if (Test-Path (Join-Path $env:USERPROFILE ".claude")) {
     }
     python -m venv $CliVenv
     & (Join-Path $CliVenv "Scripts\python.exe") -m pip install --upgrade pip
-    & (Join-Path $CliVenv "Scripts\pip.exe") install (Join-Path $AdrPath "packages\core") (Join-Path $AdrPath "packages\cli")
+    & (Join-Path $CliVenv "Scripts\pip.exe") install --upgrade --force-reinstall (Join-Path $AdrPath "packages\core") (Join-Path $AdrPath "packages\cli")
     @'
 @echo off
 set "SYBERMEM_HOME=%USERPROFILE%\.claude\sybermem\cli"
