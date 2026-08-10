@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import TypeAlias
 
+from .digest_coverage import digest_coverage_verdict
 from .project import resolve_project_root
 from .records import iter_record_files, parse_project_yaml, parse_record_file
 from .retrieval import (
@@ -12,7 +14,20 @@ from .retrieval import (
     derive_continuity_metadata,
 )
 from .search_query import QueryTerms, query_terms, score_row
+from .semantic_recall import semantic_scores
 from .workspace_search import WorkspaceIndexIncompatibleError, search_workspace, workspace_index_staleness
+
+
+# E2: opt-in semantic supplement. Off by default so the hot path keeps its current
+# token/compute economy; enable per-project via SYBERMEM_SEMANTIC_RECALL=1.
+SEMANTIC_RECALL_ENV: str = "SYBERMEM_SEMANTIC_RECALL"
+# Cosine floor for a semantic-only supplement. Deliberately high: char n-gram cosine
+# is noisy, so only strong lexical/morphological overlap earns a supplemental hit.
+SEMANTIC_SIMILARITY_FLOOR: float = 0.30
+
+
+def _semantic_recall_enabled() -> bool:
+    return os.environ.get(SEMANTIC_RECALL_ENV, "") == "1"
 
 
 SearchValue: TypeAlias = str | float
@@ -179,6 +194,23 @@ def _annotate_conflicts(rows: list[SearchRow]) -> None:
             row["conflict_note"] = "parallel authoritative records match; review before relying on either"
 
 
+def _annotate_digest_coverage(root: Path, rows: list[SearchRow]) -> None:
+    """Mechanically flag digests whose declared source records have changed (E3).
+
+    Only digests carrying a `coverage_hash` are checkable; legacy digests without it
+    are left untouched (verdict "unknown"). A stale digest is marked historical so
+    recall stops treating a drifted summary as current authoritative context.
+    """
+    for row in rows:
+        if row.get("source_kind") != "digest":
+            continue
+        verdict = digest_coverage_verdict(root, _text(row, "content"))
+        if verdict == "stale":
+            row["freshness"] = "stale"
+            if not row.get("conflict_note"):
+                row["conflict_note"] = "digest source records changed after this digest was written; regenerate before relying on it"
+
+
 def _match_type(query: str, row: SearchRow, terms: QueryTerms) -> str:
     q = query.lower().strip()
     record_id = _text(row, "record_id").lower()
@@ -206,7 +238,83 @@ def _related_digest_ids(row: SearchRow) -> set[str]:
 
 
 def _compact_match_allowed(score: float, match: str, matched_fields: int) -> bool:
-    return match in {"record-id", "relation"} or (score >= 5 and matched_fields >= 2)
+    return match in {"record-id", "relation", "semantic"} or (score >= 5 and matched_fields >= 2)
+
+
+def _add_semantic_supplement(query: str, lexical_rows: list[SearchRow]) -> list[SearchRow]:
+    """Append semantic-only recall candidates lexical scoring missed (E2, opt-in).
+
+    Char n-gram cosine recovers synonym-ish / rephrased / typo'd hits. Supplements are
+    tagged match="semantic" with a bounded score kept below the high-signal floor, so
+    they surface in explicit search but never auto-inject on the recall hot path.
+    """
+    root = resolve_project_root()
+    if root is None:
+        return lexical_rows
+    meta = parse_project_yaml(root)
+    project_id = meta.get("project_id", "")
+    slug = meta.get("slug", root.name)
+    all_rows = _load_all_rows(root, project_id, slug)
+    scored = semantic_scores(query, [{"title": _text(r, "title"), "topics": _text(r, "topics"), "content": _text(r, "content")} for r in all_rows])
+    if not scored:
+        return lexical_rows
+    seen = {_text(row, "record_id") for row in lexical_rows}
+    digest_coverage = _digest_coverage(all_rows)
+    archived_ids = _archived_record_ids(root)
+    supplemented = list(lexical_rows)
+    for index, similarity in scored:
+        if similarity < SEMANTIC_SIMILARITY_FLOOR:
+            break  # scored is descending; nothing further can clear the floor
+        row = all_rows[index]
+        record_id = _text(row, "record_id")
+        if record_id in seen:
+            continue
+        # Map similarity in [floor, 1] to a bounded score in [5, 10) — admitted by the
+        # compact gate but always below the high-signal floor (12), so never auto-injected.
+        row["score"] = round(5.0 + 5.0 * min(similarity, 0.99), 3)
+        row["matched_fields"] = "2"
+        enriched = _with_retrieval_metadata(row, match_reason="semantic", related_digest=_related_digest(row, digest_coverage), archived=record_id in archived_ids)
+        enriched["match"] = "semantic"
+        supplemented.append(enriched)
+        seen.add(record_id)
+    return supplemented
+
+
+# High-signal recall gate (E1). Automatic prompt-time injection is far more costly in
+# trust than a missed hint: a wrong hint pollutes the agent's context, a missing hint
+# costs nothing. So the hot-path hook injects ONLY strong matches — exact record-id,
+# an explicit relation match, or a lexical score clearly above the compact floor.
+# Bare keyword overlap, however current/authoritative, stays silent on the hook path;
+# explicit `/sybermem-search` still surfaces it.
+HIGH_SIGNAL_SCORE: TypeAlias = float
+HIGH_SIGNAL_SCORE_FLOOR: HIGH_SIGNAL_SCORE = 12.0
+
+
+def _is_high_signal(row: SearchRow) -> bool:
+    match = _text(row, "match")
+    if match in {"record-id", "relation"}:
+        return True
+    score = float(row.get("score", 0.0) or 0.0)
+    return score >= HIGH_SIGNAL_SCORE_FLOOR
+
+
+def high_signal_recall_hints(query: str, limit: int = 3) -> tuple[list[SearchRow], str]:
+    """Return only high-signal recall rows for automatic prompt injection (E1).
+
+    Returns (rows, abstention_reason). When rows is empty, abstention_reason explains
+    why in one bounded phrase for local debug logging; it is never injected into the
+    prompt. rows is a strict subset of compact_project_search under the high-signal gate.
+    """
+    rows = compact_project_search(query, limit=limit)
+    high_signal = [row for row in rows if _is_high_signal(row)]
+    if high_signal:
+        return high_signal[:limit], ""
+    if rows:
+        return [], "matched rows were keyword-only and below the high-signal floor"
+    diagnostic = compact_project_search(query, limit=limit, include_abstention=True)
+    if diagnostic and _text(diagnostic[0], "result") == "no_reliable_recall":
+        return [], _text(diagnostic[0], "reason")
+    return [], "no candidate records matched the prompt"
 
 
 def search_project(query: str) -> list[SearchRow]:
@@ -243,6 +351,7 @@ def search_project(query: str) -> list[SearchRow]:
             enriched["match"] = overlap.match
             results.append(enriched)
     apply_successor_guidance(results, guidance_rows)
+    _annotate_digest_coverage(root, results)
     _annotate_conflicts(results)
     return results
 
@@ -278,6 +387,9 @@ def compact_project_search(query: str, limit: int = 3, *, include_abstention: bo
                 fallback_rows.append(enriched)
         rows = fallback_rows
 
+    if _semantic_recall_enabled():
+        rows = _add_semantic_supplement(query, rows)
+
     candidates = rows
     rows = [row for row in rows if _text(row, "authority") != "evidence" and _compact_match_allowed(float(row.get("score", 0.0) or 0.0), _text(row, "match"), int(_text(row, "matched_fields") or "0"))]
     has_current = any(_text(row, "freshness") in {"current", "conflicted"} for row in rows)
@@ -287,12 +399,21 @@ def compact_project_search(query: str, limit: int = 3, *, include_abstention: bo
     if not rows and include_abstention and candidates:
         return [compact_abstention_row(query, candidates)]
 
-    def score(row: SearchRow) -> tuple[int, int, int, int]:
-        authority_rank = {"authoritative": 0, "summarized": 1, "evidence": 2}.get(_text(row, "authority") or "summarized", 3)
-        freshness_rank = {"current": 0, "historical": 1, "stale": 2}.get(_text(row, "freshness") or "historical", 3)
-        match_rank = -int(float(row.get("score", 0.0) or 0.0))
-        created_rank = -_created_rank(row)
-        return (authority_rank, freshness_rank, match_rank, created_rank)
-
-    rows.sort(key=score)
+    rows.sort(key=_compact_sort_key)
     return rows[:limit]
+
+
+# E5: rank by match *specificity* before freshness/recency. Authority still leads (we
+# never float low-trust evidence above authoritative), but among trustworthy hits a
+# precisely-matched record (exact id > relation > topic > keyword) must not be buried
+# under a newer, generically-matched one. Recency is only the final tiebreak.
+_MATCH_SPECIFICITY: dict[str, int] = {"record-id": 0, "relation": 1, "topic": 2, "keyword": 3}
+
+
+def _compact_sort_key(row: SearchRow) -> tuple[int, int, int, int, int]:
+    authority_rank = {"authoritative": 0, "summarized": 1, "evidence": 2}.get(_text(row, "authority") or "summarized", 3)
+    specificity_rank = _MATCH_SPECIFICITY.get(_text(row, "match"), 4)
+    freshness_rank = {"current": 0, "historical": 1, "stale": 2}.get(_text(row, "freshness") or "historical", 3)
+    match_rank = -int(float(row.get("score", 0.0) or 0.0))
+    created_rank = -_created_rank(row)
+    return (authority_rank, specificity_rank, freshness_rank, match_rank, created_rank)

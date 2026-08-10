@@ -71,15 +71,27 @@ def _run_intent_capture(root: Path, prompt: str) -> None:
 
 
 def _run_recall(root: Path, prompt: str) -> None:
-    """Replicate task_recall behavior; the only stdout writer on success."""
+    """Replicate task_recall behavior; the only stdout writer on success.
+
+    Routes through the SAME high-signal gate (E1) and inject/abstain logging (E6) as
+    task_recall.main, so the merged production hook and the standalone hook behave
+    identically. Uses task_recall's helpers as the single source of truth.
+    """
     try:
-        from sybermem_core.search import compact_project_search
+        from sybermem_core.search import high_signal_recall_hints
 
         if recall_hook.should_skip(prompt):
             return
-        rows = compact_project_search(prompt, limit=3)
+        rows, abstention_reason = high_signal_recall_hints(prompt, limit=3)
         if not rows:
+            if abstention_reason:
+                recall_hook.log_recall_event(root, "abstain", reason=recall_hook.safe_field(abstention_reason, 160))
             return
+        injected = [
+            {"record_id": recall_hook.safe_field(row.get("record_id", ""), 60), "match": recall_hook.safe_field(row.get("match", row.get("match_reason", "")), 24)}
+            for row in rows[:3]
+        ]
+        recall_hook.log_recall_event(root, "inject", records=injected)
         packet = recall_hook.render_packet(prompt, rows)
         print(
             json.dumps(

@@ -3,6 +3,8 @@ from __future__ import annotations
 import re
 from typing import Mapping, MutableMapping, Sequence, TypeAlias, TypedDict
 
+from .records import RECORD_ID_SUFFIX
+
 
 RetrievalValue: TypeAlias = str | float
 
@@ -25,7 +27,7 @@ class ContinuityMetadata(TypedDict):
     summary: str
 
 
-RECORD_ID_RE = re.compile(r"(?:change|decision|requirement|bug|digest)-\d{3}")
+RECORD_ID_RE = re.compile(rf"(?:change|decision|requirement|bug|digest)-{RECORD_ID_SUFFIX}")
 
 
 def is_auto_trail(title: str, content: str) -> bool:
@@ -33,7 +35,24 @@ def is_auto_trail(title: str, content: str) -> bool:
     return any(marker in text for marker in AUTO_TRAIL_MARKERS)
 
 
-def classify_source_kind(path: str, title: str = '', content: str = '') -> str:
+# E4: source-aware trust may be *declared* in record frontmatter and only *inferred*
+# from paths/markers/status as a legacy fallback. A declaration wins over inference,
+# but only when it is a recognized value — an unknown/typo'd field is ignored so a
+# malformed record cannot corrupt trust classification (parse, don't trust blindly).
+VALID_SOURCE_KINDS: frozenset[str] = frozenset({'digest', 'auto-trail', 'manual'})
+VALID_AUTHORITIES: frozenset[str] = frozenset({'summarized', 'evidence', 'authoritative'})
+VALID_LIFECYCLES: frozenset[str] = frozenset({'active', 'resolved', 'superseded', 'archived', 'conflicted'})
+
+
+def _declared(value: str, allowed: frozenset[str]) -> str:
+    normalized = (value or '').strip().lower()
+    return normalized if normalized in allowed else ''
+
+
+def classify_source_kind(path: str, title: str = '', content: str = '', declared: str = '') -> str:
+    explicit = _declared(declared, VALID_SOURCE_KINDS)
+    if explicit:
+        return explicit
     normalized = path.replace('\\', '/')
     if '/digests/' in normalized or '/theme-digests/' in normalized:
         return 'digest'
@@ -42,7 +61,10 @@ def classify_source_kind(path: str, title: str = '', content: str = '') -> str:
     return 'manual'
 
 
-def classify_authority(source_kind: str, title: str, content: str) -> str:
+def classify_authority(source_kind: str, title: str, content: str, declared: str = '') -> str:
+    explicit = _declared(declared, VALID_AUTHORITIES)
+    if explicit:
+        return explicit
     if source_kind == 'digest':
         return 'summarized'
     if source_kind == 'auto-trail' or is_auto_trail(title, content):
@@ -50,13 +72,26 @@ def classify_authority(source_kind: str, title: str, content: str) -> str:
     return 'authoritative'
 
 
-def classify_lifecycle(status: str, superseded_by: str, archived: bool) -> str:
+# Terminal (no-longer-open) record statuses. Bugs use `fixed`/`resolved`,
+# requirements/decisions use `completed`/`done`/`closed` — all mean "not open".
+# Single source so status open-detection and lifecycle classification agree.
+TERMINAL_STATUSES: frozenset[str] = frozenset({'resolved', 'fixed', 'completed', 'done', 'closed'})
+
+
+def is_open_status(status: str) -> bool:
+    return (status or '').strip().lower() not in TERMINAL_STATUSES
+
+
+def classify_lifecycle(status: str, superseded_by: str, archived: bool, declared: str = '') -> str:
+    explicit = _declared(declared, VALID_LIFECYCLES)
+    if explicit:
+        return explicit
     normalized = (status or '').strip().lower()
     if superseded_by:
         return 'superseded'
     if archived:
         return 'archived'
-    if normalized in {'resolved', 'completed', 'done'}:
+    if normalized in TERMINAL_STATUSES:
         return 'resolved'
     return 'active'
 
@@ -81,10 +116,10 @@ def derive_continuity_metadata(
 ) -> ContinuityMetadata:
     title = _row_text(row, 'title')
     content = _row_text(row, 'content')
-    source_kind = classify_source_kind(_row_text(row, 'path'), title, content)
-    authority = classify_authority(source_kind, title, content)
+    source_kind = classify_source_kind(_row_text(row, 'path'), title, content, declared=_row_text(row, 'source_kind'))
+    authority = classify_authority(source_kind, title, content, declared=_row_text(row, 'authority'))
     is_archived = archived or '[archived]' in content
-    lifecycle = classify_lifecycle(_row_text(row, 'status'), _row_text(row, 'superseded_by'), is_archived)
+    lifecycle = classify_lifecycle(_row_text(row, 'status'), _row_text(row, 'superseded_by'), is_archived, declared=_row_text(row, 'lifecycle'))
     return {
         'source_kind': source_kind,
         'authority': authority,

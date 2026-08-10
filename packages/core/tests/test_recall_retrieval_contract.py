@@ -3,7 +3,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from sybermem_core.search import compact_project_search, search_project
+from sybermem_core.search import compact_project_search, high_signal_recall_hints, search_project
 
 
 def write_project(root: Path) -> None:
@@ -341,6 +341,81 @@ def test_project_search_adds_successor_guidance_for_superseded_records(tmp_path:
     assert row["current_guidance"] == "Prefer successor decision-002 for current guidance."
 
 
+def test_project_search_resolves_uuid_backed_superseded_successor(tmp_path: Path, monkeypatch) -> None:
+    # Given: a UUID-backed old decision points at a UUID-backed successor via superseded_by
+    old_id = "decision-6a3ab8a0e44e4c41843b66bde8b7134a"
+    new_id = "decision-71c1f4bdc01a4b6cb07731667f1c08c7"
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    write_project(project_root)
+    write_record(
+        project_root,
+        "decisions",
+        f"2026-08-04-{old_id}-old.md",
+        [
+            "type: decision",
+            f"record_id: {old_id}",
+            "date: 2026-08-04",
+            "title: Old uuid-token decision",
+            "status: decided",
+            f"superseded_by: {new_id}",
+        ],
+        "## Summary\nuuid-token used the old approach.",
+    )
+    write_record(
+        project_root,
+        "decisions",
+        f"2026-08-05-{new_id}-new.md",
+        ["type: decision", f"record_id: {new_id}", "date: 2026-08-05", "title: New uuid-token decision", "status: decided"],
+        "## Summary\nuuid-token now uses the successor approach.",
+    )
+    monkeypatch.chdir(project_root)
+
+    # When: explicit historical search returns the superseded UUID hit
+    rows = search_project("old uuid-token")
+
+    # Then: successor guidance resolves across UUID-backed ids (regression: RECORD_ID_RE numeric-only)
+    row = next(item for item in rows if item["record_id"] == old_id)
+    assert row["successor_record"] == new_id
+    assert row["current_record"] == new_id
+    assert row["current_guidance"] == f"Prefer successor {new_id} for current guidance."
+
+
+def test_project_search_resolves_uuid_backed_fixes_relation(tmp_path: Path, monkeypatch) -> None:
+    # Given: a resolved UUID-backed bug and a later change using a UUID-backed fixes relation
+    bug_id = "bug-6a3ab8a0e44e4c41843b66bde8b7134a"
+    fix_id = "change-71c1f4bdc01a4b6cb07731667f1c08c7"
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    write_project(project_root)
+    write_record(
+        project_root,
+        "bugs",
+        f"2026-08-04-{bug_id}-resolved.md",
+        ["type: bug", f"record_id: {bug_id}", "date: 2026-08-04", "title: Resolved uuidfix-token bug", "status: resolved"],
+        "## Summary\nuuidfix-token bug was fixed after diagnosis.",
+    )
+    write_record(
+        project_root,
+        "changes",
+        f"2026-08-05-{fix_id}-fix.md",
+        ["type: change", f"record_id: {fix_id}", "date: 2026-08-05", "title: Fix uuidfix-token bug", "status: implemented", f"fixes: {bug_id}"],
+        "## Summary\nuuidfix-token is fixed by the current change.",
+    )
+    monkeypatch.chdir(project_root)
+
+    # When: explicit search finds both the resolved bug and the UUID-backed fixing change
+    rows = search_project("uuidfix-token bug")
+
+    # Then: fixes-based successor guidance resolves across UUID-backed ids
+    bug = next(item for item in rows if item["record_id"] == bug_id)
+    fix = next(item for item in rows if item["record_id"] == fix_id)
+    assert bug["successor_record"] == fix_id
+    assert bug["current_record"] == fix_id
+    assert fix["current_record"] == fix_id
+    assert fix["current_guidance"] == f"This record resolves {bug_id}."
+
+
 def test_project_search_adds_current_guidance_for_resolved_records_and_fixes(tmp_path: Path, monkeypatch) -> None:
     # Given: a resolved bug and a later change using the existing fixes relation
     project_root = tmp_path / "project"
@@ -513,3 +588,110 @@ def test_project_search_omits_current_guidance_for_successor_cycle(tmp_path: Pat
     assert {row["record_id"] for row in rows} == {"decision-001", "decision-002"}
     assert all("current_record" not in row for row in rows)
     assert all("successor_record" not in row for row in rows)
+
+
+def test_high_signal_recall_stays_silent_for_keyword_only_matches(tmp_path: Path, monkeypatch) -> None:
+    # Given: a current authoritative record that only matches by distributed keyword overlap
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    write_project(project_root)
+    write_record(
+        project_root,
+        "requirements",
+        "2026-08-04-001-keyword-only.md",
+        ["type: requirement", "date: 2026-08-04", "title: Workspace recall behavior", "status: accepted"],
+        "## Summary\nNatural prompts should retrieve concise context without exact phrase matching.",
+    )
+    monkeypatch.chdir(project_root)
+
+    # When: the hot-path hook helper and the explicit compact search see the same prompt
+    hints, reason = high_signal_recall_hints("retrieve workspace context for behavior", limit=3)
+    compact_rows = compact_project_search("retrieve workspace context for behavior", limit=3)
+
+    # Then: compact search still surfaces the keyword hit, but the hook abstains with a reason
+    assert [row["record_id"] for row in compact_rows] == ["requirement-001"]
+    assert hints == []
+    assert reason == "matched rows were keyword-only and below the high-signal floor"
+
+
+def test_high_signal_recall_injects_relation_and_record_id_matches(tmp_path: Path, monkeypatch) -> None:
+    # Given: a record reachable by an explicit relation match
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    write_project(project_root)
+    write_record(
+        project_root,
+        "changes",
+        "2026-08-04-001-relation-hit.md",
+        ["type: change", "date: 2026-08-04", "title: Signal change", "status: implemented", "implements: requirement-002"],
+        "## Summary\nHigh-signal relation match should inject.",
+    )
+    monkeypatch.chdir(project_root)
+
+    # When: the prompt references the related record id (relation match) and the record id itself
+    relation_hints, relation_reason = high_signal_recall_hints("what implements requirement-002 here", limit=3)
+    id_hints, id_reason = high_signal_recall_hints("change-001", limit=3)
+
+    # Then: both strong signals inject with no abstention
+    assert [row["record_id"] for row in relation_hints] == ["change-001"]
+    assert relation_reason == ""
+    assert [row["record_id"] for row in id_hints] == ["change-001"]
+    assert id_reason == ""
+
+
+def test_high_signal_recall_reports_no_candidate_reason(tmp_path: Path, monkeypatch) -> None:
+    # Given: a project whose records do not match the prompt at all
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    write_project(project_root)
+    write_record(
+        project_root,
+        "changes",
+        "2026-08-04-001-unrelated.md",
+        ["type: change", "date: 2026-08-04", "title: Unrelated topic", "status: implemented"],
+        "## Summary\nCompletely unrelated content.",
+    )
+    monkeypatch.chdir(project_root)
+
+    # When: the prompt shares no meaningful terms with any record
+    hints, reason = high_signal_recall_hints("quantum teleportation latency budget", limit=3)
+
+    # Then: the hook abstains and the reason is bounded and non-empty for debug logging
+    assert hints == []
+    assert reason != ""
+
+
+def test_compact_search_ranks_specific_match_above_newer_generic_match(tmp_path: Path, monkeypatch) -> None:
+    # Given: an older record matched specifically by topic, and a newer record matched only
+    # by generic keyword overlap — both authoritative and current.
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    write_project(project_root)
+    write_record(
+        project_root,
+        "decisions",
+        "2026-08-01-001-specific.md",
+        [
+            "type: decision",
+            "date: 2026-08-01",
+            "title: Older policy",
+            "status: decided",
+            "topics: [rankspecificity, retrieval]",
+        ],
+        "## Summary\nThe rankspecificity retrieval policy decision.",
+    )
+    write_record(
+        project_root,
+        "changes",
+        "2026-08-09-002-generic.md",
+        ["type: change", "date: 2026-08-09", "title: Newer rankspecificity retrieval note", "status: implemented"],
+        "## Summary\nA newer record that only overlaps by generic keyword in title and body.",
+    )
+    monkeypatch.chdir(project_root)
+
+    # When: a query matches the old record by topic and the new record by keyword
+    rows = compact_project_search("rankspecificity retrieval", limit=3)
+
+    # Then: the specific (topic) match ranks first despite being older (E5)
+    assert rows[0]["record_id"] == "decision-001"
+    assert rows[0]["match"] == "topic"

@@ -8,7 +8,7 @@ from typing import Literal, TypedDict
 from . import next_step_router
 from .publish import latest_phase_digest, latest_theme_digest
 from .records import iter_record_files, parse_project_yaml, parse_record_file
-from .retrieval import classify_authority, derive_summary
+from .retrieval import classify_authority, classify_source_kind, derive_summary
 from .status import project_status, publication_readiness
 
 ResumeMode = Literal["fast", "standard", "deep"]
@@ -66,22 +66,52 @@ def build_resume_checkpoint(project_root: Path, mode: ResumeMode = "fast") -> di
     confidence = _confidence(status, signals)
     freshness = _freshness(status, signals)
 
+    risks = _risk_summary(signals) if mode != "fast" else []
     checkpoint = {
         "mode": mode,
         "project": _project_identity(root),
         "active_phase": status["phase"],
         "progress": progress,
-        "risks": _risk_summary(signals) if mode != "fast" else [],
+        "risks": risks,
         "next_action": next_action,
         "confidence": confidence,
         "freshness": freshness,
         "recommendation_reason": next_action["reason"],
+        "brief": _brief(status, progress, signals, next_action, confidence, freshness),
     }
     if mode in {"standard", "deep"}:
         checkpoint["digest_coverage"] = _digest_coverage(signals)
     if mode == "deep":
         checkpoint["read_targets"] = _read_targets(root, progress, signals)
     return checkpoint
+
+
+def _brief(
+    status: dict,  # noqa: DICT_OK
+    progress: list[ResumeItem],
+    signals: ResumeSignals,
+    next_action: ResumeAction,
+    confidence: str,
+    freshness: str,
+) -> list[str]:
+    """Compose a 3-4 line human-readable resume brief from existing fields (A4).
+
+    Deterministic and read-only — a plain-language lead so `fast` resume reads like a
+    briefing instead of a field dump. Structured fields remain the authoritative source.
+    """
+    phase = status["phase"]
+    phase_label = phase.get("name") or phase.get("id") or "no active phase"
+    lines = [f"You are in phase \"{phase_label}\" ({confidence} confidence, {freshness} state)."]
+    if progress:
+        latest = progress[0]
+        lines.append(f"Most recent work: [{latest['record_id']}] {latest['title']}.")
+    else:
+        lines.append("No recent authoritative records yet.")
+    open_items = list(signals.open_bugs) + list(signals.open_requirements)
+    if open_items:
+        lines.append(f"Open items to watch: {', '.join(open_items[:3])}.")
+    lines.append(f"Suggested next: {next_action['action']} — {next_action['reason']}")
+    return lines
 
 
 def _empty_checkpoint(root: Path, mode: ResumeMode) -> dict:  # noqa: DICT_OK
@@ -141,19 +171,13 @@ def _recent_authoritative_progress(root: Path, *, include_summary: bool) -> list
     meta = parse_project_yaml(root)
     for path in iter_record_files(root):
         record = parse_record_file(path, meta.get("project_id", ""), meta.get("slug", root.name))
-        source_kind = _source_kind(record["path"])
-        authority = classify_authority(source_kind, record["title"], record["content"])
+        source_kind = classify_source_kind(record["path"], record["title"], record["content"], declared=record.get("source_kind", ""))
+        authority = classify_authority(source_kind, record["title"], record["content"], declared=record.get("authority", ""))
         if authority == "evidence":
             continue
         records.append((record.get("created_at", ""), _source_priority(source_kind), record["path"], record))
     records.sort(reverse=True)
     return [_resume_item(record, include_summary=include_summary) for _, _, _, record in records[:3]]
-
-
-def _source_kind(path: str) -> str:
-    if "/digests/" in path or "/theme-digests/" in path:
-        return "digest"
-    return "manual"
 
 
 def _source_priority(source_kind: str) -> int:
@@ -172,8 +196,8 @@ def _latest_source_date(root: Path) -> str:
     meta = parse_project_yaml(root)
     for path in iter_record_files(root):
         record = parse_record_file(path, meta.get("project_id", ""), meta.get("slug", root.name))
-        source_kind = _source_kind(record["path"])
-        authority = classify_authority(source_kind, record["title"], record["content"])
+        source_kind = classify_source_kind(record["path"], record["title"], record["content"], declared=record.get("source_kind", ""))
+        authority = classify_authority(source_kind, record["title"], record["content"], declared=record.get("authority", ""))
         if authority == "evidence":
             continue
         latest_date = max(latest_date, record.get("created_at", ""))

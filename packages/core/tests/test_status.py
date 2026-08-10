@@ -54,6 +54,33 @@ def test_project_status_returns_empty_snapshot_when_project_is_uninitialized(tmp
     assert status["open_requirements"] == []
 
 
+def test_project_status_treats_fixed_bug_as_closed_but_statusless_as_open(tmp_path: Path) -> None:
+    # Given: a project with one bug marked `fixed`, one marked `resolved`, and one with no status
+    project_root = tmp_path / "project"
+    bugs = project_root / ".sybermem" / "bugs"
+    bugs.mkdir(parents=True)
+    (project_root / ".sybermem" / "project.yaml").write_text("project_id: project-1\nslug: demo\n", encoding="utf-8")
+
+    def write_bug(name: str, status_line: str) -> None:
+        frontmatter = ["---", "type: bug", "date: 2026-08-07", f"title: {name}", "severity: high"]
+        if status_line:
+            frontmatter.append(status_line)
+        frontmatter.append("---")
+        (bugs / f"2026-08-07-{name}.md").write_text("\n".join(frontmatter) + "\n\nbody\n", encoding="utf-8")
+
+    write_bug("001-fixed", "status: fixed")
+    write_bug("002-resolved", "status: resolved")
+    write_bug("003-nostatus", "")
+
+    # When: status enumerates open bugs
+    status = project_status(project_root)
+
+    # Then: fixed and resolved are closed; a status-less bug stays open (conservative)
+    assert "bug-001" not in status["open_bugs"]
+    assert "bug-002" not in status["open_bugs"]
+    assert "bug-003" in status["open_bugs"]
+
+
 def test_recommend_next_step_returns_phase_analyze_without_commit_probe(tmp_path: Path, monkeypatch) -> None:
     # Given: a SyberMem project with no phase index yet
     project_root = tmp_path / "project"

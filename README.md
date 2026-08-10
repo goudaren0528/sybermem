@@ -2,36 +2,85 @@
 
 # SyberMem
 
-SyberMem 是一个面向 AI 工作流的项目 / 团队工程记忆系统。
+> 面向 AI 工作流的项目 / 团队工程记忆系统。把「为什么这么做」持久化成结构化记忆，让下一个会话（无论是你还是 AI agent）不用从零重建上下文。
 
-它帮助你把：
-- 项目进展
-- 技术决策
-- 阶段性沉淀
-- 团队摘要
+## 它解决什么问题
 
-保存成结构化记忆，让项目 owner、管理者与管理 agent 可以在不同会话中持续消费这些内容。
+AI 编程助手每开一个新会话就「失忆」：上一轮的决策理由、踩过的坑、当前阶段进展全部丢失，你只能反复口述背景。SyberMem 把这些沉淀成本地 Markdown 记忆：
+
+- **记录（Memory）** — 结构化 records（change / decision / requirement / bug）+ 派生 INDEX + 阶段/主题 digest 压缩
+- **治理（Governance）** — source-aware 信任标注（authority / lifecycle / freshness）+ Team publish 的 preview→review→publish 安全发布
+- **召回（Recall）** — 续接视图、项目内检索、workspace FTS 检索，以及可选的每轮提示自动召回
+
+记忆是本地 Markdown，人和 AI 都能直接读；不是黑盒数据库。
+
+## 60 秒上手
+
+```bash
+# 1. 全局安装（见下方「安装」）
+curl -sSL https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/install-remote.sh | bash
+
+# 2. 进入你的项目，初始化
+/sybermem-init-project
+
+# 3. 完成一轮有价值的工作后，记录它
+/sybermem-record
+
+# 4. 下次开新会话，先续接
+/sybermem-resume
+```
+
+`/sybermem-resume` 会返回：当前 phase、最近进展、主要风险、建议下一步、置信度与信息新鲜度 —— 只读，不会替你执行。
+
+## 一条记忆长什么样
+
+`/sybermem-record` 在 `.sybermem/changes/` 下写一个 Markdown 文件，带 canonical frontmatter：
+
+```markdown
+---
+type: change
+record_id: change-6a3ab8a0e44e4c41843b66bde8b7134a
+date: 2026-08-07
+title: UUID-backed record IDs and derived project index
+key_conclusion: 采用 UUID record_id + 派生 INDEX，让并行记录安全合并
+topics: [architecture, collaboration, quality]
+implements: [requirement-002]
+---
+
+## Change Content
+...
+
+## Reason
+...
+
+## Impact Scope
+...
+```
+
+写完后 `sybermem project index build/check` 从所有 record 派生重建 `.sybermem/INDEX.md`（导航层，不手工编辑）。
 
 ## 当前能力
 
 ### Project
-- 结构化 records（change / decision / requirement / bug）
-- 持久化 phase index
+- 结构化 records（change / decision / requirement / bug），UUID-backed `record_id`
+- 从 canonical records 派生重建的 `INDEX.md`（导航 / 会话启动关键结论层）
+- phase digest / theme digest（真正的压缩层）
 - 用户手动触发的 `/sybermem-resume` 有界只读续接
-- phase digest / theme digest
-- 关系与替代（implements / fixes / related / superseded_by）
+- 关系与替代（implements / fixes / related / superseded_by）*
 - 带 source-aware trust 字段的项目内 summary / search / link
+
+> \* 关系与 successor 引导目前对旧 numeric ID 可靠；对新 UUID ID 的自动 successor 解析存在已知缺陷，见 [已知限制](#已知限制)。
 
 ### Hub
 - project registry
-- workspace search
+- workspace search（SQLite FTS5，需 `sybermem index build`）
 - workspace index 缺失 / 过期时的安全恢复提示
 - project status
 - portfolio 视图
 
 ### Team
 - team init
-- Team publish preview，review，publish with hash
+- Team publish preview，review，publish with hash（stale-preview 拒绝）
 - team overview
 - team management summary
 - Team Project Summary
@@ -169,7 +218,21 @@ SyberMem 的能力分两类执行路径，可靠性不同，使用时请区分�
 
 `/sybermem-resume` 只读，不会自动执行建议动作，也不会写 record、digest 或设置。信任字段会尽量说明信息来自当前 authoritative record、digest，还是仅作为辅助证据的历史材料。它使用现有的 resume / status / search / next-step 路径，不会创建第二套 memory store。
 
-当你需要显式历史证据时，运行 `/sybermem-search`。项目内搜索和 workspace search 都会尽量标明 authority、lifecycle、freshness、successor guidance。workspace search 依赖 `sybermem index build` 生成的 workspace SQLite 索引；`.sybermem/INDEX.md` 则由 `sybermem project index build` 从 canonical records 派生。如果前者缺失、schema 过期或 FTS 不可用，系统会给出安全恢复提示或降级路径，而不是伪造结果。
+当你需要显式历史证据时，运行 `/sybermem-search`。两条检索路径的机制不同，请区分：
+
+- **项目内检索**（`/sybermem-search`、自动召回 hook）默认是对已解析 Markdown records 的**词法扫描 + 打分门槛**（title/topic/relation 加权、score/matched_fields 阈值），不是语义检索。它对精确关键词、record-id、relation 命中可靠；对同义改写或跨概念的模糊查询会漏召回。
+  - **可选语义补充**：设 `SYBERMEM_SEMANTIC_RECALL=1` 后，项目内检索会追加一层**零依赖本地 char n-gram 向量**召回，补回一部分同义/改写/拼写变体的漏召回。它是纯离线的词法/形态相似度（非 transformer embedding），默认关闭以保持热路径经济性；语义命中只在显式检索出现，**不会自动注入**每轮提示。
+- **workspace search**（Hub 级、跨项目）才使用 `sybermem index build` 生成的 **SQLite FTS5** 索引。
+
+两条路径都会尽量标明 authority、lifecycle、freshness、successor guidance。`.sybermem/INDEX.md` 由 `sybermem project index build` 从 canonical records 派生。如果 workspace 索引缺失、schema 过期或 FTS 不可用，系统会给出安全恢复提示或降级路径，而不是伪造结果。
+
+### 自动召回（可选）
+
+启用后，Claude 的 `UserPromptSubmit` hook 会在**每一条**满足条件的用户提示上做一次项目内检索，把最多 3 条 source-aware 提示注入上下文（标注为「非指令，依赖前请先读原 record」）。它会跳过 slash 命令、过短提示和琐碎的 1-2 词英文。
+
+- **收益**：无需手动 `/sybermem-search` 就能拿到相关历史线索。
+- **成本**：每轮提示都有一次子进程启动 + 词法扫描 + 提示 token 开销；命中质量受词法打分限制。在提示频繁或记忆库较大时，这是隐性且持续的开销。
+- **建议**：把它当作「锦上添花」而非「可靠召回」。需要确定性时用显式 `/sybermem-search` / `/sybermem-resume`。
 
 ## Team workflow
 
@@ -258,6 +321,13 @@ sybermem project uninstall
 
 - 删除全局 skills / CLI / launcher / OpenCode plugin
 - 不删除任何项目里的 `.sybermem/` 历史
+
+## 已知限制
+
+- **UUID successor 引导缺陷**：新 UUID-backed record 的 `superseded_by` / `fixes` 关系目前无法被自动解析成 successor 引导（`retrieval.py` 的 record-id 正则只匹配旧的 3 位 numeric ID）。旧 record 被正确标为 `superseded`，但系统不会提示「应改用哪条新 record」。旧 numeric ID 不受影响。修复优先级 P0。
+- **项目内检索是词法而非语义**：对模糊 / 同义查询会漏召回，见 [Resume 与信任说明](#resume-与信任说明)。
+- **压缩依赖 AI 编排**：digest / theme-digest / phase 分析由 AI 按 skill 执行，非确定性；digest 可能在源 record 变化后变陈旧而未被机械标记。`INDEX.md` 是导航层，本身不做压缩，真正的压缩来自 digest。
+- **信任元数据部分来自字符串推断**：source_kind 依赖路径子串、auto-trail 依赖 marker 文本、archived 部分依赖 `INDEX.md` 段落，存在与 canonical 记录漂移的风险。
 
 ## 兼容说明
 

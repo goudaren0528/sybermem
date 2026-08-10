@@ -5,7 +5,7 @@ from pathlib import Path
 import re
 from typing import Final, Mapping
 
-from .records import iter_record_files, parse_project_yaml, parse_record_file
+from .records import RECORD_ID_SUFFIX, iter_record_files, parse_project_yaml, parse_record_file
 from .project_index_render import InvalidRecordMetadataError, LegacyTableOverlay, Record, generated_sections, minimal_skeleton, validate_topic
 
 
@@ -24,7 +24,7 @@ CANONICAL_RECORD_DIRECTORIES: Final[Mapping[str, str]] = {
     "bug": "bugs",
 }
 RECORD_TYPES: Final[frozenset[str]] = frozenset(("change", "decision", "requirement", "bug"))
-RECORD_ID_PATTERN: Final[re.Pattern[str]] = re.compile(r"^(change|decision|requirement|bug)-(?:\d{3}|[0-9a-f]{32})$")
+RECORD_ID_PATTERN: Final[re.Pattern[str]] = re.compile(rf"^(change|decision|requirement|bug)-{RECORD_ID_SUFFIX}$")
 HEADING_PATTERN: Final[re.Pattern[str]] = re.compile(r"^## (.+)$")
 CONCLUSION_PATTERN: Final[re.Pattern[str]] = re.compile(r"^- \[([^\]]+)]\s*((?:#[\w-]+\s*)*)—\s*(.*?)\s*\(([^)]*)\)\s*$")
 TABLE_ROW_PATTERN: Final[re.Pattern[str]] = re.compile(r"^\|\s*(.*?)\s*\|$")

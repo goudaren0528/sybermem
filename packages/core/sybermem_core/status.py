@@ -5,6 +5,7 @@ from pathlib import Path
 import re
 from .project import project_source_snapshot, read_team_from_project_yaml
 from .records import parse_project_yaml, iter_record_files, parse_record_file
+from .retrieval import is_open_status
 from .identity import now_iso
 
 
@@ -77,8 +78,8 @@ def project_status(root: Path) -> dict:
     all_records = [parse_record_file(p, meta.get("project_id", ""), meta.get("slug", root.name)) for p in iter_record_files(root)]
     all_records.sort(key=lambda r: r.get("created_at", ""), reverse=True)
     recent_records = [r["record_id"] for r in all_records[:3] if r.get("record_id")]
-    open_bugs = [r["record_id"] for r in all_records if r.get("type") == "bug" and r.get("status") != "resolved"]
-    open_requirements = [r["record_id"] for r in all_records if r.get("type") == "requirement" and r.get("status") != "resolved"]
+    open_bugs = [r["record_id"] for r in all_records if r.get("type") == "bug" and is_open_status(r.get("status", ""))]
+    open_requirements = [r["record_id"] for r in all_records if r.get("type") == "requirement" and is_open_status(r.get("status", ""))]
 
     status = {
         "project_id": meta.get("project_id", ""),
