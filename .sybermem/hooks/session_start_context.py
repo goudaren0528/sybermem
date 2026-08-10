@@ -175,6 +175,40 @@ def detect_stale_signal(root: Path, boundary_commit: str | None) -> dict:
     }
 
 
+def latest_record_date(root: Path) -> str:
+    """Return the newest YYYY-MM-DD prefix across canonical record files, or ''."""
+    latest = ""
+    syb = root / ".sybermem"
+    for subdir in ("changes", "decisions", "requirements", "bugs"):
+        record_dir = syb / subdir
+        if not record_dir.is_dir():
+            continue
+        for path in record_dir.glob("*.md"):
+            m = re.match(r"(\d{4}-\d{2}-\d{2})-", path.name)
+            if m and m.group(1) > latest:
+                latest = m.group(1)
+    return latest
+
+
+def detect_record_gap(root: Path) -> dict:
+    """Count git commits since the most recent record, to nudge timely recording.
+
+    Record timeliness is the lifeblood of a memory system: reasons and impact
+    evaporate across sessions. We surface a proactive reminder (not an action) when
+    at least 3 commits have landed since the last durable record. Fail-open to no
+    reminder when git or dates are unavailable.
+    """
+    latest = latest_record_date(root)
+    if not latest:
+        return {"nudge": False, "commits_since_record": 0}
+    count_str = run_git("rev-list", "--count", f"--since={latest}", "HEAD", cwd=root)
+    try:
+        count = int(count_str)
+    except (ValueError, TypeError):
+        count = 0
+    return {"nudge": count >= 3, "commits_since_record": count, "since": latest}
+
+
 def build_context(root: Path) -> str:
     """Build the additionalContext string for Claude Code."""
     index_path = root / ".sybermem" / "INDEX.md"
@@ -214,6 +248,14 @@ def build_context(root: Path) -> str:
             )
     else:
         lines.append("Phase index: not found. Run /sybermem-phase-analyze to create it.")
+
+    record_gap = detect_record_gap(root)
+    if record_gap["nudge"]:
+        lines.append(
+            f"Record reminder: {record_gap['commits_since_record']} commits since the last record "
+            f"({record_gap['since']}). If this round did meaningful work, consider /sybermem-record "
+            "to capture the reason and impact while it is fresh."
+        )
 
     if conclusions:
         lines.append("")

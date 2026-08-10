@@ -8,3 +8,4 @@ build/
 dist/
 *.egg-info/
 docs/superpowers/plans/
+.sybermem/.recall-debug.jsonl

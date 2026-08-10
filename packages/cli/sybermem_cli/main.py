@@ -13,6 +13,7 @@ from sybermem_core.index import rebuild_index
 from sybermem_core.search import ProjectRootNotFoundError, WorkspaceIndexIncompatibleError, search_project, search_workspace, workspace_index_staleness
 from sybermem_core.status import project_status
 from sybermem_core.resume import build_resume_checkpoint
+from sybermem_core.next_step_router import recommend_next_step
 from sybermem_core.portfolio import build_portfolio
 from sybermem_core.team import init_team_repo
 from sybermem_core.publish_bootstrap import bootstrap_publish_status
@@ -109,6 +110,8 @@ def cmd_resume(args: argparse.Namespace) -> int:
     phase_label = phase.get("id") or phase.get("name") or "(no phase)"
     project = checkpoint["project"]
     print(f"[{project['slug']}] resume ({checkpoint['mode']})")
+    for line in checkpoint.get("brief", []):
+        print(f"  {line}")
     print(f"- current phase: {phase_label} {phase.get('name', '')}".rstrip())
     print(f"- confidence: {checkpoint['confidence']}  freshness: {checkpoint['freshness']}")
 
@@ -131,6 +134,26 @@ def cmd_resume(args: argparse.Namespace) -> int:
         print("- read targets:")
         for target in checkpoint["read_targets"]:
             print(f"  - {target}")
+    return 0
+
+
+def cmd_next_step(args: argparse.Namespace) -> int:
+    root = resolve_project_root()
+    if root is None:
+        payload = {
+            "action": "/sybermem-init-project",
+            "reason": "No SyberMem project root found. Initialize the project first.",
+        }
+        if args.format == "json":
+            print(dump_json(payload))
+        else:
+            print(f"next: {payload['action']} — {payload['reason']}")
+        return 0
+    payload = recommend_next_step(root)
+    if args.format == "json":
+        print(dump_json(payload))
+    else:
+        print(f"next: {payload['action']} — {payload['reason']}")
     return 0
 
 
@@ -357,6 +380,10 @@ def main() -> int:
     resume.add_argument("--mode", choices=["fast", "standard", "deep"], default="fast")
     resume.add_argument("--format", choices=["text", "json"], default="text")
     resume.set_defaults(func=cmd_resume)
+
+    next_step = sub.add_parser("next-step")
+    next_step.add_argument("--format", choices=["text", "json"], default="text")
+    next_step.set_defaults(func=cmd_next_step)
 
     team = sub.add_parser("team")
     team_sub = team.add_subparsers(dest="team_command", required=True)

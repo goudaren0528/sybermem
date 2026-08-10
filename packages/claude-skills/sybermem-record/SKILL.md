@@ -44,7 +44,32 @@ If any of these three is missing, the record is incomplete. Go back and finish i
 
 Resolve project root by walking up from cwd to find `.sybermem/` + `.claude/settings.json`. Auto-migrate `ADR/` if found. Full rules in the session protocol block in AGENTS.md/CLAUDE.md.
 
+## Choose a path: fast vs full
+
+Once write intent is clear (the user explicitly wants the record created now), pick a path:
+
+- **Fast path (default for a single, unambiguous record).** When the record type is
+  obvious from context and all required fields can be filled from the current session,
+  do it in one shot without per-item back-and-forth: auto-detect the type, generate the
+  metadata, infer relations, write the file, and build/check the index. Do **not** stop
+  to ask the user to confirm the type, each relation, or the wording unless something is
+  genuinely ambiguous. Announce what you recorded once, at the end (path + type + key
+  conclusion), so the user can correct if needed.
+- **Full path (for ambiguous or high-stakes records).** Use the step-by-step flow below
+  when the type is unclear, multiple records might be warranted, it is a `decision` with
+  real trade-offs, or the user asked to review before writing. Here you classify and
+  confirm before persisting.
+
+Both paths obey the same `<HARD-GATE>` and `## Verification`: a record is complete only
+when the file exists with generated `record_id`/`key_conclusion`/`topics` and
+`sybermem project index build` + `check` both pass. Fast path removes *confirmation
+friction*, never the completion guarantees.
+
 ## Flow
+
+The steps below are the **full path**. On the fast path, execute the same steps 4-11
+in one pass from context, skipping the interactive confirmations in steps 2-3 and the
+per-relation prompt in step 7 (still infer and write relations, just don't ask).
 
 You MUST complete these steps in order:
 
@@ -84,12 +109,17 @@ Required sections:
 - **requirement**: source, content, conclusion
 - **bug**: description, root cause, solution
 
+6a. **Optional: declare trust metadata explicitly** — trust fields are normally *inferred* (source_kind from path, authority from source, lifecycle from status/relations). You MAY additionally set explicit frontmatter to override inference when the author's intent differs from what inference would produce:
+   - `authority: authoritative | summarized | evidence` — e.g. mark a low-signal note as `evidence` so automatic recall deprioritizes it.
+   - `lifecycle: active | resolved | superseded | archived | conflicted` — e.g. pin a record `archived` without waiting on INDEX-derived detection.
+   Only recognized values take effect; an unknown value is ignored and inference applies. Omit these fields unless you specifically need to override — inference is the default and is correct for the vast majority of records.
+
 7. **Infer relations (propose, don't force)** — from the current session context, infer whether this record relates to an existing record. Look for:
    - a requirement or decision this change/work implements → propose `implements`
    - a bug this work fixes → propose `fixes`
    - a record discussed in the same session with no clear causality → propose `related`
 
-   Propose to the user, e.g. "This change appears to implement requirement-002. Add `implements: [requirement-002]`?" Only write the relation field into the record's frontmatter if the user confirms. Relation values must be existing record IDs. If there is no clear relation, skip silently. This is a proposal — it never blocks the core record steps below.
+   On the **full path**, propose to the user, e.g. "This change appears to implement requirement-002. Add `implements: [requirement-002]`?" and only write the relation if the user confirms. On the **fast path**, when the relation is clear from context, write the inferred relation directly and mention it in the final summary (the user can correct). Either way, relation values must be existing record IDs; if there is no clear relation, skip silently. This never blocks the core record steps below.
 
 8. **Create file** — path: `.sybermem/{type}/{YYYY-MM-DD}-{record_id}-{slug}.md`. Use `templates/{type}.md` as the content template and fill the canonical frontmatter fields exactly as `record_id`, `key_conclusion`, and `topics`.
 9. **Build derived project INDEX** — run `sybermem project index build` after the record file is written. Do not hand-edit `.sybermem/INDEX.md`, Key Conclusions, topic tables, or per-type tables.

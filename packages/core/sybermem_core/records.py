@@ -10,6 +10,11 @@ LEGACY_RECORD_ID_PATTERN: Final[re.Pattern[str]] = re.compile(r"\d{4}-\d{2}-\d{2
 TOPIC_TAG_PATTERN: Final[re.Pattern[str]] = re.compile(r"#([a-zA-Z][a-zA-Z0-9_-]*)")
 TOPIC_LIST_ITEM_PATTERN: Final[re.Pattern[str]] = re.compile(r"\s*-\s+(.*)")
 
+# Canonical record-id suffix: legacy 3-digit numeric or UUID4 hex (32 chars).
+# Shared so every ID parser accepts the same shape; see project_index.RECORD_ID_PATTERN
+# (anchored, record-type subset) and retrieval.RECORD_ID_RE (embedded, includes digest).
+RECORD_ID_SUFFIX: Final[str] = r"(?:\d{3}|[0-9a-f]{32})"
+
 
 def generate_record_id(record_type: str) -> str:
     """Return a canonical UUID-backed SyberMem record identifier."""
@@ -73,6 +78,8 @@ def parse_record_file(path: Path, project_id: str, slug: str) -> dict[str, str]:
     fixes = ""
     implements = ""
     related = ""
+    authority = ""
+    lifecycle = ""
     explicit_topics = False
     frontmatter = _frontmatter_lines(text)
     index = 0
@@ -119,6 +126,10 @@ def parse_record_file(path: Path, project_id: str, slug: str) -> dict[str, str]:
             implements = line.split(":", 1)[1].strip()
         elif line.startswith("related:"):
             related = line.split(":", 1)[1].strip()
+        elif line.startswith("authority:"):
+            authority = line.split(":", 1)[1].strip()
+        elif line.startswith("lifecycle:"):
+            lifecycle = line.split(":", 1)[1].strip()
         index += 1
     # Extract #topic tags from the full text (e.g. "#architecture #foundation")
     if not explicit_topics:
@@ -145,4 +156,6 @@ def parse_record_file(path: Path, project_id: str, slug: str) -> dict[str, str]:
         "fixes": fixes,
         "implements": implements,
         "related": related,
+        "authority": authority,
+        "lifecycle": lifecycle,
     }

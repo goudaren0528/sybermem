@@ -227,6 +227,20 @@ def check_record_template(path: Path) -> FileStatus:
     }
 
 
+def check_digest_template(path: Path) -> FileStatus:
+    """Check the phase-digest template: missing, stale (pre coverage_hash), or fresh.
+
+    coverage_hash is the field that enables mechanical stale-digest detection. A digest
+    template that predates it (still carries the never-computed `fingerprint` field, or
+    simply lacks `coverage_hash`) is stale and must be replaced by /sybermem-update so
+    existing projects gain the capability, not just fresh installs.
+    """
+    content = read_text(path)
+    if content is None:
+        return {"status": "missing"}
+    return {"status": "fresh" if "coverage_hash:" in content else "stale"}
+
+
 def check_dir_exists(path: Path) -> dict:
     """Simple existence check for directories."""
     return {"status": "present" if path.is_dir() else "missing"}
@@ -362,12 +376,19 @@ def generate_actions(files: dict) -> list[str]:
         ".sybermem/digests/",
         ".sybermem/theme-digests/",
         ".sybermem/analysis/phase-index.md",
-        ".sybermem/templates/digest-template.md",
         ".sybermem/templates/theme-digest-template.md",
     ):
         info = files.get(d, {})
         if info.get("status") == "missing":
             actions.append(f"create {d} from template")
+
+    # Phase-digest template — create if missing, replace if stale so the coverage_hash
+    # capability (mechanical stale-digest detection) propagates to existing projects.
+    dgt = files.get(".sybermem/templates/digest-template.md", {})
+    if dgt.get("status") == "missing":
+        actions.append("create .sybermem/templates/digest-template.md from template")
+    elif dgt.get("status") == "stale":
+        actions.append("replace .sybermem/templates/digest-template.md from template")
 
     # Project identity
     proj = files.get(".sybermem/project.yaml", {})
@@ -437,7 +458,7 @@ def main() -> int:
     files[".sybermem/templates/decision-template.md"] = check_record_template(root / ".sybermem" / "templates" / "decision-template.md")
     files[".sybermem/templates/requirement-template.md"] = check_record_template(root / ".sybermem" / "templates" / "requirement-template.md")
     files[".sybermem/templates/bug-template.md"] = check_record_template(root / ".sybermem" / "templates" / "bug-template.md")
-    files[".sybermem/templates/digest-template.md"] = check_file_exists(root / ".sybermem" / "templates" / "digest-template.md")
+    files[".sybermem/templates/digest-template.md"] = check_digest_template(root / ".sybermem" / "templates" / "digest-template.md")
     files[".sybermem/templates/theme-digest-template.md"] = check_file_exists(root / ".sybermem" / "templates" / "theme-digest-template.md")
 
     # Check for health script itself

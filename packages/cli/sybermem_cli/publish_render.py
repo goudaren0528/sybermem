@@ -13,14 +13,16 @@ def render_publish_status_text(payload: dict) -> int:
         print(f"- team: {payload['team_id']}")
         print(f"- project: {payload['slug']}")
         print(f"- source revision: {payload['source_revision']}")
-        print(f"- source hash: {payload['source_hash']}")
+        print(f"- memory source hash: {payload['source_hash']}")
+        if payload.get("source_scope"):
+            print(f"  (scope: {payload['source_scope']} — a stale-preview guard over project memory, not a full publish-safety proof)")
         print(f"- freshness: {payload['freshness']}")
         print(f"- review required: {'yes' if payload.get('review_required') else 'no'}")
         return 0
     if payload.get("status") == "stale_preview":
-        print("Publish rejected: stale preview")
-        print(f"- expected source hash: {payload['expected_source_hash']}")
-        print(f"- current source hash: {payload['preview']['source_hash']}")
+        print("Publish rejected: stale preview (project memory changed since the reviewed preview)")
+        print(f"- expected memory source hash: {payload['expected_source_hash']}")
+        print(f"- current memory source hash: {payload['preview']['source_hash']}")
         return 1
 
     print("Published project summary to Team repo:")

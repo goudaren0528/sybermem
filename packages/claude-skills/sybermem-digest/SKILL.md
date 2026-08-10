@@ -64,8 +64,12 @@ For each phase, run Steps 4–10 independently. This is the normal batch path �
 6. **Normalize and compare coverage** — normalize source list (project-relative paths, sorted, deduplicated). Compare against existing digests:
    - **Exact duplicate** → do not create, return existing digest path
    - **Partial overlap** → warn, recommend extending existing digest, only continue if user confirms
-7. **Generate metadata** — set `type: digest`, `kind: phase`, `date`, `number`, `title`, `status: completed` (default), `source_records`, `coverage.from/to`, `fingerprint`
-8. **Write the digest file** — path: `.sybermem/digests/{YYYY-MM-DD}-{NNN}-{title}.md`. Use `.sybermem/templates/digest-template.md`.
+7. **Generate metadata** — set `type: digest`, `kind: phase`, `date`, `number`, `title`, `status: completed` (default), `source_records`, `coverage.from/to`, and `coverage_hash` (see Step 7a)
+7a. **Compute `coverage_hash`** — this is a **required, deterministic** field that lets SyberMem mechanically detect when a digest has gone stale because its source records later changed. Compute it exactly as core does (`sybermem_core.digest_coverage.compute_coverage_hash`):
+   - For each project-relative path in `source_records`, sorted ascending: read the file's current bytes and take its SHA-256 hex; if the file is missing use the literal `<missing>`. Build the line `"{rel_path}:{sha256}"`.
+   - Join those lines with `\n` and take the SHA-256 hex of the UTF-8 bytes of the joined string. That hex is `coverage_hash`.
+   - Prefer calling the core helper directly (`compute_coverage_hash(root, source_records)`) instead of reimplementing it by hand, so the value always matches what the freshness check recomputes.
+8. **Write the digest file** — path: `.sybermem/digests/{YYYY-MM-DD}-{NNN}-{title}.md`. Use `.sybermem/templates/digest-template.md`. Fill `coverage_hash` with the value from Step 7a (never leave the `{{coverage_hash}}` placeholder).
 9. **Update INDEX.md** — insert row above `<!-- add new digest records here -->` in `## Phase Digests` table: `| NNN | YYYY-MM-DD | Title | <status> | X records | [link](digests/file.md) |`
 10. **Preserve Key Conclusions signal quality** — do not add to `## Key Conclusions` by default. Only add if the digest introduces a truly global project conclusion.
 11. **Archive source record conclusions** — after writing the digest, move the Key Conclusions of the source records to `## Archived Conclusions` in INDEX.md. Append `[compressed in digest-NNN]` to each archived line. This keeps Key Conclusions focused on current undigested work. Only move conclusions whose record ID is in the `source_records` list; leave other conclusions untouched.
@@ -87,6 +91,7 @@ If you catch yourself doing any of these, STOP:
 - Generating a second digest for the exact same source set
 - Skipping the overlap warning when source records partially overlap with an existing digest
 - Writing a digest that reads like a current-state summary instead of a durable conclusion
+- Leaving the `{{coverage_hash}}` placeholder unfilled, inventing a hash, or computing it over anything other than the exact `source_records` set (this silently defeats stale-digest detection)
 
 **All of these mean: go back to Step 2 and re-verify source coverage and phase status.**
 

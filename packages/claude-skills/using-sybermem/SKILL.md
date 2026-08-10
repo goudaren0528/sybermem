@@ -76,7 +76,16 @@ Explain what would currently happen if the user runs:
 
 ### Step 3: Recommend the next command
 
-Recommend the most appropriate next SyberMem command based on the current state.
+**Authoritative source: run the deterministic router, do not re-derive by hand.**
+
+Run `sybermem next-step --format json` and treat its `action` + `reason` as the
+canonical recommendation. This is the same core router (`recommend_next_step`)
+that `/sybermem-resume` uses, so `using-sybermem` and `resume` never disagree.
+Present the returned action verbatim, then add human-friendly context.
+
+If the `sybermem` CLI is unavailable in this environment, and only then, fall
+back to the decision graph below to derive an equivalent recommendation manually.
+The graph documents the router's logic; it is not a second, competing source.
 
 Team-aware priority order when several actions seem plausible:
 

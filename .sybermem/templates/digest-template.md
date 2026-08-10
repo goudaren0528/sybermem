@@ -10,7 +10,7 @@ source_records:
 coverage:
   from: {{coverage_from}}
   to: {{coverage_to}}
-fingerprint: {{fingerprint}}
+coverage_hash: {{coverage_hash}}
 ---
 
 ## Phase Scope

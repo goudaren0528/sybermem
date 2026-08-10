@@ -173,6 +173,21 @@ Read `codebase-scan-rules.md` for the existing codebase scan and record detectio
 - Treat an existing `.claude/settings.json` as custom unless it clearly matches the SyberMem-managed template. Do not overwrite unrelated custom hook settings automatically.
 - Keep custom files unless the user explicitly approves replacement.
 
+### Step 7.5: Offer a first sample record (fresh new projects only, opt-in)
+
+On a **brand-new** project (Step 2 classified it as an empty/new project, not an
+existing-codebase scan and not a refresh), a completely empty `.sybermem/` gives the
+user nothing concrete to look at. After the structure is created, **offer** — do not
+silently write — to create one small illustrative `change` record that captures
+"Initialized SyberMem in this project", so the user immediately sees what a record and
+`/sybermem-resume` look like.
+
+- Ask once: "Want a sample record so you can see the format and try `/sybermem-resume`? (y/n)"
+- Only if the user agrees, create it via the normal `/sybermem-record` fast path
+  (generated `record_id`/`key_conclusion`/`topics`, then `sybermem project index build` + `check`).
+- Never create a sample record on an existing-codebase init or on a refresh, and never
+  without explicit opt-in — this preserves the "scan but don't auto-create records" invariant.
+
 ### Step 8: Output summary
 
 ```markdown
@@ -207,6 +222,7 @@ Read `codebase-scan-rules.md` for the existing codebase scan and record detectio
 
 **Next steps:**
 - Use `/sybermem-record` after meaningful work
+- (Fresh projects) if you accepted the sample record, try `/sybermem-resume` now to see the continuity view in action
 - Use `/sybermem-summary` for weekly or monthly progress reports
 - If this project belongs in Team memory, use `/sybermem-team-publish`
 - If the project is already linked to Team memory, use `/sybermem-team-summary` to generate a Team management summary

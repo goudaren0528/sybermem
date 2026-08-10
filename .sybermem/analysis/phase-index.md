@@ -2,11 +2,13 @@
 
 ## Analysis Progress
 - status: analyzed
-- last_analysis_at: 2026-06-22
-- last_record_boundary: change-009 (2026-06-19)
-- last_git_boundary: c117f1c (2026-06-22)
-- pending_new_records: none (all existing records covered)
+- last_analysis_at: 2026-08-05
+- last_record_boundary: change-043 (2026-08-05)
+- last_git_boundary: dde4857
+- pending_new_records: none
 - unassigned_git_work: none
+- latest_active_phase: phase-013
+- unassigned_records: change-014, change-016, change-017, change-019, change-020, change-021, change-022, change-024, change-025, change-028, change-029, change-031, change-034, change-035, change-038, change-042, change-043
 
 ## Phase Candidates
 <!-- use canonical candidate blocks: ### Candidate: <title> + candidate_id/status/covered_records/rationale/proposed_at -->
@@ -36,7 +38,7 @@
   - change-001
   - change-003
 - confirmed_at: 2026-06-16
-- notes: Covers the initial ADR system design, remote install scripts, and auto-change hook template — the three foundational pieces that established SyberMem's core structure and distribution model.
+- notes: Covers the initial ADR system design, remote install scripts, and auto-change hook template.
 
 ### Phase: Digest and compression layer design
 - phase_id: phase-003
@@ -47,7 +49,7 @@
 - covered_records:
   - requirement-002
 - confirmed_at: 2026-06-16
-- notes: Formalized the need for a persistent phase digest layer after real usage exposed that raw records + one-line conclusions are insufficient for project understanding at scale. The digest-001 artifact was produced from this phase.
+- notes: Formalized the need for persistent phase summaries and durable compression.
 
 ### Phase: Root resolution and hook hardening
 - phase_id: phase-004
@@ -58,27 +60,7 @@
 - covered_records:
   - bug-001
 - confirmed_at: 2026-06-16
-- notes: Fixed init-project misclassifying missing hook files, then addressed the deeper need for project-root resolution from subdirectories. Git history shows follow-on work: global stop hook launcher, launcher migration, and root-resolution design specs.
-
-### Phase: Dual-entry protocol and visible skill
-- phase_id: phase-005
-- source_candidate_id: candidate-phase-005
-- status: confirmed
-- lifecycle: completed
-- completed_at: 2026-06-22
-- covered_records: []
-- confirmed_at: 2026-06-16
-- notes: Git-only phase (no SyberMem records yet). Introduced the marker-bounded using-sybermem session protocol block in CLAUDE.md/AGENTS.md, then added a visible /using-sybermem advisory skill as the manual diagnostic entrypoint. Paired automatic session-entry guidance with a user-invocable entry layer.
-
-### Phase: Phase analysis and digest automation
-- phase_id: phase-006
-- source_candidate_id: candidate-phase-006
-- status: confirmed
-- lifecycle: completed
-- completed_at: 2026-06-22
-- covered_records: []
-- confirmed_at: 2026-06-16
-- notes: Git-only phase (no SyberMem records yet). Auto-trigger phase analysis when phase-index is missing, auto-confirm candidates after analysis (removing the manual confirmation gate), and batch digest all confirmed phases by default.
+- notes: Fixed init-project file classification and project-root resolution from subdirectories.
 
 ### Phase: Framework hardening and skill upgrade
 - phase_id: phase-007
@@ -89,17 +71,7 @@
 - covered_records:
   - change-006
 - confirmed_at: 2026-06-22
-- notes: Repaired missing .claude/settings.json, fixed INDEX.md omissions, refreshed phase index, and upgraded all 8 SyberMem skills with HARD-GATE + numbered checklist patterns from Superpowers. Also added announce-at-start, dedup directory resolution, verification steps, Red Flags, and health checks. This was the first major quality hardening pass.
-
-### Phase: Lifecycle layer and cross-platform integration
-- phase_id: phase-008
-- source_candidate_id: candidate-phase-008
-- status: confirmed
-- lifecycle: completed
-- completed_at: 2026-06-22
-- covered_records: []
-- confirmed_at: 2026-06-22
-- notes: Added SessionStart hook for deterministic startup context injection, enhanced Stop hook with commit-gap detection and auto-trail dedup, enhanced OpenCode plugin with stale detection and compaction limits, unified .nudge-state.json across platforms, added update fast-path with check_project_health.py. Git commits 5906b90..e10e739.
+- notes: Repaired project framework state and upgraded the initial skill set with hard gates and health checks.
 
 ### Phase: Platform ecosystem and plugin packaging
 - phase_id: phase-009
@@ -112,16 +84,72 @@
   - change-008
   - change-009
 - confirmed_at: 2026-06-22
-- notes: Added Claude Code plugin skeleton (.claude-plugin/, hooks/hooks.json, polyglot run-hook.cmd), multi-platform entry files (Gemini, Cursor, Codex, Kimi, OpenCode), skill design optimization (Rationalization Tables, Integration sections, Flowcharts, init-project split), marketplace validation, and plugin package checker. Git commits d2fb7af..d86ee1b.
+- notes: Added the Claude plugin skeleton, multi-platform entry files, and package validation.
 
 ### Phase: Search, relations, and theme digest
 - phase_id: phase-010
 - source_candidate_id: candidate-phase-010
 - status: confirmed
-- lifecycle: active
-- covered_records: []
+- lifecycle: completed
+- completed_at: 2026-07-10
+- covered_records:
+  - change-010
 - confirmed_at: 2026-06-22
-- notes: Added /sybermem-search (AI-driven retrieval by keyword/topic/phase/date/record ID with reverse references), /sybermem-link (forward-only relation management), record relation inference at creation time, optional implements/fixes/related frontmatter fields, and /sybermem-theme-digest (topic-level compression layer above phase digests). Git commits e40c666..c117f1c.
+- notes: Added lifecycle-aware search, relations, theme digest, and the v2 cross-platform capability layer.
+
+### Phase: Skill and lifecycle quality hardening
+- phase_id: phase-011
+- source_candidate_id: candidate-phase-011
+- status: confirmed
+- lifecycle: completed
+- covered_records:
+  - change-011
+  - change-012
+  - change-013
+  - change-027
+  - change-032
+- confirmed_at: 2026-08-05
+- notes: Hardened skill design, reminder-first record intent, injection footprint, lifecycle quality, and distribution safety.
+
+### Phase: CLI, Hub, and Team memory foundation
+- phase_id: phase-012
+- source_candidate_id: candidate-phase-012
+- status: confirmed
+- lifecycle: completed
+- covered_records:
+  - decision-001
+  - requirement-003
+  - change-015
+  - change-018
+  - change-023
+  - change-026
+  - change-030
+- confirmed_at: 2026-08-05
+- notes: Established installable CLI, Hub/workspace foundations, Team publication and summaries, Team skills, and project-local propagation.
+
+### Phase: Continuity and source-aware trust experience
+- phase_id: phase-013
+- source_candidate_id: candidate-phase-013
+- status: confirmed
+- lifecycle: active
+- covered_records:
+  - decision-002
+  - change-033
+  - change-036
+  - change-037
+  - change-039
+  - change-040
+  - change-041
+  - bug-002
+  - bug-003
+- confirmed_at: 2026-08-05
+- notes: Current active phase for bounded resume, source-aware recall, correction guidance, workspace trust, Team preview, and review-driven hardening.
+
+## Historical Git-only Notes
+
+- phase-005: Dual-entry protocol and visible skill — git-only history introducing the marker-bounded session protocol and visible /using-sybermem entrypoint; no raw SyberMem record exists.
+- phase-006: Phase analysis and digest automation — git-only history introducing automatic phase analysis, confirmation, and batch digest behavior; no raw SyberMem record exists.
+- phase-008: Lifecycle layer and cross-platform integration — git-only history for SessionStart, Stop, OpenCode lifecycle, nudge state, and update fast-path integration; no raw SyberMem record exists.
 
 ## Coverage Map
 - requirement-001 -> phase-002
@@ -135,3 +163,42 @@
 - change-007 -> phase-009
 - change-008 -> phase-009
 - change-009 -> phase-009
+- change-010 -> phase-010
+- change-011 -> phase-011
+- change-012 -> phase-011
+- change-013 -> phase-011
+- change-014 -> unassigned (auto-trail/build artifact record)
+- change-015 -> phase-012
+- change-016 -> unassigned (auto-trail/build artifact record)
+- change-017 -> unassigned (auto-trail/build artifact record)
+- change-018 -> phase-012
+- change-019 -> unassigned (auto-trail/build artifact record)
+- change-020 -> unassigned (auto-trail/build artifact record)
+- change-021 -> unassigned (auto-trail/build artifact record)
+- change-022 -> unassigned (auto-trail/build artifact record)
+- change-023 -> phase-012
+- change-024 -> unassigned (auto-trail/build artifact record)
+- change-025 -> unassigned (auto-trail/build artifact record)
+- change-026 -> phase-012
+- change-027 -> phase-011
+- change-028 -> unassigned (auto-trail/build artifact record)
+- change-029 -> unassigned (auto-trail/build artifact record)
+- change-030 -> phase-012
+- change-031 -> unassigned (auto-trail/build artifact record)
+- change-032 -> phase-011
+- change-033 -> phase-013
+- change-034 -> unassigned (auto-trail execution artifact record)
+- change-035 -> unassigned (auto-trail research/execution artifact record)
+- change-036 -> phase-013
+- change-037 -> phase-013
+- change-038 -> unassigned (auto-trail execution artifact record)
+- change-039 -> phase-013
+- change-040 -> phase-013
+- change-041 -> phase-013
+- change-042 -> unassigned (auto-trail execution artifact record)
+- change-043 -> unassigned (auto-trail managed-file backup record)
+- decision-001 -> phase-012
+- decision-002 -> phase-013
+- requirement-003 -> phase-012
+- bug-002 -> phase-013
+- bug-003 -> phase-013

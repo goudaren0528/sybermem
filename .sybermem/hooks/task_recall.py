@@ -72,11 +72,34 @@ def render_packet(prompt: str, rows: list[dict[str, str]]) -> str:
     return "\n".join(lines)
 
 
+def log_recall_event(root, event: str, **fields) -> None:
+    """Append a bounded, non-sensitive recall event for local observability (E1/E6).
+
+    Logs both `abstain` (why nothing was injected) and `inject` (which records were
+    surfaced, with their match reason) so recall behavior is measurable over time.
+    Fail-open and best-effort: never raises, never stores the prompt payload, keeps the
+    log bounded, and stays off stdout so it cannot corrupt the hook contract.
+    """
+    try:  # noqa: BROAD_EXCEPT_OK - observability must never break the hook path.
+        from datetime import datetime, timezone
+
+        log_path = root / ".sybermem" / ".recall-debug.jsonl"
+        record = {"ts": datetime.now(timezone.utc).isoformat(), "event": event}
+        for key, value in fields.items():
+            record[key] = value
+        entry = json.dumps(record, ensure_ascii=False)
+        existing = log_path.read_text(encoding="utf-8").splitlines() if log_path.is_file() else []
+        existing.append(entry)
+        log_path.write_text("\n".join(existing[-200:]) + "\n", encoding="utf-8")
+    except Exception:  # noqa: BROAD_EXCEPT_OK - logging is best-effort only.
+        return
+
+
 def main() -> int:
     try:  # noqa: BROAD_EXCEPT_OK - hook boundary must fail open without blocking prompts.
         configure_import_path()
         from sybermem_core.project import resolve_project_root
-        from sybermem_core.search import compact_project_search
+        from sybermem_core.search import high_signal_recall_hints
 
         prompt = read_payload()
         if should_skip(prompt):
@@ -84,9 +107,16 @@ def main() -> int:
         root = resolve_project_root()
         if root is None:
             return 0
-        rows = compact_project_search(prompt, limit=3)
+        rows, abstention_reason = high_signal_recall_hints(prompt, limit=3)
         if not rows:
+            if abstention_reason:
+                log_recall_event(root, "abstain", reason=safe_field(abstention_reason, 160))
             return 0
+        injected = [
+            {"record_id": safe_field(row.get("record_id", ""), 60), "match": safe_field(row.get("match", row.get("match_reason", "")), 24)}
+            for row in rows[:3]
+        ]
+        log_recall_event(root, "inject", records=injected)
         packet = render_packet(prompt, rows)
         print(
             json.dumps(

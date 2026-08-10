@@ -51,7 +51,10 @@ def write_fake_core(core_parent: Path, title: str, search_body: str) -> None:
     (package / "search.py").write_text(
         "def compact_project_search(prompt, limit=3):\n"
         f"    {search_body}\n"
-        f"    return [{{'record_id': 'change-001', 'type': 'change', 'source_kind': 'manual', 'title': {title!r}, 'created_at': '2026-08-04', 'authority': 'authoritative', 'lifecycle': 'active', 'freshness': 'current', 'match_reason': 'keyword', 'summary': 'Trusted compact summary', 'related_digest': '', 'conflict_note': ''}}]\n",
+        f"    return [{{'record_id': 'change-001', 'type': 'change', 'source_kind': 'manual', 'title': {title!r}, 'created_at': '2026-08-04', 'authority': 'authoritative', 'lifecycle': 'active', 'freshness': 'current', 'match_reason': 'keyword', 'summary': 'Trusted compact summary', 'related_digest': '', 'conflict_note': ''}}]\n\n"
+        "def high_signal_recall_hints(prompt, limit=3):\n"
+        "    rows = compact_project_search(prompt, limit=limit)\n"
+        "    return rows[:limit], ('' if rows else 'no candidate records matched the prompt')\n",
         encoding="utf-8",
     )
 
@@ -208,6 +211,8 @@ def test_task_recall_index_or_project_failure_fails_open(tmp_path: Path) -> None
     )
     (package / "search.py").write_text(
         "def compact_project_search(prompt, limit=3):\n"
+        "    raise AssertionError('search should not run')\n\n"
+        "def high_signal_recall_hints(prompt, limit=3):\n"
         "    raise AssertionError('search should not run')\n",
         encoding="utf-8",
     )
