@@ -9,6 +9,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from sybermem_core.records import generate_record_id, parse_record_file
 
 
+def test_generate_record_id_is_exported_from_package_root() -> None:
+    # The record-id helper must be importable from the package root so callers
+    # (and the record skill) have a discoverable entrypoint, not a buried module.
+    import sybermem_core
+
+    from_root = sybermem_core.generate_record_id
+    assert "generate_record_id" in sybermem_core.__all__
+    assert re.fullmatch(r"bug-[0-9a-f]{32}", from_root("bug"))
+
+
 def test_generate_record_id_returns_uuid_backed_identifier() -> None:
     # Given: a canonical SyberMem record type
     record_type = "change"

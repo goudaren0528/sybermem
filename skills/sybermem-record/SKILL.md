@@ -100,7 +100,10 @@ When uncertain, ask the user to choose.
 
 If the managed natural-language record-intent capture seems unavailable in a Claude project, the supported manual diagnostic path is the project-local `.sybermem/hooks/detect_record_intent.py --diagnose` run. It must stay fail-open, emit only bounded non-sensitive retry guidance, and never persist prompt payloads. The primary recovery action is `/sybermem-update`.
 
-5. **Generate canonical metadata** — call the core helper contract `generate_record_id(type)` to get `record_id`. Do not invent UUID strings manually. Also generate a one-line `key_conclusion` that states both **what changed** and **why**, and choose 1-3 `topics` tags. Existing legacy numeric records remain valid for reading and indexing, but new records use the generated `record_id` path and frontmatter.
+5. **Generate canonical metadata** — get `record_id` from SyberMem, do NOT invent or hand-craft a UUID. Use the first form that works, in this order:
+   - **Preferred (CLI):** `sybermem record id --type <change|decision|requirement|bug>` — prints the canonical id (add `--format json` for `{record_id, type}`).
+   - **Fallback (Python), if the `sybermem` CLI is not on PATH:** `python -c "from sybermem_core import generate_record_id; print(generate_record_id('<type>'))"`.
+   Do not guess an import path or a different subcommand: the helper lives at `sybermem_core.generate_record_id` (re-exported from the package root; canonical implementation `sybermem_core.records.generate_record_id`), and the CLI subcommand is exactly `record id`. Also generate a one-line `key_conclusion` that states both **what changed** and **why**, and choose 1-3 `topics` tags. Existing legacy numeric records remain valid for reading and indexing, but new records use the generated `record_id` path and frontmatter.
 6. **Collect information** — extract from the current session. Only ask the user when key information is missing.
 
 Required sections:

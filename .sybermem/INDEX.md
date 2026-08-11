@@ -32,6 +32,7 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 - [change-6a3ab8a0e44e4c41843b66bde8b7134a] #architecture #collaboration #quality — Added UUID-backed canonical record IDs and derived INDEX build/check commands so parallel record creation merges safely while legacy numeric records remain readable. (2026-08-07)
 - [change-71c1f4bdc01a4b6cb07731667f1c08c7] #quality #distribution #index — SyberMem derived INDEX generation now validates untrusted record metadata, escapes Markdown safely, and update/install propagation carries the UUID-backed record contract end to end. (2026-08-07)
 - [change-72be196fdec34faf93c9fee00ce26881] #recall #search #quality — Added match-specificity \(record-id>relation>topic>keyword\) to the compact recall sort ahead of freshness/recency so a precisely-matched record is no longer buried under a newer, generically-matched one (2026-08-07)
+- [change-77f02b5fc9f34d7abd2987c7a89c0d7a] #usability #cli #distribution — Added `sybermem record id --type <type>` CLI command and re-exported generate_record_id from the package root so record creation has a discoverable entrypoint instead of forcing callers to guess a buried module path (2026-08-11)
 - [change-88bfdebb0f2f4e31bb7b0e70857c288d] #usability #hooks #automation — Added a commit-gap record reminder to the SessionStart context so unrecorded work surfaces proactively, because record timeliness is what keeps reasons and impact from evaporating across sessions (2026-08-07)
 - [change-895dad61b374427586a8b14df4c7281e] #governance #retrieval — Confirmed and tested that a record's declared lifecycle:archived frontmatter is authoritative without any INDEX-derived flag, so archival truth lives in the canonical record rather than in a derived index section (2026-08-07)
 - [change-8fd6b65d1a0940f592c2179f55f8801d] #distribution #quality #init — Refreshed global SyberMem skills, launchers, and Core/CLI runtime, then verified this project's managed files are fresh so upgraded behavior propagates without overwriting custom configuration. (2026-08-07)
@@ -172,6 +173,7 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 | change-6a3ab8a0e44e4c41843b66bde8b7134a | 2026-08-07 | UUID-backed record IDs and derived project index | implemented | [link](changes/2026-08-07-change-6a3ab8a0e44e4c41843b66bde8b7134a-uuid-record-ids-derived-index.md) |
 | change-71c1f4bdc01a4b6cb07731667f1c08c7 | 2026-08-07 | Close derived INDEX review blockers | implemented | [link](changes/2026-08-07-change-71c1f4bdc01a4b6cb07731667f1c08c7-close-derived-index-review-blockers.md) |
 | change-72be196fdec34faf93c9fee00ce26881 | 2026-08-07 | Rank compact recall by match specificity before freshness | implemented | [link](changes/2026-08-07-change-72be196fdec34faf93c9fee00ce26881-recall-specificity-ranking.md) |
+| change-77f02b5fc9f34d7abd2987c7a89c0d7a | 2026-08-11 | Make record-id generation discoverable via CLI command and package export | implemented | [link](changes/2026-08-11-change-77f02b5fc9f34d7abd2987c7a89c0d7a-record-id-discoverable-entrypoint.md) |
 | change-88bfdebb0f2f4e31bb7b0e70857c288d | 2026-08-07 | SessionStart proactively reminds when commits accrue since the last record | implemented | [link](changes/2026-08-07-change-88bfdebb0f2f4e31bb7b0e70857c288d-session-start-record-reminder.md) |
 | change-895dad61b374427586a8b14df4c7281e | 2026-08-07 | Lock archived-lifecycle declaration as canonical truth | implemented | [link](changes/2026-08-07-change-895dad61b374427586a8b14df4c7281e-archived-declaration-truth.md) |
 | change-8fd6b65d1a0940f592c2179f55f8801d | 2026-08-07 | Refresh global skills and verify project propagation | implemented | [link](changes/2026-08-07-change-8fd6b65d1a0940f592c2179f55f8801d-global-refresh-project-propagation.md) |
@@ -232,11 +234,11 @@ When adding records, create the canonical record file first, then run `sybermem 
 <!-- Auto-maintained: maps topic tags to record IDs for fast lookup -->
 - architecture: change-6a3ab8a0e44e4c41843b66bde8b7134a, decision-001, decision-002, decision-003, requirement-001, requirement-003
 - automation: change-003, change-008, change-88bfdebb0f2f4e31bb7b0e70857c288d
-- cli: change-afab61686c2e4311b517e61f902ec34b
+- cli: change-77f02b5fc9f34d7abd2987c7a89c0d7a, change-afab61686c2e4311b517e61f902ec34b
 - collaboration: change-023, change-026, change-6a3ab8a0e44e4c41843b66bde8b7134a, decision-001, requirement-003
 - compression: requirement-002
 - digest: change-010, change-023, change-b70ea980b0934358aad0ba47b64bff33, change-ba981e99b2b2413787fe94a20bc1d22f, requirement-002
-- distribution: bug-004, bug-3a161fa287bd425daf3e685e0f13f6b1, bug-9e13ab868e444035a97ae77dbbee5122, change-001, change-002, change-008, change-010, change-045, change-048, change-71c1f4bdc01a4b6cb07731667f1c08c7, change-8fd6b65d1a0940f592c2179f55f8801d, change-ba981e99b2b2413787fe94a20bc1d22f
+- distribution: bug-004, bug-3a161fa287bd425daf3e685e0f13f6b1, bug-9e13ab868e444035a97ae77dbbee5122, change-001, change-002, change-008, change-010, change-045, change-048, change-71c1f4bdc01a4b6cb07731667f1c08c7, change-77f02b5fc9f34d7abd2987c7a89c0d7a, change-8fd6b65d1a0940f592c2179f55f8801d, change-ba981e99b2b2413787fe94a20bc1d22f
 - foundation: requirement-001
 - framework: change-006
 - governance: change-619fadbe5ba0498f9c25a51f83f9c78c, change-895dad61b374427586a8b14df4c7281e, change-dcdc1324b2f340c1acb470df990a37c0
@@ -254,4 +256,4 @@ When adding records, create the canonical record file first, then run `sybermem 
 - skills: bug-003, change-002, change-006, change-026, change-041, change-049, change-358d10ce63284f98a90e8da4bbbf8079, change-b135cb2e65a24808aaef1f3007acee43
 - team: bug-002, bug-003, change-023, change-026, change-030, change-037, change-039, change-041, decision-001, decision-002, requirement-003
 - topic: change-032
-- usability: change-087966eda55f40a0aada0f86dd290e29, change-358d10ce63284f98a90e8da4bbbf8079, change-88bfdebb0f2f4e31bb7b0e70857c288d, change-afab61686c2e4311b517e61f902ec34b, change-b135cb2e65a24808aaef1f3007acee43
+- usability: change-087966eda55f40a0aada0f86dd290e29, change-358d10ce63284f98a90e8da4bbbf8079, change-77f02b5fc9f34d7abd2987c7a89c0d7a, change-88bfdebb0f2f4e31bb7b0e70857c288d, change-afab61686c2e4311b517e61f902ec34b, change-b135cb2e65a24808aaef1f3007acee43
