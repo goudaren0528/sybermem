@@ -8,4 +8,9 @@ build/
 dist/
 *.egg-info/
 docs/superpowers/plans/
-.sybermem/.recall-debug.jsonl
+
+# The repo's own SyberMem memory is a local runtime artifact of dogfooding this
+# tool; it is not part of the distributed package. Anchored to the repo root so
+# the shipped project-file templates under packages/**/project-files/.sybermem/
+# and skills/**/project-files/.sybermem/ are NOT ignored.
+/.sybermem/
