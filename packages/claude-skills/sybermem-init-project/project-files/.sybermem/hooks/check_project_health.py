@@ -127,14 +127,24 @@ def check_settings_json(root: Path) -> dict:
             "status": "missing",
             "has_session_start_hook": False,
             "has_stop_hook": False,
+            "has_relative_session_start_hook": False,
+            "has_relative_stop_hook": False,
             "has_user_prompt_hook": False,
             "has_record_intent_hook": False,
             "has_task_recall_hook": False,
             "has_auto_mode": False,
         }
 
+    # Operational target state: SessionStart/Stop call the machine-specific global
+    # launcher (launch_*). The shipped template ships a portable *relative* seed
+    # (.sybermem/hooks/session_start_context.py) that init/update must rewrite to the
+    # launcher path — so a relative-only settings.json is a valid seed but NOT fresh,
+    # because Python opens the relative hook path against the cwd before any root
+    # resolution runs and can fail when Claude invokes the hook from a subdirectory.
     has_session_start = "launch_session_start_context" in content
     has_stop = "launch_record_change_on_stop" in content
+    has_relative_session_start = ".sybermem/hooks/session_start_context.py" in content
+    has_relative_stop = ".sybermem/hooks/record_change_on_stop.py" in content
     # Merged UserPromptSubmit hook (batch A): a single user_prompt.py entry is the
     # target state. The legacy detect_record_intent.py + task_recall.py pair is
     # still recognized so we can offer a non-destructive migration.
@@ -148,6 +158,8 @@ def check_settings_json(root: Path) -> dict:
         "status": "fresh" if all_present else "stale",
         "has_session_start_hook": has_session_start,
         "has_stop_hook": has_stop,
+        "has_relative_session_start_hook": has_relative_session_start,
+        "has_relative_stop_hook": has_relative_stop,
         "has_user_prompt_hook": has_user_prompt_hook,
         "has_record_intent_hook": has_record_intent_hook,
         "has_task_recall_hook": has_task_recall_hook,
@@ -305,9 +317,15 @@ def generate_actions(files: dict) -> list[str]:
         actions.append("create .claude/settings.json from template")
     else:
         if not sj.get("has_session_start_hook"):
-            actions.append("add SessionStart hook entry to .claude/settings.json (preserve other hooks)")
+            if sj.get("has_relative_session_start_hook"):
+                actions.append("migrate SessionStart hook to the global launcher path in .claude/settings.json (replace the relative .sybermem/hooks/session_start_context.py command; preserve other hooks)")
+            else:
+                actions.append("add SessionStart hook entry to .claude/settings.json (preserve other hooks)")
         if not sj.get("has_stop_hook"):
-            actions.append("add Stop hook entry to .claude/settings.json (preserve other hooks)")
+            if sj.get("has_relative_stop_hook"):
+                actions.append("migrate Stop hook to the global launcher path in .claude/settings.json (replace the relative .sybermem/hooks/record_change_on_stop.py command; preserve other hooks)")
+            else:
+                actions.append("add Stop hook entry to .claude/settings.json (preserve other hooks)")
         if not sj.get("has_user_prompt_hook"):
             if sj.get("has_record_intent_hook") or sj.get("has_task_recall_hook"):
                 actions.append("migrate UserPromptSubmit to the merged user_prompt.py hook in .claude/settings.json (replace the detect_record_intent + task_recall entries with a single user_prompt.py entry; preserve other hooks)")

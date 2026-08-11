@@ -93,7 +93,14 @@ Write-Host "  /sybermem-theme-digest  - Create a cross-phase topic digest"
 Write-Host "  /sybermem-team-publish  - Publish the current project to Team memory"
 Write-Host "  /sybermem-team-summary  - Generate the Team management summary"
 Write-Host ""
-Write-Host "sybermem CLI installed. Run: sybermem project init --register"
+$sybermemOnPath = ($env:PATH -split ';' | Where-Object { $_.TrimEnd('\') -ieq $CliDir.TrimEnd('\') }).Count -gt 0
+if ($sybermemOnPath) {
+    Write-Host "sybermem CLI installed and on PATH. Run: sybermem project init --register"
+} else {
+    Write-Host "sybermem CLI installed at: $CliWrapper"
+    Write-Host "To run it as ``sybermem`` from anywhere, add this directory to your PATH: $CliDir"
+    Write-Host "Or run it by full path: & `"$CliWrapper`" project init --register"
+}
 Write-Host ""
 Write-Host "Next: open your project and run /sybermem-update"
 Write-Host "For a local project refresh check, run /sybermem-init-project"

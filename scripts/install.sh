@@ -38,7 +38,7 @@ install_skills() {
 install_skills "$CLAUDE_SKILLS" "Claude Code"
 install_skills "$OPENCODE_SKILLS" "OpenCode"
 
-# Claude Code: install global stop hook launcher
+# Global launchers: only needed by the Claude Code lifecycle hooks.
 if [ -d "$HOME/.claude" ]; then
     mkdir -p "$LAUNCHER_DIR"
     cp "$LAUNCHER_SOURCE" "$LAUNCHER_PATH"
@@ -47,18 +47,35 @@ if [ -d "$HOME/.claude" ]; then
     cp "$SESSION_LAUNCHER_SOURCE" "$SESSION_LAUNCHER_PATH"
     chmod +x "$SESSION_LAUNCHER_PATH"
     echo "  [Claude Code] 已安装 session start launcher: $SESSION_LAUNCHER_PATH"
+fi
 
-    mkdir -p "$CLI_DIR"
-    python -m venv "$CLI_VENV"
-    "$CLI_VENV/bin/python" -m pip install --upgrade pip
-    "$CLI_VENV/bin/pip" install --upgrade --force-reinstall "$ADR_PATH/packages/core" "$ADR_PATH/packages/cli"
-    cat > "$CLI_WRAPPER" <<'EOF'
+# sybermem CLI/runtime: install unconditionally. OpenCode skills (search/record/
+# using-sybermem) call the `sybermem` CLI, so gating this on ~/.claude would leave
+# OpenCode-only machines with skills that invoke a runtime that was never installed.
+mkdir -p "$CLI_DIR"
+python -m venv "$CLI_VENV"
+"$CLI_VENV/bin/python" -m pip install --upgrade pip
+"$CLI_VENV/bin/pip" install --upgrade --force-reinstall "$ADR_PATH/packages/core" "$ADR_PATH/packages/cli"
+cat > "$CLI_WRAPPER" <<'EOF'
 #!/bin/bash
 SYBERMEM_HOME="$HOME/.claude/sybermem/cli"
 exec "$SYBERMEM_HOME/venv/bin/sybermem" "$@"
 EOF
-    chmod +x "$CLI_WRAPPER"
-    echo "  [Claude Code] 已安装 sybermem CLI: $CLI_WRAPPER"
+chmod +x "$CLI_WRAPPER"
+echo "  [Global] 已安装 sybermem CLI: $CLI_WRAPPER"
+
+# Make `sybermem` resolvable without editing the user's shell rc: symlink the
+# wrapper into ~/.local/bin (a conventional per-user bin dir that is on PATH on
+# most systems). We never rewrite .bashrc/.zshrc/.profile; if ~/.local/bin is not
+# on PATH we print honest guidance instead of claiming the command is runnable.
+LOCAL_BIN="$HOME/.local/bin"
+SYBERMEM_ON_PATH=0
+mkdir -p "$LOCAL_BIN"
+if ln -sf "$CLI_WRAPPER" "$LOCAL_BIN/sybermem" 2>/dev/null; then
+    echo "  [Global] 已链接 sybermem 到 PATH 目录: $LOCAL_BIN/sybermem"
+    case ":$PATH:" in
+        *":$LOCAL_BIN:"*) SYBERMEM_ON_PATH=1 ;;
+    esac
 fi
 
 # OpenCode: install plugin
@@ -87,7 +104,13 @@ echo "  /sybermem-theme-digest  — 为单个 topic 创建跨多个 phase 的持
 echo "  /sybermem-team-publish  — 将当前项目发布到 Team memory"
 echo "  /sybermem-team-summary  — 生成 Team 管理摘要"
 echo ""
-echo "sybermem CLI 已安装，可直接运行：sybermem project init --register"
+if [ "$SYBERMEM_ON_PATH" = "1" ]; then
+    echo "sybermem CLI 已安装并在 PATH 中，可直接运行：sybermem project init --register"
+else
+    echo "sybermem CLI 已安装：$CLI_WRAPPER"
+    echo "已尝试链接到 $LOCAL_BIN/sybermem。如果 \`sybermem\` 仍无法直接运行，请将 $LOCAL_BIN 加入 PATH，"
+    echo "或直接用完整路径运行：$CLI_WRAPPER project init --register"
+fi
 echo ""
 echo "下一步：进入你的项目目录后执行 /sybermem-update"
 echo "如果你只想初始化或刷新当前项目，可执行 /sybermem-init-project"
