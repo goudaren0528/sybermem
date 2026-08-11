@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-import re
 from typing import Literal, TypedDict
 
 from . import next_step_router
@@ -134,7 +133,7 @@ def _empty_checkpoint(root: Path, mode: ResumeMode) -> dict:  # noqa: DICT_OK
 
 
 def _resume_signals(root: Path, status: dict) -> ResumeSignals:  # noqa: DICT_OK
-    phase_state = _phase_state(root)
+    phase_state = next_step_router.compute_phase_state(root)
     return ResumeSignals(
         phase_state=phase_state,
         phase_digest_path=latest_phase_digest(root),
@@ -142,20 +141,6 @@ def _resume_signals(root: Path, status: dict) -> ResumeSignals:  # noqa: DICT_OK
         open_bugs=list(status["open_bugs"]),
         open_requirements=list(status["open_requirements"]),
     )
-
-
-def _phase_state(root: Path) -> str:
-    phase_index = root / ".sybermem" / "analysis" / "phase-index.md"
-    if not phase_index.is_file():
-        return "missing"
-    text = phase_index.read_text(encoding="utf-8")
-    for line in text.splitlines():
-        if line.startswith("- status:") and line.split(":", 1)[1].strip() == "not_yet_analyzed":
-            return "stale"
-    boundary_date = _phase_boundary_date(text)
-    if boundary_date and _latest_source_date(root) > boundary_date:
-        return "stale"
-    return "current"
 
 
 def _project_identity(root: Path) -> dict[str, str]:
@@ -202,24 +187,6 @@ def _source_priority(source_kind: str) -> int:
     if source_kind == "manual":
         return 1
     return 0
-
-
-def _phase_boundary_date(text: str) -> str:
-    match = re.search(r"(?m)^- last_record_boundary: .+\((\d{4}-\d{2}-\d{2})\)", text)
-    return match.group(1) if match else ""
-
-
-def _latest_source_date(root: Path) -> str:
-    latest_date = ""
-    meta = parse_project_yaml(root)
-    for path in iter_record_files(root):
-        record = parse_record_file(path, meta.get("project_id", ""), meta.get("slug", root.name))
-        source_kind = classify_source_kind(record["path"], record["title"], record["content"], declared=record.get("source_kind", ""))
-        authority = classify_authority(source_kind, record["title"], record["content"], declared=record.get("authority", ""))
-        if authority == "evidence":
-            continue
-        latest_date = max(latest_date, record.get("created_at", ""))
-    return latest_date
 
 
 def _resume_item(record: dict[str, str], *, include_summary: bool) -> ResumeItem:

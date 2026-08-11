@@ -183,9 +183,9 @@ claude --plugin-dir .
 
 ### 不确定下一步时
 
-- `/sybermem-resume`：先恢复当前上下文
-- `/using-sybermem`：检查当前状态并获得推荐命令
-- `sybermem next-step`：用 CLI 获取下一步建议
+- `/sybermem-resume`（slash skill）：先恢复当前上下文
+- `/using-sybermem`（slash skill）：检查当前状态并获得推荐命令
+- `sybermem next-step`（终端 CLI 命令，**不是** slash 命令，没有 `/sybermem-next-step`）：用 CLI 直接获取下一步建议；`/using-sybermem` 内部也调用它，两者与 `/sybermem-resume` 使用同一个路由，结论一致
 
 ## 索引与检索
 

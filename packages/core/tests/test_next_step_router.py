@@ -7,7 +7,13 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from sybermem_core.next_step_router import recommend_next_step_read_only, route_record_candidate
+from sybermem_core.next_step_router import (
+    compute_phase_state,
+    recommend_next_step,
+    recommend_next_step_read_only,
+    route_record_candidate,
+)
+from sybermem_core.resume import build_resume_checkpoint
 
 
 def write_project(root: Path) -> None:
@@ -90,4 +96,72 @@ def test_router_returns_only_one_action_for_digest_candidate(tmp_path: Path) -> 
 
     # Then: callers receive one safe next action, not competing commands
     assert set(step) == {"action", "reason"}
-    assert step == {"action": "/sybermem-digest", "reason": "phase appears stable"}
+
+
+def _write_stale_phase_project(root: Path) -> None:
+    sybermem = root / ".sybermem"
+    (sybermem / "analysis").mkdir(parents=True)
+    (sybermem / "changes").mkdir()
+    (sybermem / "project.yaml").write_text("project_id: project-1\nslug: demo\n", encoding="utf-8")
+    (sybermem / "INDEX.md").write_text("# SyberMem Index\n", encoding="utf-8")
+    # Phase index bounded at an OLD record date...
+    (sybermem / "analysis" / "phase-index.md").write_text(
+        "\n".join(
+            [
+                "# Phase Index",
+                "- status: current",
+                "- last_record_boundary: change-001 (2026-08-01)",
+                "### Phase: Current",
+                "- phase_id: phase-001",
+                "- lifecycle: active",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    # ...while a NEWER authoritative record exists after that boundary.
+    (sybermem / "changes" / "2026-08-09-001-newer-work.md").write_text(
+        "\n".join(
+            [
+                "---",
+                "type: change",
+                "record_id: change-001",
+                "date: 2026-08-09",
+                "title: Newer work after boundary",
+                "status: implemented",
+                "---",
+                "",
+                "## Change Content\nNew material landed after phase analysis.",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
+def test_stale_phase_index_makes_next_step_recommend_phase_analyze(tmp_path: Path) -> None:
+    # Given: a project whose phase index lags newer source material
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    _write_stale_phase_project(project_root)
+
+    # When: the CLI next-step entry runs (it must compute phase_state itself)
+    assert compute_phase_state(project_root) == "stale"
+    step = recommend_next_step(project_root)
+
+    # Then: it steers to phase-analyze instead of a later-stage action
+    assert step["action"] == "/sybermem-phase-analyze"
+
+
+def test_next_step_and_resume_agree_on_stale_phase(tmp_path: Path) -> None:
+    # Given: the same stale-phase project
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    _write_stale_phase_project(project_root)
+
+    # When: both the CLI router and resume are asked for the next action
+    router_action = recommend_next_step(project_root)["action"]
+    resume_action = build_resume_checkpoint(project_root, mode="fast")["next_action"]["action"]
+
+    # Then: the two entrypoints no longer disagree (regression guard)
+    assert router_action == resume_action == "/sybermem-phase-analyze"

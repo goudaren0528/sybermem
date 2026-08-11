@@ -183,9 +183,9 @@ If a project already has custom `.claude/settings.json` content, SyberMem patche
 
 ### When Unsure What To Do Next
 
-- `/sybermem-resume`: restore current context first
-- `/using-sybermem`: inspect state and get the recommended command
-- `sybermem next-step`: get next-step guidance from the CLI
+- `/sybermem-resume` (slash skill): restore current context first
+- `/using-sybermem` (slash skill): inspect state and get the recommended command
+- `sybermem next-step` (terminal CLI command, **not** a slash command — there is no `/sybermem-next-step`): get next-step guidance directly; `/using-sybermem` calls it internally, and it shares the same router as `/sybermem-resume`, so they agree
 
 ## Indexing and Search
 
