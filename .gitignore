@@ -7,7 +7,18 @@ __pycache__/
 build/
 dist/
 *.egg-info/
-docs/superpowers/plans/
+
+# Internal development artifacts, not part of the distributed package:
+#  - docs/ holds superpowers plans/specs/BACKLOG, internal audits, improvement
+#    plans, and an outdated zh/ doc backup — all scaffolding from building this
+#    tool, not product documentation (that lives in the root README/INSTALL/etc).
+#  - the root superpowers analysis note is unrelated to the shipped project.
+#  - the repo's own .claude/settings.json is this checkout's local dev hook wiring
+#    (machine-specific absolute paths); the user-facing template lives under
+#    packages/**/project-files/.claude/settings.json.
+/docs/
+/superpowers-skill-design-analysis.md
+/.claude/settings.json
 
 # The repo's own SyberMem memory is a local runtime artifact of dogfooding this
 # tool; it is not part of the distributed package. Anchored to the repo root so
