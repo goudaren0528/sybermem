@@ -6,7 +6,8 @@ import sys
 from pathlib import Path
 from sybermem_core.formats import dump_json
 from sybermem_core.project import resolve_project_root, ensure_project_yaml
-from sybermem_core.project_index import DuplicateRecordIdError, InvalidRecordMetadataError, check_project_index, write_project_index
+from sybermem_core.project_index import RECORD_TYPES, DuplicateRecordIdError, InvalidRecordMetadataError, check_project_index, write_project_index
+from sybermem_core.records import generate_record_id
 from sybermem_core.registry import register_project
 from sybermem_core.identity import git_remote
 from sybermem_core.index import rebuild_index
@@ -93,6 +94,15 @@ def cmd_search(args: argparse.Namespace) -> int:
                 f"(indexed HEAD != current HEAD); run 'sybermem index build' to refresh: {slugs}",
                 file=sys.stderr,
             )
+    return 0
+
+
+def cmd_record_id(args: argparse.Namespace) -> int:
+    record_id = generate_record_id(args.type)
+    if args.format == "json":
+        print(dump_json({"record_id": record_id, "type": args.type}))
+    else:
+        print(record_id)
     return 0
 
 
@@ -384,6 +394,13 @@ def main() -> int:
     next_step = sub.add_parser("next-step")
     next_step.add_argument("--format", choices=["text", "json"], default="text")
     next_step.set_defaults(func=cmd_next_step)
+
+    record = sub.add_parser("record")
+    record_sub = record.add_subparsers(dest="record_command", required=True)
+    record_id = record_sub.add_parser("id")
+    record_id.add_argument("--type", required=True, choices=sorted(RECORD_TYPES))
+    record_id.add_argument("--format", choices=["text", "json"], default="text")
+    record_id.set_defaults(func=cmd_record_id)
 
     team = sub.add_parser("team")
     team_sub = team.add_subparsers(dest="team_command", required=True)
