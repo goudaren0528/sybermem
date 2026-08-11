@@ -7,9 +7,50 @@ import re
 import subprocess
 
 from .project import read_team_from_project_yaml
+from .records import iter_record_files, parse_project_yaml, parse_record_file
+from .retrieval import classify_authority, classify_source_kind
 from .status import project_status, publication_readiness
 from .publish import latest_phase_digest, latest_theme_digest
 from .record_intent import RecordCandidate, classify_record_intent, route_record_candidate
+
+
+def _phase_boundary_date(text: str) -> str:
+    match = re.search(r"(?m)^- last_record_boundary: .+\((\d{4}-\d{2}-\d{2})\)", text)
+    return match.group(1) if match else ""
+
+
+def _latest_source_date(root: Path) -> str:
+    latest_date = ""
+    meta = parse_project_yaml(root)
+    for path in iter_record_files(root):
+        record = parse_record_file(path, meta.get("project_id", ""), meta.get("slug", root.name))
+        source_kind = classify_source_kind(record["path"], record["title"], record["content"], declared=record.get("source_kind", ""))
+        authority = classify_authority(source_kind, record["title"], record["content"], declared=record.get("authority", ""))
+        if authority == "evidence":
+            continue
+        latest_date = max(latest_date, record.get("created_at", ""))
+    return latest_date
+
+
+def compute_phase_state(root: Path) -> str:
+    """Return "missing" | "stale" | "current" for the project phase index.
+
+    Shared source of truth for phase freshness so the CLI `next-step` path and
+    `resume` agree. Previously only `resume` computed this and passed it in, so a
+    bare `sybermem next-step` could recommend a later-stage action (e.g. team
+    publish) while `resume` correctly steered to phase-analyze on a stale index.
+    """
+    phase_index = root / ".sybermem" / "analysis" / "phase-index.md"
+    if not phase_index.is_file():
+        return "missing"
+    text = phase_index.read_text(encoding="utf-8")
+    for line in text.splitlines():
+        if line.startswith("- status:") and line.split(":", 1)[1].strip() == "not_yet_analyzed":
+            return "stale"
+    boundary_date = _phase_boundary_date(text)
+    if boundary_date and _latest_source_date(root) > boundary_date:
+        return "stale"
+    return "current"
 
 
 def _count_commits_since_last_record(root: Path) -> int:
@@ -41,6 +82,10 @@ def recommend_next_step(root: Path) -> dict[str, str]:
     readiness = publication_readiness(root)
     phase_digest = latest_phase_digest(root)
     theme_digest = latest_theme_digest(root)
+    # Compute phase freshness here so the CLI `next-step` path uses the same
+    # phase-stale signal `resume` already passes in; otherwise the two entrypoints
+    # could disagree on a stale phase index.
+    phase_state = compute_phase_state(root)
 
     first_pass = recommend_next_step_read_only(
         root,
@@ -48,6 +93,7 @@ def recommend_next_step(root: Path) -> dict[str, str]:
         readiness=readiness,
         phase_digest=phase_digest,
         theme_digest=theme_digest,
+        phase_state=phase_state,
     )
     if first_pass["action"] == "/sybermem-phase-analyze":
         return first_pass
@@ -58,6 +104,7 @@ def recommend_next_step(root: Path) -> dict[str, str]:
         readiness=readiness,
         phase_digest=phase_digest,
         theme_digest=theme_digest,
+        phase_state=phase_state,
         commit_gap=_count_commits_since_last_record(root),
     )
 
