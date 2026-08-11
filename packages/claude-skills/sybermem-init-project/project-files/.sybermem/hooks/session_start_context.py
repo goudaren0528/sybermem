@@ -190,6 +190,28 @@ def latest_record_date(root: Path) -> str:
     return latest
 
 
+def detect_stale_digests(root: Path) -> dict:
+    """Count mechanically-stale digests via the CLI, for a proactive governance heads-up.
+
+    Shells to `sybermem digest status --format json` (the single source of truth in
+    sybermem_core.digest_governance) rather than reimplementing coverage-hash logic in
+    the hook. Fail-open to no signal when the CLI is unavailable or errors, so session
+    start never breaks. This only surfaces a heads-up — it never regenerates a digest.
+    """
+    try:
+        result = subprocess.run(
+            ["sybermem", "digest", "status", "--format", "json"],
+            cwd=root, capture_output=True, text=True, encoding="utf-8", check=False,
+        )
+        if result.returncode not in (0, 1) or not result.stdout.strip():
+            return {"stale": 0}
+        import json as _json
+        payload = _json.loads(result.stdout)
+        return {"stale": int(payload.get("stale", 0) or 0)}
+    except Exception:
+        return {"stale": 0}
+
+
 def detect_record_gap(root: Path) -> dict:
     """Count git commits since the most recent record, to nudge timely recording.
 
@@ -255,6 +277,18 @@ def build_context(root: Path) -> str:
             f"Record reminder: {record_gap['commits_since_record']} commits since the last record "
             f"({record_gap['since']}). If this round did meaningful work, consider /sybermem-record "
             "to capture the reason and impact while it is fresh."
+        )
+
+    # Digest governance heads-up (G5): a scarce ⭐ marker fires only when a genuinely
+    # load-bearing signal exists — one or more phase/theme digests are mechanically stale
+    # because their source records changed. This never regenerates a digest; it points
+    # the user at /sybermem-digest so drifted summaries stop reading as authoritative.
+    stale_digests = detect_stale_digests(root)
+    if stale_digests["stale"] > 0:
+        lines.append(
+            f"⭐ Digest heads-up: {stale_digests['stale']} digest(s) are stale — their source "
+            "records changed since the summary was written. Run /sybermem-digest to regenerate, "
+            "or `sybermem digest status` to see which sources drifted."
         )
 
     if conclusions:

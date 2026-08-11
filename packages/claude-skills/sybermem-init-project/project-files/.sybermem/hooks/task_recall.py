@@ -48,10 +48,66 @@ def safe_field(value: str, limit: int = 120) -> str:
     return cleaned[:limit]
 
 
+# Aha expressiveness (1+2): a recall hint earns a scarce ⭐ marker and a synthesized
+# "Why now" / "Heads-up" line ONLY when it carries genuinely load-bearing signal —
+# an exact record-id/relation match, a resolved successor to prefer, or a stale/
+# conflicted trust state worth a warning. Bare keyword overlap stays symbol-free so
+# the marker keeps its meaning (scarcity = value). All text is composed strictly from
+# fields the retrieval layer already computed; nothing is inferred or invented here.
+_AHA_MATCHES = frozenset({"record-id", "relation"})
+_WARN_FRESHNESS = frozenset({"stale", "conflicted"})
+
+
+def _is_aha_row(row: dict[str, str]) -> bool:
+    match = (row.get("match_reason") or row.get("match") or "").strip().lower()
+    if match in _AHA_MATCHES:
+        return True
+    if (row.get("successor_record") or row.get("current_guidance") or "").strip():
+        return True
+    freshness = (row.get("freshness") or "").strip().lower()
+    if freshness in _WARN_FRESHNESS and (row.get("conflict_note") or "").strip():
+        return True
+    return False
+
+
+def _why_now(row: dict[str, str]) -> str:
+    """One evidence-bound relevance sentence, or '' when the match is only keyword-level."""
+    match = (row.get("match_reason") or row.get("match") or "").strip().lower()
+    if match == "record-id":
+        return "prompt names this record directly"
+    if match == "relation":
+        return "linked by an explicit record relation to your prompt"
+    guidance = safe_field(row.get("current_guidance", ""), 100)
+    if guidance:
+        return guidance
+    return ""
+
+
+def _staleness_note(row: dict[str, str]) -> str:
+    """A short heads-up for non-current recalled memory, or '' when the record is current."""
+    conflict_note = safe_field(row.get("conflict_note", ""), 120)
+    if conflict_note:
+        return conflict_note
+    successor = safe_field(row.get("successor_record", ""), 60)
+    freshness = (row.get("freshness") or "").strip().lower()
+    if successor and freshness in _WARN_FRESHNESS:
+        return f"superseded — prefer current successor {successor}"
+    return ""
+
+
 def render_packet(prompt: str, rows: list[dict[str, str]]) -> str:
     lines = ["SyberMem retrieval hints for this task (maximum 3):"]
     for row in rows[:3]:
-        lines.append(f"- [{safe_field(row['record_id'])}] {safe_field(row['title'])}")
+        aha = _is_aha_row(row)
+        marker = "⭐ " if aha else ""
+        lines.append(f"- {marker}[{safe_field(row['record_id'])}] {safe_field(row['title'])}")
+        if aha:
+            why_now = _why_now(row)
+            if why_now:
+                lines.append(f"  - Why now: {why_now}")
+            staleness = _staleness_note(row)
+            if staleness:
+                lines.append(f"  - Heads-up: {staleness}")
         lines.append(f"  - Type: {safe_field(row.get('type', 'unknown'))}")
         lines.append(f"  - Source kind: {safe_field(row.get('source_kind', 'unknown'))}")
         lines.append(f"  - Date: {safe_field(row.get('created_at', 'unknown'))}")
@@ -118,17 +174,20 @@ def main() -> int:
         ]
         log_recall_event(root, "inject", records=injected)
         packet = render_packet(prompt, rows)
-        print(
-            json.dumps(
-                {
-                    "hookSpecificOutput": {
-                        "hookEventName": "UserPromptSubmit",
-                        "additionalContext": packet,
-                    }
-                },
-                ensure_ascii=False,
-            )
+        payload = json.dumps(
+            {
+                "hookSpecificOutput": {
+                    "hookEventName": "UserPromptSubmit",
+                    "additionalContext": packet,
+                }
+            },
+            ensure_ascii=False,
         )
+        # Write UTF-8 directly to the byte buffer: the hint packet and record content can
+        # contain non-ASCII (⭐ aha markers, CJK titles), and a console locale like GBK
+        # would otherwise raise UnicodeEncodeError and make the hook silently emit nothing.
+        sys.stdout.buffer.write((payload + "\n").encode("utf-8"))
+        sys.stdout.buffer.flush()
         return 0
     except Exception:  # noqa: BROAD_EXCEPT_OK - hook boundary must fail open without stdout.
         return 0

@@ -93,17 +93,20 @@ def _run_recall(root: Path, prompt: str) -> None:
         ]
         recall_hook.log_recall_event(root, "inject", records=injected)
         packet = recall_hook.render_packet(prompt, rows)
-        print(
-            json.dumps(
-                {
-                    "hookSpecificOutput": {
-                        "hookEventName": "UserPromptSubmit",
-                        "additionalContext": packet,
-                    }
-                },
-                ensure_ascii=False,
-            )
+        payload = json.dumps(
+            {
+                "hookSpecificOutput": {
+                    "hookEventName": "UserPromptSubmit",
+                    "additionalContext": packet,
+                }
+            },
+            ensure_ascii=False,
         )
+        # Write UTF-8 to the byte buffer directly: the packet can carry non-ASCII (⭐ aha
+        # markers, CJK titles), and a console locale like GBK would otherwise raise
+        # UnicodeEncodeError and make this wired hook silently emit nothing.
+        sys.stdout.buffer.write((payload + "\n").encode("utf-8"))
+        sys.stdout.buffer.flush()
     except Exception:  # noqa: BROAD_EXCEPT_OK - hook boundary must fail open.
         return
 

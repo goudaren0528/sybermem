@@ -520,9 +520,12 @@ export const SyberMemPlugin: Plugin = async ({ $, directory }) => {
             commitsSinceRecord >= 3
               ? `. ${commitsSinceRecord} commits since last record — consider /sybermem-record`
               : ""
+          // Prefix a scarce ⭐ only when a real signal fired (stale index or record
+          // gap) so the marker flags an aha moment worth attention, not every load.
+          const ahaMarker = stale.stale || commitsSinceRecord >= 3 ? "⭐ " : ""
           return {
             "tui.toast.show": {
-              message: `SyberMem: loaded ${parsed.conclusions.length} key conclusions${staleNote}${recordNote}`,
+              message: `${ahaMarker}SyberMem: loaded ${parsed.conclusions.length} key conclusions${staleNote}${recordNote}`,
               level: "info",
             },
           }
@@ -622,6 +625,29 @@ export const SyberMemPlugin: Plugin = async ({ $, directory }) => {
       context += "### Key Conclusions\n"
       for (const c of parsed.conclusions) {
         context += c + "\n"
+      }
+
+      // Aha expressiveness (parity with the Claude recall packet): a scarce ⭐ heads-up
+      // is added ONLY when a genuinely load-bearing, already-computed signal exists —
+      // here, a stale phase index. This mirrors the "symbol scarcity = value" rule so
+      // the marker means something instead of decorating every compaction.
+      if (stale.stale) {
+        context += `\n⭐ Heads-up: phase index trails HEAD by ${stale.commitsAhead} commits — the conclusions above may lag your latest work. Consider /sybermem-phase-analyze before relying on phase context.\n`
+      }
+
+      // Digest governance heads-up (G5): shell to the single-source-of-truth
+      // `sybermem digest status` and flag mechanically-stale digests so drifted phase
+      // summaries stop reading as authoritative during compaction. Read-only — it points
+      // to /sybermem-digest, never regenerates. Fails open when the CLI is unavailable.
+      try {
+        const raw = await $`sybermem digest status --format json`.cwd(root).text()
+        const report = JSON.parse(raw)
+        const staleDigests = typeof report?.stale === "number" ? report.stale : 0
+        if (staleDigests > 0) {
+          context += `\n⭐ Digest heads-up: ${staleDigests} digest(s) are stale — their source records changed. Run /sybermem-digest to regenerate, or \`sybermem digest status\` to see which sources drifted.\n`
+        }
+      } catch {
+        // CLI missing or errored — skip the digest governance line.
       }
 
       if (phaseInfo.exists) {

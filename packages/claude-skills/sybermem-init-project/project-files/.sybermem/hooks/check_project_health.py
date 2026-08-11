@@ -187,7 +187,11 @@ def check_session_start_hook(root: Path) -> dict:
     # Stale if it still injects full Topic Index or skill list into output
     has_topic_dump = "Topic Index:" in content and "for topic, records" in content
     has_skill_list = "SyberMem skills available:" in content
-    is_stale = has_topic_dump or has_skill_list
+    # Also stale if it predates the digest-governance heads-up (G5): a content-check,
+    # not just existence, so this capability actually propagates to older projects
+    # via /sybermem-update (the same lesson as bug-9e13ab868).
+    missing_digest_heads_up = "detect_stale_digests" not in content
+    is_stale = has_topic_dump or has_skill_list or missing_digest_heads_up
     return {"status": "stale" if is_stale else "fresh"}
 
 
@@ -199,7 +203,18 @@ def check_task_recall_hook(root: Path) -> dict:
         return {"status": "missing"}
     has_task_context_banner = "SyberMem retrieval hints for this task (maximum 3):" in content
     has_user_prompt_submit_contract = '"hookEventName": "UserPromptSubmit"' in content
-    return {"status": "fresh" if has_task_context_banner and has_user_prompt_submit_contract else "stale"}
+    # Content-check the newer capabilities so they propagate to existing projects:
+    # the aha recall layer (_is_aha_row) and the UTF-8 byte-buffer output that keeps
+    # non-ASCII hints from silently failing on locales like GBK.
+    has_aha_layer = "_is_aha_row" in content
+    has_utf8_output = "sys.stdout.buffer.write" in content
+    is_fresh = (
+        has_task_context_banner
+        and has_user_prompt_submit_contract
+        and has_aha_layer
+        and has_utf8_output
+    )
+    return {"status": "fresh" if is_fresh else "stale"}
 
 
 def check_user_prompt_hook(root: Path) -> dict:
@@ -212,7 +227,10 @@ def check_user_prompt_hook(root: Path) -> dict:
     has_merged_contract = "Merged UserPromptSubmit hook" in content or (
         "detect_record_intent" in content and "task_recall" in content
     )
-    return {"status": "fresh" if has_merged_contract else "stale"}
+    # Content-check the UTF-8 byte-buffer output so the fix (non-ASCII aha markers /
+    # CJK titles no longer crash this wired hook on GBK consoles) reaches old projects.
+    has_utf8_output = "sys.stdout.buffer.write" in content
+    return {"status": "fresh" if has_merged_contract and has_utf8_output else "stale"}
 
 
 def check_file_exists(path: Path) -> dict:

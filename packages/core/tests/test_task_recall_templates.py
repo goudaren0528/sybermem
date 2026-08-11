@@ -26,10 +26,14 @@ def load_hook(path: Path):
 
 
 def run_hook(hook_path: Path, stdin: str, env: dict[str, str], cwd: Path) -> subprocess.CompletedProcess[str]:
+    # Decode hook output as UTF-8 explicitly. The hook writes UTF-8 bytes (⭐ aha markers,
+    # CJK titles); relying on the console locale (e.g. GBK on Chinese Windows) would
+    # mis-decode them, so pin the encoding the way Claude Code reads hook stdout.
     return subprocess.run(
         [sys.executable, str(hook_path)],
         input=stdin,
         text=True,
+        encoding="utf-8",
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         cwd=cwd,
