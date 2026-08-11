@@ -57,6 +57,13 @@ EOF
 chmod +x "$CLI_WRAPPER"
 echo "  [Global] 已安装 sybermem CLI: $CLI_WRAPPER"
 
+# Keep the ~/.local/bin symlink current on update too (no shell-rc edit).
+LOCAL_BIN="$HOME/.local/bin"
+mkdir -p "$LOCAL_BIN"
+if ln -sf "$CLI_WRAPPER" "$LOCAL_BIN/sybermem" 2>/dev/null; then
+    echo "  [Global] 已链接 sybermem 到 PATH 目录: $LOCAL_BIN/sybermem"
+fi
+
 if [ -d "$HOME/.config/opencode" ]; then
     mkdir -p "$OPENCODE_PLUGIN_DIR"
     cp "$PLUGIN_SOURCE" "$OPENCODE_PLUGIN_DIR/sybermem.ts"
@@ -82,7 +89,12 @@ echo "  /sybermem-theme-digest  — 为单个 topic 创建跨多个 phase 的持
 echo "  /sybermem-team-publish  — 将当前项目发布到 Team memory"
 echo "  /sybermem-team-summary  — 生成 Team 管理摘要"
 echo ""
-echo "sybermem CLI 已安装，可直接运行：sybermem project init --register"
+if command -v sybermem >/dev/null 2>&1; then
+    echo "sybermem CLI 已安装并在 PATH 中，可直接运行：sybermem project init --register"
+else
+    echo "sybermem CLI 已安装：$CLI_WRAPPER （已链接到 $LOCAL_BIN/sybermem）"
+    echo "如果 \`sybermem\` 无法直接运行，请将 $LOCAL_BIN 加入 PATH，或用完整路径运行。"
+fi
 echo ""
 echo "下一步：进入你的项目目录后执行 /sybermem-update"
 echo "如果你只想检查项目本地文档是否需要刷新，可执行 /sybermem-init-project"

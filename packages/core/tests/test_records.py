@@ -6,7 +6,14 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from sybermem_core.records import generate_record_id, parse_record_file
+from sybermem_core.records import (
+    generate_record_id,
+    parse_project_yaml,
+    parse_project_yaml_full,
+    parse_record_file,
+    unwrap_scalar,
+)
+from sybermem_core.retrieval import derive_continuity_metadata
 
 
 def test_generate_record_id_is_exported_from_package_root() -> None:
@@ -149,3 +156,141 @@ def test_parse_record_file_reads_canonical_requirement_and_bug_metadata(tmp_path
     assert requirement["source"] == "Product review"
     assert requirement["priority"] == "high"
     assert bug["severity"] == "critical"
+
+
+def test_parse_record_file_reads_declared_source_kind(tmp_path: Path) -> None:
+    # Given: a record that declares source_kind in frontmatter
+    record_path = tmp_path / "2026-08-11-001-declared-source-kind.md"
+    record_path.write_text(
+        "\n".join(
+            [
+                "---",
+                "type: change",
+                "record_id: change-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "date: 2026-08-11",
+                "title: Declared source_kind",
+                "source_kind: digest",
+                "---",
+                "",
+                "## Change Content",
+                "Body.",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    # When: the record is parsed and continuity metadata is derived
+    record = parse_record_file(record_path, "project-1", "demo")
+    metadata = derive_continuity_metadata(record, match_reason="")
+
+    # Then: the declared source_kind is both parsed and honored by classification
+    assert record["source_kind"] == "digest"
+    assert metadata["source_kind"] == "digest"
+
+
+def test_declared_source_kind_falls_back_when_invalid(tmp_path: Path) -> None:
+    # Given: a record whose declared source_kind is not a recognized value
+    record_path = tmp_path / "2026-08-11-002-invalid-source-kind.md"
+    record_path.write_text(
+        "\n".join(
+            [
+                "---",
+                "type: change",
+                "record_id: change-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "date: 2026-08-11",
+                "title: Invalid source_kind",
+                "source_kind: nonsense",
+                "---",
+                "",
+                "## Change Content",
+                "Body.",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    # When: parsed and classified
+    record = parse_record_file(record_path, "project-1", "demo")
+    metadata = derive_continuity_metadata(record, match_reason="")
+
+    # Then: the raw value is preserved by the parser but ignored by validation
+    # (parse, don't trust blindly), so classification falls back to inference.
+    assert record["source_kind"] == "nonsense"
+    assert metadata["source_kind"] == "manual"
+
+
+def test_parse_record_file_unwraps_quoted_scalars_and_topics(tmp_path: Path) -> None:
+    # Given: a record with quoted title (containing a colon) and quoted inline topics
+    record_path = tmp_path / "2026-08-11-003-quoted.md"
+    record_path.write_text(
+        "\n".join(
+            [
+                "---",
+                "type: change",
+                "record_id: change-cccccccccccccccccccccccccccccccc",
+                "date: 2026-08-11",
+                'title: "Fix: quoted title with colon"',
+                'topics: ["arch", "quality"]',
+                "---",
+                "",
+                "## Change Content",
+                "Body.",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    # When: parsed
+    record = parse_record_file(record_path, "project-1", "demo")
+
+    # Then: quotes are stripped and the colon-bearing title survives intact
+    assert record["title"] == "Fix: quoted title with colon"
+    assert record["topics"] == "arch,quality"
+
+
+def test_unwrap_scalar_strips_only_matching_quote_pairs() -> None:
+    assert unwrap_scalar("  'hi'  ") == "hi"
+    assert unwrap_scalar('"hi"') == "hi"
+    assert unwrap_scalar("plain") == "plain"
+    # Mismatched surrounding quotes must be left untouched.
+    assert unwrap_scalar("'mismatch\"") == "'mismatch\""
+
+
+def test_parse_project_yaml_handles_nested_repository_and_quotes(tmp_path: Path) -> None:
+    # Given: a project.yaml with a nested repository map and a quoted scalar
+    syb = tmp_path / ".sybermem"
+    syb.mkdir()
+    (syb / "project.yaml").write_text(
+        "\n".join(
+            [
+                "schema_version: 1",
+                "project_id: 01J-ABC",
+                "slug: sybermem",
+                'name: "sybermem"',
+                "created_at: 2026-08-11T10:00:00",
+                "repository:",
+                "  remote: git@github.com:goudaren0528/sybermem.git",
+                "  default_branch: main",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    # When: parsed via the flat (back-compat) and full views
+    flat = parse_project_yaml(tmp_path)
+    full = parse_project_yaml_full(tmp_path)
+
+    # Then: the flat view exposes only scalars (quoted values unwrapped) and never
+    # leaks nested children as bogus top-level keys.
+    assert flat["name"] == "sybermem"
+    assert flat["slug"] == "sybermem"
+    assert flat["project_id"] == "01J-ABC"
+    assert "remote" not in flat and "default_branch" not in flat
+    # And: the full view surfaces the nested repository map.
+    assert isinstance(full["repository"], dict)
+    assert full["repository"]["remote"] == "git@github.com:goudaren0528/sybermem.git"
+    assert full["repository"]["default_branch"] == "main"

@@ -11,6 +11,34 @@ The current OpenCode plugin implements these lifecycle hooks:
 - `session.idle`
 - `experimental.session.compacting`
 
+## Capability parity with Claude Code
+
+Across the three OpenCode seams above, the plugin now mirrors the Claude Code
+lifecycle-hook behavior as closely as the OpenCode plugin API allows:
+
+- `session.created` surfaces the loaded key-conclusion count, a stale-signal note,
+  and a commit-gap record reminder (threshold ≥ 3 commits since the last record),
+  matching the Claude `SessionStart` context.
+- `session.idle` classifies changed files into a record nudge, a digest nudge, or
+  no nudge using the same thresholds and high-signal / high-level-area heuristics
+  as the Claude `Stop` hook, tracks a per-theme window for digest clustering, and
+  persists a bounded `.sybermem/.auto-trail.jsonl` journal with >80% overlap dedup.
+- `experimental.session.compacting` injects project identity (`slug` /
+  `project_id`), phase-index status and confirmed count, active phase, stale
+  signal, the topic index, and a next-step recommendation from `sybermem next-step`
+  (fails open when the CLI is unavailable).
+
+The following Claude capabilities remain **genuinely unsupported** on OpenCode
+because they depend on a per-prompt `UserPromptSubmit` seam with `additionalContext`
+injection that OpenCode does not expose:
+
+- prompt-time record-intent capture (`.record-intent.json`)
+- prompt-time high-signal task recall injection
+- prompt-time recall observability logging (`.recall-debug.jsonl`)
+
+These are not simulated on OpenCode. Task recall there stays manual via
+`/sybermem-search`, and carry-forward relies on the supported compaction hook.
+
 OpenCode does not currently expose a documented prompt-time plugin callback for
 injecting `additionalContext` on every user prompt. SyberMem therefore does not
 invent or register an unsupported `UserPromptSubmit` event there. Use

@@ -350,9 +350,12 @@ def search_project(query: str) -> list[SearchRow]:
             enriched = _with_retrieval_metadata(row, match_reason=overlap.match, related_digest=_related_digest(row, digest_coverage), archived=_text(row, "record_id") in archived_ids)
             enriched["match"] = overlap.match
             results.append(enriched)
+    if _semantic_recall_enabled():
+        results = _add_semantic_supplement(query, results)
     apply_successor_guidance(results, guidance_rows)
     _annotate_digest_coverage(root, results)
     _annotate_conflicts(results)
+    results.sort(key=_explicit_sort_key)
     return results
 
 
@@ -417,3 +420,14 @@ def _compact_sort_key(row: SearchRow) -> tuple[int, int, int, int, int]:
     match_rank = -int(float(row.get("score", 0.0) or 0.0))
     created_rank = -_created_rank(row)
     return (authority_rank, specificity_rank, freshness_rank, match_rank, created_rank)
+
+
+# Explicit `sybermem search` sort: unlike compact recall (which leads with trust so a
+# wrong hint never outranks an authoritative one on the hot path), user-facing search
+# should surface the most *relevant* record first. Rank by raw score, then match
+# specificity (exact id > relation > topic > keyword), then recency as the tiebreak.
+def _explicit_sort_key(row: SearchRow) -> tuple[float, int, int]:
+    score_rank = -float(row.get("score", 0.0) or 0.0)
+    specificity_rank = _MATCH_SPECIFICITY.get(_text(row, "match"), 4)
+    created_rank = -_created_rank(row)
+    return (score_rank, specificity_rank, created_rank)

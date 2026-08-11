@@ -223,3 +223,71 @@ def test_newer_digest_after_phase_boundary_marks_resume_stale(tmp_path: Path) ->
     assert checkpoint["confidence"] == "low"
     assert checkpoint["freshness"] == "stale"
     assert checkpoint["next_action"]["action"] == "/sybermem-phase-analyze"
+
+
+def test_same_day_progress_ordering_is_deterministic(tmp_path: Path) -> None:
+    # Given: two manual change records on the SAME date (date-only frontmatter)
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    write_project(project_root)
+    write_phase_index(project_root)
+    changes = project_root / ".sybermem" / "changes"
+    changes.mkdir()
+    for rid in ("change-00000000000000000000000000000001", "change-00000000000000000000000000000002"):
+        (changes / f"2026-08-04-{rid}.md").write_text(
+            "\n".join(
+                [
+                    "---",
+                    "type: change",
+                    f"record_id: {rid}",
+                    "date: 2026-08-04",
+                    f"title: Work {rid[-1]}",
+                    "status: implemented",
+                    "---",
+                    "",
+                    "## Change Content\nBody.",
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+    # When: resume is built twice
+    first = build_resume_checkpoint(project_root, mode="fast")
+    second = build_resume_checkpoint(project_root, mode="fast")
+
+    # Then: same-day ordering is stable and reproducible (record_id tiebreak, desc),
+    # so the higher record_id leads deterministically instead of arbitrarily.
+    order = [item["record_id"] for item in first["progress"]]
+    assert order == [item["record_id"] for item in second["progress"]]
+    assert order[:2] == [
+        "change-00000000000000000000000000000002",
+        "change-00000000000000000000000000000001",
+    ]
+
+
+def test_confidence_reasons_expose_drivers_without_expanding_enum(tmp_path: Path) -> None:
+    # Given: a current project with one open bug (medium confidence)
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    write_project(project_root)
+    write_phase_index(project_root)
+    write_record(
+        project_root,
+        "bugs",
+        "2026-08-04-001-open.md",
+        ["type: bug", "date: 2026-08-04", "title: Open bug", "status: open"],
+        "## Summary\nStill open.",
+    )
+
+    # When: resume is built
+    checkpoint = build_resume_checkpoint(project_root, mode="fast")
+
+    # Then: the label stays within the 3-level enum, and reasons explain it
+    assert checkpoint["confidence"] in {"low", "medium", "high"}
+    assert checkpoint["confidence"] == "medium"
+    reasons = checkpoint["confidence_reasons"]
+    assert "phase index is current" in reasons
+    assert "active phase id present" in reasons
+    assert "1 open bugs" in reasons
+    assert "0 open requirements" in reasons

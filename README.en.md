@@ -2,57 +2,19 @@
 
 # SyberMem
 
-SyberMem is an AI-oriented project and team engineering-memory system.
+SyberMem is a project and team engineering-memory system for AI coding workflows. It stores context, decisions, rationale, and phase conclusions as local Markdown so the next session does not have to rebuild project history from scratch.
 
-It helps you store:
-- project progress
-- technical decisions
-- phase-level conclusions
-- team-facing summaries
+## Why It Exists
 
-as structured memory so project owners, managers, and management agents can keep consuming those signals across sessions.
+AI agents can move quickly inside one context window, but cross-session work often loses three important signals:
 
-## Current Capabilities
+- why a design was chosen
+- which problems were already found or fixed
+- what the safest next step is now
 
-### Project
-- structured records (`change` / `decision` / `requirement` / `bug`)
-- persistent phase index
-- user-invoked, bounded, read-only `/sybermem-resume`
-- phase digests / theme digests
-- relations and supersession (`implements`, `fixes`, `related`, `superseded_by`)
-- project-level summary / search / link with source-aware trust fields
+SyberMem preserves those signals through structured records, derived indexes, phase/theme digests, and bounded read-only resume views. Data lives in the project's `.sybermem/` directory, so humans and AI agents can inspect it directly without relying on a black-box service.
 
-### Hub
-- project registry
-- workspace search
-- safe guidance for missing or stale workspace indexes
-- project status
-- portfolio view
-
-### Team
-- team init
-- Team publish preview, review, and publish-with-hash flow
-- team overview
-- team management summary
-- Team Project Summary
-- full phase / theme digest history sync
-
-## Platform support levels
-
-Integration completeness varies by platform. Choose based on the actual level:
-
-| Platform | Support level | Notes |
-|---|---|---|
-| **Claude Code** | Full | plugin manifest + marketplace + hooks fully wired, validated by `claude plugins validate` |
-| **OpenCode** | Full | real TypeScript runtime (`packages/opencode-plugin/sybermem.ts`), script install |
-| **Gemini** | Entry integration | `gemini-extension.json` + `GEMINI.md` entry; no deep runtime validation |
-| **Codex / Cursor / Kimi** | Metadata placeholder | unified manifest metadata only; no platform runtime hook yet |
-
-> Codex / Cursor / Kimi are metadata placeholders today — they do not yet ship a platform-specific runtime integration.
-
-## Install
-
-### One-line install (recommended for users)
+## Quick Start
 
 ```bash
 # macOS / Linux
@@ -62,162 +24,189 @@ curl -sSL https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/i
 irm https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/install-remote.ps1 | iex
 ```
 
-The most intuitive path — no clone needed. One command refreshes Claude Code / OpenCode skills, the OpenCode plugin, and the CLI / Core runtime.
+Then open a target project:
 
-### Claude Code plugin install (developers / local validation)
+```text
+/sybermem-init-project
+/sybermem-record
+/sybermem-resume
+```
+
+The usual loop is: initialize the project, record meaningful work after a session, then start the next session with `/sybermem-resume` to see the current phase, recent progress, risks, recommended next action, confidence, and freshness.
+
+## What a Memory Record Looks Like
+
+`/sybermem-record` writes Markdown records under `.sybermem/changes/`, `.sybermem/decisions/`, `.sybermem/requirements/`, or `.sybermem/bugs/`:
+
+```markdown
+---
+type: change
+record_id: change-6a3ab8a0e44e4c41843b66bde8b7134a
+date: 2026-08-07
+title: UUID-backed record IDs and derived project index
+key_conclusion: Use UUID record IDs and a derived INDEX so parallel records merge safely
+topics: [architecture, collaboration, quality]
+implements: [requirement-002]
+---
+
+## Change Content
+...
+
+## Reason
+...
+
+## Impact Scope
+...
+```
+
+`.sybermem/INDEX.md` is derived from canonical records and acts as the navigation and session-start key-conclusion layer. Long-term compression lives in phase digests and theme digests.
+
+## Current Capabilities
+
+### Project Memory
+
+- structured records: `change` / `decision` / `requirement` / `bug`
+- UUID-backed `record_id` values, with legacy numeric record IDs still readable
+- derived `.sybermem/INDEX.md` from canonical records
+- phase digests and theme digests for phase/topic compression
+- record relations: `implements` / `fixes` / `related` / `superseded_by`
+- read-only resume: `/sybermem-resume` and `sybermem resume`
+- project search: `/sybermem-search` and `sybermem search`
+- next-step guidance: `/using-sybermem` and `sybermem next-step`
+
+### Workspace / Hub
+
+- project registry
+- workspace SQLite FTS5 search index: `sybermem index build`
+- workspace search with project, type, and status filters
+- recovery guidance for missing, incompatible, or stale indexes
+- portfolio view: `sybermem portfolio`
+
+### Team Memory
+
+- Team repo initialization: `sybermem team init`
+- read-only publish preview: `sybermem publish status --preview`
+- publish with a reviewed preview hash to avoid stale writes
+- automatic Team overview rebuilds
+- Team management summary: `sybermem team summary`
+- phase/theme digest history sync into the Team repo
+- matching skills: `/sybermem-team-publish`, `/sybermem-team-summary`
+
+## CLI vs Skill Boundaries
+
+SyberMem has two execution paths with different reliability properties:
+
+| Path | Representative capabilities | Notes |
+|---|---|---|
+| CLI / Core | `sybermem resume`, `search`, `next-step`, `portfolio`, `index build`, `project index build/check`, `record id`, `team init/summary`, `publish status`, `project uninstall` | Programmatic and scriptable; best for deterministic queries and publication flows |
+| Skill orchestration | `/sybermem-record`, `/sybermem-link`, `/sybermem-digest`, `/sybermem-theme-digest`, `/sybermem-phase-analyze`, `/sybermem-phase-confirm` | AI edits `.sybermem/` Markdown according to skill instructions; best for work that requires judgment and synthesis |
+
+`sybermem record id --type <change|decision|requirement|bug>` only mints a canonical record ID. Full record creation still happens through `/sybermem-record`.
+
+## Platform Support
+
+| Platform | Support level | Notes |
+|---|---|---|
+| Claude Code | Full integration | plugin metadata, skills, SessionStart / Stop / UserPromptSubmit hooks |
+| OpenCode | Supported integration | skills + TypeScript plugin; session lifecycle and compaction carry-forward |
+
+OpenCode does not currently expose a documented per-prompt automatic injection callback. SyberMem does not claim hidden auto-resume, background execution, or unsupported prompt-time injection on OpenCode; `/sybermem-resume` and `/sybermem-search` are manual there, and automatic carry-forward primarily relies on the supported compaction lifecycle. See [`.opencode/INSTALL.md`](.opencode/INSTALL.md) for details.
+
+## Install and Upgrade
+
+### One-Line Install
+
+```bash
+# macOS / Linux
+curl -sSL https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/install-remote.sh | bash
+
+# Windows (PowerShell)
+irm https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/install-remote.ps1 | iex
+```
+
+This refreshes user-level Claude Code skills, OpenCode skills, the OpenCode plugin, and the CLI / Core runtime.
+
+### Local Plugin Validation
 
 ```bash
 claude --plugin-dir .
 ```
 
-Best for loading hooks and skills as a plugin directly inside a local checkout for development or validation.
+Use this from a repository checkout to validate the Claude Code plugin, hooks, and skills locally.
 
-### OpenCode
+### Upgrade Order
 
-OpenCode can also use SyberMem through its plugin/runtime path. See [`.opencode/INSTALL.md`](.opencode/INSTALL.md).
+1. Re-run the global install / update command first.
+2. Open each existing project and run `/sybermem-update`.
+3. For new projects, run `/sybermem-init-project`.
 
-The documented limitation still applies: OpenCode does not expose a documented per-prompt automatic injection callback, so SyberMem does not claim or register unsupported `UserPromptSubmit` prompt injection there. On OpenCode, explicit historical recall is still manual through `/sybermem-search`, while automatic carry-forward is limited to the supported compaction flow.
-
-`/sybermem-resume` is also available manually on OpenCode, but it stays a read-only restart view. It does not auto-run the suggested action, and it does not claim hidden auto-resume, background execution, or unsupported prompt-time injection.
-
-### Install and upgrade order
-
-1. Refresh the global install first.
-   - The install scripts refresh Claude Code skills, OpenCode skills, the OpenCode plugin, and the CLI/Core runtime.
-   - Re-running the remote install command is a supported global runtime refresh.
-2. Then open each target project and run `/sybermem-update`.
-   - That is the project-local repair step for managed hooks, templates, instruction files, and managed settings patches.
-3. If the project is not initialized yet, run `/sybermem-init-project`.
-
-In short, global first, then project-local. Existing projects do not pick up new managed behavior from a global refresh alone.
+The global refresh updates user-level runtime and skills. Project-local `.sybermem/`, hooks, templates, and instruction files are refreshed by `/sybermem-update`.
 
 ## Initialize a Project
 
-Inside your project directory, run:
+Run this in the target project:
 
 ```text
 /sybermem-init-project
 ```
 
-This creates or refreshes:
+It creates or refreshes:
+
 - `.sybermem/`
 - `.sybermem/digests/`
 - `.sybermem/theme-digests/`
 - `.sybermem/analysis/phase-index.md`
 - `.sybermem/project.yaml`
-- `.sybermem/hooks/record_change_on_stop.py`
-- `.sybermem/hooks/detect_record_intent.py`
-- `.sybermem/hooks/task_recall.py`
+- `.sybermem/hooks/`
 - `CLAUDE.md`
 - `AGENTS.md`
 - `.claude/settings.json`
 
-Where:
-- `auto` = lightweight `change` trail + reminders
-- `remind` = reminders only, with no automatic `change` trail
-- the default Claude `UserPromptSubmit` hook handles both natural-language record-intent capture and read-only task recall
-- if a project already has a custom `.claude/settings.json`, SyberMem applies only surgical patches to recognized managed entries and does not overwrite unrelated custom hooks, env, or instructions
+If a project already has custom `.claude/settings.json` content, SyberMem patches only recognized managed entries and does not overwrite unrelated hooks, env, or instructions.
 
 ## Daily Usage
 
-### Project owner
-- `/sybermem-resume` — rebuild the current project context from natural language with a bounded, read-only restart brief
-- `/sybermem-record` — record a meaningful round of work
-- `/sybermem-summary` — inspect current project state
-- `/sybermem-digest` — capture a stable phase conclusion
-- `/sybermem-theme-digest` — capture a cross-phase topic conclusion
-- `/sybermem-team-publish` — preview, review, then publish the current project into Team memory with the preview hash
+### Project Owner
 
-### Manager / management agent
-- `/sybermem-team-summary` — generate the Team management summary
-- read `dashboards/current-overview.md` / `latest-management-summary.md`
+- `/sybermem-resume`: get a bounded read-only resume view
+- `/sybermem-record`: record a meaningful round of work
+- `/sybermem-search`: search historical records
+- `/sybermem-summary`: inspect current project state
+- `/sybermem-digest`: capture a stable phase conclusion
+- `/sybermem-theme-digest`: capture a cross-phase topic conclusion
+- `/sybermem-team-publish`: preview, review, then publish into Team memory
 
-### If you're unsure what to do next
-- `/sybermem-resume` — get the read-only restart brief before choosing whether to run the next step
-- `/using-sybermem` — inspect the current state and get the recommended command
+### Manager / Management Agent
 
-## Commands vs Skill orchestration
+- `/sybermem-team-summary`: generate the Team management summary
+- read `dashboards/current-overview.md` and `latest-management-summary.md` in the Team repo
 
-SyberMem capabilities run through two execution paths with different reliability. Know which is which:
+### When Unsure What To Do Next
 
-| Category | Capabilities | How it runs | Characteristics |
-|---|---|---|---|
-| **CLI commands** (program-verified) | `sybermem resume` / `search` / `project status` / `portfolio` / `team init` / `team summary` / `publish status` | Executed directly by the `sybermem` CLI + core | Deterministic, scriptable, stable output |
-| **Skill orchestration** (AI-executed) | `/sybermem-record` / `/sybermem-link` / `/sybermem-digest` / `/sybermem-theme-digest` / `/sybermem-phase-analyze` / `/sybermem-phase-confirm` | The AI edits `.sybermem/` markdown per skill instructions | Depends on AI judgement, not a deterministic command |
+- `/sybermem-resume`: restore current context first
+- `/using-sybermem`: inspect state and get the recommended command
+- `sybermem next-step`: get next-step guidance from the CLI
 
-- `sybermem resume` now provides a **programmatic** restart brief (`--mode fast|standard|deep`, `--format text|json`) alongside the natural-language `/sybermem-resume` skill.
-- record / link / digest and similar are skill orchestration: they have no CLI command and rely on the AI following skill instructions to edit markdown records, so their reliability depends on the AI doing so correctly.
+## Indexing and Search
 
-## Indexes and record IDs
-
-- `sybermem index build` builds the workspace-level SQLite search index used by Hub and workspace search.
-- `sybermem project index build` rebuilds the derived `.sybermem/INDEX.md` from canonical record files, and `sybermem project index check` verifies that derived file is up to date.
-- `.sybermem/INDEX.md` is a derived artifact, so the normal record workflow should not hand-edit it.
-- New records use generated, UUID-backed `record_id` values. Legacy numeric records remain readable.
-- Record creation still happens through `/sybermem-record` skill orchestration. There is no separate record-creation CLI.
-
-## Resume and trust UX
-
-`/sybermem-resume` is the natural-language-first restart entrypoint for requests like "resume this project", "what was I doing", or "what should I do next".
-
-- `fast`: a short restart brief with the current phase, recent progress, top risk, next action, and the reason for that recommendation
-- `standard`: the default handoff, with a bit more trust context such as digest coverage or the most important unresolved question
-- `deep`: still bounded, but points you to the right records or digests for follow-up instead of auto-reading full history
-
-The restart brief should show current phase, recent progress, risks, next action, confidence, freshness, and reason.
-
-`/sybermem-resume` is read-only. It never auto-executes the suggested action, and it never writes records, digests, or settings. Trust fields should make it clear whether the result is grounded in a current authoritative record, a digest, or lower-confidence supporting evidence. It uses the existing resume, status, search, and next-step path, not a second memory store.
-
-When you need explicit historical evidence, run `/sybermem-search`. Project search and workspace search aim to surface authority, lifecycle, freshness, and successor guidance clearly. Workspace search depends on the workspace SQLite index built by `sybermem index build`. `.sybermem/INDEX.md`, by contrast, is derived from canonical records via `sybermem project index build`. If the workspace index is missing, stale, or FTS falls back, the system should guide recovery safely instead of inventing recall.
+- `.sybermem/INDEX.md` is a derived project navigation file rebuilt by `sybermem project index build` and checked by `sybermem project index check`.
+- `sybermem index build` builds the workspace SQLite FTS5 index for cross-project search.
+- Project search defaults to lexical matching and scoring over parsed Markdown records; use the workspace index for cross-project search.
+- Optional `SYBERMEM_SEMANTIC_RECALL=1` enables a local char n-gram recall supplement for explicit search. It does not automatically inject recall into every prompt.
 
 ## Team Workflow
 
-The recommended Team workflow today is:
+Recommended path:
 
-1. record and digest work inside each project
-2. generate a read-only preview with `/sybermem-team-publish`
-3. review source revision, source hash, freshness, conflicts, and review-required state
-4. publish with the reviewed preview hash
-5. let Team overview rebuild automatically
-6. generate a management summary with `/sybermem-team-summary`
-7. drill into digest history when more detail is needed
+1. Keep recording and digesting inside each project.
+2. Generate a read-only preview with `/sybermem-team-publish` or `sybermem publish status --preview --format json`.
+3. Review source revision, source hash, freshness, conflicts, and review-required state.
+4. Publish with the reviewed preview hash.
+5. Let Team overview rebuild automatically.
+6. Generate a management summary with `/sybermem-team-summary` or `sybermem team summary`.
+7. Drill into full digest history when details are needed.
 
-In other words:
-
-```text
-skim status
-read digest history for detail
-```
-
-### Team support available today
-- **Phase A**: `sybermem team init` — create the Team repo skeleton, write `team.yaml`, and bind the Git remote
-- **Phase B**: `sybermem publish status --preview --format json` — generate a read-only preview for review
-- **Phase C**: `sybermem publish status --preview-source-hash <source_hash> --format json` — perform the actual publish from the reviewed preview
-- **Phase D**: automatically rebuild `dashboards/current-overview.md` after each `publish status`
-- **Phase E**: remember Team association so `publish status` no longer needs `--team-path` every time
-- **Phase F**: `sybermem team summary` — generate a low-cost management summary (markdown + json)
-- **Phase G**: sync the full phase / theme digest history into the Team repo
-- **Team Skills**: `/sybermem-team-publish` and `/sybermem-team-summary`
-
-> The safe Team publish path is preview → review → publish with hash. The preview is read-only. If publish returns `stale_preview`, generate a fresh preview before publishing again.
-
-## Modes and Reminders
-
-- `auto` = lightweight automatic `change` trail + reminders
-- `remind` = reminders only, no automatic `change` trail
-- If you explicitly say something like “remind me to record this round when it’s done”, SyberMem can remember that intent and remind you to run `/sybermem-record` at the right time.
-
-## Workflow Router
-
-SyberMem now recommends the next step using this priority order:
-
-```text
-record > digest > team-publish
-```
-
-This reduces the “what should I do next?” friction after a round of work.
-
-## Repo Structure
+## Repository Structure
 
 ```text
 .claude-plugin/                      # Claude Code plugin metadata and marketplace manifest
@@ -226,26 +215,21 @@ skills/                              # Plugin-facing skills tree
 packages/claude-skills/              # Skill source for distribution
 packages/core/                       # Core memory / Team publication logic
 packages/cli/                        # sybermem CLI
-scripts/                             # Install, update, and packaging scripts
+packages/opencode-plugin/            # OpenCode plugin
+scripts/                             # Install, update, uninstall, and package-check scripts
 ```
 
 ## Uninstall
 
-SyberMem supports two layers of uninstall:
-
-### Project-level uninstall (preserve history, deactivate runtime)
+### Project-Level Uninstall
 
 ```text
 sybermem project uninstall
 ```
 
-- preserves `.sybermem/` history
-- only removes SyberMem hooks / env from `.claude/settings.json`
-- only removes the SyberMem protocol block from `CLAUDE.md` / `AGENTS.md`
-- user's own content is never destroyed
-- can be re-enabled later by running `/sybermem-update`
+This deactivates SyberMem runtime management in the project while preserving `.sybermem/` history and removing only managed hook / env / instruction-block content where possible.
 
-### Global uninstall (remove global runtime, preserve project history)
+### Global Uninstall
 
 ```bash
 # Windows (PowerShell)
@@ -255,15 +239,14 @@ sybermem project uninstall
 ./scripts/uninstall.sh
 ```
 
-- removes global skills / CLI / launcher / OpenCode plugin
-- does not delete any `.sybermem/` history inside projects
+Global uninstall removes user-level skills, CLI, launchers, and the OpenCode plugin. It does not delete `.sybermem/` history from any project.
 
 ## Compatibility
 
-- `.sybermem/` is the canonical project data directory
-- if a project still uses legacy `ADR/`, first use will migrate it automatically to `.sybermem/`
-- Claude-specific `UserPromptSubmit` repair applies only to managed Claude hooks. OpenCode does not support, and SyberMem does not claim, the same prompt-time injection model there.
-- for deeper upgrade and compatibility notes, see `INSTALL.md`
+- `.sybermem/` is the current canonical project data directory.
+- If a project still uses legacy `ADR/`, the first relevant SyberMem workflow migrates it to `.sybermem/`.
+- Claude prompt-time recall applies only to managed Claude hooks; OpenCode does not claim the same per-prompt injection model.
+- For more installation, upgrade, and compatibility details, see [INSTALL.md](INSTALL.md).
 
 ## License
 

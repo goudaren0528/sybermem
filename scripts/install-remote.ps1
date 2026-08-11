@@ -67,7 +67,7 @@ try {
         }
     }
 
-    # Claude Code: install global stop hook launcher
+    # Global launchers: only needed by the Claude Code lifecycle hooks.
     if (Test-Path (Join-Path $env:USERPROFILE ".claude")) {
         if (-not (Test-Path $LauncherDir)) {
             New-Item -ItemType Directory -Path $LauncherDir -Force | Out-Null
@@ -78,20 +78,24 @@ try {
             Copy-Item -Path $SessionLauncherSource -Destination $SessionLauncherPath -Force
             Write-Host "  [Claude Code] installed session start launcher: $SessionLauncherPath"
         }
-        if (-not (Test-Path $CliDir)) {
-            New-Item -ItemType Directory -Path $CliDir -Force | Out-Null
-        }
-        $pipExe = Join-Path $CliVenv "Scripts\pip.exe"
-        python -m venv $CliVenv
-        & (Join-Path $CliVenv "Scripts\python.exe") -m pip install --upgrade pip
-        & $pipExe install --upgrade --force-reinstall $CoreSource $CliSource
-        @'
+    }
+
+    # sybermem CLI/runtime: install unconditionally. OpenCode skills (search/record/
+    # using-sybermem) call the `sybermem` CLI, so gating this on ~/.claude would leave
+    # OpenCode-only machines with skills that invoke a runtime that was never installed.
+    if (-not (Test-Path $CliDir)) {
+        New-Item -ItemType Directory -Path $CliDir -Force | Out-Null
+    }
+    $pipExe = Join-Path $CliVenv "Scripts\pip.exe"
+    python -m venv $CliVenv
+    & (Join-Path $CliVenv "Scripts\python.exe") -m pip install --upgrade pip
+    & $pipExe install --upgrade --force-reinstall $CoreSource $CliSource
+    @'
 @echo off
 set "SYBERMEM_HOME=%USERPROFILE%\.claude\sybermem\cli"
 "%SYBERMEM_HOME%\venv\Scripts\sybermem.exe" %*
 '@ | Set-Content -Path $CliWrapper -Encoding ASCII
-        Write-Host "  [Claude Code] installed sybermem CLI: $CliWrapper"
-    }
+    Write-Host "  [Global] installed sybermem CLI: $CliWrapper"
 
     # OpenCode: install plugin
     if (Test-Path (Join-Path $env:USERPROFILE ".config\opencode")) {
@@ -126,7 +130,18 @@ Write-Host "  /sybermem-theme-digest  - Create a durable topic-level digest"
 Write-Host "  /sybermem-team-publish  - Publish the current project into Team memory"
 Write-Host "  /sybermem-team-summary  - Generate the Team management summary"
 Write-Host ""
-Write-Host "sybermem CLI is installed. You can now run: sybermem project init --register"
+# Honest PATH guidance: the wrapper lives in $CliDir, not on PATH by default on
+# Windows. We do NOT modify persistent PATH automatically; detect and guide.
+$sybermemOnPath = ($env:PATH -split ';' | Where-Object { $_.TrimEnd('\') -ieq $CliDir.TrimEnd('\') }).Count -gt 0
+if ($sybermemOnPath) {
+    Write-Host "sybermem CLI is installed and on PATH. You can now run: sybermem project init --register"
+} else {
+    Write-Host "sybermem CLI is installed at: $CliWrapper"
+    Write-Host "To run it as ``sybermem`` from anywhere, add this directory to your PATH:"
+    Write-Host "  $CliDir"
+    Write-Host "  e.g. setx PATH `"$CliDir;`$env:PATH`"  (opens a new shell to take effect)"
+    Write-Host "Or run it by full path: & `"$CliWrapper`" project init --register"
+}
 Write-Host ""
 Write-Host "Next: open your project and run /sybermem-update"
 Write-Host "If you only want the local project refresh check, run /sybermem-init-project"

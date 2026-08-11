@@ -66,7 +66,32 @@ def search_workspace(query: str, *, project: str | None = None, type_: str | Non
         enriched["match"] = overlap.match
         results.append(enriched)
     apply_successor_guidance(results, guidance_rows)
+    results.sort(key=_relevance_sort_key)
     return results
+
+
+_MATCH_SPECIFICITY: dict[str, int] = {"record-id": 0, "relation": 1, "topic": 2, "keyword": 3}
+
+
+def _relevance_sort_key(row: SearchRow) -> tuple[float, int, str]:
+    """Rank workspace results by relevance: raw score, then match specificity, then recency.
+
+    Mirrors project explicit search so cross-project results are relevance-ordered
+    instead of returned in SQL row order (slug, created_at DESC).
+    """
+    score_rank = -float(row.get("score", 0.0) or 0.0)
+    specificity_rank = _MATCH_SPECIFICITY.get(_text(row, "match"), 4)
+    created_rank = _text(row, "created_at")
+    return (score_rank, specificity_rank, _negated_date(created_rank))
+
+
+def _negated_date(created_at: str) -> str:
+    """Invert a YYYY-MM-DD string for descending sort as the final tiebreak."""
+    digits = created_at.replace("-", "")
+    if not digits.isdigit():
+        return "\uffff"  # undated records sort last
+    complement = 10 ** len(digits) - 1 - int(digits)
+    return str(complement).zfill(len(digits))
 
 
 def _with_retrieval_metadata(row: SearchRow, *, match_reason: str) -> SearchRow:

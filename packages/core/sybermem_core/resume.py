@@ -75,6 +75,7 @@ def build_resume_checkpoint(project_root: Path, mode: ResumeMode = "fast") -> di
         "risks": risks,
         "next_action": next_action,
         "confidence": confidence,
+        "confidence_reasons": _confidence_reasons(status, signals),
         "freshness": freshness,
         "recommendation_reason": next_action["reason"],
         "brief": _brief(status, progress, signals, next_action, confidence, freshness),
@@ -175,9 +176,26 @@ def _recent_authoritative_progress(root: Path, *, include_summary: bool) -> list
         authority = classify_authority(source_kind, record["title"], record["content"], declared=record.get("authority", ""))
         if authority == "evidence":
             continue
-        records.append((record.get("created_at", ""), _source_priority(source_kind), record["path"], record))
-    records.sort(reverse=True)
-    return [_resume_item(record, include_summary=include_summary) for _, _, _, record in records[:3]]
+        records.append(record)
+    # Deterministic recency ordering. `date` is date-only (YYYY-MM-DD), so multiple
+    # records on the same day would otherwise order arbitrarily. A stable identity
+    # tiebreak (record_id then normalized path) makes same-day ordering reproducible
+    # across clones/checkouts — deliberately NOT file mtime, which is not a durable
+    # project-memory fact. Manual records still outrank generated ones on the same day.
+    records.sort(key=_progress_sort_key, reverse=True)
+    return [_resume_item(record, include_summary=include_summary) for record in records[:3]]
+
+
+def _progress_sort_key(record: dict[str, str]) -> tuple[str, int, str, str]:
+    source_kind = classify_source_kind(
+        record["path"], record["title"], record["content"], declared=record.get("source_kind", "")
+    )
+    return (
+        record.get("created_at", ""),
+        _source_priority(source_kind),
+        record.get("record_id", ""),
+        record.get("path", ""),
+    )
 
 
 def _source_priority(source_kind: str) -> int:
@@ -254,6 +272,26 @@ def _confidence(status: dict, signals: ResumeSignals) -> str:  # noqa: DICT_OK
     if signals.open_bugs or signals.open_requirements:
         return "medium"
     return "high"
+
+
+def _confidence_reasons(status: dict, signals: ResumeSignals) -> list[str]:  # noqa: DICT_OK
+    """Explain the confidence label without expanding the 3-level enum (Oracle P2).
+
+    The label stays low|medium|high (a finer scale would be false precision for an
+    AI consumer). These deterministic reason strings expose the drivers behind it so
+    a consumer can see *why* confidence is what it is.
+    """
+    reasons: list[str] = []
+    if signals.phase_state == "current":
+        reasons.append("phase index is current")
+    elif signals.phase_state == "missing":
+        reasons.append("phase index is missing")
+    else:
+        reasons.append("phase index is stale")
+    reasons.append("active phase id present" if status["phase"].get("id") else "no active phase id")
+    reasons.append(f"{len(signals.open_bugs)} open bugs")
+    reasons.append(f"{len(signals.open_requirements)} open requirements")
+    return reasons
 
 
 def _freshness(status: dict, signals: ResumeSignals) -> str:  # noqa: DICT_OK

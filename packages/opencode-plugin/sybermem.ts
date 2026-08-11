@@ -87,6 +87,56 @@ function getActivePhase(root: string): string | null {
   return phases[phases.length - 1][1]
 }
 
+interface PhaseIndexInfo {
+  exists: boolean
+  status?: string
+  confirmedCount?: number
+  activePhase?: string | null
+}
+
+/**
+ * Parse phase-index status + confirmed count, mirroring the Claude SessionStart
+ * hook (session_start_context.py::parse_phase_index) so compaction context carries
+ * the same phase signal Claude injects at startup.
+ */
+function parsePhaseIndex(root: string): PhaseIndexInfo {
+  const phasePath = join(root, ".sybermem", "analysis", "phase-index.md")
+  if (!existsSync(phasePath)) return { exists: false }
+  const content = readFileSync(phasePath, "utf-8")
+  const statusMatch = content.match(/^- status:\s*(.+)/m)
+  const phases = [...content.matchAll(/### Phase: (.+)/g)]
+  return {
+    exists: true,
+    status: statusMatch ? statusMatch[1].trim() : "unknown",
+    confirmedCount: phases.length,
+    activePhase: getActivePhase(root),
+  }
+}
+
+interface ProjectIdentity {
+  exists: boolean
+  projectId?: string | null
+  slug?: string | null
+}
+
+/**
+ * Read .sybermem/project.yaml identity (slug, project_id) with the same simple
+ * line-based parsing the Claude hook uses (session_start_context.py::parse_project_identity),
+ * so injected memory context is attributable to a concrete project.
+ */
+function parseProjectIdentity(root: string): ProjectIdentity {
+  const projPath = join(root, ".sybermem", "project.yaml")
+  if (!existsSync(projPath)) return { exists: false }
+  let projectId: string | null = null
+  let slug: string | null = null
+  for (const raw of readFileSync(projPath, "utf-8").split("\n")) {
+    const line = raw.trim()
+    if (line.startsWith("project_id:")) projectId = line.split(":").slice(1).join(":").trim()
+    else if (line.startsWith("slug:")) slug = line.split(":").slice(1).join(":").trim()
+  }
+  return { exists: true, projectId, slug }
+}
+
 // ---------------------------------------------------------------------------
 // Stale phase-index detection
 // ---------------------------------------------------------------------------
@@ -168,6 +218,196 @@ async function getChangedFiles(
 function trailFiles(files: string[]): string[] {
   const nonSoft = files.filter((f) => !SOFT_SKIP.has(f))
   return nonSoft.length > 0 ? files : []
+}
+
+// ---------------------------------------------------------------------------
+// Follow-up classification (parity with the Claude Stop hook
+// record_change_on_stop.py::classify_followup). Mirrors the same thresholds and
+// signal/area detection so the OpenCode idle nudge distinguishes record vs digest
+// vs no-nudge with the same heuristics Claude uses at Stop.
+// ---------------------------------------------------------------------------
+
+const RECORD_FILE_THRESHOLD = 5
+const COMMIT_GAP_THRESHOLD = 5
+const THEME_WINDOW_SIZE = 10
+const DIGEST_CLUSTER_THRESHOLD = 2
+const DIGEST_SIGNAL_FILE_FLOOR = 3
+
+const HIGH_SIGNAL_PATTERNS: RegExp[] = [
+  /^README(?:\..+)?$/i,
+  /^INSTALL(?:\..+)?$/i,
+  /^CLAUDE\.md$/i,
+  /^AGENTS\.md$/i,
+  /^packages\/claude-skills\/.+\/SKILL\.md$/i,
+  /^\.sybermem\/hooks\//i,
+  /^scripts\/install/i,
+  /^scripts\/update/i,
+  /^docs\/superpowers\/specs\//i,
+]
+const HIGH_LEVEL_AREAS: [string, RegExp][] = [
+  ["skills", /^packages\/claude-skills\//i],
+  ["scripts", /^scripts\//i],
+  ["docs", /^(docs\/|README|INSTALL)/i],
+  ["instructions", /^(CLAUDE\.md|AGENTS\.md)$/i],
+  ["sybermem", /^\.sybermem\//i],
+]
+
+function matchesHighSignal(file: string): boolean {
+  return HIGH_SIGNAL_PATTERNS.some((p) => p.test(file))
+}
+
+function detectHighLevelAreas(files: string[]): Set<string> {
+  const areas = new Set<string>()
+  for (const file of files) {
+    for (const [name, pattern] of HIGH_LEVEL_AREAS) {
+      if (pattern.test(file)) areas.add(name)
+    }
+  }
+  return areas
+}
+
+function slugifyAreas(areas: Set<string>): string {
+  return [...areas].sort().join("-") || "misc"
+}
+
+interface FollowupResult {
+  type: "record" | "digest" | "none"
+  themeKey: string
+  message: string | null
+}
+
+/**
+ * Classify whether the current changed-file set warrants a record nudge, a digest
+ * nudge, or nothing — mirroring classify_followup in the Claude Stop hook. The
+ * digest branch requires a recent same-theme cluster (DIGEST_CLUSTER_THRESHOLD)
+ * plus a qualifying current stop; the record branch fires on strong signal,
+ * cross-area, large change, or commit gap, with a per-theme dedup guard.
+ */
+function classifyFollowup(
+  files: string[],
+  commitsSinceRecord: number,
+  state: NudgeState
+): FollowupResult {
+  const highSignal = files.filter(matchesHighSignal)
+  const areas = detectHighLevelAreas(files)
+  const themeKey = slugifyAreas(areas)
+
+  const recentStops = state.theme_recent_stops?.[themeKey] ?? []
+  const recentOverlap = recentStops.length >= DIGEST_CLUSTER_THRESHOLD
+  const presentQualifies =
+    highSignal.length > 0 || areas.size >= 2 || files.length >= DIGEST_SIGNAL_FILE_FLOOR
+  const nudgedAt = state.digest_nudged_at_window_len?.[themeKey]
+  const alreadyDigested = nudgedAt !== undefined && recentStops.length <= nudgedAt
+
+  if (recentOverlap && presentQualifies && !alreadyDigested) {
+    return {
+      type: "digest",
+      themeKey,
+      message:
+        "SyberMem: recent records around this area may now be enough for a /sybermem-digest if this phase has reached a stable stopping point.",
+    }
+  }
+
+  const crossArea = areas.size >= 2
+  const strongSignal = highSignal.length > 0
+  const largeChange = files.length >= RECORD_FILE_THRESHOLD
+  const commitGap = commitsSinceRecord >= COMMIT_GAP_THRESHOLD
+  const lastType = state.last_nudge_type
+  const lastTheme = state.last_theme
+  if (
+    (strongSignal || crossArea || largeChange || commitGap) &&
+    !(lastType === "record" && lastTheme === themeKey)
+  ) {
+    const gapNote = commitGap ? ` (${commitsSinceRecord} commits since last record)` : ""
+    return {
+      type: "record",
+      themeKey,
+      message: `SyberMem: this change looks important enough for a manual /sybermem-record so the reason and impact are preserved.${gapNote}`,
+    }
+  }
+
+  return { type: "none", themeKey, message: null }
+}
+
+// ---------------------------------------------------------------------------
+// Auto-trail journal (parity with record_change_on_stop.py auto-trail): a bounded
+// rolling .sybermem/.auto-trail.jsonl of low-signal change trails, with >80%
+// overlap dedup against the last few entries so repeated idle stops on the same
+// file set do not re-nudge or bloat the journal.
+// ---------------------------------------------------------------------------
+
+const AUTO_TRAIL_JOURNAL_FILE = ".auto-trail.jsonl"
+const AUTO_TRAIL_JOURNAL_MAX = 200
+const AUTO_TRAIL_DEDUP_WINDOW = 3
+const AUTO_TRAIL_OVERLAP_THRESHOLD = 0.8
+
+interface AutoTrailEntry {
+  date: string
+  files: string[]
+  areas: string[]
+  followup_hint: string
+}
+
+function readRecentAutoTrail(root: string, limit: number): AutoTrailEntry[] {
+  const p = join(root, ".sybermem", AUTO_TRAIL_JOURNAL_FILE)
+  if (!existsSync(p)) return []
+  try {
+    const lines = readFileSync(p, "utf-8").split("\n")
+    const entries: AutoTrailEntry[] = []
+    for (const line of lines.slice(-limit)) {
+      const t = line.trim()
+      if (!t) continue
+      try {
+        const parsed = JSON.parse(t)
+        if (parsed && typeof parsed === "object") entries.push(parsed)
+      } catch {
+        // skip malformed line
+      }
+    }
+    return entries
+  } catch {
+    return []
+  }
+}
+
+function overlapsRecentAutoTrails(root: string, files: string[]): boolean {
+  const current = new Set(files)
+  if (current.size === 0) return false
+  for (const entry of readRecentAutoTrail(root, AUTO_TRAIL_DEDUP_WINDOW)) {
+    const trail = new Set((entry.files ?? []).map((f) => String(f).trim()).filter(Boolean))
+    if (trail.size === 0) continue
+    let shared = 0
+    for (const f of current) if (trail.has(f)) shared++
+    const overlap = shared / Math.max(current.size, trail.size)
+    if (overlap >= AUTO_TRAIL_OVERLAP_THRESHOLD) return true
+  }
+  return false
+}
+
+function appendAutoTrailJournal(
+  root: string,
+  date: string,
+  files: string[],
+  areas: Set<string>,
+  followupHint: string
+): void {
+  const p = join(root, ".sybermem", AUTO_TRAIL_JOURNAL_FILE)
+  try {
+    const entry: AutoTrailEntry = {
+      date,
+      files: [...files],
+      areas: [...areas].sort(),
+      followup_hint: followupHint,
+    }
+    let existing: string[] = []
+    if (existsSync(p)) existing = readFileSync(p, "utf-8").split("\n")
+    existing = existing.filter((l) => l.trim())
+    existing.push(JSON.stringify(entry))
+    const bounded = existing.slice(-AUTO_TRAIL_JOURNAL_MAX)
+    writeFileSync(p, bounded.join("\n") + "\n", "utf-8")
+  } catch {
+    // never raise out of the hook
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -272,16 +512,24 @@ export const SyberMemPlugin: Plugin = async ({ $, directory }) => {
           const staleNote = stale.stale
             ? ` (phase-index ${stale.commitsAhead} commits behind)`
             : ""
+          // Commit-gap record reminder, mirroring the Claude SessionStart hook
+          // (session_start_context.py::detect_record_gap, threshold >= 3): surface a
+          // proactive nudge when unrecorded commits have accrued since the last record.
+          const commitsSinceRecord = await countCommitsSinceLastRecord($, root)
+          const recordNote =
+            commitsSinceRecord >= 3
+              ? `. ${commitsSinceRecord} commits since last record — consider /sybermem-record`
+              : ""
           return {
             "tui.toast.show": {
-              message: `SyberMem: loaded ${parsed.conclusions.length} key conclusions${staleNote}`,
+              message: `SyberMem: loaded ${parsed.conclusions.length} key conclusions${staleNote}${recordNote}`,
               level: "info",
             },
           }
         }
       }
 
-      // --- Session idle: detect changes and nudge ---
+      // --- Session idle: detect changes and nudge (parity with Claude Stop hook) ---
       if (event.type === "session.idle" && root) {
         const files = await getChangedFiles($, root)
         const trail = trailFiles(files)
@@ -292,31 +540,65 @@ export const SyberMemPlugin: Plugin = async ({ $, directory }) => {
         const state = loadNudgeState(root)
         if (state.lastFingerprint === fingerprint) return
 
-        // Check record gap
-        const commitsSince = await countCommitsSinceLastRecord($, root)
-        const shouldNudge = trail.length >= 5 || commitsSince >= 10
+        // Dedup: skip nudging when this file set already overlaps >80% with a recent
+        // auto-trail entry, matching the Claude Stop hook's dedup guard.
+        if (overlapsRecentAutoTrails(root, trail)) {
+          saveNudgeState(root, { ...state, lastFingerprint: fingerprint })
+          return
+        }
 
-        if (shouldNudge) {
+        const commitsSince = await countCommitsSinceLastRecord($, root)
+        const followup = classifyFollowup(trail, commitsSince, state)
+        const today = new Date().toISOString().split("T")[0]
+
+        // Persist a bounded auto-trail entry regardless of nudge decision, so dedup
+        // and digest-cluster detection have durable history across idle stops.
+        appendAutoTrailJournal(root, today, trail, detectHighLevelAreas(trail), followup.type)
+
+        if (followup.type === "none") {
+          // Track same-theme activity so a future qualifying stop can cross the
+          // digest cluster threshold, then persist the fingerprint.
+          const windows = { ...(state.theme_recent_stops ?? {}) }
+          const current = [...(windows[followup.themeKey] ?? []), today]
+          windows[followup.themeKey] = current.slice(-THEME_WINDOW_SIZE)
           saveNudgeState(root, {
             ...state,
             lastFingerprint: fingerprint,
-            lastNudgeCommitCount: commitsSince,
-            last_nudge: {
-              platform: "opencode",
-              type: "record",
-              theme: "idle-detect",
-              date: new Date().toISOString().split("T")[0],
-            },
+            theme_recent_stops: windows,
           })
-          return {
-            "tui.toast.show": {
-              message: `SyberMem: ${trail.length} files changed${commitsSince >= 10 ? `, ${commitsSince} commits since last record` : ""}. Consider /sybermem-record`,
-              level: "info",
-            },
-          }
+          return
         }
 
-        saveNudgeState(root, { ...state, lastFingerprint: fingerprint })
+        // A record/digest nudge fires: update theme window + per-theme dedup guards.
+        const windows = { ...(state.theme_recent_stops ?? {}) }
+        const current = [...(windows[followup.themeKey] ?? []), today]
+        windows[followup.themeKey] = current.slice(-THEME_WINDOW_SIZE)
+        const digestGuard = { ...(state.digest_nudged_at_window_len ?? {}) }
+        if (followup.type === "digest") {
+          digestGuard[followup.themeKey] = windows[followup.themeKey].length
+        }
+
+        saveNudgeState(root, {
+          ...state,
+          lastFingerprint: fingerprint,
+          lastNudgeCommitCount: commitsSince,
+          theme_recent_stops: windows,
+          digest_nudged_at_window_len: digestGuard,
+          last_theme: followup.themeKey,
+          last_nudge_type: followup.type,
+          last_nudge: {
+            platform: "opencode",
+            type: followup.type,
+            theme: followup.themeKey,
+            date: today,
+          },
+        })
+        return {
+          "tui.toast.show": {
+            message: followup.message ?? "SyberMem: consider recording this work.",
+            level: "info",
+          },
+        }
       }
     },
 
@@ -327,17 +609,26 @@ export const SyberMemPlugin: Plugin = async ({ $, directory }) => {
       const parsed = parseIndex(root)
       if (!parsed || parsed.conclusions.length === 0) return
 
-      const activePhase = getActivePhase(root)
+      const phaseInfo = parsePhaseIndex(root)
+      const identity = parseProjectIdentity(root)
       const stale = await detectStaleSignal($, root)
 
       let context = "## SyberMem Project Memory\n\n"
+
+      if (identity.exists && identity.slug) {
+        context += `Project: ${identity.slug} (${identity.projectId ?? "no id"}).\n\n`
+      }
+
       context += "### Key Conclusions\n"
       for (const c of parsed.conclusions) {
         context += c + "\n"
       }
 
-      if (activePhase) {
-        context += `\n### Active Phase: ${activePhase}\n`
+      if (phaseInfo.exists) {
+        context += `\n### Phase Index\nStatus: ${phaseInfo.status}. ${phaseInfo.confirmedCount} confirmed phases.\n`
+        if (phaseInfo.activePhase) {
+          context += `Active phase: ${phaseInfo.activePhase}.\n`
+        }
       }
 
       if (stale.stale) {
@@ -349,6 +640,22 @@ export const SyberMemPlugin: Plugin = async ({ $, directory }) => {
         for (const [topic, records] of Object.entries(parsed.topicIndex)) {
           context += `- ${topic}: ${records.join(", ")}\n`
         }
+      }
+
+      // Next-step router fallback, mirroring the Claude Stop hook's use of the
+      // deterministic next-step router. Shells to the installed `sybermem next-step`
+      // CLI so the recommendation matches resume/using-sybermem; fails open when the
+      // CLI is unavailable so compaction never breaks.
+      try {
+        const raw = await $`sybermem next-step --format json`.cwd(root).text()
+        const rec = JSON.parse(raw)
+        const action = typeof rec?.action === "string" ? rec.action.trim() : ""
+        const reason = typeof rec?.reason === "string" ? rec.reason.trim() : ""
+        if (action) {
+          context += `\n### Recommended Next Step\n${action}${reason ? ` — ${reason}` : ""}\n`
+        }
+      } catch {
+        // CLI missing or errored — skip the recommendation line.
       }
 
       context += "\n### SyberMem Commands\n"
