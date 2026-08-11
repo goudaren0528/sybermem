@@ -15,6 +15,7 @@ from sybermem_core.search import ProjectRootNotFoundError, WorkspaceIndexIncompa
 from sybermem_core.status import project_status
 from sybermem_core.resume import build_resume_checkpoint
 from sybermem_core.next_step_router import recommend_next_step
+from sybermem_core.digest_governance import build_digest_governance_report
 from sybermem_core.portfolio import build_portfolio
 from sybermem_core.team import init_team_repo
 from sybermem_core.publish_bootstrap import bootstrap_publish_status
@@ -165,6 +166,33 @@ def cmd_next_step(args: argparse.Namespace) -> int:
     else:
         print(f"next: {payload['action']} — {payload['reason']}")
     return 0
+
+
+def cmd_digest_status(args: argparse.Namespace) -> int:
+    root = resolve_project_root()
+    if root is None:
+        print("No SyberMem project root found.", file=sys.stderr)
+        return 1
+    report = build_digest_governance_report(root)
+    if args.format == "json":
+        print(dump_json(report))
+    else:
+        if report["total"] == 0:
+            print("No digests found.")
+            return 0
+        print(
+            f"digests: {report['total']} total — "
+            f"{report['stale']} stale, {report['unknown']} unknown, {report['current']} current"
+        )
+        for digest in report["digests"]:
+            marker = {"stale": "⚠ ", "unknown": "? ", "current": "✓ "}.get(digest["verdict"], "")
+            print(f"{marker}[{digest['record_id']}] {digest['title']} — {digest['verdict']}")
+            if digest["verdict"] != "current":
+                print(f"    {digest['reason']}")
+                for drift in digest["drifted_sources"]:
+                    print(f"    - {drift['state']}: {drift['path']}")
+    # Non-zero exit when any digest is stale, so scripts/CI can gate on governance health.
+    return 1 if report["stale"] > 0 else 0
 
 
 def cmd_project_status(args: argparse.Namespace) -> int:
@@ -338,6 +366,17 @@ def cmd_project_index_check(args: argparse.Namespace) -> int:
 
 
 def main() -> int:
+    # Emit UTF-8 regardless of console locale. Record titles/conclusions and governance
+    # markers can contain non-ASCII (CJK titles, ⚠/✓/⭐), which a locale like GBK on
+    # Chinese Windows would otherwise fail to encode, crashing otherwise-correct output.
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            try:
+                reconfigure(encoding="utf-8")
+            except (ValueError, OSError):
+                pass
+
     parser = argparse.ArgumentParser(prog="sybermem")
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -394,6 +433,12 @@ def main() -> int:
     next_step = sub.add_parser("next-step")
     next_step.add_argument("--format", choices=["text", "json"], default="text")
     next_step.set_defaults(func=cmd_next_step)
+
+    digest = sub.add_parser("digest")
+    digest_sub = digest.add_subparsers(dest="digest_command", required=True)
+    digest_status_cmd = digest_sub.add_parser("status")
+    digest_status_cmd.add_argument("--format", choices=["text", "json"], default="text")
+    digest_status_cmd.set_defaults(func=cmd_digest_status)
 
     record = sub.add_parser("record")
     record_sub = record.add_subparsers(dest="record_command", required=True)
