@@ -16,7 +16,7 @@ Manage explicit User Habit Memory. Habits are personal preferences stored under 
 - Never write raw prompt text into project records or Team memory.
 - Do not infer habits silently from behavior.
 - Prefer normalized, durable statements over verbatim user phrasing.
-- OpenCode has no supported per-prompt habit hook; use this skill, CLI, or compaction-only injection there.
+- OpenCode supports bounded prompt-time habit reminders through `chat.message` + `experimental.chat.system.transform`; this skill and the CLI remain the explicit management path.
 
 ## CLI Resolution
 
@@ -37,7 +37,7 @@ Before running SyberMem CLI commands, resolve a command variable first. On Windo
 
 Types: `workflow`, `style`, `tooling`, `communication`, `review`, `avoidance`.
 
-Use `--injection-policy prompt_ok_when_supported` only when the user explicitly wants Claude prompt-time reminders for this habit. Default `compaction_ok` is safer and works for manual/compaction carry-forward.
+Use `--injection-policy prompt_ok_when_supported` only when the user explicitly wants prompt-time reminders on supported hosts such as Claude Code, OpenCode, or Codex. Default `compaction_ok` is safer and works for manual/compaction carry-forward.
 
 ## Workflow
 
@@ -80,7 +80,7 @@ $SyberMemCli habit remind --context "planning implementation preference" --forma
 | Writing a habit through `/sybermem-record` | Use `$SyberMemCli habit add` or `"$SYBERMEM_CLI" habit add`; habits are user-level. |
 | Saving a habit after observing repeated behavior | Ask for confirmation first. |
 | Storing the user's raw prompt as the habit | Store a normalized statement. |
-| Claiming OpenCode prompt-time reminders | State OpenCode is manual/skill/CLI plus compaction-only. |
+| Claiming unsupported platform reminders | State the actual boundary: Claude Code and OpenCode support prompt-time habit reminders; Codex supports habit-only `UserPromptSubmit` reminders; Gemini/Cursor/Kimi do not have runtime reminder wiring. |
 | Adding prompt-time policy by default | Use `prompt_ok_when_supported` only on explicit request. |
 
 ## Completion
