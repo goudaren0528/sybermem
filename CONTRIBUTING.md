@@ -19,10 +19,12 @@ Python 3.10+ is required.
 ## Supported platforms
 
 - **Fully supported (runtime + validation):** Claude Code, OpenCode.
-- **Phase 1.5 skills support:** Codex installs user-level skills to
-  `~/.agents/skills`, and package checks verify health-check discoverability from
-  that install path, with no Codex hooks, prompt-time injection, or background
-  runtime automation.
+- **Codex skills + habit reminders:** Codex installs user-level skills to `~/.agents/skills`
+  and a bounded `UserPromptSubmit` hook to `~/.codex/hooks/` for User Habit
+  Memory prompt reminders through `additionalContext`. Package checks verify both
+  skill discoverability and hook distribution. Codex project recall, hidden
+  auto-resume, prompt/agent handler runtimes, `.codex/config.toml`, and background
+  automation remain unsupported.
 - **Metadata only (entry manifests, not fully wired runtimes):** Gemini, Cursor,
   Kimi. When touching these, keep their manifests consistent but do not claim full
   runtime support.
@@ -77,7 +79,7 @@ Also ensure:
 - Dual-language docs (`README.md` / `README.en.md`) are kept in sync when you
   change user-facing behavior.
 
-Codex Phase 1.5 changes should also run the non-mutating smoke set:
+Codex distribution or habit-hook changes should also run the non-mutating smoke set:
 
 ```bash
 python -m pytest packages/core/tests/test_package_integrity_scripts.py packages/core/tests/test_init_project_distribution.py -q
