@@ -19,12 +19,15 @@ Python 3.10+ is required.
 ## Supported platforms
 
 - **Fully supported (runtime + validation):** Claude Code, OpenCode.
-- **Codex skills + habit reminders:** Codex installs user-level skills to `~/.agents/skills`
-  and a bounded `UserPromptSubmit` hook to `~/.codex/hooks/` for User Habit
-  Memory prompt reminders through `additionalContext`. Package checks verify both
-  skill discoverability and hook distribution. Codex project recall, hidden
-  auto-resume, prompt/agent handler runtimes, `.codex/config.toml`, and background
-  automation remain unsupported.
+- **Codex partial runtime + skills:** Codex installs user-level skills to
+  `~/.agents/skills` and bounded `SessionStart` / `UserPromptSubmit` / `Stop` /
+  `PostCompact` hooks to
+  `~/.codex/hooks/` for startup context, prompt-time recall, User Habit Memory
+  reminders, record-intent capture, loop-safe Stop nudges, and compact re-seed
+  markers. Package checks verify skill discoverability and hook distribution.
+  Codex hidden auto-resume, prompt/agent handler runtimes, `.codex/config.toml`,
+  broad background automation, and direct compaction prompt injection remain
+  unsupported.
 - **Metadata only (entry manifests, not fully wired runtimes):** Gemini, Cursor,
   Kimi. When touching these, keep their manifests consistent but do not claim full
   runtime support.
