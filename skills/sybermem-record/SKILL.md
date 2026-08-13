@@ -35,7 +35,7 @@ reading and indexing, but new records use generated canonical IDs.
 Do NOT claim a record is complete unless ALL three actions have been executed and verified:
 1. The record file exists on disk at the correct path
 2. The file frontmatter includes generated `record_id`, `key_conclusion`, and `topics`
-3. `sybermem project index build` and `sybermem project index check` both succeed
+3. `$SyberMemCli project index build` / `"$SYBERMEM_CLI" project index build` and `$SyberMemCli project index check` / `"$SYBERMEM_CLI" project index check` both succeed
 
 If any of these three is missing, the record is incomplete. Go back and finish it.
 </HARD-GATE>
@@ -43,6 +43,10 @@ If any of these three is missing, the record is incomplete. Go back and finish i
 ## Directory Resolution
 
 Resolve project root by walking up from cwd to find `.sybermem/` + `.claude/settings.json`. Auto-migrate `ADR/` if found. Full rules in the session protocol block in AGENTS.md/CLAUDE.md.
+
+## CLI Resolution
+
+Before running SyberMem CLI commands, resolve a command variable first. On Windows PowerShell, prefer `$env:USERPROFILE\.claude\sybermem\cli\sybermem.cmd` and store the chosen command in `$SyberMemCli`; on Unix, prefer `$HOME/.claude/sybermem/cli/sybermem` and store the chosen command in `"$SYBERMEM_CLI"`. If the fixed launcher is unavailable, fall back to bare `sybermem`. Do not modify persistent PATH automatically. Command examples below use `$SyberMemCli` / `"$SYBERMEM_CLI"`.
 
 ## Choose a path: fast vs full
 
@@ -62,7 +66,7 @@ Once write intent is clear (the user explicitly wants the record created now), p
 
 Both paths obey the same `<HARD-GATE>` and `## Verification`: a record is complete only
 when the file exists with generated `record_id`/`key_conclusion`/`topics` and
-`sybermem project index build` + `check` both pass. Fast path removes *confirmation
+`$SyberMemCli project index build` / `"$SYBERMEM_CLI" project index build` + `check` both pass. Fast path removes *confirmation
 friction*, never the completion guarantees.
 
 ## Flow
@@ -101,8 +105,9 @@ When uncertain, ask the user to choose.
 If the managed natural-language record-intent capture seems unavailable in a Claude project, the supported manual diagnostic path is the project-local `.sybermem/hooks/detect_record_intent.py --diagnose` run. It must stay fail-open, emit only bounded non-sensitive retry guidance, and never persist prompt payloads. The primary recovery action is `/sybermem-update`.
 
 5. **Generate canonical metadata** — get `record_id` from SyberMem, do NOT invent or hand-craft a UUID. Use the first form that works, in this order:
-   - **Preferred (CLI):** `sybermem record id --type <change|decision|requirement|bug>` — prints the canonical id (add `--format json` for `{record_id, type}`).
-   - **Fallback (Python), if the `sybermem` CLI is not on PATH:** `python -c "from sybermem_core import generate_record_id; print(generate_record_id('<type>'))"`.
+   - **Preferred fixed launcher:** `$SyberMemCli record id --type <change|decision|requirement|bug>` or `"$SYBERMEM_CLI" record id --type <change|decision|requirement|bug>` — prints the canonical id (add `--format json` for `{record_id, type}`).
+   - **Fallback bare CLI:** `sybermem record id --type <change|decision|requirement|bug>`.
+   - **Last resort (Python), only if both fixed launcher and bare CLI fail:** `python -c "from sybermem_core import generate_record_id; print(generate_record_id('<type>'))"`.
    Do not guess an import path or a different subcommand: the helper lives at `sybermem_core.generate_record_id` (re-exported from the package root; canonical implementation `sybermem_core.records.generate_record_id`), and the CLI subcommand is exactly `record id`. Also generate a one-line `key_conclusion` that states both **what changed** and **why**, and choose 1-3 `topics` tags. Existing legacy numeric records remain valid for reading and indexing, but new records use the generated `record_id` path and frontmatter.
 6. **Collect information** — extract from the current session. Only ask the user when key information is missing.
 
@@ -125,8 +130,8 @@ Required sections:
    On the **full path**, propose to the user, e.g. "This change appears to implement requirement-002. Add `implements: [requirement-002]`?" and only write the relation if the user confirms. On the **fast path**, when the relation is clear from context, write the inferred relation directly and mention it in the final summary (the user can correct). Either way, relation values must be existing record IDs; if there is no clear relation, skip silently. This never blocks the core record steps below.
 
 8. **Create file** — path: `.sybermem/{type}/{YYYY-MM-DD}-{record_id}-{slug}.md`. Use `templates/{type}.md` as the content template and fill the canonical frontmatter fields exactly as `record_id`, `key_conclusion`, and `topics`.
-9. **Build derived project INDEX** — run `sybermem project index build` after the record file is written. Do not hand-edit `.sybermem/INDEX.md`, Key Conclusions, topic tables, or per-type tables.
-10. **Check derived project INDEX** — run `sybermem project index check` and treat any failure as blocking.
+9. **Build derived project INDEX** — run `$SyberMemCli project index build` or `"$SYBERMEM_CLI" project index build` after the record file is written. Do not hand-edit `.sybermem/INDEX.md`, Key Conclusions, topic tables, or per-type tables.
+10. **Check derived project INDEX** — run `$SyberMemCli project index check` or `"$SYBERMEM_CLI" project index check` and treat any failure as blocking.
 11. **Clear record intent state** — if `.sybermem/.record-intent.json` exists, delete it after a successful record write and successful project index build/check. A real manual record completes the earlier reminder loop, so the intent file must not survive afterward.
 
 ## Error Handling
@@ -140,8 +145,8 @@ Required sections:
 This skill is complete when:
 - the record file is created
 - the file contains generated `record_id`, `key_conclusion`, and `topics`
-- `sybermem project index build` succeeds
-- `sybermem project index check` succeeds
+- `$SyberMemCli project index build` / `"$SYBERMEM_CLI" project index build` succeeds
+- `$SyberMemCli project index check` / `"$SYBERMEM_CLI" project index check` succeeds
 - the user has been told the record path
 
 ## Verification
@@ -152,8 +157,8 @@ After completing Steps 6-10, verify:
 3. **ID source check:** Was `record_id` obtained from `generate_record_id(type)` instead of manual UUID invention?
 4. **Key conclusion quality:** Does `key_conclusion` contain both *what changed* and *why*?
 5. **Topic quality:** Does `topics` contain the intended 1-3 topic tags for derived indexing?
-6. **Derived INDEX build check:** Did `sybermem project index build` succeed without manual INDEX edits?
-7. **Derived INDEX integrity check:** Did `sybermem project index check` succeed?
+6. **Derived INDEX build check:** Did `$SyberMemCli project index build` or `"$SYBERMEM_CLI" project index build` succeed without manual INDEX edits?
+7. **Derived INDEX integrity check:** Did `$SyberMemCli project index check` or `"$SYBERMEM_CLI" project index check` succeed?
 8. **Legacy compatibility check:** Were existing legacy numeric records left untouched and still treated as supported historical inputs?
 9. **Relation validity:** If any `implements`/`fixes`/`related` field was written, does each referenced ID correspond to an existing record?
 
@@ -180,7 +185,7 @@ If you catch yourself doing any of these, STOP:
 | "The auto trail already captured it" | Auto trail only has file lists. No reason, impact, or verification. High-signal changes need manual records. |
 | "I'll record it later" | Context evaporates across sessions. Record now while the reasoning is fresh. |
 | "This is a decision, but I'll just record it as a change" | Decisions have options, trade-offs, and rationale that the change template doesn't capture. Use the right type. |
-| "I'll just edit INDEX.md directly, it's faster" | INDEX is derived output now. The canonical source is the record file plus `sybermem project index build/check`. |
+| "I'll just edit INDEX.md directly, it's faster" | INDEX is derived output now. The canonical source is the record file plus `$SyberMemCli project index build/check` or `"$SYBERMEM_CLI" project index build/check`. |
 
 ## When NOT to Record
 
