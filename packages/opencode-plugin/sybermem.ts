@@ -57,7 +57,30 @@ async function sybermemText(
   if (args[0] === "context" && args[1] === "session") {
     return $`${sybermem} context session ${args[2]} ${args[3]}`.cwd(root).text()
   }
+  if (args[0] === "context" && args[1] === "recall") {
+    return $`${sybermem} context recall --query ${args[3]} --format markdown`.cwd(root).text()
+  }
+  if (args[0] === "context" && args[1] === "habit") {
+    return $`${sybermem} context habit --context ${args[3]} --delivery ${args[5]} --format ${args[7]}`.cwd(root).text()
+  }
   throw new Error(`Unsupported SyberMem command route: ${args[0] ?? ""} ${args[1] ?? ""}`.trim())
+}
+
+// Per-prompt recall stashing: `chat.message` captures the current user turn, computes
+// gated recall hints, and stashes them by sessionID. `experimental.chat.system.transform`
+// injects the stashed hints into that same turn's system prompt through supported
+// OpenCode hooks instead of inventing a Claude hook name.
+const RECALL_STASH = new Map<string, string[]>()
+
+function appendPromptPacket(
+  packets: string[],
+  raw: string,
+  heading: string
+): void {
+  const trimmed = raw.trim()
+  if (trimmed.startsWith(heading)) {
+    packets.push(trimmed)
+  }
 }
 
 async function digestStatusText($: any, root: string): Promise<string> {
@@ -535,7 +558,7 @@ async function countCommitsSinceLastRecord(
 // Plugin export
 // ---------------------------------------------------------------------------
 
-export const SyberMemPlugin: Plugin = async ({ $, directory }) => {
+export const SyberMemPlugin: Plugin = async ({ $, directory, client }) => {
   const root = resolveRoot(directory)
 
   return {
@@ -559,12 +582,12 @@ export const SyberMemPlugin: Plugin = async ({ $, directory }) => {
           // Prefix a scarce ⭐ only when a real signal fired (stale index or record
           // gap) so the marker flags an aha moment worth attention, not every load.
           const ahaMarker = stale.stale || commitsSinceRecord >= 3 ? "⭐ " : ""
-          return {
-            "tui.toast.show": {
+          await client.tui.showToast({
+            body: {
               message: `${ahaMarker}SyberMem: loaded ${parsed.conclusions.length} key conclusions${staleNote}${recordNote}`,
-              level: "info",
+              variant: "info",
             },
-          }
+          })
         }
       }
 
@@ -632,12 +655,57 @@ export const SyberMemPlugin: Plugin = async ({ $, directory }) => {
             date: today,
           },
         })
-        return {
-          "tui.toast.show": {
+        await client.tui.showToast({
+          body: {
             message: followup.message ?? "SyberMem: consider recording this work.",
-            level: "info",
+            variant: "info",
           },
-        }
+        })
+      }
+    },
+
+    // --- Per-prompt high-signal recall through supported OpenCode hooks ---
+    "chat.message": async ({ sessionID }, output) => {
+      if (!root) return
+      // Extract the current user prompt text from the user message parts.
+      const text = (output.parts ?? [])
+        .filter((p: any) => p.type === "text")
+        .map((p: any) => p.text ?? "")
+        .join(" ")
+        .trim()
+      if (!text) return
+      const packets: string[] = []
+      try {
+        const raw = await sybermemText($, root, ["context", "recall", "--query", text, "--format", "markdown"])
+        appendPromptPacket(packets, raw, "## SyberMem Recall Hints")
+      } catch {
+        // Fail open: recall is additive context only.
+      }
+      try {
+        const raw = await sybermemText($, root, ["context", "habit", "--context", text, "--delivery", "prompt-time", "--format", "markdown"])
+        appendPromptPacket(packets, raw, "## User Habit Reminder")
+      } catch {
+        // Fail open: habit reminders are additive context only.
+      }
+      if (packets.length > 0) {
+        RECALL_STASH.set(sessionID, packets)
+      } else {
+        RECALL_STASH.delete(sessionID)
+      }
+    },
+
+    "experimental.chat.system.transform": async ({ sessionID }, output) => {
+      if (!root) return
+      const packets = RECALL_STASH.get(sessionID ?? "")
+      RECALL_STASH.delete(sessionID ?? "")
+      if (!packets || packets.length === 0) return
+      const hints = packets.join("\n\n")
+      // Inject into the first system block if present, else append a dedicated block,
+      // so the recall packet is model-visible on the same turn it was computed.
+      if (output.system && output.system.length > 0) {
+        output.system[0] = `${hints}\n\n${output.system[0]}`
+      } else {
+        output.system = [hints, ...(output.system ?? [])]
       }
     },
 
@@ -735,8 +803,9 @@ export const SyberMemPlugin: Plugin = async ({ $, directory }) => {
         // CLI missing or errored — skip the recommendation line.
       }
 
-      // User Habit Memory is user-owned and injected only at supported compaction
-      // time. This deliberately avoids claiming an undocumented per-prompt hook.
+      // User Habit Memory is user-owned. Compaction uses `habit inject`; prompt-time
+      // reminders use the supported chat transform path above and the stricter
+      // `context habit --delivery prompt-time` route.
       try {
         const habitContext = "compaction planning review implementation coding documentation"
         const habitMarkdown = (
