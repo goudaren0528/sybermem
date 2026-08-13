@@ -88,6 +88,19 @@ PACKAGE_METADATA: Final = [
     Path("hooks/hooks.json"),
     Path("packages/core/pyproject.toml"),
     Path("packages/cli/pyproject.toml"),
+    Path("packages/opencode-plugin/package.json"),
+]
+OPENCODE_PLUGIN_SOURCE_MODULES: Final = [
+    Path("packages/opencode-plugin/src/index.ts"),
+    Path("packages/opencode-plugin/src/plugin.ts"),
+    Path("packages/opencode-plugin/src/runtime.ts"),
+    Path("packages/opencode-plugin/src/project_state.ts"),
+    Path("packages/opencode-plugin/src/followup.ts"),
+    Path("packages/opencode-plugin/src/state.ts"),
+    Path("packages/opencode-plugin/src/prompt_context.ts"),
+    Path("packages/opencode-plugin/src/compaction.ts"),
+    Path("packages/opencode-plugin/src/record_intent.ts"),
+    Path("packages/opencode-plugin/src/recall_debug.ts"),
 ]
 CLI_USING_SKILLS: Final = [
     Path("packages/claude-skills/using-sybermem/SKILL.md"),
@@ -520,6 +533,42 @@ def check_opencode_plugin_cli_resolution(root: Path) -> None:
         fail(f"packages/opencode-plugin/sybermem.ts still contains direct bare CLI calls: {', '.join(found)}")
 
 
+def check_opencode_plugin_source_bundle(root: Path) -> None:
+    plugin_path = root / "packages" / "opencode-plugin" / "sybermem.ts"
+    plugin_text = plugin_path.read_text(encoding="utf-8")
+    if "SyberMem OpenCode Plugin (generated bundle)" not in plugin_text:
+        fail("packages/opencode-plugin/sybermem.ts must carry the generated-source header")
+    forbidden_bundle_fragments = ['from "./src', "from './src", 'from "./plugin"', 'from "./runtime"']
+    found_bundle = [fragment for fragment in forbidden_bundle_fragments if fragment in plugin_text]
+    if found_bundle:
+        fail(f"packages/opencode-plugin/sybermem.ts must be bundled without local source imports: {', '.join(found_bundle)}")
+
+    for relative_path in OPENCODE_PLUGIN_SOURCE_MODULES:
+        module_path = root / relative_path
+        if not module_path.is_file():
+            fail(f"Missing OpenCode plugin source module: {relative_path.as_posix()}")
+        pure_loc = sum(
+            1
+            for line in module_path.read_text(encoding="utf-8").splitlines()
+            if line.strip() and not line.lstrip().startswith(("//", "/*", "*"))
+        )
+        if pure_loc > 250:
+            fail(f"OpenCode plugin source module exceeds 250 pure LOC: {relative_path.as_posix()} ({pure_loc})")
+
+    bun = shutil.which("bun") or shutil.which("bun.cmd")
+    if bun is None:
+        fail("bun is required to verify packages/opencode-plugin/sybermem.ts freshness")
+    result = subprocess.run(
+        [bun, "scripts/build-opencode-plugin.mjs", "--check"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        fail(result.stderr.strip() or "packages/opencode-plugin/sybermem.ts is stale")
+
+
 def check_opencode_plugin_prompt_recall(root: Path) -> None:
     """Guard the OpenCode plugin's per-prompt high-signal recall path.
 
@@ -543,6 +592,10 @@ def check_opencode_plugin_prompt_recall(root: Path) -> None:
         "prompt-time",
         "## User Habit Reminder",
         "RECALL_STASH",
+        "captureRecordIntent",
+        ".record-intent.json",
+        "appendRecallDebug",
+        ".recall-debug.jsonl",
     ]
     missing = [fragment for fragment in required_fragments if fragment not in plugin_text]
     if missing:
@@ -554,10 +607,30 @@ def check_opencode_plugin_prompt_recall(root: Path) -> None:
         "sybermem habit remind",
         "injected only at supported compaction",
         "undocumented per-prompt hook",
+        "phrase: text",
+        "prompt:",
     ]
     found = [fragment for fragment in forbidden_fragments if fragment in plugin_text]
     if found:
         fail(f"packages/opencode-plugin/sybermem.ts uses non-standard toast contract: {', '.join(found)}")
+
+
+def check_opencode_prompt_privacy(root: Path) -> None:
+    record_intent = (root / "packages" / "opencode-plugin" / "src" / "record_intent.ts").read_text(encoding="utf-8")
+    recall_debug = (root / "packages" / "opencode-plugin" / "src" / "recall_debug.ts").read_text(encoding="utf-8")
+    required_intent = ["source: \"opencode-chat-message\"", "phrase: \"\"", ".record-intent.json", "matched_pattern"]
+    missing_intent = [fragment for fragment in required_intent if fragment not in record_intent]
+    if missing_intent:
+        fail(f"OpenCode record-intent source is missing bounded metadata fragments: {', '.join(missing_intent)}")
+    required_debug = [".recall-debug.jsonl", "boundedJsonlAppend", "200", "record_ids", "match_classes", "abstain"]
+    missing_debug = [fragment for fragment in required_debug if fragment not in recall_debug]
+    if missing_debug:
+        fail(f"OpenCode recall debug source is missing bounded log fragments: {', '.join(missing_debug)}")
+    forbidden_privacy = ["raw_prompt", "prompt_text", "phrase: text", "prompt:"]
+    combined = f"{record_intent}\n{recall_debug}"
+    found_privacy = [fragment for fragment in forbidden_privacy if fragment in combined]
+    if found_privacy:
+        fail(f"OpenCode prompt-time metadata must not persist prompt text: {', '.join(found_privacy)}")
 
 
 def check_codex_metadata_honesty(root: Path) -> None:
@@ -718,8 +791,10 @@ def main(root: Path = ROOT) -> int:
     check_hook_wiring(root)
     check_no_python_cache_artifacts(root)
     check_version_consistency(root)
+    check_opencode_plugin_source_bundle(root)
     check_opencode_plugin_cli_resolution(root)
     check_opencode_plugin_prompt_recall(root)
+    check_opencode_prompt_privacy(root)
     names = check_skill_tree_parity(root)
     check_skill_cli_resolution_guidance(root)
     check_distribution_script_coverage(root, names)
