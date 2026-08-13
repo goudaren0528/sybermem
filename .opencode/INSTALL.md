@@ -9,7 +9,7 @@ The current OpenCode plugin implements these hooks:
 
 - `session.created`
 - `session.idle`
-- `chat.message` — captures each user prompt and computes gated recall hints
+- `chat.message` — captures each user prompt, computes gated recall hints, and writes bounded record-intent / recall-debug metadata without storing raw prompt text
 - `experimental.chat.system.transform` — injects those hints plus bounded User Habit Memory reminder markdown into the same turn's system prompt
 - `experimental.session.compacting`
 
@@ -19,7 +19,7 @@ Across the OpenCode seams above, the plugin mirrors the Claude Code
 lifecycle-hook and prompt-time recall behavior:
 
 - `session.created` surfaces the loaded key-conclusion count, a stale-signal note,
-  and a commit-gap record reminder (threshold �� 3 commits since the last record),
+  and a commit-gap record reminder (threshold >= 3 commits since the last record),
   matching the Claude `SessionStart` context.
 - `chat.message` + `experimental.chat.system.transform` deliver per-prompt high-signal
   task recall with the same `⭐` (important) / `💡` (ordinary) markers the Claude
@@ -33,20 +33,26 @@ lifecycle-hook and prompt-time recall behavior:
   no nudge using the same thresholds and high-signal / high-level-area heuristics
   as the Claude `Stop` hook, tracks a per-theme window for digest clustering, and
   persists a bounded `.sybermem/.auto-trail.jsonl` journal with >80% overlap dedup.
- - `experimental.session.compacting` first tries to include the shared manual
-   session brief from `sybermem context session --format markdown`, then adds
-   project identity (`slug` / `project_id`), phase-index status and confirmed
-   count, active phase, stale signal, the topic index, a next-step recommendation
-   from `sybermem next-step`, and bounded User Habit Memory from `sybermem habit
-   inject` with a compaction/planning/review/coding context (fails open when the
-   CLI is unavailable or no habits match).
+- `chat.message` writes `.sybermem/.record-intent.json` only when an explicit
+  record request classifies as `change`, `decision`, `requirement`, or `bug`.
+  The file stores bounded classifier metadata (`source`, `classification`,
+  `action`, `reason`, `matched_pattern`, timestamp, and an empty `phrase`) and
+  never stores raw prompt text.
+- `chat.message` also appends `.sybermem/.recall-debug.jsonl` for recall
+  `inject` / `abstain` outcomes. The log is capped to the newest 200 entries and
+  stores only source, timestamp, event, record IDs, match classes, and reason
+  codes — not the prompt.
+- `experimental.session.compacting` first tries to include the shared manual
+  session brief from `sybermem context session --format markdown`, then adds
+  project identity (`slug` / `project_id`), phase-index status and confirmed
+  count, active phase, stale signal, the topic index, a next-step recommendation
+  from `sybermem next-step`, and bounded User Habit Memory from `sybermem habit
+  inject` with a compaction/planning/review/coding context (fails open when the
+  CLI is unavailable or no habits match).
 
-The following Claude capabilities remain **unsupported** on OpenCode:
-
-- prompt-time record-intent capture (`.record-intent.json`)
-- prompt-time recall observability logging (`.recall-debug.jsonl`) — OpenCode recall
-  instead surfaces through the injected `⭐`/`💡` markers you see on each qualifying
-  prompt
+The OpenCode implementation is still bounded to documented plugin hooks. This
+limitation means it does not add hidden auto-resume, hidden background workers, or undocumented
+post-response hooks.
 
 Per-prompt task recall and prompt-time User Habit Memory reminders are now
 automatic on OpenCode through `chat.message` +
@@ -69,6 +75,7 @@ This means:
 - per-prompt high-signal recall is automatic through `chat.message` +
   `experimental.chat.system.transform`, surfacing `⭐`/`💡` markers on qualifying prompts
 - prompt-time User Habit Memory reminders are automatic through the same transform path, but stay bounded and conservative
+- prompt-time record-intent metadata and recall debug metadata are automatic through `chat.message`, bounded, and prompt-free
 - User Habit Memory is still manual through `/sybermem-habit`, `sybermem habit remind`, and `sybermem context habit`, plus compaction carry-forward through `sybermem habit inject`
 - there is no hidden auto-resume
 - the plugin does not create a second memory store
@@ -104,8 +111,9 @@ The OpenCode plugin and CLI-using skills prefer that fixed launcher when an Open
 That global refresh does not replace project-local SyberMem files. Existing
 projects still need `/sybermem-update` when you want refreshed managed hooks,
 templates, or instruction files inside the project. Older users should re-run
-the global install or update first to get the new OpenCode prompt-time habit
-reminder path, then run `/sybermem-update` so project-managed files stay fresh.
+the global install or update first to get the new bundled OpenCode plugin
+(`~/.config/opencode/plugins/sybermem.ts`) with prompt-time record-intent and
+recall debug support, then run `/sybermem-update` so project-managed files stay fresh.
 
 Project initialization still uses `/sybermem-init-project`.
 
