@@ -1,0 +1,119 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+import sys
+
+import pytest
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "core"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from sybermem_cli import context as context_module
+from sybermem_cli import main as main_module
+
+
+def run_cli(argv: list[str], monkeypatch: pytest.MonkeyPatch) -> int:
+    monkeypatch.setattr(sys, "argv", ["sybermem", *argv])
+    return main_module.main()
+
+
+def test_cli_context_session_json_uses_resume_checkpoint(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    # Given: a SyberMem project and a deterministic resume checkpoint
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    monkeypatch.setattr(context_module, "resolve_project_root", lambda: project_root)
+    monkeypatch.setattr(
+        context_module,
+        "build_resume_checkpoint",
+        lambda root, mode: {
+            "mode": mode,
+            "project": {"slug": "demo", "path": str(root)},
+            "brief": ["line one", "line two"],
+            "next_action": {"action": "/sybermem-record", "reason": "record useful work"},
+        },
+    )
+
+    # When: session context is requested through the real CLI parser
+    exit_code = run_cli(["context", "session", "--format", "json"], monkeypatch)
+
+    # Then: the payload is explicit that this is a manual context helper
+    payload = json.loads(capsys.readouterr().out)
+    assert exit_code == 0
+    assert payload["delivery"] == "manual"
+    assert payload["kind"] == "session"
+    assert payload["project"] == "demo"
+    assert payload["brief"] == ["line one", "line two"]
+    assert payload["next_action"]["action"] == "/sybermem-record"
+
+
+def test_cli_context_prompt_markdown_uses_project_search(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    # Given: project search returns one relevant record
+    monkeypatch.setattr(
+        context_module,
+        "search_project",
+        lambda query: [
+            {
+                "record_id": "change-123",
+                "title": "Fix auth flow",
+                "type": "change",
+                "score": 7,
+            }
+        ],
+    )
+
+    # When: prompt context is requested as Markdown
+    exit_code = run_cli(["context", "prompt", "--query", "auth", "--format", "markdown"], monkeypatch)
+
+    # Then: the output is copy/paste-safe and names matching record IDs
+    output = capsys.readouterr().out
+    assert exit_code == 0
+    assert output.startswith("## SyberMem Manual Prompt Context")
+    assert "Delivery: manual" in output
+    assert "[change-123]" in output
+
+
+def test_cli_context_habit_json_delegates_to_reminder_renderer(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    # Given: the habit reminder renderer returns one matching habit row
+    monkeypatch.setattr(
+        context_module,
+        "render_habit_reminder_markdown",
+        lambda context, higher_authority_text="": "## User Habit Reminder\n- [habit-abc] keep plans short\n",
+    )
+
+    # When: habit context is requested through the manual context helper
+    exit_code = run_cli(["context", "habit", "--context", "planning", "--format", "json"], monkeypatch)
+
+    # Then: the helper remains a manual delivery surface and exposes habit IDs structurally
+    payload = json.loads(capsys.readouterr().out)
+    assert exit_code == 0
+    assert payload["delivery"] == "manual"
+    assert payload["kind"] == "habit"
+    assert payload["reminded"] == ["habit-abc"]
+
+
+def test_cli_context_returns_error_without_project_root(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    # Given: the command is invoked outside a SyberMem project
+    monkeypatch.setattr(context_module, "resolve_project_root", lambda: None)
+
+    # When: session context is requested
+    exit_code = run_cli(["context", "session"], monkeypatch)
+
+    # Then: the CLI reports the standard concise root-not-found error
+    captured = capsys.readouterr()
+    assert exit_code == 1
+    assert captured.out == ""
+    assert captured.err == "No SyberMem project root found.\n"
