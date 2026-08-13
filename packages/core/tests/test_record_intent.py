@@ -13,6 +13,8 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from sybermem_core.next_step_router import classify_record_intent
+from sybermem_core.user_habit_model import HabitType, InjectionPolicy
+from sybermem_core.user_habits import add_habit
 
 
 HOOKS_DIR = Path(__file__).resolve().parents[3] / ".sybermem" / "hooks"
@@ -307,6 +309,48 @@ def test_stop_hook_remind_mode_does_not_write_auto_record(tmp_path: Path, monkey
     # Then: remind mode keeps durable records untouched
     assert exit_code == 0
     assert not list((project_root / ".sybermem" / "changes").glob("*.md"))
+
+
+def test_user_prompt_hook_emits_habit_reminder_without_persisting_prompt(tmp_path: Path) -> None:
+    # Given: a Claude-managed project and a prompt-approved user habit
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    write_project(project_root)
+    sybermem_home = tmp_path / "home" / ".sybermem"
+    env = {**os.environ, "SYBERMEM_HOME": str(sybermem_home), "PYTHONPATH": str(Path(__file__).resolve().parents[1])}
+    old_home = os.environ.get("SYBERMEM_HOME")
+    os.environ["SYBERMEM_HOME"] = str(sybermem_home)
+    try:
+        add_habit(
+            statement="Prefer plans before implementation",
+            habit_type=HabitType.WORKFLOW,
+            applies_to=("planning",),
+            injection_policy=InjectionPolicy.PROMPT_OK_WHEN_SUPPORTED,
+        )
+    finally:
+        if old_home is None:
+            os.environ.pop("SYBERMEM_HOME", None)
+        else:
+            os.environ["SYBERMEM_HOME"] = old_home
+
+    # When: the merged UserPromptSubmit hook receives a matching prompt
+    proc = subprocess.run(
+        [sys.executable, str(HOOKS_DIR / "user_prompt.py")],
+        cwd=project_root,
+        input=json.dumps({"prompt": "planning with secret-token-unicorn-8472"}).encode("utf-8"),
+        capture_output=True,
+        env=env,
+        check=False,
+    )
+
+    # Then: the hook emits a bounded reminder and logs no raw prompt content
+    assert proc.returncode == 0
+    payload = json.loads(proc.stdout.decode("utf-8"))
+    context = payload["hookSpecificOutput"]["additionalContext"]
+    assert "## User Habit Reminder" in context
+    assert "Prefer plans before implementation" in context
+    events = (sybermem_home / "user-habits" / "injection-log.jsonl").read_text(encoding="utf-8")
+    assert "secret-token-unicorn-8472" not in events
 
 
 class _BytesStdin:

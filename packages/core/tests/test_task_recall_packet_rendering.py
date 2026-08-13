@@ -142,8 +142,85 @@ def test_bare_keyword_match_stays_symbol_free() -> None:
     for hook_path in [ROOT_HOOK, *TEMPLATE_HOOKS]:
         module = load_hook(hook_path)
         packet = module.render_packet("something", [row])
-        assert "- [change-003] Generic keyword match" in packet
+        assert "- 💡 [change-003] Generic keyword match" in packet
         assert "⭐" not in packet
+        assert "Why now:" not in packet
+        assert "Heads-up:" not in packet
+
+
+def test_topic_match_with_high_numeric_score_earns_aha_marker() -> None:
+    # Given: an injected topic row whose score crosses the high-signal threshold
+    row = {
+        "record_id": "change-004",
+        "type": "change",
+        "source_kind": "manual",
+        "title": "High-signal topic row",
+        "created_at": "2026-08-11",
+        "authority": "authoritative",
+        "lifecycle": "active",
+        "freshness": "current",
+        "match_reason": "topic",
+        "score": "12.0",
+        "summary": "Topic recall was auto-injected.",
+        "related_digest": "",
+        "conflict_note": "",
+    }
+
+    # When/Then: every hook copy visibly marks the injected row as aha
+    for hook_path in [ROOT_HOOK, *TEMPLATE_HOOKS]:
+        module = load_hook(hook_path)
+        packet = module.render_packet("topic prompt", [row])
+        assert "⭐ [change-004] High-signal topic row" in packet
+
+
+def test_keyword_match_with_high_numeric_score_earns_aha_marker() -> None:
+    # Given: an injected keyword row whose score crosses the high-signal threshold
+    row = {
+        "record_id": "change-005",
+        "type": "change",
+        "source_kind": "manual",
+        "title": "High-signal keyword row",
+        "created_at": "2026-08-11",
+        "authority": "authoritative",
+        "lifecycle": "active",
+        "freshness": "current",
+        "match_reason": "keyword",
+        "score": "15.0",
+        "summary": "Keyword recall was auto-injected.",
+        "related_digest": "",
+        "conflict_note": "",
+    }
+
+    # When/Then: every hook copy visibly marks the injected row as aha
+    for hook_path in [ROOT_HOOK, *TEMPLATE_HOOKS]:
+        module = load_hook(hook_path)
+        packet = module.render_packet("keyword prompt", [row])
+        assert "⭐ [change-005] High-signal keyword row" in packet
+
+
+def test_keyword_match_below_high_signal_threshold_uses_lightbulb_only() -> None:
+    # Given: an injected keyword row that was included but does not meet the aha threshold
+    row = {
+        "record_id": "change-006",
+        "type": "change",
+        "source_kind": "manual",
+        "title": "Low-signal keyword row",
+        "created_at": "2026-08-11",
+        "authority": "authoritative",
+        "lifecycle": "active",
+        "freshness": "current",
+        "match_reason": "keyword",
+        "score": "11.0",
+        "summary": "Keyword recall was injected without aha weight.",
+        "related_digest": "",
+        "conflict_note": "",
+    }
+
+    # When/Then: every hook copy shows the non-aha marker but no synthesized guidance lines
+    for hook_path in [ROOT_HOOK, *TEMPLATE_HOOKS]:
+        module = load_hook(hook_path)
+        packet = module.render_packet("keyword prompt", [row])
+        assert "💡 [change-006] Low-signal keyword row" in packet
         assert "Why now:" not in packet
         assert "Heads-up:" not in packet
 
@@ -174,7 +251,7 @@ def test_task_recall_packets_are_bounded_to_three_metadata_only_rows() -> None:
     for hook_path in [ROOT_HOOK, *TEMPLATE_HOOKS]:
         module = load_hook(hook_path)
         packet = module.render_packet("fix search", rows)
-        assert packet.count("- [change-") == 3
+        assert packet.count("⭐ [change-") + packet.count("💡 [change-") == 3
         assert "change-004" not in packet
         assert "FULL SECRET CONTENT" not in packet
         assert "/sybermem-record" not in packet
