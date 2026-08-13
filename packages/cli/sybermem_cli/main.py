@@ -21,6 +21,8 @@ from sybermem_core.team import init_team_repo
 from sybermem_core.publish_bootstrap import bootstrap_publish_status
 from sybermem_core.team_summary import build_team_management_summary
 from sybermem_core.uninstall import deactivate_project_sybermem
+from sybermem_cli.habits import register_habit_commands
+from sybermem_cli.context import register_context_commands
 from sybermem_cli.publish_render import render_publish_status_text
 from sybermem_cli.search_render import render_search_text
 
@@ -470,6 +472,9 @@ def main() -> int:
     publish_status_cmd.add_argument("--preview-source-hash", default=None)
     publish_status_cmd.add_argument("--format", choices=["text", "json"], default="text")
     publish_status_cmd.set_defaults(func=cmd_publish_status)
+
+    register_context_commands(sub)
+    register_habit_commands(sub)
 
     args = parser.parse_args()
     return args.func(args)
