@@ -31,6 +31,18 @@ VISIBLE_SKILL_SCRIPTS: Final = [
     Path("scripts/update.ps1"),
 ]
 OPENCODE_PLUGIN_UPDATE_SCRIPTS: Final = [
+    Path("scripts/install.sh"),
+    Path("scripts/install.ps1"),
+    Path("scripts/install-remote.sh"),
+    Path("scripts/install-remote.ps1"),
+    Path("scripts/update.sh"),
+    Path("scripts/update.ps1"),
+]
+CODEX_SKILL_SCRIPTS: Final = [
+    Path("scripts/install.sh"),
+    Path("scripts/install.ps1"),
+    Path("scripts/install-remote.sh"),
+    Path("scripts/install-remote.ps1"),
     Path("scripts/update.sh"),
     Path("scripts/update.ps1"),
 ]
@@ -54,6 +66,7 @@ PUBLIC_DOCS: Final = [
     Path("INSTALL.md"),
     Path("CHANGELOG.md"),
     Path("GEMINI.md"),
+    Path(".codex/INSTALL.md"),
     Path(".opencode/INSTALL.md"),
 ]
 PACKAGE_METADATA: Final = [
@@ -66,6 +79,51 @@ PACKAGE_METADATA: Final = [
     Path("hooks/hooks.json"),
     Path("packages/core/pyproject.toml"),
     Path("packages/cli/pyproject.toml"),
+]
+CLI_USING_SKILLS: Final = [
+    Path("packages/claude-skills/using-sybermem/SKILL.md"),
+    Path("packages/claude-skills/sybermem-record/SKILL.md"),
+    Path("packages/claude-skills/sybermem-search/SKILL.md"),
+    Path("packages/claude-skills/sybermem-habit/SKILL.md"),
+    Path("packages/claude-skills/sybermem-team-publish/SKILL.md"),
+    Path("packages/claude-skills/sybermem-team-summary/SKILL.md"),
+    Path("packages/claude-skills/sybermem-init-project/SKILL.md"),
+]
+CODEX_HEALTH_CHECK_FILES: Final = [
+    Path("packages/claude-skills/sybermem-init-project/project-files/.sybermem/hooks/check_project_health.py"),
+    Path("skills/sybermem-init-project/project-files/.sybermem/hooks/check_project_health.py"),
+]
+UNSUPPORTED_CLAIM_DOCS: Final = [
+    Path(".opencode/INSTALL.md"),
+    Path(".codex/INSTALL.md"),
+    Path("README.md"),
+    Path("README.en.md"),
+    Path("docs/current-capability-audit-2026-08-13.md"),
+]
+UNSUPPORTED_RUNTIME_CLAIMS: Final = [
+    "UserPromptSubmit",
+    "per-prompt additionalContext",
+    "automatic prompt-time injection",
+    "prompt-time injection",
+    "hidden auto-resume",
+    "Codex hooks",
+    ".codex/config.toml",
+    "background automation",
+]
+LIMITATION_MARKERS: Final = [
+    "unsupported",
+    "不支持",
+    "blocked",
+    "限制",
+    "does not",
+    "does **not**",
+    "do not",
+    "not install",
+    "not** install",
+    "no hooks",
+    "无 hooks",
+    "没有",
+    "不能",
 ]
 
 
@@ -208,6 +266,18 @@ def check_opencode_plugin_update_wiring(root: Path) -> None:
             fail(f"{script.as_posix()} is missing OpenCode plugin update wiring: {', '.join(missing)}")
 
 
+def check_codex_skill_install_wiring(root: Path) -> None:
+    for script in CODEX_SKILL_SCRIPTS:
+        script_text = (root / script).read_text(encoding="utf-8")
+        required_fragments = [
+            ".agents/skills" if script.suffix == ".sh" else ".agents\\skills",
+            "Codex",
+        ]
+        missing = [fragment for fragment in required_fragments if fragment not in script_text]
+        if missing:
+            fail(f"{script.as_posix()} is missing Codex skills install wiring: {', '.join(missing)}")
+
+
 def check_runtime_refresh_wiring(root: Path) -> None:
     for script in RUNTIME_REFRESH_SCRIPTS:
         script_text = (root / script).read_text(encoding="utf-8")
@@ -242,6 +312,148 @@ def check_required_files(root: Path) -> None:
             fail(f"Missing file: {path.as_posix()}")
         if full_path.suffix == ".json":
             check_json(full_path, root)
+
+
+def check_skill_cli_resolution_guidance(root: Path) -> None:
+    required_fragments = [
+        ".claude\\sybermem\\cli\\sybermem.cmd",
+        ".claude/sybermem/cli/sybermem",
+        "Do not modify persistent PATH automatically",
+        "$SyberMemCli",
+        "SYBERMEM_CLI",
+    ]
+    for relative_path in CLI_USING_SKILLS:
+        skill_path = root / relative_path
+        if not skill_path.is_file():
+            fail(f"Missing file: {relative_path.as_posix()}")
+        skill_text = skill_path.read_text(encoding="utf-8")
+        missing = [fragment for fragment in required_fragments if fragment not in skill_text]
+        if missing:
+            fail(f"{relative_path.as_posix()} is missing CLI resolution guidance: {', '.join(missing)}")
+
+
+def check_opencode_plugin_cli_resolution(root: Path) -> None:
+    plugin_path = root / "packages" / "opencode-plugin" / "sybermem.ts"
+    if not plugin_path.is_file():
+        fail("Missing file: packages/opencode-plugin/sybermem.ts")
+    plugin_text = plugin_path.read_text(encoding="utf-8")
+
+    required_fragments = [
+        "resolveSybermemCommand",
+        ".claude",
+        "sybermem.cmd",
+        '"sybermem", "cli", "sybermem"',
+        "USERPROFILE",
+        "HOME",
+        "sybermemText",
+    ]
+    missing = [fragment for fragment in required_fragments if fragment not in plugin_text]
+    if missing:
+        fail(f"packages/opencode-plugin/sybermem.ts is missing CLI resolution support: {', '.join(missing)}")
+
+    forbidden_fragments = [
+        "$`sybermem digest status --format json`",
+        "$`sybermem next-step --format json`",
+        "$`sybermem habit inject --context ${habitContext} --format markdown`",
+    ]
+    found = [fragment for fragment in forbidden_fragments if fragment in plugin_text]
+    if found:
+        fail(f"packages/opencode-plugin/sybermem.ts still contains direct bare CLI calls: {', '.join(found)}")
+
+
+def check_codex_metadata_honesty(root: Path) -> None:
+    metadata_path = root / ".codex-plugin" / "plugin.json"
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    description = str(metadata.get("description", ""))
+    keywords = metadata.get("keywords", [])
+    if not isinstance(keywords, list):
+        fail(".codex-plugin/plugin.json keywords must be a list")
+
+    required_description_fragments = ["Codex", "skills"]
+    missing_description = [fragment for fragment in required_description_fragments if fragment not in description]
+    if missing_description:
+        fail(f".codex-plugin/plugin.json description is missing Codex skills support: {', '.join(missing_description)}")
+
+    required_keywords = ["codex", "agents"]
+    keyword_values = {str(keyword).lower() for keyword in keywords}
+    missing_keywords = [keyword for keyword in required_keywords if keyword not in keyword_values]
+    if missing_keywords:
+        fail(f".codex-plugin/plugin.json keywords are missing: {', '.join(missing_keywords)}")
+
+    serialized = json.dumps(metadata, ensure_ascii=False).lower()
+    forbidden_fragments = ["hook", "runtime", "prompt-time", "auto-resume", "background automation"]
+    found = [fragment for fragment in forbidden_fragments if fragment in serialized]
+    if found:
+        fail(f".codex-plugin/plugin.json contains unsupported Codex automation claims: {', '.join(found)}")
+
+
+def check_codex_phase_one_point_five_discoverability(root: Path) -> None:
+    codex_project_files_fragment = 'Path.home() / ".agents" / "skills" / "sybermem-init-project" / "project-files"'
+    unsupported_codex_fragments = [
+        "Codex hooks",
+        ".codex/config.toml",
+        "prompt-time injection",
+        "hidden auto-resume",
+        "background automation",
+    ]
+
+    health_contents: list[bytes] = []
+    for relative_path in CODEX_HEALTH_CHECK_FILES:
+        health_path = root / relative_path
+        if not health_path.is_file():
+            fail(f"Missing file: {relative_path.as_posix()}")
+        health_text = health_path.read_text(encoding="utf-8")
+        if codex_project_files_fragment not in health_text:
+            fail(f"{relative_path.as_posix()} is missing Codex discoverability source: {codex_project_files_fragment}")
+        health_contents.append(health_path.read_bytes())
+
+    if health_contents[0] != health_contents[1]:
+        fail(
+            "Codex health-check copies drifted: "
+            "skills/sybermem-init-project/project-files/.sybermem/hooks/check_project_health.py "
+            "must stay byte-identical to packages/claude-skills/sybermem-init-project/project-files/.sybermem/hooks/check_project_health.py"
+        )
+
+    codex_install = root / ".codex" / "INSTALL.md"
+    if not codex_install.is_file():
+        fail("Missing file: .codex/INSTALL.md")
+    codex_install_text = codex_install.read_text(encoding="utf-8")
+    missing_doc_fragments = [fragment for fragment in unsupported_codex_fragments if fragment not in codex_install_text]
+    if missing_doc_fragments:
+        fail(f".codex/INSTALL.md must explicitly document unsupported Codex runtime claims: {', '.join(missing_doc_fragments)}")
+
+    codex_config = root / ".codex" / "config.toml"
+    if codex_config.exists():
+        fail("Codex support must remain skills-only; .codex/config.toml must not be distributed")
+
+    metadata = json.loads((root / ".codex-plugin" / "plugin.json").read_text(encoding="utf-8"))
+    serialized_metadata = json.dumps(metadata, ensure_ascii=False).lower()
+    forbidden_metadata_fragments = ["hook", "runtime", "prompt-time", "auto-resume", "background automation"]
+    found_metadata = [fragment for fragment in forbidden_metadata_fragments if fragment in serialized_metadata]
+    if found_metadata:
+        fail(f".codex-plugin/plugin.json contains unsupported Codex automation claims: {', '.join(found_metadata)}")
+
+
+def check_unsupported_platform_claims(root: Path) -> None:
+    for relative_path in UNSUPPORTED_CLAIM_DOCS:
+        path = root / relative_path
+        if not path.is_file():
+            continue
+        lines = path.read_text(encoding="utf-8").splitlines()
+        for line_number, line in enumerate(lines, start=1):
+            if not any(claim in line for claim in UNSUPPORTED_RUNTIME_CLAIMS):
+                continue
+            start = max(0, line_number - 7)
+            end = min(len(lines), line_number + 2)
+            normalized = "\n".join(lines[start:end]).lower()
+            platform_doc = relative_path.parts[0] in {".opencode", ".codex"}
+            platform_context = "opencode" in normalized or "codex" in normalized
+            if not platform_doc and not platform_context:
+                continue
+            if not any(marker in normalized for marker in LIMITATION_MARKERS):
+                fail(
+                    f"{relative_path.as_posix()}:{line_number} mentions unsupported platform automation without limitation framing"
+                )
 
 
 def claude_validate(root: Path, target: Path) -> None:
@@ -308,9 +520,15 @@ def main(root: Path = ROOT) -> int:
     check_hook_wiring(root)
     check_no_python_cache_artifacts(root)
     check_version_consistency(root)
+    check_opencode_plugin_cli_resolution(root)
     names = check_skill_tree_parity(root)
+    check_skill_cli_resolution_guidance(root)
     check_distribution_script_coverage(root, names)
     check_opencode_plugin_update_wiring(root)
+    check_codex_skill_install_wiring(root)
+    check_codex_metadata_honesty(root)
+    check_codex_phase_one_point_five_discoverability(root)
+    check_unsupported_platform_claims(root)
     check_runtime_refresh_wiring(root)
 
     claude_cli = shutil.which("claude")

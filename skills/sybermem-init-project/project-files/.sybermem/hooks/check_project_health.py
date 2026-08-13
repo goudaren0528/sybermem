@@ -23,6 +23,11 @@ RECORD_TEMPLATE_REQUIRED_FIELDS: Final[tuple[str, ...]] = (
     "topics:",
 )
 LEGACY_RECORD_TEMPLATE_MARKERS: Final[tuple[str, ...]] = ("number:",)
+GLOBAL_TEMPLATE_PROJECT_FILES: Final[tuple[Path, ...]] = (
+    Path.home() / ".claude" / "skills" / "sybermem-init-project" / "project-files",
+    Path.home() / ".config" / "opencode" / "skills" / "sybermem-init-project" / "project-files",
+    Path.home() / ".agents" / "skills" / "sybermem-init-project" / "project-files",
+)
 
 
 def resolve_sybermem_root() -> Path | None:
@@ -204,14 +209,16 @@ def check_task_recall_hook(root: Path) -> dict:
     has_task_context_banner = "SyberMem retrieval hints for this task (maximum 3):" in content
     has_user_prompt_submit_contract = '"hookEventName": "UserPromptSubmit"' in content
     # Content-check the newer capabilities so they propagate to existing projects:
-    # the aha recall layer (_is_aha_row) and the UTF-8 byte-buffer output that keeps
+    # the aha/visible marker layer and the UTF-8 byte-buffer output that keeps
     # non-ASCII hints from silently failing on locales like GBK.
     has_aha_layer = "_is_aha_row" in content
+    has_visible_marker_layer = "_has_high_signal_score" in content and "💡" in content
     has_utf8_output = "sys.stdout.buffer.write" in content
     is_fresh = (
         has_task_context_banner
         and has_user_prompt_submit_contract
         and has_aha_layer
+        and has_visible_marker_layer
         and has_utf8_output
     )
     return {"status": "fresh" if is_fresh else "stale"}
@@ -444,10 +451,8 @@ def main() -> int:
     # This ensures the health check always knows about the latest managed-file requirements,
     # even when the project was initialized with an older version of SyberMem.
     me = Path(__file__).resolve()
-    for skill_base in (
-        Path.home() / ".claude" / "skills" / "sybermem-init-project" / "project-files" / ".sybermem" / "hooks",
-        Path.home() / ".config" / "opencode" / "skills" / "sybermem-init-project" / "project-files" / ".sybermem" / "hooks",
-    ):
+    for project_files in GLOBAL_TEMPLATE_PROJECT_FILES:
+        skill_base = project_files / ".sybermem" / "hooks"
         template_health = skill_base / "check_project_health.py"
         if template_health.is_file():
             template_text = template_health.read_text(encoding="utf-8")
@@ -466,10 +471,7 @@ def main() -> int:
     # Find the template by checking known global skill paths
     template_claude = ""
     template_agents = ""
-    for skill_base in (
-        Path.home() / ".claude" / "skills" / "sybermem-init-project" / "project-files",
-        Path.home() / ".config" / "opencode" / "skills" / "sybermem-init-project" / "project-files",
-    ):
+    for skill_base in GLOBAL_TEMPLATE_PROJECT_FILES:
         claude_path = skill_base / "CLAUDE.md"
         agents_path = skill_base / "AGENTS.md"
         if claude_path.is_file() and not template_claude:

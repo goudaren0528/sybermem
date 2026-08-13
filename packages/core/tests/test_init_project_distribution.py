@@ -159,6 +159,27 @@ def test_managed_file_copies_stay_byte_identical_across_distribution() -> None:
         assert canonical == mirror, f"distribution drift in {rel.as_posix()}"
 
 
+def test_health_check_global_template_sources_include_codex_skill_install() -> None:
+    # Given: Codex Phase 1.5 must make the globally installed Codex skill tree discoverable
+    codex_fragment = 'Path.home() / ".agents" / "skills" / "sybermem-init-project" / "project-files"'
+
+    # When / Then: both distributed health-check copies search the Codex global project-files source
+    for base in (PROJECT_FILES, ROOT / "skills" / "sybermem-init-project" / "project-files"):
+        health_check = (base / ".sybermem" / "hooks" / "check_project_health.py").read_text(encoding="utf-8")
+        assert codex_fragment in health_check
+
+
+def test_init_project_templates_do_not_store_user_habits_in_project_memory() -> None:
+    # Given: user habit memory is a user-owned layer, not canonical project memory
+    text_suffixes = {".json", ".md", ".py", ".toml", ".yaml", ".yml"}
+    project_files = [path for path in PROJECT_FILES.rglob("*") if path.is_file() and path.suffix in text_suffixes]
+
+    # When / Then: fresh-project templates never create habit storage under project .sybermem
+    for path in project_files:
+        text = path.read_text(encoding="utf-8")
+        assert "user-habits" not in text, f"project template leaks user habit storage: {path.relative_to(PROJECT_FILES).as_posix()}"
+
+
 def test_merged_prompt_hook_applies_high_signal_recall_gate() -> None:
     # Given: user_prompt.py is the merged hook actually wired into settings (it reuses
     # task_recall's helpers). The high-signal gate (E1) and inject/abstain logging (E6)
