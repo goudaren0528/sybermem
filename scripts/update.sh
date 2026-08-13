@@ -8,6 +8,10 @@ SKILL_SOURCE="$ADR_PATH/packages/claude-skills"
 CLAUDE_SKILLS="$HOME/.claude/skills"
 OPENCODE_SKILLS="$HOME/.config/opencode/skills"
 CODEX_SKILLS="$HOME/.agents/skills"
+CODEX_HOOK_SOURCE="$ADR_PATH/.codex/hooks/user_prompt.py"
+CODEX_HOOK_DIR="$HOME/.codex/hooks"
+CODEX_HOOK_PATH="$CODEX_HOOK_DIR/sybermem_user_prompt.py"
+CODEX_HOOKS_JSON="$HOME/.codex/hooks.json"
 LAUNCHER_DIR="$HOME/.claude/sybermem"
 LAUNCHER_PATH="$LAUNCHER_DIR/launch_record_change_on_stop.py"
 LAUNCHER_SOURCE="$ADR_PATH/scripts/global-stop-hook-launcher.py"
@@ -39,6 +43,68 @@ sync_skills() {
 sync_skills "$CLAUDE_SKILLS" "Claude Code"
 sync_skills "$OPENCODE_SKILLS" "OpenCode"
 sync_skills "$CODEX_SKILLS" "Codex"
+
+install_codex_user_prompt_hook() {
+    if [ ! -f "$CODEX_HOOK_SOURCE" ]; then
+        echo "  [Codex] 跳过 user prompt hook：源文件不存在 $CODEX_HOOK_SOURCE"
+        return
+    fi
+
+    mkdir -p "$CODEX_HOOK_DIR"
+    cp "$CODEX_HOOK_SOURCE" "$CODEX_HOOK_PATH"
+    chmod +x "$CODEX_HOOK_PATH"
+
+    CODEX_HOOK_PATH="$CODEX_HOOK_PATH" CODEX_HOOKS_JSON="$CODEX_HOOKS_JSON" python - <<'PY'
+from __future__ import annotations
+
+import json
+import os
+from pathlib import Path
+
+hook_path = Path(os.environ["CODEX_HOOK_PATH"])
+hooks_json = Path(os.environ["CODEX_HOOKS_JSON"])
+command = f'python "{hook_path}"'
+managed = {
+    "type": "command",
+    "command": command,
+    "additionalContextLimit": 6000,
+    "message": "SyberMem user habit reminders add Codex prompt context when relevant.",
+}
+
+data: dict[str, object] = {}
+if hooks_json.is_file():
+    try:
+        loaded = json.loads(hooks_json.read_text(encoding="utf-8"))
+        if isinstance(loaded, dict):
+            data = loaded
+    except json.JSONDecodeError:
+        data = {}
+
+hooks = data.get("hooks")
+if not isinstance(hooks, dict):
+    hooks = {}
+    data["hooks"] = hooks
+
+event = hooks.get("UserPromptSubmit")
+if isinstance(event, list):
+    handlers = event
+elif event is None:
+    handlers = []
+else:
+    handlers = [event]
+
+def is_managed(value: object) -> bool:
+    return isinstance(value, dict) and "sybermem_user_prompt.py" in str(value.get("command", ""))
+
+hooks["UserPromptSubmit"] = [handler for handler in handlers if not is_managed(handler)] + [managed]
+hooks_json.parent.mkdir(parents=True, exist_ok=True)
+hooks_json.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+PY
+    echo "  [Codex] 已安装 UserPromptSubmit hook: $CODEX_HOOK_PATH"
+    echo "  [Codex] 已更新 hooks.json（保留非 SyberMem hooks）: $CODEX_HOOKS_JSON"
+}
+
+install_codex_user_prompt_hook
 
 mkdir -p "$LAUNCHER_DIR"
 cp "$LAUNCHER_SOURCE" "$LAUNCHER_PATH"
