@@ -5,8 +5,14 @@ $ErrorActionPreference = "Stop"
 $AdrPath = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 $SkillSource = Join-Path $AdrPath "packages\claude-skills"
 $CodexHookSource = Join-Path $AdrPath ".codex\hooks\user_prompt.py"
+$CodexSessionHookSource = Join-Path $AdrPath ".codex\hooks\session_start.py"
+$CodexStopHookSource = Join-Path $AdrPath ".codex\hooks\stop.py"
+$CodexPostCompactHookSource = Join-Path $AdrPath ".codex\hooks\post_compact.py"
 $CodexHookDir = Join-Path $env:USERPROFILE ".codex\hooks"
 $CodexHookPath = Join-Path $CodexHookDir "sybermem_user_prompt.py"
+$CodexSessionHookPath = Join-Path $CodexHookDir "sybermem_session_start.py"
+$CodexStopHookPath = Join-Path $CodexHookDir "sybermem_stop.py"
+$CodexPostCompactHookPath = Join-Path $CodexHookDir "sybermem_post_compact.py"
 $CodexHooksJson = Join-Path $env:USERPROFILE ".codex\hooks.json"
 $LauncherDir = Join-Path $env:USERPROFILE ".claude\sybermem"
 $LauncherPath = Join-Path $LauncherDir "launch_record_change_on_stop.py"
@@ -52,8 +58,8 @@ foreach ($target in $Targets) {
 }
 
 function Install-CodexUserPromptHook {
-    if (-not (Test-Path $CodexHookSource)) {
-        Write-Host "  [Codex] skipped user prompt hook: source not found at $CodexHookSource"
+    if ((-not (Test-Path $CodexHookSource)) -or (-not (Test-Path $CodexSessionHookSource)) -or (-not (Test-Path $CodexStopHookSource)) -or (-not (Test-Path $CodexPostCompactHookSource))) {
+        Write-Host "  [Codex] skipped hooks: one or more sources were not found"
         return
     }
 
@@ -61,6 +67,9 @@ function Install-CodexUserPromptHook {
         New-Item -ItemType Directory -Path $CodexHookDir -Force | Out-Null
     }
     Copy-Item -Path $CodexHookSource -Destination $CodexHookPath -Force
+    Copy-Item -Path $CodexSessionHookSource -Destination $CodexSessionHookPath -Force
+    Copy-Item -Path $CodexStopHookSource -Destination $CodexStopHookPath -Force
+    Copy-Item -Path $CodexPostCompactHookSource -Destination $CodexPostCompactHookPath -Force
 
     $data = [ordered]@{}
     if (Test-Path $CodexHooksJson) {
@@ -81,31 +90,58 @@ function Install-CodexUserPromptHook {
         $data["hooks"] = [ordered]@{}
     }
     $hooks = $data["hooks"]
-    $event = $hooks["UserPromptSubmit"]
-    if ($event -is [System.Collections.IList]) {
-        $handlers = @($event)
-    } elseif ($null -eq $event) {
-        $handlers = @()
-    } else {
-        $handlers = @($event)
+    function Get-Handlers($eventName) {
+        $event = $hooks[$eventName]
+        if ($event -is [System.Collections.IList]) {
+            return @($event)
+        }
+        if ($null -eq $event) {
+            return @()
+        }
+        return @($event)
     }
 
-    $managed = [ordered]@{
+    function Remove-Managed($handlers, $marker) {
+        return @($handlers | Where-Object {
+            -not (($_ -is [System.Collections.IDictionary]) -and ([string]($_["command"]) -like "*$marker*"))
+        })
+    }
+
+    $promptManaged = [ordered]@{
         type = "command"
         command = "python `"$CodexHookPath`""
         additionalContextLimit = 6000
-        message = "SyberMem user habit reminders add Codex prompt context when relevant."
+        message = "SyberMem prompt context adds bounded Codex recall and habit reminders when relevant."
     }
-    $preserved = @($handlers | Where-Object {
-        -not (($_ -is [System.Collections.IDictionary]) -and ([string]($_["command"]) -like "*sybermem_user_prompt.py*"))
-    })
-    $hooks["UserPromptSubmit"] = @($preserved + $managed)
+    $sessionManaged = [ordered]@{
+        type = "command"
+        command = "python `"$CodexSessionHookPath`""
+        additionalContextLimit = 6000
+        message = "SyberMem session context adds bounded Codex startup context when available."
+    }
+    $stopManaged = [ordered]@{
+        type = "command"
+        command = "python `"$CodexStopHookPath`""
+        message = "SyberMem Stop nudge adds bounded record reminders without looping."
+    }
+    $postCompactManaged = [ordered]@{
+        type = "command"
+        command = "python `"$CodexPostCompactHookPath`""
+        message = "SyberMem PostCompact marks compact re-seed for the next SessionStart."
+    }
+    $hooks["UserPromptSubmit"] = @((Remove-Managed (Get-Handlers "UserPromptSubmit") "sybermem_user_prompt.py") + $promptManaged)
+    $hooks["SessionStart"] = @((Remove-Managed (Get-Handlers "SessionStart") "sybermem_session_start.py") + $sessionManaged)
+    $hooks["Stop"] = @((Remove-Managed (Get-Handlers "Stop") "sybermem_stop.py") + $stopManaged)
+    $hooks["PostCompact"] = @((Remove-Managed (Get-Handlers "PostCompact") "sybermem_post_compact.py") + $postCompactManaged)
 
     if (-not (Test-Path (Split-Path -Parent $CodexHooksJson))) {
         New-Item -ItemType Directory -Path (Split-Path -Parent $CodexHooksJson) -Force | Out-Null
     }
     $data | ConvertTo-Json -Depth 20 | Set-Content -Path $CodexHooksJson -Encoding UTF8
     Write-Host "  [Codex] installed UserPromptSubmit hook: $CodexHookPath"
+    Write-Host "  [Codex] installed SessionStart hook: $CodexSessionHookPath"
+    Write-Host "  [Codex] installed Stop hook: $CodexStopHookPath"
+    Write-Host "  [Codex] installed PostCompact hook: $CodexPostCompactHookPath"
     Write-Host "  [Codex] updated hooks.json without removing unrelated hooks: $CodexHooksJson"
 }
 
