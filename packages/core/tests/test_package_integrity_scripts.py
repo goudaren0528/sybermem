@@ -23,11 +23,11 @@ def test_package_integrity_checks_all_runtime_refresh_scripts() -> None:
     ]
 
 
-def test_package_integrity_checks_codex_phase_one_distribution() -> None:
-    # Given: Codex Phase 1 support is skills-only distribution, not runtime automation
+def test_package_integrity_checks_codex_phase_one_point_five_distribution() -> None:
+    # Given: Codex Phase 1.5 installs skills plus a bounded UserPromptSubmit reminder hook
     checker = runpy.run_path(str(CHECK_SCRIPT))
 
-    # When / Then: the integrity checker tracks Codex skill scripts, public docs, and metadata honesty
+    # When / Then: the integrity checker tracks Codex skill scripts, hook scripts, public docs, and metadata honesty
     assert checker["CODEX_SKILL_SCRIPTS"] == [
         Path("scripts/install.sh"),
         Path("scripts/install.ps1"),
@@ -36,17 +36,25 @@ def test_package_integrity_checks_codex_phase_one_distribution() -> None:
         Path("scripts/update.sh"),
         Path("scripts/update.ps1"),
     ]
+    assert checker["CODEX_HOOK_INSTALL_SCRIPTS"] == checker["CODEX_SKILL_SCRIPTS"]
     assert Path(".codex/INSTALL.md") in checker["PUBLIC_DOCS"]
+    assert Path("docs/feature_map.md") in checker["PUBLIC_DOCS"]
     assert callable(checker["check_codex_skill_install_wiring"])
+    assert callable(checker["check_codex_user_prompt_hook_install_wiring"])
     assert callable(checker["check_codex_metadata_honesty"])
     assert callable(checker["check_codex_phase_one_point_five_discoverability"])
+    assert Path("CONTRIBUTING.md") in checker["UNSUPPORTED_CLAIM_DOCS"]
+    assert Path("CHANGELOG.md") in checker["UNSUPPORTED_CLAIM_DOCS"]
+    assert Path("docs/feature_map.md") in checker["UNSUPPORTED_CLAIM_DOCS"]
 
 
-def test_package_integrity_calls_dedicated_codex_phase_one_point_five_guard() -> None:
-    # Given: Codex Phase 1.5 has a dedicated integrity guard, separate from Phase 1 wiring checks
+def test_package_integrity_calls_dedicated_codex_phase_one_point_five_guards_from_main() -> None:
+    # Given: Codex Phase 1.5 has dedicated integrity guards for install wiring and honest claims
     script = CHECK_SCRIPT.read_text(encoding="utf-8")
 
-    # When / Then: main() invokes the dedicated guard as part of package verification
+    # When / Then: main() invokes both Codex-specific guards as part of package verification
+    assert "def check_codex_user_prompt_hook_install_wiring(root: Path) -> None:" in script
+    assert "check_codex_user_prompt_hook_install_wiring(root)" in script
     assert "def check_codex_phase_one_point_five_discoverability(root: Path) -> None:" in script
     assert "check_codex_phase_one_point_five_discoverability(root)" in script
 
@@ -63,8 +71,8 @@ def test_codex_phase_one_installers_include_user_skill_targets() -> None:
         assert "Codex" in text
 
 
-def test_codex_plugin_metadata_is_skills_only() -> None:
-    # Given: Codex metadata must honestly describe Phase 1 user-skill support
+def test_codex_plugin_metadata_keeps_supported_scope_narrow() -> None:
+    # Given: Codex metadata must honestly describe skills support without broad automation claims
     metadata = (ROOT / ".codex-plugin" / "plugin.json").read_text(encoding="utf-8")
 
     # When / Then: it mentions Codex skills without claiming unsupported automation
@@ -77,14 +85,35 @@ def test_codex_plugin_metadata_is_skills_only() -> None:
     assert "prompt-time" not in metadata.lower()
 
 
-def test_codex_install_documents_manual_context_workflow() -> None:
-    # Given: Codex has no runtime hooks, so prompt context must be a deliberate CLI/skill workflow
+def test_codex_install_documents_manual_project_context_workflow() -> None:
+    # Given: Codex project context remains manual even though bounded habit reminders use UserPromptSubmit
     install_doc = (ROOT / ".codex" / "INSTALL.md").read_text(encoding="utf-8")
 
     # When / Then: the docs expose the shared context helper while preserving the unsupported boundary
     assert "sybermem context prompt --query" in install_doc
     assert "manual" in install_doc.lower()
-    assert "Codex Phase 1.5 does not add any Codex runtime automation" in install_doc
+    assert "Codex support does not add broad Codex runtime automation" in install_doc
+    assert "hidden auto-resume" in install_doc
+    assert "background automation" in install_doc
+    assert "prompt-time injection" in install_doc
+    assert ".codex/config.toml" in install_doc
+
+
+def test_codex_user_prompt_hook_source_stays_habit_only() -> None:
+    # Given: Codex support uses one bounded user prompt hook for habit reminders only
+    hook_source = (ROOT / ".codex" / "hooks" / "user_prompt.py").read_text(encoding="utf-8")
+
+    # When / Then: the source keeps the documented Codex hook contract and avoids project recall automation
+    assert "UserPromptSubmit" in hook_source
+    assert "hookSpecificOutput" in hook_source
+    assert "additionalContext" in hook_source
+    assert '"context"' in hook_source
+    assert '"habit"' in hook_source
+    assert "--delivery" in hook_source
+    assert "prompt-time" in hook_source
+    assert "context recall" not in hook_source
+    assert "project recall" not in hook_source.lower()
+    assert "auto-resume" not in hook_source.lower()
 
 
 def test_package_integrity_checks_cli_using_skills_with_fixed_launcher_guidance() -> None:
@@ -142,12 +171,11 @@ def test_opencode_plugin_injects_user_habits_only_during_compaction() -> None:
     # Given: OpenCode support must stay inside documented compaction behavior
     plugin = (ROOT / "packages" / "opencode-plugin" / "sybermem.ts").read_text(encoding="utf-8")
 
-    # When / Then: habit injection is wired through resolver-backed CLI at compaction time, not a prompt-time hook
+    # When / Then: compaction keeps the inject route, and prompt-time support must not bypass it with a direct remind CLI call
     assert "experimental.session.compacting" in plugin
     assert 'sybermemText($, root, ["habit", "inject", "--context", habitContext, "--format", "markdown"])' in plugin
     assert "compaction planning review implementation coding documentation" in plugin
-    assert "UserPromptSubmit" not in plugin
-    assert "prompt-time" not in plugin
+    assert "sybermem habit remind" not in plugin
 
 
 def test_package_integrity_exposes_unsupported_platform_claim_guard() -> None:
@@ -158,6 +186,7 @@ def test_package_integrity_exposes_unsupported_platform_claim_guard() -> None:
     assert callable(checker["check_unsupported_platform_claims"])
     assert Path(".opencode/INSTALL.md") in checker["UNSUPPORTED_CLAIM_DOCS"]
     assert Path(".codex/INSTALL.md") in checker["UNSUPPORTED_CLAIM_DOCS"]
+    assert Path("docs/feature_map.md") in checker["UNSUPPORTED_CLAIM_DOCS"]
 
 
 def test_platform_docs_keep_unsupported_claims_in_limitation_sections() -> None:
@@ -167,8 +196,8 @@ def test_platform_docs_keep_unsupported_claims_in_limitation_sections() -> None:
 
     # When / Then: current platform docs satisfy the machine-enforced honesty guard
     checker["check_unsupported_platform_claims"](ROOT)
-    assert "UserPromptSubmit" in guarded_fragments
-    assert "prompt-time injection" in guarded_fragments
+    assert "per-prompt additionalContext" in guarded_fragments
+    assert "background automation" in guarded_fragments
 
 
 def test_package_integrity_exposes_opencode_cli_resolution_check() -> None:
@@ -222,3 +251,38 @@ def test_opencode_plugin_reuses_manual_context_helper_for_compaction() -> None:
     assert "experimental.session.compacting" in plugin
     assert 'sybermemText($, root, ["context", "session", "--format", "markdown"])' in plugin
     assert "## SyberMem Manual Session Context" in plugin
+
+
+def test_opencode_plugin_wires_prompt_time_recall_and_toasts() -> None:
+    # Given: OpenCode per-prompt recall must use supported plugin hooks and the SDK toast API
+    plugin = (ROOT / "packages" / "opencode-plugin" / "sybermem.ts").read_text(encoding="utf-8")
+
+    # When / Then: the prompt capture/injection route and toast contract remain wired
+    assert '"chat.message"' in plugin
+    assert '"experimental.chat.system.transform"' in plugin
+    assert "RECALL_STASH" in plugin
+    assert "context recall" in plugin
+    assert "context habit" in plugin
+    assert "--delivery" in plugin
+    assert "prompt-time" in plugin
+    assert "## User Habit Reminder" in plugin
+    assert "client.tui.showToast" in plugin
+    assert "sybermem habit remind" not in plugin
+    assert "injected only at supported compaction" not in plugin
+    assert "undocumented per-prompt hook" not in plugin
+    assert '"tui.toast.show"' not in plugin
+    assert "level:" not in plugin
+
+
+def test_active_docs_do_not_retain_stale_codex_or_opencode_platform_claims() -> None:
+    # Given: contributor and changelog guidance are active release-facing docs
+    active_text = "\n".join(
+        (ROOT / relative_path).read_text(encoding="utf-8")
+        for relative_path in [Path("CONTRIBUTING.md"), Path("CHANGELOG.md")]
+    )
+
+    # When / Then: they no longer describe OpenCode/Codex as prompt-time/manual-only platforms
+    assert "skills-only boundary" not in active_text
+    assert "skills-only smoke path" not in active_text
+    assert "no Codex hooks, prompt-time injection" not in active_text
+    assert "supported compaction only" not in active_text

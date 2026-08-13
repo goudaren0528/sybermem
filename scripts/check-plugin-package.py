@@ -46,6 +46,14 @@ CODEX_SKILL_SCRIPTS: Final = [
     Path("scripts/update.sh"),
     Path("scripts/update.ps1"),
 ]
+CODEX_HOOK_INSTALL_SCRIPTS: Final = [
+    Path("scripts/install.sh"),
+    Path("scripts/install.ps1"),
+    Path("scripts/install-remote.sh"),
+    Path("scripts/install-remote.ps1"),
+    Path("scripts/update.sh"),
+    Path("scripts/update.ps1"),
+]
 RUNTIME_REFRESH_SCRIPTS: Final = [
     Path("scripts/install.sh"),
     Path("scripts/install.ps1"),
@@ -65,6 +73,7 @@ PUBLIC_DOCS: Final = [
     Path("README.en.md"),
     Path("INSTALL.md"),
     Path("CHANGELOG.md"),
+    Path("docs/feature_map.md"),
     Path("GEMINI.md"),
     Path(".codex/INSTALL.md"),
     Path(".opencode/INSTALL.md"),
@@ -94,17 +103,16 @@ CODEX_HEALTH_CHECK_FILES: Final = [
     Path("skills/sybermem-init-project/project-files/.sybermem/hooks/check_project_health.py"),
 ]
 UNSUPPORTED_CLAIM_DOCS: Final = [
+    Path("CONTRIBUTING.md"),
+    Path("CHANGELOG.md"),
     Path(".opencode/INSTALL.md"),
     Path(".codex/INSTALL.md"),
     Path("README.md"),
     Path("README.en.md"),
-    Path("docs/current-capability-audit-2026-08-13.md"),
+    Path("docs/feature_map.md"),
 ]
 UNSUPPORTED_RUNTIME_CLAIMS: Final = [
-    "UserPromptSubmit",
     "per-prompt additionalContext",
-    "automatic prompt-time injection",
-    "prompt-time injection",
     "hidden auto-resume",
     "Codex hooks",
     ".codex/config.toml",
@@ -278,6 +286,85 @@ def check_codex_skill_install_wiring(root: Path) -> None:
             fail(f"{script.as_posix()} is missing Codex skills install wiring: {', '.join(missing)}")
 
 
+def check_codex_user_prompt_hook_install_wiring(root: Path) -> None:
+    hook_source = root / ".codex" / "hooks" / "user_prompt.py"
+    if not hook_source.is_file():
+        fail("Missing Codex user prompt hook source: .codex/hooks/user_prompt.py")
+
+    hook_source_text = hook_source.read_text(encoding="utf-8")
+    required_source_fragments = [
+        "UserPromptSubmit",
+        "hookSpecificOutput",
+        "additionalContext",
+        "context",
+        '"habit"',
+        "--delivery",
+        "prompt-time",
+    ]
+    missing_source = [fragment for fragment in required_source_fragments if fragment not in hook_source_text]
+    if missing_source:
+        fail(f".codex/hooks/user_prompt.py is missing Codex habit reminder hook fragments: {', '.join(missing_source)}")
+
+    forbidden_source_fragments = [
+        "context recall",
+        "project recall",
+        "auto-resume",
+        "background automation",
+    ]
+    found_source = [fragment for fragment in forbidden_source_fragments if fragment in hook_source_text.lower()]
+    if found_source:
+        fail(f".codex/hooks/user_prompt.py contains unsupported Codex automation behavior: {', '.join(found_source)}")
+
+    for script in CODEX_HOOK_INSTALL_SCRIPTS:
+        script_text = (root / script).read_text(encoding="utf-8")
+        if script.suffix == ".sh":
+            required_fragments = [
+                ".codex/hooks/user_prompt.py",
+                ".codex/hooks",
+                "sybermem_user_prompt.py",
+                ".codex/hooks.json",
+                '"UserPromptSubmit"',
+                '"type": "command"',
+                "additionalContextLimit",
+                "SyberMem user habit reminders add Codex prompt context when relevant.",
+            ]
+            forbidden_fragments = [
+                ".codex/config.toml",
+                '"agent"',
+                '"startup"',
+                '"session"',
+                "background automation",
+                "project recall",
+                "auto-resume",
+            ]
+        else:
+            required_fragments = [
+                ".codex\\hooks\\user_prompt.py",
+                ".codex\\hooks",
+                "sybermem_user_prompt.py",
+                ".codex\\hooks.json",
+                '"UserPromptSubmit"',
+                'type = "command"',
+                "additionalContextLimit",
+                "SyberMem user habit reminders add Codex prompt context when relevant.",
+            ]
+            forbidden_fragments = [
+                ".codex\\config.toml",
+                'type = "agent"',
+                'type = "startup"',
+                'type = "session"',
+                "background automation",
+                "project recall",
+                "auto-resume",
+            ]
+        missing = [fragment for fragment in required_fragments if fragment not in script_text]
+        if missing:
+            fail(f"{script.as_posix()} is missing Codex UserPromptSubmit hook install wiring: {', '.join(missing)}")
+        found = [fragment for fragment in forbidden_fragments if fragment.lower() in script_text.lower()]
+        if found:
+            fail(f"{script.as_posix()} contains unsupported Codex automation wiring: {', '.join(found)}")
+
+
 def check_runtime_refresh_wiring(root: Path) -> None:
     for script in RUNTIME_REFRESH_SCRIPTS:
         script_text = (root / script).read_text(encoding="utf-8")
@@ -359,6 +446,46 @@ def check_opencode_plugin_cli_resolution(root: Path) -> None:
     found = [fragment for fragment in forbidden_fragments if fragment in plugin_text]
     if found:
         fail(f"packages/opencode-plugin/sybermem.ts still contains direct bare CLI calls: {', '.join(found)}")
+
+
+def check_opencode_plugin_prompt_recall(root: Path) -> None:
+    """Guard the OpenCode plugin's per-prompt high-signal recall path.
+
+    Requires the `chat.message` capture + `experimental.chat.system.transform` injection
+    seam, the `client.tui.showToast` toast API (not the undocumented hook-return map),
+    and the resolver-backed `sybermem context recall` + `context habit --delivery prompt-time`
+    CLI routes so recall and habit reminders arrive on the same prompt turn.
+    """
+    plugin_path = root / "packages" / "opencode-plugin" / "sybermem.ts"
+    if not plugin_path.is_file():
+        fail("Missing file: packages/opencode-plugin/sybermem.ts")
+    plugin_text = plugin_path.read_text(encoding="utf-8")
+
+    required_fragments = [
+        '"chat.message"',
+        '"experimental.chat.system.transform"',
+        "client.tui.showToast",
+        "context recall",
+        "context habit",
+        "--delivery",
+        "prompt-time",
+        "## User Habit Reminder",
+        "RECALL_STASH",
+    ]
+    missing = [fragment for fragment in required_fragments if fragment not in plugin_text]
+    if missing:
+        fail(f"packages/opencode-plugin/sybermem.ts is missing per-prompt recall wiring: {', '.join(missing)}")
+
+    forbidden_fragments = [
+        '"tui.toast.show"',
+        "level:",
+        "sybermem habit remind",
+        "injected only at supported compaction",
+        "undocumented per-prompt hook",
+    ]
+    found = [fragment for fragment in forbidden_fragments if fragment in plugin_text]
+    if found:
+        fail(f"packages/opencode-plugin/sybermem.ts uses non-standard toast contract: {', '.join(found)}")
 
 
 def check_codex_metadata_honesty(root: Path) -> None:
@@ -521,11 +648,13 @@ def main(root: Path = ROOT) -> int:
     check_no_python_cache_artifacts(root)
     check_version_consistency(root)
     check_opencode_plugin_cli_resolution(root)
+    check_opencode_plugin_prompt_recall(root)
     names = check_skill_tree_parity(root)
     check_skill_cli_resolution_guidance(root)
     check_distribution_script_coverage(root, names)
     check_opencode_plugin_update_wiring(root)
     check_codex_skill_install_wiring(root)
+    check_codex_user_prompt_hook_install_wiring(root)
     check_codex_metadata_honesty(root)
     check_codex_phase_one_point_five_discoverability(root)
     check_unsupported_platform_claims(root)
