@@ -1,12 +1,13 @@
 #!/bin/bash
 
 # SyberMem - 更新脚本
-# 同步最新 skills 到 Claude Code 和 OpenCode 用户级目录
+# 同步最新 skills 到 Claude Code、OpenCode 和 Codex 用户级目录
 
 ADR_PATH="$(cd "$(dirname "$0")/.." && pwd)"
 SKILL_SOURCE="$ADR_PATH/packages/claude-skills"
 CLAUDE_SKILLS="$HOME/.claude/skills"
 OPENCODE_SKILLS="$HOME/.config/opencode/skills"
+CODEX_SKILLS="$HOME/.agents/skills"
 LAUNCHER_DIR="$HOME/.claude/sybermem"
 LAUNCHER_PATH="$LAUNCHER_DIR/launch_record_change_on_stop.py"
 LAUNCHER_SOURCE="$ADR_PATH/scripts/global-stop-hook-launcher.py"
@@ -26,7 +27,7 @@ sync_skills() {
     local label="$2"
     mkdir -p "$target"
     rm -rf "$target/init-project" "$target/record" "$target/summary"
-    for skill in sybermem-init-project sybermem-record sybermem-summary sybermem-resume sybermem-digest sybermem-phase-analyze sybermem-phase-confirm using-sybermem sybermem-update sybermem-search sybermem-link sybermem-theme-digest sybermem-team-publish sybermem-team-summary; do
+    for skill in sybermem-init-project sybermem-record sybermem-summary sybermem-resume sybermem-digest sybermem-phase-analyze sybermem-phase-confirm using-sybermem sybermem-update sybermem-search sybermem-link sybermem-theme-digest sybermem-team-publish sybermem-team-summary sybermem-habit; do
         if [ -d "$SKILL_SOURCE/$skill" ]; then
             rm -rf "$target/$skill"
             cp -r "$SKILL_SOURCE/$skill" "$target/"
@@ -37,6 +38,7 @@ sync_skills() {
 
 sync_skills "$CLAUDE_SKILLS" "Claude Code"
 sync_skills "$OPENCODE_SKILLS" "OpenCode"
+sync_skills "$CODEX_SKILLS" "Codex"
 
 mkdir -p "$LAUNCHER_DIR"
 cp "$LAUNCHER_SOURCE" "$LAUNCHER_PATH"
@@ -88,6 +90,7 @@ echo "  /sybermem-link          — 在两条已有记录间建立正向关系�
 echo "  /sybermem-theme-digest  — 为单个 topic 创建跨多个 phase 的持久化高阶摘要"
 echo "  /sybermem-team-publish  — 将当前项目发布到 Team memory"
 echo "  /sybermem-team-summary  — 生成 Team 管理摘要"
+echo "  /sybermem-habit         — 管理用户级习惯记忆与提醒"
 echo ""
 if command -v sybermem >/dev/null 2>&1; then
     echo "sybermem CLI 已安装并在 PATH 中，可直接运行：sybermem project init --register"

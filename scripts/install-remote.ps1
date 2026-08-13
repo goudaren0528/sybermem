@@ -18,6 +18,7 @@ $OpenCodePluginDir = Join-Path $env:USERPROFILE ".config\opencode\plugins"
 $Targets = @(
     @{ Path = Join-Path $env:USERPROFILE ".claude\skills"; Label = "Claude Code" }
     @{ Path = Join-Path $env:USERPROFILE ".config\opencode\skills"; Label = "OpenCode" }
+    @{ Path = Join-Path $env:USERPROFILE ".agents\skills"; Label = "Codex" }
 )
 
 Write-Host "=== SyberMem Remote Install ==="
@@ -54,7 +55,7 @@ try {
                 Remove-Item -Path $legacyPath -Recurse -Force -Confirm:$false
             }
         }
-        foreach ($skill in @("sybermem-init-project", "sybermem-record", "sybermem-summary", "sybermem-resume", "sybermem-digest", "sybermem-phase-analyze", "sybermem-phase-confirm", "using-sybermem", "sybermem-update", "sybermem-search", "sybermem-link", "sybermem-theme-digest", "sybermem-team-publish", "sybermem-team-summary")) {
+        foreach ($skill in @("sybermem-init-project", "sybermem-record", "sybermem-summary", "sybermem-resume", "sybermem-digest", "sybermem-phase-analyze", "sybermem-phase-confirm", "using-sybermem", "sybermem-update", "sybermem-search", "sybermem-link", "sybermem-theme-digest", "sybermem-team-publish", "sybermem-team-summary", "sybermem-habit")) {
             $src = Join-Path $SkillsSrc $skill
             $dst = Join-Path $target.Path $skill
             if (Test-Path $src) {
@@ -129,6 +130,7 @@ Write-Host "  /sybermem-link          - Add a forward relation between two exist
 Write-Host "  /sybermem-theme-digest  - Create a durable topic-level digest"
 Write-Host "  /sybermem-team-publish  - Publish the current project into Team memory"
 Write-Host "  /sybermem-team-summary  - Generate the Team management summary"
+Write-Host "  /sybermem-habit         - Manage user-level habit memory and reminders"
 Write-Host ""
 # Honest PATH guidance: the wrapper lives in $CliDir, not on PATH by default on
 # Windows. We do NOT modify persistent PATH automatically; detect and guide.
