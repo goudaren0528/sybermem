@@ -4,6 +4,10 @@
 $ErrorActionPreference = "Stop"
 $AdrPath = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 $SkillSource = Join-Path $AdrPath "packages\claude-skills"
+$CodexHookSource = Join-Path $AdrPath ".codex\hooks\user_prompt.py"
+$CodexHookDir = Join-Path $env:USERPROFILE ".codex\hooks"
+$CodexHookPath = Join-Path $CodexHookDir "sybermem_user_prompt.py"
+$CodexHooksJson = Join-Path $env:USERPROFILE ".codex\hooks.json"
 $LauncherDir = Join-Path $env:USERPROFILE ".claude\sybermem"
 $LauncherPath = Join-Path $LauncherDir "launch_record_change_on_stop.py"
 $LauncherSource = Join-Path $AdrPath "scripts\global-stop-hook-launcher.py"
@@ -46,6 +50,66 @@ foreach ($target in $Targets) {
         }
     }
 }
+
+function Install-CodexUserPromptHook {
+    if (-not (Test-Path $CodexHookSource)) {
+        Write-Host "  [Codex] skipped user prompt hook: source not found at $CodexHookSource"
+        return
+    }
+
+    if (-not (Test-Path $CodexHookDir)) {
+        New-Item -ItemType Directory -Path $CodexHookDir -Force | Out-Null
+    }
+    Copy-Item -Path $CodexHookSource -Destination $CodexHookPath -Force
+
+    $data = [ordered]@{}
+    if (Test-Path $CodexHooksJson) {
+        try {
+            $loaded = Get-Content -Path $CodexHooksJson -Raw -Encoding UTF8 | ConvertFrom-Json -AsHashtable
+            if ($loaded -is [System.Collections.IDictionary]) {
+                $data = [ordered]@{}
+                foreach ($key in $loaded.Keys) {
+                    $data[$key] = $loaded[$key]
+                }
+            }
+        } catch {
+            $data = [ordered]@{}
+        }
+    }
+
+    if (($data["hooks"] -isnot [System.Collections.IDictionary])) {
+        $data["hooks"] = [ordered]@{}
+    }
+    $hooks = $data["hooks"]
+    $event = $hooks["UserPromptSubmit"]
+    if ($event -is [System.Collections.IList]) {
+        $handlers = @($event)
+    } elseif ($null -eq $event) {
+        $handlers = @()
+    } else {
+        $handlers = @($event)
+    }
+
+    $managed = [ordered]@{
+        type = "command"
+        command = "python `"$CodexHookPath`""
+        additionalContextLimit = 6000
+        message = "SyberMem user habit reminders add Codex prompt context when relevant."
+    }
+    $preserved = @($handlers | Where-Object {
+        -not (($_ -is [System.Collections.IDictionary]) -and ([string]($_["command"]) -like "*sybermem_user_prompt.py*"))
+    })
+    $hooks["UserPromptSubmit"] = @($preserved + $managed)
+
+    if (-not (Test-Path (Split-Path -Parent $CodexHooksJson))) {
+        New-Item -ItemType Directory -Path (Split-Path -Parent $CodexHooksJson) -Force | Out-Null
+    }
+    $data | ConvertTo-Json -Depth 20 | Set-Content -Path $CodexHooksJson -Encoding UTF8
+    Write-Host "  [Codex] installed UserPromptSubmit hook: $CodexHookPath"
+    Write-Host "  [Codex] updated hooks.json without removing unrelated hooks: $CodexHooksJson"
+}
+
+Install-CodexUserPromptHook
 
 if (-not (Test-Path $LauncherDir)) {
     New-Item -ItemType Directory -Path $LauncherDir -Force | Out-Null
