@@ -112,11 +112,11 @@ UNSUPPORTED_CLAIM_DOCS: Final = [
     Path("docs/feature_map.md"),
 ]
 UNSUPPORTED_RUNTIME_CLAIMS: Final = [
-    "per-prompt additionalContext",
     "hidden auto-resume",
-    "Codex hooks",
     ".codex/config.toml",
     "background automation",
+    '"agent"',
+    '"prompt" handler',
 ]
 LIMITATION_MARKERS: Final = [
     "unsupported",
@@ -291,25 +291,75 @@ def check_codex_user_prompt_hook_install_wiring(root: Path) -> None:
     if not hook_source.is_file():
         fail("Missing Codex user prompt hook source: .codex/hooks/user_prompt.py")
 
+    session_hook_source = root / ".codex" / "hooks" / "session_start.py"
+    if not session_hook_source.is_file():
+        fail("Missing Codex session start hook source: .codex/hooks/session_start.py")
+    stop_hook_source = root / ".codex" / "hooks" / "stop.py"
+    if not stop_hook_source.is_file():
+        fail("Missing Codex stop hook source: .codex/hooks/stop.py")
+    post_compact_hook_source = root / ".codex" / "hooks" / "post_compact.py"
+    if not post_compact_hook_source.is_file():
+        fail("Missing Codex post compact hook source: .codex/hooks/post_compact.py")
+
     hook_source_text = hook_source.read_text(encoding="utf-8")
     required_source_fragments = [
         "UserPromptSubmit",
         "hookSpecificOutput",
         "additionalContext",
         "context",
+        '"recall"',
         '"habit"',
         "--delivery",
         "prompt-time",
+        "classify_record_intent",
+        ".record-intent.json",
     ]
     missing_source = [fragment for fragment in required_source_fragments if fragment not in hook_source_text]
     if missing_source:
-        fail(f".codex/hooks/user_prompt.py is missing Codex habit reminder hook fragments: {', '.join(missing_source)}")
+        fail(f".codex/hooks/user_prompt.py is missing Codex user prompt hook fragments: {', '.join(missing_source)}")
+
+    session_source_text = session_hook_source.read_text(encoding="utf-8")
+    required_session_fragments = [
+        "SessionStart",
+        "hookSpecificOutput",
+        "additionalContext",
+        "context",
+        '"session"',
+    ]
+    missing_session = [fragment for fragment in required_session_fragments if fragment not in session_source_text]
+    if missing_session:
+        fail(f".codex/hooks/session_start.py is missing Codex SessionStart hook fragments: {', '.join(missing_session)}")
+
+    stop_source_text = stop_hook_source.read_text(encoding="utf-8")
+    required_stop_fragments = [
+        "Stop",
+        "stop_hook_active",
+        '"decision"',
+        '"block"',
+        '"reason"',
+        "/sybermem-record",
+        ".nudge-state.json",
+    ]
+    missing_stop = [fragment for fragment in required_stop_fragments if fragment not in stop_source_text]
+    if missing_stop:
+        fail(f".codex/hooks/stop.py is missing Codex Stop hook fragments: {', '.join(missing_stop)}")
+
+    post_compact_source_text = post_compact_hook_source.read_text(encoding="utf-8")
+    required_post_compact_fragments = [
+        "PostCompact",
+        ".codex-compact-marker.json",
+        "hook_event_name",
+        "trigger",
+    ]
+    missing_post_compact = [fragment for fragment in required_post_compact_fragments if fragment not in post_compact_source_text]
+    if missing_post_compact:
+        fail(f".codex/hooks/post_compact.py is missing Codex PostCompact hook fragments: {', '.join(missing_post_compact)}")
 
     forbidden_source_fragments = [
-        "context recall",
-        "project recall",
         "auto-resume",
         "background automation",
+        '"agent"',
+        '"prompt" handler',
     ]
     found_source = [fragment for fragment in forbidden_source_fragments if fragment in hook_source_text.lower()]
     if found_source:
@@ -320,13 +370,25 @@ def check_codex_user_prompt_hook_install_wiring(root: Path) -> None:
         if script.suffix == ".sh":
             required_fragments = [
                 ".codex/hooks/user_prompt.py",
+                ".codex/hooks/session_start.py",
+                ".codex/hooks/stop.py",
+                ".codex/hooks/post_compact.py",
                 ".codex/hooks",
                 "sybermem_user_prompt.py",
+                "sybermem_session_start.py",
+                "sybermem_stop.py",
+                "sybermem_post_compact.py",
                 ".codex/hooks.json",
                 '"UserPromptSubmit"',
+                '"SessionStart"',
+                '"Stop"',
+                '"PostCompact"',
                 '"type": "command"',
                 "additionalContextLimit",
-                "SyberMem user habit reminders add Codex prompt context when relevant.",
+                "SyberMem prompt context adds bounded Codex recall and habit reminders when relevant.",
+                "SyberMem session context adds bounded Codex startup context when available.",
+                "SyberMem Stop nudge adds bounded record reminders without looping.",
+                "SyberMem PostCompact marks compact re-seed for the next SessionStart.",
             ]
             forbidden_fragments = [
                 ".codex/config.toml",
@@ -334,19 +396,30 @@ def check_codex_user_prompt_hook_install_wiring(root: Path) -> None:
                 '"startup"',
                 '"session"',
                 "background automation",
-                "project recall",
                 "auto-resume",
             ]
         else:
             required_fragments = [
                 ".codex\\hooks\\user_prompt.py",
+                ".codex\\hooks\\session_start.py",
+                ".codex\\hooks\\stop.py",
+                ".codex\\hooks\\post_compact.py",
                 ".codex\\hooks",
                 "sybermem_user_prompt.py",
+                "sybermem_session_start.py",
+                "sybermem_stop.py",
+                "sybermem_post_compact.py",
                 ".codex\\hooks.json",
                 '"UserPromptSubmit"',
+                '"SessionStart"',
+                '"Stop"',
+                '"PostCompact"',
                 'type = "command"',
                 "additionalContextLimit",
-                "SyberMem user habit reminders add Codex prompt context when relevant.",
+                "SyberMem prompt context adds bounded Codex recall and habit reminders when relevant.",
+                "SyberMem session context adds bounded Codex startup context when available.",
+                "SyberMem Stop nudge adds bounded record reminders without looping.",
+                "SyberMem PostCompact marks compact re-seed for the next SessionStart.",
             ]
             forbidden_fragments = [
                 ".codex\\config.toml",
@@ -354,7 +427,6 @@ def check_codex_user_prompt_hook_install_wiring(root: Path) -> None:
                 'type = "startup"',
                 'type = "session"',
                 "background automation",
-                "project recall",
                 "auto-resume",
             ]
         missing = [fragment for fragment in required_fragments if fragment not in script_text]
@@ -514,14 +586,13 @@ def check_codex_metadata_honesty(root: Path) -> None:
         fail(f".codex-plugin/plugin.json contains unsupported Codex automation claims: {', '.join(found)}")
 
 
-def check_codex_phase_one_point_five_discoverability(root: Path) -> None:
+def check_codex_runtime_discoverability(root: Path) -> None:
     codex_project_files_fragment = 'Path.home() / ".agents" / "skills" / "sybermem-init-project" / "project-files"'
     unsupported_codex_fragments = [
-        "Codex hooks",
         ".codex/config.toml",
-        "prompt-time injection",
         "hidden auto-resume",
         "background automation",
+        "prompt or agent handler runtime",
     ]
 
     health_contents: list[bytes] = []
@@ -551,7 +622,7 @@ def check_codex_phase_one_point_five_discoverability(root: Path) -> None:
 
     codex_config = root / ".codex" / "config.toml"
     if codex_config.exists():
-        fail("Codex support must remain skills-only; .codex/config.toml must not be distributed")
+        fail("Codex support must not distribute .codex/config.toml")
 
     metadata = json.loads((root / ".codex-plugin" / "plugin.json").read_text(encoding="utf-8"))
     serialized_metadata = json.dumps(metadata, ensure_ascii=False).lower()
@@ -656,7 +727,7 @@ def main(root: Path = ROOT) -> int:
     check_codex_skill_install_wiring(root)
     check_codex_user_prompt_hook_install_wiring(root)
     check_codex_metadata_honesty(root)
-    check_codex_phase_one_point_five_discoverability(root)
+    check_codex_runtime_discoverability(root)
     check_unsupported_platform_claims(root)
     check_runtime_refresh_wiring(root)
 
