@@ -86,7 +86,7 @@ For OpenCode plugin installation and lifecycle details, see [`.opencode/INSTALL.
 
 Project initialization still uses `/sybermem-init-project` after the global install or plugin setup.
 
-On OpenCode, `/sybermem-resume` is a manual, read-only entrypoint. Use it to rebuild current context, use `/sybermem-search` when you need explicit historical evidence, and use `sybermem context session|prompt|habit` when you want explicit copy/paste-safe context. OpenCode now supports prompt-time project recall plus conservative User Habit Memory reminders through `chat.message` + `experimental.chat.system.transform`. Do not expect hidden auto-resume or unsupported background execution.
+On OpenCode, `/sybermem-resume` is a manual, read-only entrypoint. Use it to rebuild current context, use `/sybermem-search` when you need explicit historical evidence, and use `sybermem context session|prompt|habit` when you want explicit copy/paste-safe context. OpenCode now supports prompt-time project recall plus conservative User Habit Memory reminders through `chat.message` + `experimental.chat.system.transform`, and `chat.message` also writes bounded prompt-free record-intent metadata plus recall inject/abstain debug metadata. Do not expect hidden auto-resume or unsupported background execution.
 
 ### Codex
 
@@ -103,7 +103,7 @@ Re-run the one-liner install command. This is a real global runtime refresh, not
 - Claude Code skills
 - OpenCode skills
 - Codex skills
-- OpenCode plugin
+- OpenCode plugin (`~/.config/opencode/plugins/sybermem.ts`, generated from `packages/opencode-plugin/src/` but still installed as one file)
 - Codex SessionStart / UserPromptSubmit / Stop / PostCompact hooks
 - CLI / Core runtime
 
@@ -166,7 +166,7 @@ For existing projects, `/sybermem-update` should now deliver both parts of `usin
 - **Claude record-intent capture says Core is unavailable**
   Use the bounded diagnostic path, then rerun `/sybermem-update` or reinstall the managed Claude hook. This diagnostic should not store prompt content.
 - **OpenCode looks stale after an upgrade**
-  Re-run the remote install command or the local update script. That refreshes the OpenCode skills and plugin, including the prompt-time habit reminder path, then run `/sybermem-update` in the project if project-local managed files also need refresh.
+  Re-run the remote install command or the local update script. That refreshes the OpenCode skills and the single-file plugin at `~/.config/opencode/plugins/sybermem.ts`, including prompt-time habit reminders, record-intent metadata, and recall debug logging. Then run `/sybermem-update` in the project if project-local managed files also need refresh.
 - **Codex skills are missing after an upgrade**
   Re-run the remote install command or the local update script. That refreshes `~/.agents/skills`; then run `/sybermem-update` in the project if `AGENTS.md` or `.sybermem/` needs refresh. From a checkout, use `python -m pytest packages/core/tests/test_package_integrity_scripts.py packages/core/tests/test_init_project_distribution.py -q` and `python scripts/check-plugin-package.py` as the non-mutating Codex package smoke set.
 - **Codex runtime hooks are missing after an upgrade**
