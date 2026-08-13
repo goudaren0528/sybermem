@@ -315,7 +315,7 @@ def test_user_prompt_hook_emits_habit_reminder_without_persisting_prompt(tmp_pat
     # Given: a Claude-managed project and a prompt-approved user habit
     project_root = tmp_path / "project"
     project_root.mkdir()
-    write_project(project_root)
+    write_hook_project(project_root)
     sybermem_home = tmp_path / "home" / ".sybermem"
     env = {**os.environ, "SYBERMEM_HOME": str(sybermem_home), "PYTHONPATH": str(Path(__file__).resolve().parents[1])}
     old_home = os.environ.get("SYBERMEM_HOME")
