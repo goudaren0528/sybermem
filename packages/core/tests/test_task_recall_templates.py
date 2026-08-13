@@ -111,6 +111,51 @@ def test_project_health_accepts_current_task_recall_contract() -> None:
     assert result == {"status": "fresh"}
 
 
+def test_project_health_rejects_task_recall_missing_visible_marker_contract(tmp_path: Path) -> None:
+    # Given: a project has the previous Aha-capable task_recall hook before lightbulb markers
+    project = tmp_path / "project"
+    hook_dir = project / ".sybermem" / "hooks"
+    hook_dir.mkdir(parents=True)
+    stale_text = ROOT_HOOK.read_text(encoding="utf-8").replace(
+        "_SCORE_AHA_MATCHES = frozenset({\"topic\", \"keyword\"})\n_WARN_FRESHNESS",
+        "_WARN_FRESHNESS",
+    ).replace(
+        "def _has_high_signal_score(row: dict[str, str]) -> bool:\n"
+        "    match = (row.get(\"match_reason\") or row.get(\"match\") or \"\").strip().lower()\n"
+        "    if match not in _SCORE_AHA_MATCHES:\n"
+        "        return False\n"
+        "    raw_score = (row.get(\"score\") or \"\").strip()\n"
+        "    if not raw_score:\n"
+        "        return False\n"
+        "    try:\n"
+        "        return float(raw_score) >= 12.0\n"
+        "    except ValueError:\n"
+        "        return False\n\n\n",
+        "",
+    ).replace(
+        "    if _has_high_signal_score(row):\n"
+        "        return True\n",
+        "",
+    ).replace(
+        '        marker = "⭐ " if aha else "💡 "',
+        '        marker = "⭐ " if aha else ""',
+    )
+    (hook_dir / "task_recall.py").write_text(stale_text, encoding="utf-8")
+
+    # When: project health evaluates the installed hook and derives repair actions
+    spec = util.spec_from_file_location("project_health", HEALTH_CHECK)
+    assert spec is not None
+    assert spec.loader is not None
+    module = util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    result = module.check_task_recall_hook(project)
+    actions = module.generate_actions({".sybermem/hooks/task_recall.py": result})
+
+    # Then: /sybermem-update will replace the old hook instead of treating it as fresh
+    assert result == {"status": "stale"}
+    assert "replace .sybermem/hooks/task_recall.py from template" in actions
+
+
 def test_task_recall_rejects_target_project_core_by_default(tmp_path: Path) -> None:
     # Given: an untrusted target project core and a trusted installed core on PYTHONPATH
     hook_path = install_hook_project(tmp_path)

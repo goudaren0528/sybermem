@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import importlib
 import os
 import re
 import sys
@@ -55,12 +56,28 @@ def safe_field(value: str, limit: int = 120) -> str:
 # the marker keeps its meaning (scarcity = value). All text is composed strictly from
 # fields the retrieval layer already computed; nothing is inferred or invented here.
 _AHA_MATCHES = frozenset({"record-id", "relation"})
+_SCORE_AHA_MATCHES = frozenset({"topic", "keyword"})
 _WARN_FRESHNESS = frozenset({"stale", "conflicted"})
+
+
+def _has_high_signal_score(row: dict[str, str]) -> bool:
+    match = (row.get("match_reason") or row.get("match") or "").strip().lower()
+    if match not in _SCORE_AHA_MATCHES:
+        return False
+    raw_score = (row.get("score") or "").strip()
+    if not raw_score:
+        return False
+    try:
+        return float(raw_score) >= 12.0
+    except ValueError:
+        return False
 
 
 def _is_aha_row(row: dict[str, str]) -> bool:
     match = (row.get("match_reason") or row.get("match") or "").strip().lower()
     if match in _AHA_MATCHES:
+        return True
+    if _has_high_signal_score(row):
         return True
     if (row.get("successor_record") or row.get("current_guidance") or "").strip():
         return True
@@ -99,7 +116,7 @@ def render_packet(prompt: str, rows: list[dict[str, str]]) -> str:
     lines = ["SyberMem retrieval hints for this task (maximum 3):"]
     for row in rows[:3]:
         aha = _is_aha_row(row)
-        marker = "⭐ " if aha else ""
+        marker = "⭐ " if aha else "💡 "
         lines.append(f"- {marker}[{safe_field(row['record_id'])}] {safe_field(row['title'])}")
         if aha:
             why_now = _why_now(row)
@@ -154,16 +171,16 @@ def log_recall_event(root, event: str, **fields) -> None:
 def main() -> int:
     try:  # noqa: BROAD_EXCEPT_OK - hook boundary must fail open without blocking prompts.
         configure_import_path()
-        from sybermem_core.project import resolve_project_root
-        from sybermem_core.search import high_signal_recall_hints
+        project_module = importlib.import_module("sybermem_core.project")
+        search_module = importlib.import_module("sybermem_core.search")
 
         prompt = read_payload()
         if should_skip(prompt):
             return 0
-        root = resolve_project_root()
+        root = project_module.resolve_project_root()
         if root is None:
             return 0
-        rows, abstention_reason = high_signal_recall_hints(prompt, limit=3)
+        rows, abstention_reason = search_module.high_signal_recall_hints(prompt, limit=3)
         if not rows:
             if abstention_reason:
                 log_recall_event(root, "abstain", reason=safe_field(abstention_reason, 160))
