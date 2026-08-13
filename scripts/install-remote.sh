@@ -11,6 +11,7 @@ ARCHIVE_PREFIX="sybermem-$BRANCH"
 
 CLAUDE_SKILLS="$HOME/.claude/skills"
 OPENCODE_SKILLS="$HOME/.config/opencode/skills"
+CODEX_SKILLS="$HOME/.agents/skills"
 LAUNCHER_DIR="$HOME/.claude/sybermem"
 LAUNCHER_PATH="$LAUNCHER_DIR/launch_record_change_on_stop.py"
 SESSION_LAUNCHER_PATH="$LAUNCHER_DIR/launch_session_start_context.py"
@@ -45,7 +46,7 @@ install_skills() {
     local label="$2"
     mkdir -p "$target"
     rm -rf "$target/init-project" "$target/record" "$target/summary"
-    for skill in sybermem-init-project sybermem-record sybermem-summary sybermem-resume sybermem-digest sybermem-phase-analyze sybermem-phase-confirm using-sybermem sybermem-update sybermem-search sybermem-link sybermem-theme-digest sybermem-team-publish sybermem-team-summary; do
+    for skill in sybermem-init-project sybermem-record sybermem-summary sybermem-resume sybermem-digest sybermem-phase-analyze sybermem-phase-confirm using-sybermem sybermem-update sybermem-search sybermem-link sybermem-theme-digest sybermem-team-publish sybermem-team-summary sybermem-habit; do
         if [ -d "$SKILLS_SRC/$skill" ]; then
             rm -rf "$target/$skill"
             cp -r "$SKILLS_SRC/$skill" "$target/"
@@ -56,6 +57,7 @@ install_skills() {
 
 install_skills "$CLAUDE_SKILLS" "Claude Code"
 install_skills "$OPENCODE_SKILLS" "OpenCode"
+install_skills "$CODEX_SKILLS" "Codex"
 
 # Global launchers: only needed by the Claude Code lifecycle hooks.
 if [ -d "$HOME/.claude" ]; then
@@ -125,6 +127,7 @@ echo "  /sybermem-link          — Add a forward relation between two existing 
 echo "  /sybermem-theme-digest  — Create a durable topic-level digest that compresses one theme across multiple related phases or records"
 echo "  /sybermem-team-publish  — Publish the current project into Team memory"
 echo "  /sybermem-team-summary  — Generate the Team management summary"
+echo "  /sybermem-habit         — Manage user-level habit memory and reminders"
 echo ""
 if [ "$SYBERMEM_ON_PATH" = "1" ]; then
     echo "sybermem CLI is installed and on PATH. You can now run: sybermem project init --register"

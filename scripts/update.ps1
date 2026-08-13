@@ -1,5 +1,5 @@
 # SyberMem - update script (Windows)
-# Sync current skills to the Claude Code and OpenCode user directories.
+# Sync current skills to the Claude Code, OpenCode, and Codex user directories.
 
 $ErrorActionPreference = "Stop"
 $AdrPath = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
@@ -19,6 +19,7 @@ $LegacyLocalSkills = Join-Path $AdrPath ".claude\skills"
 $Targets = @(
     @{ Path = Join-Path $env:USERPROFILE ".claude\skills"; Label = "Claude Code" }
     @{ Path = Join-Path $env:USERPROFILE ".config\opencode\skills"; Label = "OpenCode" }
+    @{ Path = Join-Path $env:USERPROFILE ".agents\skills"; Label = "Codex" }
 )
 
 Write-Host "=== SyberMem Update ==="
@@ -33,7 +34,7 @@ foreach ($target in $Targets) {
             Remove-Item -Path $legacyPath -Recurse -Force -Confirm:$false
         }
     }
-    foreach ($skill in @("sybermem-init-project", "sybermem-record", "sybermem-summary", "sybermem-resume", "sybermem-digest", "sybermem-phase-analyze", "sybermem-phase-confirm", "using-sybermem", "sybermem-update", "sybermem-search", "sybermem-link", "sybermem-theme-digest", "sybermem-team-publish", "sybermem-team-summary")) {
+    foreach ($skill in @("sybermem-init-project", "sybermem-record", "sybermem-summary", "sybermem-resume", "sybermem-digest", "sybermem-phase-analyze", "sybermem-phase-confirm", "using-sybermem", "sybermem-update", "sybermem-search", "sybermem-link", "sybermem-theme-digest", "sybermem-team-publish", "sybermem-team-summary", "sybermem-habit")) {
         $src = Join-Path $SkillSource $skill
         $dst = Join-Path $target.Path $skill
         if (Test-Path $src) {
@@ -92,6 +93,7 @@ Write-Host "  /sybermem-link          - Link existing records"
 Write-Host "  /sybermem-theme-digest  - Create a cross-phase topic digest"
 Write-Host "  /sybermem-team-publish  - Publish the current project to Team memory"
 Write-Host "  /sybermem-team-summary  - Generate the Team management summary"
+Write-Host "  /sybermem-habit         - Manage user-level habit memory and reminders"
 Write-Host ""
 $sybermemOnPath = ($env:PATH -split ';' | Where-Object { $_.TrimEnd('\') -ieq $CliDir.TrimEnd('\') }).Count -gt 0
 if ($sybermemOnPath) {
