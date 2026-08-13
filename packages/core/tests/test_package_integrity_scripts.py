@@ -248,6 +248,28 @@ def test_package_integrity_exposes_opencode_cli_resolution_check() -> None:
     ]
 
 
+def test_package_integrity_exposes_opencode_source_bundle_and_privacy_guards() -> None:
+    # Given: OpenCode ships one bundled plugin but keeps maintainable source modules
+    checker = runpy.run_path(str(CHECK_SCRIPT))
+
+    # When / Then: package integrity checks track the source split and prompt-free metadata guards
+    assert checker["OPENCODE_PLUGIN_SOURCE_MODULES"] == [
+        Path("packages/opencode-plugin/src/index.ts"),
+        Path("packages/opencode-plugin/src/plugin.ts"),
+        Path("packages/opencode-plugin/src/runtime.ts"),
+        Path("packages/opencode-plugin/src/project_state.ts"),
+        Path("packages/opencode-plugin/src/followup.ts"),
+        Path("packages/opencode-plugin/src/state.ts"),
+        Path("packages/opencode-plugin/src/prompt_context.ts"),
+        Path("packages/opencode-plugin/src/compaction.ts"),
+        Path("packages/opencode-plugin/src/record_intent.ts"),
+        Path("packages/opencode-plugin/src/recall_debug.ts"),
+    ]
+    assert callable(checker["check_opencode_plugin_source_bundle"])
+    assert callable(checker["check_opencode_prompt_privacy"])
+    assert "scripts/build-opencode-plugin.mjs" in CHECK_SCRIPT.read_text(encoding="utf-8")
+
+
 def test_opencode_plugin_uses_resolver_backed_cli_commands() -> None:
     # Given: OpenCode plugin commands must be routed through the resolver-backed launcher fallback
     plugin = (ROOT / "packages" / "opencode-plugin" / "sybermem.ts").read_text(encoding="utf-8")
@@ -304,6 +326,55 @@ def test_opencode_plugin_wires_prompt_time_recall_and_toasts() -> None:
     assert "undocumented per-prompt hook" not in plugin
     assert '"tui.toast.show"' not in plugin
     assert "level:" not in plugin
+
+
+def test_opencode_plugin_bundle_keeps_single_file_installer_contract() -> None:
+    # Given: installers still copy the generated single-file OpenCode plugin artifact
+    plugin = (ROOT / "packages" / "opencode-plugin" / "sybermem.ts").read_text(encoding="utf-8")
+
+    # When / Then: the artifact is generated and has no local source imports
+    assert "SyberMem OpenCode Plugin (generated bundle)" in plugin
+    assert "packages/opencode-plugin/src/index.ts" in plugin
+    assert "from \"./src" not in plugin
+    assert "from './src" not in plugin
+    assert "from \"./plugin\"" not in plugin
+    assert "--check" in (ROOT / "scripts" / "build-opencode-plugin.mjs").read_text(encoding="utf-8")
+    for relative_path in [
+        Path("scripts/install.sh"),
+        Path("scripts/install.ps1"),
+        Path("scripts/install-remote.sh"),
+        Path("scripts/install-remote.ps1"),
+        Path("scripts/update.sh"),
+        Path("scripts/update.ps1"),
+    ]:
+        text = (ROOT / relative_path).read_text(encoding="utf-8")
+        source_fragment = "packages/opencode-plugin/sybermem.ts" if relative_path.suffix == ".sh" else "packages\\opencode-plugin\\sybermem.ts"
+        assert source_fragment in text
+
+
+def test_opencode_plugin_records_prompt_free_intent_and_recall_debug_metadata() -> None:
+    # Given: OpenCode prompt-time behavior writes bounded metadata only
+    record_intent = (ROOT / "packages" / "opencode-plugin" / "src" / "record_intent.ts").read_text(encoding="utf-8")
+    recall_debug = (ROOT / "packages" / "opencode-plugin" / "src" / "recall_debug.ts").read_text(encoding="utf-8")
+    plugin = (ROOT / "packages" / "opencode-plugin" / "sybermem.ts").read_text(encoding="utf-8")
+
+    # When / Then: record intent and recall debug persist metadata, not raw prompt text
+    assert ".record-intent.json" in record_intent
+    assert "source: \"opencode-chat-message\"" in record_intent
+    assert "phrase: \"\"" in record_intent
+    assert "matched_pattern" in record_intent
+    assert ".recall-debug.jsonl" in recall_debug
+    assert "boundedJsonlAppend" in recall_debug
+    assert "record_ids" in recall_debug
+    assert "match_classes" in recall_debug
+    assert "abstain" in recall_debug
+    assert ".record-intent.json" in plugin
+    assert ".recall-debug.jsonl" in plugin
+    assert "opencode-chat-message" in plugin
+    combined = f"{record_intent}\n{recall_debug}"
+    assert "raw_prompt" not in combined
+    assert "prompt_text" not in combined
+    assert "phrase: text" not in combined
 
 
 def test_active_docs_do_not_retain_stale_codex_or_opencode_platform_claims() -> None:
