@@ -39,6 +39,10 @@ Do NOT report a record without verifying it exists with a file-system tool.
 
 Resolve project root by walking up from cwd to find `.sybermem/` + `.claude/settings.json`. Auto-migrate `ADR/` if found. Full rules in the session protocol block in AGENTS.md/CLAUDE.md.
 
+## CLI Resolution
+
+Before running SyberMem CLI commands, resolve a command variable first. On Windows PowerShell, prefer `$env:USERPROFILE\.claude\sybermem\cli\sybermem.cmd` and store the chosen command in `$SyberMemCli`; on Unix, prefer `$HOME/.claude/sybermem/cli/sybermem` and store the chosen command in `"$SYBERMEM_CLI"`. If the fixed launcher is unavailable, fall back to bare `sybermem`. Do not modify persistent PATH automatically. Command examples below use `$SyberMemCli` / `"$SYBERMEM_CLI"`.
+
 ## Query Syntax
 
 | Query form | Meaning |
@@ -64,9 +68,9 @@ You MUST complete these steps in order:
    - **free keyword** → Grep `## Key Conclusions` first, then Grep `## Archived Conclusions`, then Grep record bodies under `.sybermem/{changes,decisions,requirements,bugs}/`. Results from `## Archived Conclusions` are marked with their archive reason (e.g. `[superseded by ...]`, `[archived]`).
 
    **When `--scope workspace` is specified:**
-   - Prefer running `sybermem search <query> --scope workspace --format json`.
+   - Prefer running `$SyberMemCli search <query> --scope workspace --format json` or `"$SYBERMEM_CLI" search <query> --scope workspace --format json`.
    - Optional filters may be added: `--project <slug>`, `--type <change|decision|requirement|bug>`, `--project-status <active|missing|stale>`.
-   - If the CLI reports that the workspace index is missing, tell the user to run `sybermem index build` first.
+   - If the CLI reports that the workspace index is missing, tell the user to run `$SyberMemCli index build` or `"$SYBERMEM_CLI" index build` first.
    - Use the returned JSON as the source of truth, then explain or group the results for the user.
 4. **Enrich each hit** — for every matched record, look up its phase (from phase-index coverage map), read its `implements`/`fixes`/`related` fields, read its optional `superseded_by` field, and reverse-scan for records that it supersedes.
 5. **Rank** — keyword hits in Key Conclusions rank above body-only hits; newer dates rank higher within the same tier.

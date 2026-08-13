@@ -9,6 +9,10 @@ description: Generate the Team management summary from the current project's rem
 
 Use the existing Team summary CLI surface to generate management-consumption outputs.
 
+## CLI Resolution
+
+Before running SyberMem CLI commands, resolve a command variable first. On Windows PowerShell, prefer `$env:USERPROFILE\.claude\sybermem\cli\sybermem.cmd` and store the chosen command in `$SyberMemCli`; on Unix, prefer `$HOME/.claude/sybermem/cli/sybermem` and store the chosen command in `"$SYBERMEM_CLI"`. If the fixed launcher is unavailable, fall back to bare `sybermem`. Do not modify persistent PATH automatically. Command examples below use `$SyberMemCli` / `"$SYBERMEM_CLI"`.
+
 ## Flow
 
 1. Resolve the current project root.
@@ -16,7 +20,7 @@ Use the existing Team summary CLI surface to generate management-consumption out
 3. If present, run:
 
 ```bash
-sybermem team summary --team-path <team-path> --format json
+$SyberMemCli team summary --team-path <team-path> --format json
 ```
 
 4. If not present, ask the user for a Team repo path.

@@ -43,6 +43,10 @@ Do NOT ignore the resolved root and answer from the wrong directory context.
 
 Resolve project root by walking up from cwd to find `.sybermem/` + `.claude/settings.json`. Auto-migrate `ADR/` if found. Full rules in the session protocol block in AGENTS.md/CLAUDE.md.
 
+## CLI Resolution
+
+Before running SyberMem CLI commands, resolve a command variable first. On Windows PowerShell, prefer `$env:USERPROFILE\.claude\sybermem\cli\sybermem.cmd` and store the chosen command in `$SyberMemCli`; on Unix, prefer `$HOME/.claude/sybermem/cli/sybermem` and store the chosen command in `"$SYBERMEM_CLI"`. If the fixed launcher is unavailable, fall back to bare `sybermem`. Do not modify persistent PATH automatically. Command examples below use `$SyberMemCli` / `"$SYBERMEM_CLI"`.
+
 ## Flow
 
 ### Step 1: Health check and report current SyberMem state
@@ -78,7 +82,7 @@ Explain what would currently happen if the user runs:
 
 **Authoritative source: run the deterministic router, do not re-derive by hand.**
 
-Run `sybermem next-step --format json` and treat its `action` + `reason` as the
+Run `$SyberMemCli next-step --format json` or `"$SYBERMEM_CLI" next-step --format json` and treat its `action` + `reason` as the
 canonical recommendation. This is the same core router (`recommend_next_step`)
 that `/sybermem-resume` uses, so `using-sybermem` and `resume` never disagree.
 Present the returned action verbatim, then add human-friendly context.

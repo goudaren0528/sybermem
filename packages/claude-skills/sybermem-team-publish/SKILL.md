@@ -9,6 +9,10 @@ description: Publish the current project into Team memory using the remembered T
 
 Use the existing Team publication pipeline through the `sybermem` CLI. Team publish is a high-impact action: always use preview -> review -> publish with the preview source hash.
 
+## CLI Resolution
+
+Before running SyberMem CLI commands, resolve a command variable first. On Windows PowerShell, prefer `$env:USERPROFILE\.claude\sybermem\cli\sybermem.cmd` and store the chosen command in `$SyberMemCli`; on Unix, prefer `$HOME/.claude/sybermem/cli/sybermem` and store the chosen command in `"$SYBERMEM_CLI"`. If the fixed launcher is unavailable, fall back to bare `sybermem`. Do not modify persistent PATH automatically. Command examples below use `$SyberMemCli` / `"$SYBERMEM_CLI"`.
+
 ## Flow
 
 1. Resolve the current project root.
@@ -16,13 +20,13 @@ Use the existing Team publication pipeline through the `sybermem` CLI. Team publ
 3. Generate a read-only preview. If the project is already linked to Team memory, run:
 
 ```bash
-sybermem publish status --preview --format json
+$SyberMemCli publish status --preview --format json
 ```
 
 4. If the project is not yet linked to Team memory, ask the user for a Team repo path, then preview with:
 
 ```bash
-sybermem publish status --team-path <path> --preview --format json
+$SyberMemCli publish status --team-path <path> --preview --format json
 ```
 
 5. Review the preview before publishing. Check and report the trust envelope:
@@ -35,13 +39,13 @@ sybermem publish status --team-path <path> --preview --format json
 6. Only if the preview is acceptable, publish with the exact preview hash:
 
 ```bash
-sybermem publish status --preview-source-hash <source_hash_from_preview> --format json
+$SyberMemCli publish status --preview-source-hash <source_hash_from_preview> --format json
 ```
 
 If using a one-time Team path, keep the same path:
 
 ```bash
-sybermem publish status --team-path <path> --preview-source-hash <source_hash_from_preview> --format json
+$SyberMemCli publish status --team-path <path> --preview-source-hash <source_hash_from_preview> --format json
 ```
 
 If publish returns `stale_preview`, stop and generate a new preview. Do not retry with the old hash.

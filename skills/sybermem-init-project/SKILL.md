@@ -73,6 +73,10 @@ After resolving the project root, apply legacy directory checks:
 3. If the resolved root has both `.sybermem/` and `ADR/`, use `.sybermem/`, warn that `ADR/` was ignored.
 4. If neither exists, create `.sybermem/`.
 
+## CLI Resolution
+
+Before running SyberMem CLI commands, resolve a command variable first. On Windows PowerShell, prefer `$env:USERPROFILE\.claude\sybermem\cli\sybermem.cmd` and store the chosen command in `$SyberMemCli`; on Unix, prefer `$HOME/.claude/sybermem/cli/sybermem` and store the chosen command in `"$SYBERMEM_CLI"`. If the fixed launcher is unavailable, fall back to bare `sybermem`. Do not modify persistent PATH automatically. Command examples below use `$SyberMemCli` / `"$SYBERMEM_CLI"`.
+
 ## Flow
 
 ### Step 0.5: Fast-path health check (existing projects only)
@@ -185,7 +189,7 @@ silently write — to create one small illustrative `change` record that capture
 
 - Ask once: "Want a sample record so you can see the format and try `/sybermem-resume`? (y/n)"
 - Only if the user agrees, create it via the normal `/sybermem-record` fast path
-  (generated `record_id`/`key_conclusion`/`topics`, then `sybermem project index build` + `check`).
+  (generated `record_id`/`key_conclusion`/`topics`, then `$SyberMemCli project index build` / `"$SYBERMEM_CLI" project index build` + `check`).
 - Never create a sample record on an existing-codebase init or on a refresh, and never
   without explicit opt-in — this preserves the "scan but don't auto-create records" invariant.
 
