@@ -29,6 +29,42 @@ function resolveRoot(cwd: string): string | null {
   return null
 }
 
+function userHome(): string | null {
+  return process.env.USERPROFILE ?? process.env.HOME ?? null
+}
+
+function resolveSybermemCommand(): string {
+  const home = userHome()
+  if (!home) return "sybermem"
+  const launcher = process.platform === "win32"
+    ? join(home, ".claude", "sybermem", "cli", "sybermem.cmd")
+    : join(home, ".claude", "sybermem", "cli", "sybermem")
+  return existsSync(launcher) ? launcher : "sybermem"
+}
+
+async function sybermemText(
+  $: any,
+  root: string,
+  args: string[]
+): Promise<string> {
+  const sybermem = resolveSybermemCommand()
+  if (args[0] === "next-step") {
+    return $`${sybermem} next-step ${args[1]} ${args[2]}`.cwd(root).text()
+  }
+  if (args[0] === "habit" && args[1] === "inject") {
+    return $`${sybermem} habit inject ${args[2]} ${args[3]} ${args[4]} ${args[5]}`.cwd(root).text()
+  }
+  if (args[0] === "context" && args[1] === "session") {
+    return $`${sybermem} context session ${args[2]} ${args[3]}`.cwd(root).text()
+  }
+  throw new Error(`Unsupported SyberMem command route: ${args[0] ?? ""} ${args[1] ?? ""}`.trim())
+}
+
+async function digestStatusText($: any, root: string): Promise<string> {
+  const sybermem = resolveSybermemCommand()
+  return $`${sybermem} digest status --format json`.cwd(root).nothrow().text()
+}
+
 // ---------------------------------------------------------------------------
 // INDEX.md parsing
 // ---------------------------------------------------------------------------
@@ -616,7 +652,22 @@ export const SyberMemPlugin: Plugin = async ({ $, directory }) => {
       const identity = parseProjectIdentity(root)
       const stale = await detectStaleSignal($, root)
 
-      let context = "## SyberMem Project Memory\n\n"
+      let context = ""
+
+      try {
+        const manualContext = (
+          await sybermemText($, root, ["context", "session", "--format", "markdown"])
+        ).trim()
+        if (manualContext.startsWith("## SyberMem Manual Session Context")) {
+          context += `${manualContext}\n\n`
+        }
+      } catch {
+        // Old CLI or unavailable launcher — fall back to the inline compaction context below.
+      }
+
+      if (!context) {
+        context = "## SyberMem Project Memory\n\n"
+      }
 
       if (identity.exists && identity.slug) {
         context += `Project: ${identity.slug} (${identity.projectId ?? "no id"}).\n\n`
@@ -640,7 +691,7 @@ export const SyberMemPlugin: Plugin = async ({ $, directory }) => {
       // summaries stop reading as authoritative during compaction. Read-only — it points
       // to /sybermem-digest, never regenerates. Fails open when the CLI is unavailable.
       try {
-        const raw = await $`sybermem digest status --format json`.cwd(root).text()
+        const raw = await digestStatusText($, root)
         const report = JSON.parse(raw)
         const staleDigests = typeof report?.stale === "number" ? report.stale : 0
         if (staleDigests > 0) {
@@ -673,7 +724,7 @@ export const SyberMemPlugin: Plugin = async ({ $, directory }) => {
       // CLI so the recommendation matches resume/using-sybermem; fails open when the
       // CLI is unavailable so compaction never breaks.
       try {
-        const raw = await $`sybermem next-step --format json`.cwd(root).text()
+        const raw = await sybermemText($, root, ["next-step", "--format", "json"])
         const rec = JSON.parse(raw)
         const action = typeof rec?.action === "string" ? rec.action.trim() : ""
         const reason = typeof rec?.reason === "string" ? rec.reason.trim() : ""
@@ -682,6 +733,20 @@ export const SyberMemPlugin: Plugin = async ({ $, directory }) => {
         }
       } catch {
         // CLI missing or errored — skip the recommendation line.
+      }
+
+      // User Habit Memory is user-owned and injected only at supported compaction
+      // time. This deliberately avoids claiming an undocumented per-prompt hook.
+      try {
+        const habitContext = "compaction planning review implementation coding documentation"
+        const habitMarkdown = (
+          await sybermemText($, root, ["habit", "inject", "--context", habitContext, "--format", "markdown"])
+        ).trim()
+        if (habitMarkdown) {
+          context += `\n${habitMarkdown}\n`
+        }
+      } catch {
+        // CLI missing, old install, or no habit support — compaction stays fail-open.
       }
 
       context += "\n### SyberMem Commands\n"
