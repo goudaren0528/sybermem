@@ -92,14 +92,24 @@ implements: [requirement-002]
 - phase / theme digest 历史同步到 Team repo
 - 对应 skill：`/sybermem-team-publish`、`/sybermem-team-summary`
 
+### User Habit Memory
+
+- 用户级习惯存储：`~/.sybermem/user-habits/`，或测试/自定义环境中的 `SYBERMEM_HOME/user-habits/`
+- 显式记录：`sybermem habit add --type workflow --applies-to planning "Prefer plans before implementation"`
+- 查看与治理：`sybermem habit list`、`search`、`pause`、`delete`
+- 可见提醒：`sybermem habit remind --context planning --format markdown` 与 `/sybermem-habit`
+- 手动/compaction 注入：`sybermem habit inject --context planning --format markdown`
+- 保守门槛：只注入 active、高置信、未被排除、与上下文直接相关的习惯，最多 3 条
+- 默认不进入项目 `.sybermem/` records，也不发布到 Team memory
+
 ## CLI 与 Skill 的边界
 
 SyberMem 有两类执行路径，可靠性不同：
 
 | 路径 | 代表能力 | 说明 |
 |---|---|---|
-| CLI / Core | `sybermem resume`、`search`、`next-step`、`portfolio`、`index build`、`project index build/check`、`record id`、`team init/summary`、`publish status`、`project uninstall` | 程序执行，可脚本化，适合确定性查询和发布流程 |
-| Skill 编排 | `/sybermem-record`、`/sybermem-link`、`/sybermem-digest`、`/sybermem-theme-digest`、`/sybermem-phase-analyze`、`/sybermem-phase-confirm` | 由 AI 按 skill 指令编辑 `.sybermem/` Markdown，适合需要判断和整理的工作 |
+| CLI / Core | `sybermem resume`、`search`、`next-step`、`portfolio`、`index build`、`project index build/check`、`record id`、`habit add/list/search/pause/delete/remind/inject`、`team init/summary`、`publish status`、`project uninstall` | 程序执行，可脚本化，适合确定性查询和发布流程 |
+| Skill 编排 | `/sybermem-record`、`/sybermem-habit`、`/sybermem-link`、`/sybermem-digest`、`/sybermem-theme-digest`、`/sybermem-phase-analyze`、`/sybermem-phase-confirm` | 由 AI 按 skill 指令编辑 `.sybermem/` Markdown 或调用用户级 habit CLI，适合需要判断和整理的工作 |
 
 `sybermem record id --type <change|decision|requirement|bug>` 只生成 canonical record ID；完整 record 创建仍通过 `/sybermem-record` 完成。
 
@@ -109,8 +119,9 @@ SyberMem 有两类执行路径，可靠性不同：
 |---|---|---|
 | Claude Code | 完整集成 | plugin metadata、skills、SessionStart / Stop / UserPromptSubmit hooks |
 | OpenCode | 支持集成 | skills + TypeScript plugin；session lifecycle 与 compaction 承接 |
+| Codex | Phase 1.5 skills | 用户级 skills 安装到 `~/.agents/skills`；带健康检查可发现性与发布验证；无 hooks 或运行时自动化 |
 
-OpenCode 目前没有已文档化的逐次用户提示词自动注入回调。SyberMem 不会在 OpenCode 上声明隐藏 auto-resume、后台执行或不受支持的 prompt-time injection；OpenCode 上的 `/sybermem-resume` 和 `/sybermem-search` 是手动入口，自动承接主要依赖受支持的 compaction 生命周期。更多说明见 [`.opencode/INSTALL.md`](.opencode/INSTALL.md)。
+Claude Code 受管项目可通过 `UserPromptSubmit` 对明显偏好语句或 prompt-approved habits 给出有界提醒；老项目需运行 `/sybermem-update` 刷新 hook。OpenCode 目前没有已文档化的逐次用户提示词自动注入回调。SyberMem 不会在 OpenCode 上声明隐藏 auto-resume、后台执行或不受支持的 prompt-time injection；OpenCode 上的 `/sybermem-resume`、`/sybermem-search` 和 `/sybermem-habit` 是手动入口，项目记忆和 User Habit Memory 的自动承接主要依赖受支持的 compaction 生命周期。Codex Phase 1.5 只安装用户级 skills 到 `~/.agents/skills`，并让项目健康检查从该安装位置发现模板；它不安装 Codex hooks、`.codex/config.toml` 或后台自动化；更多说明见 [`.codex/INSTALL.md`](.codex/INSTALL.md)。OpenCode 说明见 [`.opencode/INSTALL.md`](.opencode/INSTALL.md)。
 
 ## 安装与升级
 
@@ -124,7 +135,7 @@ curl -sSL https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/i
 irm https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/install-remote.ps1 | iex
 ```
 
-这会刷新用户级 Claude Code skills、OpenCode skills、OpenCode plugin，以及 CLI / Core runtime。
+这会刷新用户级 Claude Code skills、OpenCode skills、Codex skills（`~/.agents/skills`）、OpenCode plugin，以及 CLI / Core runtime。安装器会创建固定 CLI launcher：macOS / Linux 为 `$HOME/.claude/sybermem/cli/sybermem`，Windows 为 `%USERPROFILE%\.claude\sybermem\cli\sybermem.cmd`。SyberMem 的 OpenCode plugin 和 CLI 型 skills 在 agent 子进程找不到裸 `sybermem` 时会优先使用这个固定 launcher；安装脚本默认不修改持久 PATH。
 
 ### 本地插件验证
 
@@ -140,7 +151,7 @@ claude --plugin-dir .
 2. 再进入已有项目运行 `/sybermem-update`。
 3. 新项目运行 `/sybermem-init-project`。
 
-全局刷新只更新用户级 runtime 和 skills；项目内的 `.sybermem/`、hooks、模板和说明文件需要 `/sybermem-update` 才会刷新。
+全局刷新只更新用户级 runtime、Claude/OpenCode/Codex skills 和 OpenCode plugin；项目内的 `.sybermem/`、hooks、模板和说明文件需要 `/sybermem-update` 才会刷新。Codex Phase 1.5 的健康检查会把 `~/.agents/skills/sybermem-init-project/project-files` 作为模板来源之一，因此 Codex 安装路径也能参与项目 freshness 检查。若修复的是 CLI launcher、OpenCode plugin 或 skill 指令链路，按上面的顺序重跑全局安装/更新，再进项目跑 `/sybermem-update` 即可让现有项目生效。
 
 ## 初始化项目
 
@@ -171,6 +182,7 @@ claude --plugin-dir .
 - `/sybermem-resume`：获取只读续接视图
 - `/sybermem-record`：记录一轮有价值的工作
 - `/sybermem-search`：查找历史 records
+- `/sybermem-habit`：记录、查看、暂停、删除用户级习惯，或触发可见提醒
 - `/sybermem-summary`：查看当前项目状态
 - `/sybermem-digest`：沉淀稳定阶段结论
 - `/sybermem-theme-digest`：沉淀跨阶段主题结论
@@ -216,6 +228,8 @@ packages/claude-skills/              # Skills 分发源
 packages/core/                       # Core memory / Team publication logic
 packages/cli/                        # sybermem CLI
 packages/opencode-plugin/            # OpenCode plugin
+.codex-plugin/                       # Codex marketplace/entry metadata
+.codex/                              # Codex Phase 1 install notes
 scripts/                             # 安装、更新、卸载与打包校验脚本
 ```
 
@@ -245,7 +259,7 @@ sybermem project uninstall
 
 - `.sybermem/` 是当前规范目录。
 - 如果项目仍使用旧 `ADR/`，首次运行相关 SyberMem workflow 时会迁移到 `.sybermem/`。
-- Claude 的 prompt-time recall 只适用于受管 Claude hooks；OpenCode 不声明同类逐次注入。
+- Claude 的 prompt-time recall 只适用于受管 Claude hooks；OpenCode 和 Codex 不声明同类逐次注入。
 - 更多安装、升级和兼容细节见 [INSTALL.md](INSTALL.md)。
 
 ## License

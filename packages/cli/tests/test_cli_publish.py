@@ -121,9 +121,10 @@ def test_team_publish_skill_requires_preview_review_publish_hash_flow() -> None:
         text = skill_path.read_text(encoding="utf-8")
 
         # Then: the default path binds publish to a reviewed preview source hash
-        assert "sybermem publish status --preview --format json" in text
+        assert "$SyberMemCli publish status --preview --format json" in text
         assert "--preview-source-hash <source_hash_from_preview> --format json" in text
         assert "preview -> review -> publish" in text
+        assert "Do not modify persistent PATH automatically" in text
         assert "sybermem publish status --format json" not in text
 
 
