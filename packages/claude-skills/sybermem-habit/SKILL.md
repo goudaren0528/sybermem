@@ -80,7 +80,7 @@ $SyberMemCli habit remind --context "planning implementation preference" --forma
 | Writing a habit through `/sybermem-record` | Use `$SyberMemCli habit add` or `"$SYBERMEM_CLI" habit add`; habits are user-level. |
 | Saving a habit after observing repeated behavior | Ask for confirmation first. |
 | Storing the user's raw prompt as the habit | Store a normalized statement. |
-| Claiming unsupported platform reminders | State the actual boundary: Claude Code and OpenCode support prompt-time habit reminders; Codex supports habit-only `UserPromptSubmit` reminders; Gemini/Cursor/Kimi do not have runtime reminder wiring. |
+| Claiming unsupported platform reminders | State the actual boundary: Claude Code, OpenCode, and Codex support prompt-time habit reminders on their supported prompt seams; Codex also supports bounded startup context, prompt recall, record-intent capture, Stop record nudges, and compact re-seed markers, but not hidden auto-resume or direct compaction prompt injection. Gemini/Cursor/Kimi do not have runtime reminder wiring. |
 | Adding prompt-time policy by default | Use `prompt_ok_when_supported` only on explicit request. |
 
 ## Completion

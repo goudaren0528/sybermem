@@ -98,7 +98,7 @@ On OpenCode, this skill remains manual and read-only:
 - use `/sybermem-search` when you need explicit historical evidence
 - rely on the supported compaction flow when OpenCode compacts the session
 
-Do not claim prompt-time automatic injection on OpenCode. The documented limitation still applies.
+Do not claim unsupported hidden automation. OpenCode prompt-time project recall and habit reminders use the documented chat transform seam; Codex prompt-time recall and habit reminders use `UserPromptSubmit` `additionalContext`.
 
 ## Red Flags — STOP and Re-check
 
