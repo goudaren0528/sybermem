@@ -92,14 +92,24 @@ implements: [requirement-002]
 - phase/theme digest history sync into the Team repo
 - matching skills: `/sybermem-team-publish`, `/sybermem-team-summary`
 
+### User Habit Memory
+
+- user-level habit storage: `~/.sybermem/user-habits/`, or `SYBERMEM_HOME/user-habits/` in tests/custom environments
+- explicit capture: `sybermem habit add --type workflow --applies-to planning "Prefer plans before implementation"`
+- review and governance: `sybermem habit list`, `search`, `pause`, and `delete`
+- visible reminders: `sybermem habit remind --context planning --format markdown` and `/sybermem-habit`
+- manual/compaction injection: `sybermem habit inject --context planning --format markdown`
+- conservative gates: only active, high-confidence, directly relevant, non-excluded habits are injected, with a maximum of three
+- habits are not stored in project `.sybermem/` records and are not published to Team memory by default
+
 ## CLI vs Skill Boundaries
 
 SyberMem has two execution paths with different reliability properties:
 
 | Path | Representative capabilities | Notes |
 |---|---|---|
-| CLI / Core | `sybermem resume`, `search`, `next-step`, `portfolio`, `index build`, `project index build/check`, `record id`, `team init/summary`, `publish status`, `project uninstall` | Programmatic and scriptable; best for deterministic queries and publication flows |
-| Skill orchestration | `/sybermem-record`, `/sybermem-link`, `/sybermem-digest`, `/sybermem-theme-digest`, `/sybermem-phase-analyze`, `/sybermem-phase-confirm` | AI edits `.sybermem/` Markdown according to skill instructions; best for work that requires judgment and synthesis |
+| CLI / Core | `sybermem resume`, `search`, `next-step`, `portfolio`, `index build`, `project index build/check`, `record id`, `habit add/list/search/pause/delete/remind/inject`, `team init/summary`, `publish status`, `project uninstall` | Programmatic and scriptable; best for deterministic queries and publication flows |
+| Skill orchestration | `/sybermem-record`, `/sybermem-habit`, `/sybermem-link`, `/sybermem-digest`, `/sybermem-theme-digest`, `/sybermem-phase-analyze`, `/sybermem-phase-confirm` | AI edits `.sybermem/` Markdown or invokes user-level habit CLI according to skill instructions; best for work that requires judgment and synthesis |
 
 `sybermem record id --type <change|decision|requirement|bug>` only mints a canonical record ID. Full record creation still happens through `/sybermem-record`.
 
@@ -109,8 +119,9 @@ SyberMem has two execution paths with different reliability properties:
 |---|---|---|
 | Claude Code | Full integration | plugin metadata, skills, SessionStart / Stop / UserPromptSubmit hooks |
 | OpenCode | Supported integration | skills + TypeScript plugin; session lifecycle and compaction carry-forward |
+| Codex | Phase 1.5 skills | user-level skills at `~/.agents/skills`; health-check discoverability and release verification; no hooks or runtime automation |
 
-OpenCode does not currently expose a documented per-prompt automatic injection callback. SyberMem does not claim hidden auto-resume, background execution, or unsupported prompt-time injection on OpenCode; `/sybermem-resume` and `/sybermem-search` are manual there, and automatic carry-forward primarily relies on the supported compaction lifecycle. See [`.opencode/INSTALL.md`](.opencode/INSTALL.md) for details.
+Claude Code managed projects can use `UserPromptSubmit` for bounded reminders when prompts look like reusable preferences or when prompt-approved habits match; existing projects need `/sybermem-update` to refresh the hook. OpenCode does not currently expose a documented per-prompt automatic injection callback. SyberMem does not claim hidden auto-resume, background execution, or unsupported prompt-time injection on OpenCode; `/sybermem-resume`, `/sybermem-search`, and `/sybermem-habit` are manual there, and automatic carry-forward for project memory plus User Habit Memory primarily relies on the supported compaction lifecycle. Codex Phase 1.5 only installs user-level skills to `~/.agents/skills` and lets project health checks discover templates from that install location; it does not install Codex hooks, `.codex/config.toml`, or background automation. See [`.codex/INSTALL.md`](.codex/INSTALL.md) for Codex details and [`.opencode/INSTALL.md`](.opencode/INSTALL.md) for OpenCode details.
 
 ## Install and Upgrade
 
@@ -124,7 +135,7 @@ curl -sSL https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/i
 irm https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/install-remote.ps1 | iex
 ```
 
-This refreshes user-level Claude Code skills, OpenCode skills, the OpenCode plugin, and the CLI / Core runtime.
+This refreshes user-level Claude Code skills, OpenCode skills, Codex skills (`~/.agents/skills`), the OpenCode plugin, and the CLI / Core runtime. The installer creates a fixed CLI launcher at `$HOME/.claude/sybermem/cli/sybermem` on macOS / Linux and `%USERPROFILE%\.claude\sybermem\cli\sybermem.cmd` on Windows. SyberMem's OpenCode plugin and CLI-using skills prefer this fixed launcher when an agent subprocess cannot resolve bare `sybermem`; install scripts do not modify persistent PATH by default.
 
 ### Local Plugin Validation
 
@@ -140,7 +151,7 @@ Use this from a repository checkout to validate the Claude Code plugin, hooks, a
 2. Open each existing project and run `/sybermem-update`.
 3. For new projects, run `/sybermem-init-project`.
 
-The global refresh updates user-level runtime and skills. Project-local `.sybermem/`, hooks, templates, and instruction files are refreshed by `/sybermem-update`.
+The global refresh updates user-level runtime, Claude/OpenCode/Codex skills, and the OpenCode plugin. Project-local `.sybermem/`, hooks, templates, and instruction files are refreshed by `/sybermem-update`. Codex Phase 1.5 health checks treat `~/.agents/skills/sybermem-init-project/project-files` as one template source, so the Codex install path participates in project freshness checks. For fixes to the CLI launcher, OpenCode plugin, or skill instructions, re-run the global install/update first, then run `/sybermem-update` in the project to make existing projects pick up the distribution changes.
 
 ## Initialize a Project
 
@@ -171,6 +182,7 @@ If a project already has custom `.claude/settings.json` content, SyberMem patche
 - `/sybermem-resume`: get a bounded read-only resume view
 - `/sybermem-record`: record a meaningful round of work
 - `/sybermem-search`: search historical records
+- `/sybermem-habit`: add, review, pause, delete, or remind user-level habits
 - `/sybermem-summary`: inspect current project state
 - `/sybermem-digest`: capture a stable phase conclusion
 - `/sybermem-theme-digest`: capture a cross-phase topic conclusion
@@ -216,6 +228,8 @@ packages/claude-skills/              # Skill source for distribution
 packages/core/                       # Core memory / Team publication logic
 packages/cli/                        # sybermem CLI
 packages/opencode-plugin/            # OpenCode plugin
+.codex-plugin/                       # Codex marketplace/entry metadata
+.codex/                              # Codex Phase 1 install notes
 scripts/                             # Install, update, uninstall, and package-check scripts
 ```
 
@@ -245,7 +259,7 @@ Global uninstall removes user-level skills, CLI, launchers, and the OpenCode plu
 
 - `.sybermem/` is the current canonical project data directory.
 - If a project still uses legacy `ADR/`, the first relevant SyberMem workflow migrates it to `.sybermem/`.
-- Claude prompt-time recall applies only to managed Claude hooks; OpenCode does not claim the same per-prompt injection model.
+- Claude prompt-time recall applies only to managed Claude hooks; OpenCode and Codex do not claim the same per-prompt injection model.
 - For more installation, upgrade, and compatibility details, see [INSTALL.md](INSTALL.md).
 
 ## License

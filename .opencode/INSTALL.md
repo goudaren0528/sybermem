@@ -23,10 +23,13 @@ lifecycle-hook behavior as closely as the OpenCode plugin API allows:
   no nudge using the same thresholds and high-signal / high-level-area heuristics
   as the Claude `Stop` hook, tracks a per-theme window for digest clustering, and
   persists a bounded `.sybermem/.auto-trail.jsonl` journal with >80% overlap dedup.
-- `experimental.session.compacting` injects project identity (`slug` /
-  `project_id`), phase-index status and confirmed count, active phase, stale
-  signal, the topic index, and a next-step recommendation from `sybermem next-step`
-  (fails open when the CLI is unavailable).
+- `experimental.session.compacting` first tries to include the shared manual
+  session brief from `sybermem context session --format markdown`, then adds
+  project identity (`slug` / `project_id`), phase-index status and confirmed
+  count, active phase, stale signal, the topic index, a next-step recommendation
+  from `sybermem next-step`, and bounded User Habit Memory from `sybermem habit
+  inject` with a compaction/planning/review/coding context (fails open when the
+  CLI is unavailable or no habits match).
 
 The following Claude capabilities remain **genuinely unsupported** on OpenCode
 because they depend on a per-prompt `UserPromptSubmit` seam with `additionalContext`
@@ -35,9 +38,11 @@ injection that OpenCode does not expose:
 - prompt-time record-intent capture (`.record-intent.json`)
 - prompt-time high-signal task recall injection
 - prompt-time recall observability logging (`.recall-debug.jsonl`)
+- prompt-time User Habit Memory reminders
 
 These are not simulated on OpenCode. Task recall there stays manual via
-`/sybermem-search`, and carry-forward relies on the supported compaction hook.
+`/sybermem-search` or `sybermem context prompt --query "..." --format markdown`,
+and carry-forward relies on the supported compaction hook.
 
 OpenCode does not currently expose a documented prompt-time plugin callback for
 injecting `additionalContext` on every user prompt. SyberMem therefore does not
@@ -49,8 +54,11 @@ This means:
 
 - `/sybermem-resume` is manual
 - `/sybermem-search` is manual
+- `sybermem context prompt --query "..." --format markdown` is a manual helper
+  for copying relevant project memory into an important prompt
+- User Habit Memory is manual through `/sybermem-habit` or `sybermem habit remind`, and compaction-only through `sybermem habit inject`
 - there is no hidden auto-resume
-- there is no unsupported per-prompt injection
+- there is no unsupported per-prompt injection or reminder hook
 - the plugin does not create a second memory store
 
 `/sybermem-resume` is also manual on OpenCode. Use it when you want a bounded,
@@ -76,7 +84,10 @@ the rest of SyberMem.
 
 - global install or global update refreshes `~/.config/opencode/skills/`
 - global install or global update refreshes `~/.config/opencode/plugins/sybermem.ts`
+- global install or global update refreshes the fixed SyberMem CLI launcher at `$HOME/.claude/sybermem/cli/sybermem` on macOS / Linux or `%USERPROFILE%\.claude\sybermem\cli\sybermem.cmd` on Windows
 - re-running the remote install command is a real refresh path for the OpenCode plugin and skills
+
+The OpenCode plugin and CLI-using skills prefer that fixed launcher when an OpenCode or agent subprocess cannot resolve bare `sybermem` from PATH. SyberMem does not modify persistent PATH automatically; adding the launcher directory to PATH remains an optional user choice.
 
 That global refresh does not replace project-local SyberMem files. Existing
 projects still need `/sybermem-update` when you want refreshed managed hooks,
