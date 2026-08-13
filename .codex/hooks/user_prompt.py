@@ -7,11 +7,14 @@ import shutil
 import subprocess
 import sys
 from typing import Final, TypeAlias, TypedDict
+from datetime import datetime, timezone
 
 
 HOOK_EVENT_NAME: Final = "UserPromptSubmit"
+RECALL_HEADING: Final = "## SyberMem Recall Hints"
 REMINDER_HEADING: Final = "## User Habit Reminder"
 SYBERMEM_TIMEOUT_SECONDS: Final = 5
+RECORD_INTENT_PATH: Final = ".sybermem/.record-intent.json"
 
 
 class HookInput(TypedDict, total=False):
@@ -65,12 +68,22 @@ def _string_field(data: dict[str, JsonValue], key: str) -> str | None:
     return None
 
 
-def _habit_markdown(prompt: str) -> str:
+def _context_markdown(prompt: str, kind: str) -> str:
     command = _sybermem_command()
     if command is None:
         return ""
-    result = subprocess.run(
-        [
+    if kind == "recall":
+        args = [
+            *command,
+            "context",
+            "recall",
+            "--query",
+            prompt,
+            "--format",
+            "markdown",
+        ]
+    else:
+        args = [
             *command,
             "context",
             "habit",
@@ -80,7 +93,10 @@ def _habit_markdown(prompt: str) -> str:
             "prompt-time",
             "--format",
             "markdown",
-        ],
+        ]
+    result = subprocess.run(
+        args,
+        env={**os.environ, "PYTHONIOENCODING": "utf-8"},
         text=True,
         encoding="utf-8",
         errors="replace",
@@ -93,10 +109,67 @@ def _habit_markdown(prompt: str) -> str:
     return result.stdout
 
 
-def _hook_output(markdown: str) -> HookOutput | None:
-    if not markdown.startswith(REMINDER_HEADING):
+def _core_paths() -> list[Path]:
+    paths: list[Path] = []
+    source_root = Path(__file__).resolve().parents[2]
+    paths.append(source_root / "packages" / "core")
+
+    fixed = _fixed_launcher()
+    if os.name == "nt":
+        paths.append(fixed.parent / "venv" / "Lib" / "site-packages")
+    else:
+        lib = fixed.parent / "venv" / "lib"
+        if lib.is_dir():
+            paths.extend(path / "site-packages" for path in lib.glob("python*"))
+    return paths
+
+
+def _ensure_core_import_path() -> None:
+    for path in _core_paths():
+        if path.exists():
+            value = str(path)
+            if value not in sys.path:
+                sys.path.insert(0, value)
+
+
+def _capture_record_intent(prompt: str) -> None:
+    _ensure_core_import_path()
+    from sybermem_core.project import resolve_project_root
+    from sybermem_core.record_intent import WRITE_CLASSIFICATIONS, classify_record_intent
+
+    root = resolve_project_root()
+    if root is None:
+        return
+    candidate = classify_record_intent(root, prompt)
+    classification = candidate.get("classification", "defer")
+    if classification not in WRITE_CLASSIFICATIONS:
+        return
+    payload = {
+        "record_intent": True,
+        "classification": classification,
+        "action": candidate.get("action", "/sybermem-record"),
+        "reason": candidate.get("reason", ""),
+        "source": "codex-user-prompt-submit",
+        "created_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "matched_pattern": classification,
+        "phrase": "",
+    }
+    (root / RECORD_INTENT_PATH).write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def _context_sections(prompt: str) -> list[str]:
+    sections: list[str] = []
+    for kind, heading in (("recall", RECALL_HEADING), ("habit", REMINDER_HEADING)):
+        markdown = _context_markdown(prompt, kind).strip()
+        if markdown.startswith(heading):
+            sections.append(markdown)
+    return sections
+
+
+def _hook_output(sections: list[str]) -> HookOutput | None:
+    if not sections:
         return None
-    additional_context = markdown if markdown.endswith("\n") else f"{markdown}\n"
+    additional_context = "\n\n".join(sections) + "\n"
     return {
         "hookSpecificOutput": {
             "hookEventName": HOOK_EVENT_NAME,
@@ -110,7 +183,11 @@ def main() -> int:  # noqa: BROAD_EXCEPT_OK
         prompt = _prompt_from_stdin(sys.stdin.read())
         if prompt is None:
             return 0
-        output = _hook_output(_habit_markdown(prompt))
+        try:
+            _capture_record_intent(prompt)
+        except Exception:
+            pass
+        output = _hook_output(_context_sections(prompt))
         if output is not None:
             sys.stdout.write(json.dumps(output, ensure_ascii=False))
     except Exception:
