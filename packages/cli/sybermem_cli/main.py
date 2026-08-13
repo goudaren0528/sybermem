@@ -14,7 +14,7 @@ from sybermem_core.index import rebuild_index
 from sybermem_core.search import ProjectRootNotFoundError, WorkspaceIndexIncompatibleError, search_project, search_workspace, workspace_index_staleness
 from sybermem_core.status import project_status
 from sybermem_core.resume import build_resume_checkpoint
-from sybermem_core.next_step_router import recommend_next_step
+from sybermem_core.next_step_router import classify_record_intent, recommend_next_step
 from sybermem_core.digest_governance import build_digest_governance_report
 from sybermem_core.portfolio import build_portfolio
 from sybermem_core.team import init_team_repo
@@ -275,6 +275,24 @@ def cmd_publish_status(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_record_intent(args: argparse.Namespace) -> int:
+    root = resolve_project_root()
+    if root is None:
+        print("No SyberMem project root found.", file=sys.stderr)
+        return 1
+    candidate = classify_record_intent(root, args.prompt)
+    bounded = {
+        "classification": candidate["classification"],
+        "action": candidate.get("action", ""),
+        "reason": candidate.get("reason", ""),
+    }
+    if args.format == "json":
+        print(dump_json(bounded))
+    else:
+        print(bounded["classification"])
+    return 0
+
+
 def cmd_team_summary(args: argparse.Namespace) -> int:
     try:
         result = build_team_management_summary(Path(args.team_path))
@@ -448,6 +466,11 @@ def main() -> int:
     record_id.add_argument("--type", required=True, choices=sorted(RECORD_TYPES))
     record_id.add_argument("--format", choices=["text", "json"], default="text")
     record_id.set_defaults(func=cmd_record_id)
+
+    record_intent = record_sub.add_parser("intent")
+    record_intent.add_argument("--prompt", required=True)
+    record_intent.add_argument("--format", choices=["text", "json"], default="text")
+    record_intent.set_defaults(func=cmd_record_intent)
 
     team = sub.add_parser("team")
     team_sub = team.add_subparsers(dest="team_command", required=True)
