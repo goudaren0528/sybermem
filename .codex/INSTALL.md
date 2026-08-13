@@ -1,6 +1,6 @@
 # Codex Installation Notes
 
-SyberMem Codex support is **Phase 1.5: user skills with verification**.
+SyberMem Codex support is **user skills plus bounded User Habit Memory prompt reminders**.
 
 The global install and update scripts copy the canonical SyberMem skills from
 `packages/claude-skills/` into the Codex user skills directory:
@@ -13,8 +13,10 @@ This lets Codex users invoke the same SyberMem slash-style skills, including
 `/sybermem-search`, `/using-sybermem`, and `/sybermem-habit`, when their Codex
 environment loads user skills from `~/.agents/skills`.
 
-Phase 1.5 adds discoverability and release verification around that skills-only
-path. It does not add Codex runtime automation.
+Codex support includes discoverability and release verification around the
+skills path, plus a conservative `UserPromptSubmit` reminder hook for User
+Habit Memory. It still does not add project recall or broader Codex runtime
+automation.
 
 ## Install and update
 
@@ -36,6 +38,8 @@ Each install/update path refreshes:
 - Claude Code user skills
 - OpenCode user skills and plugin
 - Codex user skills at `~/.agents/skills`
+- the Codex `UserPromptSubmit` habit hook at `~/.codex/hooks/sybermem_user_prompt.py`
+- the Codex hook registry merge in `~/.codex/hooks.json`
 - the SyberMem CLI / Core runtime
 - the fixed SyberMem CLI launcher
 
@@ -44,9 +48,13 @@ The fixed launcher remains in the existing SyberMem location:
 - macOS / Linux: `$HOME/.claude/sybermem/cli/sybermem`
 - Windows: `%USERPROFILE%\.claude\sybermem\cli\sybermem.cmd`
 
-CLI-using skills include fallback guidance for that launcher when an agent
-subprocess cannot resolve bare `sybermem`. Install scripts do not modify
-persistent PATH automatically.
+CLI-using skills and the Codex habit hook include fallback guidance for that
+launcher when a subprocess cannot resolve bare `sybermem`. Install scripts do
+not modify persistent PATH automatically.
+
+The Codex hook is merged under `UserPromptSubmit` and returns bounded reminder
+text through `hookSpecificOutput.additionalContext`. It is only for User Habit
+Memory reminders, not for project recall.
 
 ## Project setup
 
@@ -69,8 +77,10 @@ protocol and project-local guidance without requiring a Codex-specific runtime.
 
 ## Manual context workflow
 
-Codex does not receive SyberMem context automatically at prompt time. For an
-important prompt, use the installed skills and CLI intentionally:
+Codex does not receive SyberMem project recall automatically at prompt time.
+User Habit Memory reminders can appear through the supported `UserPromptSubmit`
+hook, but project memory remains manual. For an important prompt, use the
+installed skills and CLI intentionally:
 
 ```text
 /sybermem-resume
@@ -83,8 +93,9 @@ sybermem context prompt --query "<what you are about to do>" --format markdown
 current project's SyberMem records. `sybermem context session --format markdown`
 is useful at the start of a Codex session, and `sybermem context habit --context
 planning --format markdown` can surface user habits explicitly. These commands
-do not install Codex hooks, do not modify `.codex/config.toml`, and do not create
-automatic prompt-time injection.
+remain the manual context path for project memory. The new habit reminder hook
+does not install or require `.codex/config.toml`, and it does not create
+automatic project recall.
 
 ## Verify
 
@@ -105,7 +116,25 @@ Test-Path "$env:USERPROFILE\.agents\skills\sybermem-record"
 Then run `/sybermem-init-project` or `/sybermem-update` in a target project. A
 successful project setup creates or refreshes `.sybermem/` and `AGENTS.md`.
 
-## Phase 1.5 verification
+Verify the Codex habit reminder hook too:
+
+```bash
+ls ~/.codex/hooks/sybermem_user_prompt.py
+cat ~/.codex/hooks.json
+```
+
+On Windows PowerShell:
+
+```powershell
+Test-Path "$env:USERPROFILE\.codex\hooks\sybermem_user_prompt.py"
+Test-Path "$env:USERPROFILE\.codex\hooks.json"
+```
+
+The installed `hooks.json` should contain a `UserPromptSubmit` entry that points
+to the SyberMem hook. The hook writes reminder text through
+`hookSpecificOutput.additionalContext`.
+
+## Repository verification
 
 For repository release checks, run the Codex-safe smoke set from a checkout:
 
@@ -118,7 +147,7 @@ These checks are non-mutating: they do not copy files into your real
 `~/.agents/skills` directory. They verify that the install/update scripts still
 target Codex user skills, that project health checks can discover templates from
 `~/.agents/skills/sybermem-init-project/project-files`, and that Codex docs and
-metadata remain honest about the skills-only boundary.
+metadata remain honest about the supported boundaries.
 
 For an installed user environment, verify both layers:
 
@@ -136,6 +165,10 @@ For an installed user environment, verify both layers:
   Run `/sybermem-update` inside the project. Global refresh updates user-level
   skills and runtime files; project-local `.sybermem/` and `AGENTS.md` refresh
   only when the project update skill runs.
+- **Codex habit reminders never appear after an upgrade**
+  Re-run the global installer or updater so `~/.codex/hooks/sybermem_user_prompt.py`
+  and `~/.codex/hooks.json` are refreshed. Then run `/sybermem-update` in the
+  project if you also need fresh project-managed files.
 - **A skill subprocess cannot resolve `sybermem`**
   Re-run the global installer or updater so the fixed launcher is refreshed.
   CLI-using skills include guidance for `$HOME/.claude/sybermem/cli/sybermem`
@@ -143,22 +176,41 @@ For an installed user environment, verify both layers:
   persistent PATH.
 - **Project health still reports stale managed files**
   Confirm `/sybermem-update` was run from the target project after the global
-  refresh. Phase 1.5 lets the health check read current templates from Codex's
+  refresh. Codex support lets the health check read current templates from Codex's
   global skill install, but it still reports project-local freshness.
 
-## Explicitly unsupported in Phase 1.5
+## Supported reminder behavior
 
-Codex Phase 1.5 does not add any Codex runtime automation. In particular,
-SyberMem does **not** install or claim:
+The Codex `UserPromptSubmit` hook only injects bounded User Habit Memory
+reminders. It does not inject project recall. Reminder output is conservative
+and fail open: only active, high-confidence, directly relevant,
+prompt-ok-when-supported habits are eligible, with bounded output.
 
-- Codex hooks
+Manual commands stay documented and supported:
+
+- `sybermem context session --format markdown`
+- `sybermem context prompt --query "..." --format markdown`
+- `sybermem context habit --context planning --format markdown`
+- `/sybermem-resume`
+- `/sybermem-search`
+
+## Explicitly unsupported
+
+Codex support does not add broad Codex runtime automation. It only adds bounded
+User Habit Memory reminders through `UserPromptSubmit`.
+
+In particular, SyberMem does **not** install or claim:
+
+- Codex hooks for project recall or lifecycle automation
 - `.codex/config.toml`
-- prompt-time injection
+- project recall
+- prompt-time injection for project memory
 - hidden auto-resume
-- background automation
+- unsupported background automation
+- prompt or agent handler runtimes
 - plugin-copy lifecycle behavior
 - a repository `.agents/skills` mirror
 
-Codex users invoke SyberMem intentionally through the installed user skills and
-the `sybermem` CLI. Automatic prompt/lifecycle carry-forward remains limited to
-platforms where SyberMem has an explicit supported runtime seam.
+Codex users still invoke project memory intentionally through the installed user
+skills and the `sybermem` CLI. For Codex, project memory stays manual except for
+the bounded User Habit Memory reminder path described above.
