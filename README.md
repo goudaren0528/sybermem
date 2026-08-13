@@ -120,10 +120,10 @@ SyberMem 有两类执行路径，可靠性不同：
 | 平台 | 支持级别 | 说明 |
 |---|---|---|
 | Claude Code | 完整集成 | plugin metadata、skills、SessionStart / Stop / UserPromptSubmit hooks |
-| OpenCode | 支持集成 | skills + TypeScript plugin；session lifecycle、prompt-time project recall 与 User Habit Memory 提醒都走受支持的 chat transform 路径 |
+| OpenCode | 支持集成 | skills + TypeScript plugin；session lifecycle、prompt-time project recall、User Habit Memory 提醒、record-intent metadata 与 recall debug logging 都走受支持的 plugin/chat transform 路径 |
 | Codex | Partial runtime + skills | 用户级 skills 安装到 `~/.agents/skills`，并安装 `SessionStart` / `UserPromptSubmit` / `Stop` / `PostCompact` hooks；支持 bounded startup context、prompt-time recall、habit reminder、record-intent capture、Stop record nudge 和 compact re-seed marker；仍无 hidden auto-resume、后台自动化或 agent runtime |
 
-Claude Code 受管项目可通过 `UserPromptSubmit` 对明显偏好语句或 prompt-approved habits 给出有界提醒；老项目需运行 `/sybermem-update` 刷新 hook。OpenCode 通过 `chat.message` + `experimental.chat.system.transform` 提供逐 prompt 高信号项目召回，并把 User Habit Memory 提醒和 recall hints 一起注入同一轮 system prompt；`⭐`/`💡` 继续用于可见化 recall，habit 提醒保持保守，只取 active、高置信、直接相关、在受支持 prompt 场景下允许注入的内容，输出有界且 fail-open。Codex 现在会安装 `~/.codex/hooks/sybermem_session_start.py`、`sybermem_user_prompt.py`、`sybermem_stop.py` 和 `sybermem_post_compact.py`，并把它们合并到 `~/.codex/hooks.json` 的 `SessionStart` / `UserPromptSubmit` / `Stop` / `PostCompact`。其中 `SessionStart` / `UserPromptSubmit` 通过 `hookSpecificOutput.additionalContext` 提供 bounded startup context、prompt-time project recall 和 User Habit Memory 提醒；UserPromptSubmit 还会为显式记录请求写入 bounded `.sybermem/.record-intent.json` metadata，不保存原始 prompt；Stop 只做防循环 record nudge；PostCompact 只写 compact re-seed marker。但 Codex 仍不支持 hidden auto-resume、后台自动化、prompt 或 agent handler runtime，也不安装 `.codex/config.toml`。更多说明见 [`.codex/INSTALL.md`](.codex/INSTALL.md)。OpenCode 说明见 [`.opencode/INSTALL.md`](.opencode/INSTALL.md)。
+Claude Code 受管项目可通过 `UserPromptSubmit` 对明显偏好语句或 prompt-approved habits 给出有界提醒；老项目需运行 `/sybermem-update` 刷新 hook。OpenCode 通过 `chat.message` + `experimental.chat.system.transform` 提供逐 prompt 高信号项目召回，并把 User Habit Memory 提醒和 recall hints 一起注入同一轮 system prompt；`chat.message` 还会写入 bounded `.sybermem/.record-intent.json` 和 `.sybermem/.recall-debug.jsonl` metadata，不保存原始 prompt；`⭐`/`💡` 继续用于可见化 recall，habit 提醒保持保守，只取 active、高置信、直接相关、在受支持 prompt 场景下允许注入的内容，输出有界且 fail-open。Codex 现在会安装 `~/.codex/hooks/sybermem_session_start.py`、`sybermem_user_prompt.py`、`sybermem_stop.py` 和 `sybermem_post_compact.py`，并把它们合并到 `~/.codex/hooks.json` 的 `SessionStart` / `UserPromptSubmit` / `Stop` / `PostCompact`。其中 `SessionStart` / `UserPromptSubmit` 通过 `hookSpecificOutput.additionalContext` 提供 bounded startup context、prompt-time project recall 和 User Habit Memory 提醒；UserPromptSubmit 还会为显式记录请求写入 bounded `.sybermem/.record-intent.json` metadata，不保存原始 prompt；Stop 只做防循环 record nudge；PostCompact 只写 compact re-seed marker。但 Codex 仍不支持 hidden auto-resume、后台自动化、prompt 或 agent handler runtime，也不安装 `.codex/config.toml`。更多说明见 [`.codex/INSTALL.md`](.codex/INSTALL.md)。OpenCode 说明见 [`.opencode/INSTALL.md`](.opencode/INSTALL.md)。
 
 ## 安装与升级
 
@@ -153,7 +153,7 @@ claude --plugin-dir .
 2. 再进入已有项目运行 `/sybermem-update`。
 3. 新项目运行 `/sybermem-init-project`。
 
-全局刷新只更新用户级 runtime、Claude/OpenCode/Codex skills、OpenCode plugin 和 Codex 用户级 hooks；项目内的 `.sybermem/`、hooks、模板和说明文件需要 `/sybermem-update` 才会刷新。Codex 的健康检查会把 `~/.agents/skills/sybermem-init-project/project-files` 作为模板来源之一，因此 Codex 安装路径也能参与项目 freshness 检查。老用户要拿到 OpenCode 新的 habit reminder 注入链路或 Codex 新的 runtime hooks，先重跑全局安装/更新，再进项目跑 `/sybermem-update`。若修复的是 CLI launcher、OpenCode plugin、Codex hook 或 skill 指令链路，也按这个顺序生效。
+全局刷新只更新用户级 runtime、Claude/OpenCode/Codex skills、OpenCode plugin 和 Codex 用户级 hooks；项目内的 `.sybermem/`、hooks、模板和说明文件需要 `/sybermem-update` 才会刷新。Codex 的健康检查会把 `~/.agents/skills/sybermem-init-project/project-files` 作为模板来源之一，因此 Codex 安装路径也能参与项目 freshness 检查。老用户要拿到 OpenCode 新的 habit reminder、record-intent metadata 或 recall debug logging 链路，先重跑全局安装/更新以刷新 `~/.config/opencode/plugins/sybermem.ts`，再进项目跑 `/sybermem-update`。若修复的是 CLI launcher、OpenCode plugin、Codex hook 或 skill 指令链路，也按这个顺序生效。
 
 ## 初始化项目
 
@@ -261,7 +261,7 @@ sybermem project uninstall
 
 - `.sybermem/` 是当前规范目录。
 - 如果项目仍使用旧 `ADR/`，首次运行相关 SyberMem workflow 时会迁移到 `.sybermem/`。
-- Claude 的 prompt-time recall 适用于受管 Claude hooks；OpenCode 使用 `chat.message` + `experimental.chat.system.transform` 提供高信号项目召回，并在同一条 transform 注入保守的 User Habit Memory 提醒；Codex 通过 `SessionStart` / `UserPromptSubmit` / `Stop` / `PostCompact` 提供 bounded startup context、prompt-time recall、habit reminder、record-intent capture、loop-safe record nudge 和 compact re-seed marker，但仍不支持 hidden auto-resume、后台自动化或 direct compaction prompt injection。
+- Claude 的 prompt-time recall 适用于受管 Claude hooks；OpenCode 使用 `chat.message` + `experimental.chat.system.transform` 提供高信号项目召回，并在同一条 transform 注入保守的 User Habit Memory 提醒，同时通过 `chat.message` 写入 prompt-free record-intent 与 recall debug metadata；Codex 通过 `SessionStart` / `UserPromptSubmit` / `Stop` / `PostCompact` 提供 bounded startup context、prompt-time recall、habit reminder、record-intent capture、loop-safe record nudge 和 compact re-seed marker，但仍不支持 hidden auto-resume、后台自动化或 direct compaction prompt injection。
 - 更多安装、升级和兼容细节见 [INSTALL.md](INSTALL.md)。
 
 ## License
