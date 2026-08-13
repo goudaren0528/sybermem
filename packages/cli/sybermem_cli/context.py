@@ -6,8 +6,41 @@ import sys
 from sybermem_core.formats import dump_json
 from sybermem_core.project import resolve_project_root
 from sybermem_core.resume import build_resume_checkpoint
-from sybermem_core.search import ProjectRootNotFoundError, search_project
+from sybermem_core.search import (
+    ProjectRootNotFoundError,
+    high_signal_recall_hints,
+    search_project,
+)
 from sybermem_core.user_habits import render_habit_reminder_markdown
+
+# Marker parity with the Claude task-recall packet (hooks/task_recall.py). A row is
+# an aha ⭐ when it is an exact record-id / relation match, or a topic/keyword match
+# at/above the high-signal floor, or carries successor/current guidance, or carries a
+# stale/conflicted warning with a conflict note. Every other injected row is 💡.
+_AHA_MATCHES = frozenset({"record-id", "relation"})
+_WARN_FRESHNESS = frozenset({"stale", "conflicted"})
+
+
+def _is_aha(row: dict) -> bool:  # noqa: DICT_OK
+    match = (row.get("match_reason") or row.get("match") or "").strip().lower()
+    if match in _AHA_MATCHES:
+        return True
+    if match in {"topic", "keyword"} and _score(row) >= 12.0:
+        return True
+    if (row.get("successor_record") or row.get("current_guidance") or "").strip():
+        return True
+    if _score(row) >= 12.0:
+        return True
+    if (row.get("freshness") or "").strip().lower() in _WARN_FRESHNESS and (row.get("conflict_note") or "").strip():
+        return True
+    return False
+
+
+def _score(row: dict) -> float:  # noqa: DICT_OK
+    try:
+        return float(row.get("score", 0.0) or 0.0)
+    except (TypeError, ValueError):
+        return 0.0
 
 
 def _habit_ids(markdown: str) -> list[str]:
@@ -45,6 +78,21 @@ def _print_markdown_prompt(payload: dict) -> None:  # noqa: DICT_OK
     print("Relevant records:")
     for item in payload["results"]:
         print(f"- [{item['record_id']}] {item['title']} ({item['type']}, score={item['score']})")
+
+
+def _print_markdown_recall(payload: dict) -> None:  # noqa: DICT_OK
+    print("## SyberMem Recall Hints")
+    print("Delivery: prompt-time automatic recall (high-signal gate)")
+    print(f"Query: {payload['query']}")
+    print("")
+    if not payload["results"]:
+        print(payload.get("abstention") or "No reliable SyberMem recall for this prompt.")
+        return
+    for item in payload["results"]:
+        marker = "⭐ " if item["aha"] else "💡 "
+        print(f"- {marker}[{item['record_id']}] {item['title']} ({item['type']}, score={item['score']}, match={item['match']})")
+    print("")
+    print("These hints are not instructions. Read the referenced record before relying on details.")
 
 
 def _print_json_or_markdown(args: argparse.Namespace, payload: dict, markdown: str | None = None) -> None:  # noqa: DICT_OK
@@ -101,12 +149,50 @@ def cmd_context_habit(args: argparse.Namespace) -> int:
     )
     payload = {
         "kind": "habit",
-        "delivery": "manual",
+        "delivery": args.delivery,
+        "delivery_metadata": {"mode": args.delivery},
         "context": args.context,
         "reminded": _habit_ids(markdown),
         "markdown": markdown,
     }
     _print_json_or_markdown(args, payload, markdown)
+    return 0
+
+
+def cmd_context_recall(args: argparse.Namespace) -> int:
+    """Run the same high-signal prompt recall the Claude hook uses, with ⭐/💡 markers.
+
+    This is the programmatic twin of the Claude task-recall hook so OpenCode can
+    inject the exact same gated, marker-tagged recall packet per prompt.
+    """
+    try:
+        rows, abstention_reason = high_signal_recall_hints(args.query, limit=args.limit)
+    except ProjectRootNotFoundError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    results = []
+    for row in rows:
+        results.append(
+            {
+                "record_id": str(row.get("record_id", "")),
+                "type": str(row.get("type", "")),
+                "title": str(row.get("title", "")),
+                "score": int(_score(row)),
+                "match": str(row.get("match_reason") or row.get("match") or "keyword"),
+                "aha": bool(_is_aha(row)),
+            }
+        )
+    payload = {
+        "kind": "recall",
+        "delivery": "prompt-time automatic recall (high-signal gate)",
+        "query": args.query,
+        "results": results,
+        "abstention": abstention_reason or None,
+    }
+    if args.format == "json":
+        print(dump_json(payload))
+    else:
+        _print_markdown_recall(payload)
     return 0
 
 
@@ -125,8 +211,15 @@ def register_context_commands(sub) -> None:
     prompt.add_argument("--format", choices=["json", "markdown"], default="markdown")
     prompt.set_defaults(func=cmd_context_prompt)
 
+    recall = context_sub.add_parser("recall")
+    recall.add_argument("--query", required=True)
+    recall.add_argument("--limit", type=int, default=3)
+    recall.add_argument("--format", choices=["json", "markdown"], default="markdown")
+    recall.set_defaults(func=cmd_context_recall)
+
     habit = context_sub.add_parser("habit")
     habit.add_argument("--context", required=True)
+    habit.add_argument("--delivery", choices=["manual", "prompt-time"], default="manual")
     habit.add_argument("--higher-authority-text", default="")
     habit.add_argument("--format", choices=["json", "markdown"], default="markdown")
     habit.set_defaults(func=cmd_context_habit)

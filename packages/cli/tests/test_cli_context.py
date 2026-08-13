@@ -102,6 +102,55 @@ def test_cli_context_habit_json_delegates_to_reminder_renderer(
     assert payload["reminded"] == ["habit-abc"]
 
 
+def test_cli_context_habit_json_defaults_to_manual_delivery_metadata(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    # Given: the reminder renderer returns one matching habit row
+    monkeypatch.setattr(
+        context_module,
+        "render_habit_reminder_markdown",
+        lambda context, higher_authority_text="": "## User Habit Reminder\n- [habit-abc] keep plans short\n",
+    )
+
+    # When: habit context is requested without an explicit delivery override
+    exit_code = run_cli(["context", "habit", "--context", "planning", "--format", "json"], monkeypatch)
+
+    # Then: the JSON contract stays manual by default and includes reminder metadata
+    payload = json.loads(capsys.readouterr().out)
+    assert exit_code == 0
+    assert payload["kind"] == "habit"
+    assert payload["delivery"] == "manual"
+    assert payload["delivery_metadata"] == {"mode": "manual"}
+    assert payload["reminded"] == ["habit-abc"]
+
+
+def test_cli_context_habit_json_supports_prompt_time_delivery_metadata(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    # Given: the reminder renderer returns one matching habit row
+    monkeypatch.setattr(
+        context_module,
+        "render_habit_reminder_markdown",
+        lambda context, higher_authority_text="": "## User Habit Reminder\n- [habit-xyz] restate acceptance criteria\n",
+    )
+
+    # When: habit context is requested for prompt-time delivery
+    exit_code = run_cli(
+        ["context", "habit", "--context", "planning", "--delivery", "prompt-time", "--format", "json"],
+        monkeypatch,
+    )
+
+    # Then: the JSON contract reports prompt-time delivery while preserving reminder IDs
+    payload = json.loads(capsys.readouterr().out)
+    assert exit_code == 0
+    assert payload["kind"] == "habit"
+    assert payload["delivery"] == "prompt-time"
+    assert payload["delivery_metadata"] == {"mode": "prompt-time"}
+    assert payload["reminded"] == ["habit-xyz"]
+
+
 def test_cli_context_returns_error_without_project_root(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
@@ -117,3 +166,95 @@ def test_cli_context_returns_error_without_project_root(
     assert exit_code == 1
     assert captured.out == ""
     assert captured.err == "No SyberMem project root found.\n"
+
+
+def test_cli_context_recall_markdown_uses_high_signal_hints_with_markers(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    # Given: high-signal recall returns one aha (record-id) and one non-aha (topic) row
+    monkeypatch.setattr(
+        context_module,
+        "high_signal_recall_hints",
+        lambda query, limit=3: (
+            [
+                {
+                    "record_id": "change-abc",
+                    "title": "Exact id hit",
+                    "type": "change",
+                    "score": 100,
+                    "match": "record-id",
+                    "match_reason": "record-id",
+                },
+                {
+                    "record_id": "change-def",
+                    "title": "Topic hit below floor",
+                    "type": "change",
+                    "score": 10,
+                    "match": "topic",
+                    "match_reason": "topic",
+                },
+            ],
+            "",
+        ),
+    )
+
+    # When: recall context is requested as Markdown through the real CLI parser
+    exit_code = run_cli(["context", "recall", "--query", "auth", "--format", "markdown"], monkeypatch)
+
+    # Then: the packet is gated and carries ⭐ for high-signal and 💡 for ordinary rows
+    output = capsys.readouterr().out
+    assert exit_code == 0
+    assert output.startswith("## SyberMem Recall Hints")
+    assert "Delivery: prompt-time automatic recall" in output
+    assert "⭐ [change-abc] Exact id hit" in output
+    assert "💡 [change-def] Topic hit below floor" in output
+
+
+def test_cli_context_recall_json_reports_abstention_when_gate_blocks(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    # Given: high-signal recall returns no rows with an abstention reason
+    monkeypatch.setattr(
+        context_module,
+        "high_signal_recall_hints",
+        lambda query, limit=3: ([], "matched rows were keyword-only and below the high-signal floor"),
+    )
+
+    # When: recall context is requested as JSON
+    exit_code = run_cli(["context", "recall", "--query", "weak", "--format", "json"], monkeypatch)
+
+    # Then: the payload exposes the gate decision without pretending a hit occurred
+    payload = json.loads(capsys.readouterr().out)
+    assert exit_code == 0
+    assert payload["kind"] == "recall"
+    assert payload["results"] == []
+    assert "below the high-signal floor" in payload["abstention"]
+
+
+def test_cli_context_recall_propagates_project_root_error(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    # Given: the recall command is invoked outside a SyberMem project
+    monkeypatch.setattr(
+        context_module,
+        "high_signal_recall_hints",
+        lambda query, limit=3: (_raise_project_root_error(), ""),
+    )
+
+    # When: recall context is requested
+    exit_code = run_cli(["context", "recall", "--query", "auth"], monkeypatch)
+
+    # Then: the CLI reports the standard root-not-found error without a traceback
+    captured = capsys.readouterr()
+    assert exit_code == 1
+    assert captured.out == ""
+    assert captured.err == "No SyberMem project root found.\n"
+
+
+def _raise_project_root_error() -> list:
+    from sybermem_core.search import ProjectRootNotFoundError
+
+    raise ProjectRootNotFoundError()

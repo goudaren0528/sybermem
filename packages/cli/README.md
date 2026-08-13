@@ -19,7 +19,9 @@ sybermem habit inject --context planning --format markdown
 
 `pause` and `delete` keep habits out of reminders and injection. Reminder output is
 visible and confirmation-first; injection emits at most three active, high-confidence,
-directly relevant habits.
+directly relevant habits. On hosts that support prompt-time reminder injection,
+the same conservative gate also requires the habit to be prompt-ok-when-supported,
+and the host should fail open if nothing qualifies.
 
 Manual context helpers provide copy/paste-safe memory briefs for hosts without
 Claude Code's prompt-time hook surface:
@@ -27,11 +29,25 @@ Claude Code's prompt-time hook surface:
 ```bash
 sybermem context session --format markdown
 sybermem context prompt --query "auth flow" --format markdown
+sybermem context recall --query "auth flow" --format markdown
 sybermem context habit --context planning --format markdown
 ```
 
-These commands are explicit manual delivery surfaces. They do not install hooks,
-background automation, or automatic prompt-time injection for OpenCode or Codex.
+`context session` / `context prompt` / `context habit` are explicit manual delivery
+surfaces. They remain the documented manual path for OpenCode and for Codex
+project memory. They do not install project recall hooks, background automation,
+or unsupported runtimes.
+
+`context recall` runs the exact high-signal recall gate the Claude prompt hook uses
+and renders the same `⭐` (important) / `💡` (ordinary) markers. The OpenCode plugin
+calls it on every prompt to deliver gated, marker-tagged project recall through
+`chat.message` + `experimental.chat.system.transform`. Codex does not use this
+path for project recall. You can also invoke it manually to preview what would be
+recalled for a given prompt:
+
+```bash
+sybermem context recall --query "deploy checklist" --format markdown
+```
 
 See the [main repository](https://github.com/goudaren0528/sybermem) for
 installation and usage.
