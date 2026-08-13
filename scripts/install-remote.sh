@@ -14,6 +14,9 @@ OPENCODE_SKILLS="$HOME/.config/opencode/skills"
 CODEX_SKILLS="$HOME/.agents/skills"
 CODEX_HOOK_DIR="$HOME/.codex/hooks"
 CODEX_HOOK_PATH="$CODEX_HOOK_DIR/sybermem_user_prompt.py"
+CODEX_SESSION_HOOK_PATH="$CODEX_HOOK_DIR/sybermem_session_start.py"
+CODEX_STOP_HOOK_PATH="$CODEX_HOOK_DIR/sybermem_stop.py"
+CODEX_POST_COMPACT_HOOK_PATH="$CODEX_HOOK_DIR/sybermem_post_compact.py"
 CODEX_HOOKS_JSON="$HOME/.codex/hooks.json"
 LAUNCHER_DIR="$HOME/.claude/sybermem"
 LAUNCHER_PATH="$LAUNCHER_DIR/launch_record_change_on_stop.py"
@@ -39,6 +42,9 @@ PLUGIN_SOURCE="$TMPDIR/$ARCHIVE_PREFIX/packages/opencode-plugin/sybermem.ts"
 CORE_SOURCE="$TMPDIR/$ARCHIVE_PREFIX/packages/core"
 CLI_SOURCE="$TMPDIR/$ARCHIVE_PREFIX/packages/cli"
 CODEX_HOOK_SOURCE="$TMPDIR/$ARCHIVE_PREFIX/.codex/hooks/user_prompt.py"
+CODEX_SESSION_HOOK_SOURCE="$TMPDIR/$ARCHIVE_PREFIX/.codex/hooks/session_start.py"
+CODEX_STOP_HOOK_SOURCE="$TMPDIR/$ARCHIVE_PREFIX/.codex/hooks/stop.py"
+CODEX_POST_COMPACT_HOOK_SOURCE="$TMPDIR/$ARCHIVE_PREFIX/.codex/hooks/post_compact.py"
 
 if [ ! -d "$SKILLS_SRC" ]; then
     echo "Error: skills not found in archive"
@@ -64,16 +70,22 @@ install_skills "$OPENCODE_SKILLS" "OpenCode"
 install_skills "$CODEX_SKILLS" "Codex"
 
 install_codex_user_prompt_hook() {
-    if [ ! -f "$CODEX_HOOK_SOURCE" ]; then
-        echo "  [Codex] skipped user prompt hook: source not found at $CODEX_HOOK_SOURCE"
+    if [ ! -f "$CODEX_HOOK_SOURCE" ] || [ ! -f "$CODEX_SESSION_HOOK_SOURCE" ] || [ ! -f "$CODEX_STOP_HOOK_SOURCE" ] || [ ! -f "$CODEX_POST_COMPACT_HOOK_SOURCE" ]; then
+        echo "  [Codex] skipped hooks: one or more sources were not found"
         return
     fi
 
     mkdir -p "$CODEX_HOOK_DIR"
     cp "$CODEX_HOOK_SOURCE" "$CODEX_HOOK_PATH"
+    cp "$CODEX_SESSION_HOOK_SOURCE" "$CODEX_SESSION_HOOK_PATH"
+    cp "$CODEX_STOP_HOOK_SOURCE" "$CODEX_STOP_HOOK_PATH"
+    cp "$CODEX_POST_COMPACT_HOOK_SOURCE" "$CODEX_POST_COMPACT_HOOK_PATH"
     chmod +x "$CODEX_HOOK_PATH"
+    chmod +x "$CODEX_SESSION_HOOK_PATH"
+    chmod +x "$CODEX_STOP_HOOK_PATH"
+    chmod +x "$CODEX_POST_COMPACT_HOOK_PATH"
 
-    CODEX_HOOK_PATH="$CODEX_HOOK_PATH" CODEX_HOOKS_JSON="$CODEX_HOOKS_JSON" python - <<'PY'
+    CODEX_HOOK_PATH="$CODEX_HOOK_PATH" CODEX_SESSION_HOOK_PATH="$CODEX_SESSION_HOOK_PATH" CODEX_STOP_HOOK_PATH="$CODEX_STOP_HOOK_PATH" CODEX_POST_COMPACT_HOOK_PATH="$CODEX_POST_COMPACT_HOOK_PATH" CODEX_HOOKS_JSON="$CODEX_HOOKS_JSON" python - <<'PY'
 from __future__ import annotations
 
 import json
@@ -81,13 +93,31 @@ import os
 from pathlib import Path
 
 hook_path = Path(os.environ["CODEX_HOOK_PATH"])
+session_hook_path = Path(os.environ["CODEX_SESSION_HOOK_PATH"])
+stop_hook_path = Path(os.environ["CODEX_STOP_HOOK_PATH"])
+post_compact_hook_path = Path(os.environ["CODEX_POST_COMPACT_HOOK_PATH"])
 hooks_json = Path(os.environ["CODEX_HOOKS_JSON"])
-command = f'python "{hook_path}"'
-managed = {
+prompt_managed = {
     "type": "command",
-    "command": command,
+    "command": f'python "{hook_path}"',
     "additionalContextLimit": 6000,
-    "message": "SyberMem user habit reminders add Codex prompt context when relevant.",
+    "message": "SyberMem prompt context adds bounded Codex recall and habit reminders when relevant.",
+}
+session_managed = {
+    "type": "command",
+    "command": f'python "{session_hook_path}"',
+    "additionalContextLimit": 6000,
+    "message": "SyberMem session context adds bounded Codex startup context when available.",
+}
+stop_managed = {
+    "type": "command",
+    "command": f'python "{stop_hook_path}"',
+    "message": "SyberMem Stop nudge adds bounded record reminders without looping.",
+}
+post_compact_managed = {
+    "type": "command",
+    "command": f'python "{post_compact_hook_path}"',
+    "message": "SyberMem PostCompact marks compact re-seed for the next SessionStart.",
 }
 
 data: dict[str, object] = {}
@@ -104,22 +134,28 @@ if not isinstance(hooks, dict):
     hooks = {}
     data["hooks"] = hooks
 
-event = hooks.get("UserPromptSubmit")
-if isinstance(event, list):
-    handlers = event
-elif event is None:
-    handlers = []
-else:
-    handlers = [event]
+def handlers_for(event_name: str) -> list[object]:
+    event = hooks.get(event_name)
+    if isinstance(event, list):
+        return event
+    if event is None:
+        return []
+    return [event]
 
-def is_managed(value: object) -> bool:
-    return isinstance(value, dict) and "sybermem_user_prompt.py" in str(value.get("command", ""))
+def without_managed(handlers: list[object], marker: str) -> list[object]:
+    return [handler for handler in handlers if not (isinstance(handler, dict) and marker in str(handler.get("command", "")))]
 
-hooks["UserPromptSubmit"] = [handler for handler in handlers if not is_managed(handler)] + [managed]
+hooks["UserPromptSubmit"] = without_managed(handlers_for("UserPromptSubmit"), "sybermem_user_prompt.py") + [prompt_managed]
+hooks["SessionStart"] = without_managed(handlers_for("SessionStart"), "sybermem_session_start.py") + [session_managed]
+hooks["Stop"] = without_managed(handlers_for("Stop"), "sybermem_stop.py") + [stop_managed]
+hooks["PostCompact"] = without_managed(handlers_for("PostCompact"), "sybermem_post_compact.py") + [post_compact_managed]
 hooks_json.parent.mkdir(parents=True, exist_ok=True)
 hooks_json.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 PY
     echo "  [Codex] installed UserPromptSubmit hook: $CODEX_HOOK_PATH"
+    echo "  [Codex] installed SessionStart hook: $CODEX_SESSION_HOOK_PATH"
+    echo "  [Codex] installed Stop hook: $CODEX_STOP_HOOK_PATH"
+    echo "  [Codex] installed PostCompact hook: $CODEX_POST_COMPACT_HOOK_PATH"
     echo "  [Codex] updated hooks.json without removing unrelated hooks: $CODEX_HOOKS_JSON"
 }
 
