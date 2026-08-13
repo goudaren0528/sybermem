@@ -115,13 +115,15 @@ SyberMem 有两类执行路径，可靠性不同：
 
 ## 平台支持
 
+详细功能矩阵见 [SyberMem Feature Map](docs/feature_map.md)；这里保留最常用的平台摘要。
+
 | 平台 | 支持级别 | 说明 |
 |---|---|---|
 | Claude Code | 完整集成 | plugin metadata、skills、SessionStart / Stop / UserPromptSubmit hooks |
-| OpenCode | 支持集成 | skills + TypeScript plugin；session lifecycle 与 compaction 承接 |
-| Codex | Phase 1.5 skills | 用户级 skills 安装到 `~/.agents/skills`；带健康检查可发现性与发布验证；无 hooks 或运行时自动化 |
+| OpenCode | 支持集成 | skills + TypeScript plugin；session lifecycle、prompt-time project recall 与 User Habit Memory 提醒都走受支持的 chat transform 路径 |
+| Codex | Phase 2 prompt reminders + skills | 用户级 skills 安装到 `~/.agents/skills`，并安装 `UserPromptSubmit` habit reminder hook；仍无 project recall、auto-resume、后台自动化或 agent runtime |
 
-Claude Code 受管项目可通过 `UserPromptSubmit` 对明显偏好语句或 prompt-approved habits 给出有界提醒；老项目需运行 `/sybermem-update` 刷新 hook。OpenCode 目前没有已文档化的逐次用户提示词自动注入回调。SyberMem 不会在 OpenCode 上声明隐藏 auto-resume、后台执行或不受支持的 prompt-time injection；OpenCode 上的 `/sybermem-resume`、`/sybermem-search` 和 `/sybermem-habit` 是手动入口，项目记忆和 User Habit Memory 的自动承接主要依赖受支持的 compaction 生命周期。Codex Phase 1.5 只安装用户级 skills 到 `~/.agents/skills`，并让项目健康检查从该安装位置发现模板；它不安装 Codex hooks、`.codex/config.toml` 或后台自动化；更多说明见 [`.codex/INSTALL.md`](.codex/INSTALL.md)。OpenCode 说明见 [`.opencode/INSTALL.md`](.opencode/INSTALL.md)。
+Claude Code 受管项目可通过 `UserPromptSubmit` 对明显偏好语句或 prompt-approved habits 给出有界提醒；老项目需运行 `/sybermem-update` 刷新 hook。OpenCode 通过 `chat.message` + `experimental.chat.system.transform` 提供逐 prompt 高信号项目召回，并把 User Habit Memory 提醒和 recall hints 一起注入同一轮 system prompt；`⭐`/`💡` 继续用于可见化 recall，habit 提醒保持保守，只取 active、高置信、直接相关、在受支持 prompt 场景下允许注入的内容，输出有界且 fail-open。OpenCode 上的 `/sybermem-resume`、`/sybermem-search`、`/sybermem-habit` 与 `sybermem context session|prompt|habit` 仍是手动入口。Codex 现在会安装 `~/.codex/hooks/sybermem_user_prompt.py`，并把它合并到 `~/.codex/hooks.json` 的 `UserPromptSubmit`，通过 `hookSpecificOutput.additionalContext` 提供同样保守的 User Habit Memory 提醒；但 Codex 仍不支持 project recall、auto-resume、后台自动化、prompt 或 agent handler runtime，也不安装 `.codex/config.toml`。更多说明见 [`.codex/INSTALL.md`](.codex/INSTALL.md)。OpenCode 说明见 [`.opencode/INSTALL.md`](.opencode/INSTALL.md)。
 
 ## 安装与升级
 
@@ -135,7 +137,7 @@ curl -sSL https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/i
 irm https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/install-remote.ps1 | iex
 ```
 
-这会刷新用户级 Claude Code skills、OpenCode skills、Codex skills（`~/.agents/skills`）、OpenCode plugin，以及 CLI / Core runtime。安装器会创建固定 CLI launcher：macOS / Linux 为 `$HOME/.claude/sybermem/cli/sybermem`，Windows 为 `%USERPROFILE%\.claude\sybermem\cli\sybermem.cmd`。SyberMem 的 OpenCode plugin 和 CLI 型 skills 在 agent 子进程找不到裸 `sybermem` 时会优先使用这个固定 launcher；安装脚本默认不修改持久 PATH。
+这会刷新用户级 Claude Code skills、OpenCode skills、Codex skills（`~/.agents/skills`）、OpenCode plugin、Codex `UserPromptSubmit` habit hook，以及 CLI / Core runtime。安装器会创建固定 CLI launcher：macOS / Linux 为 `$HOME/.claude/sybermem/cli/sybermem`，Windows 为 `%USERPROFILE%\.claude\sybermem\cli\sybermem.cmd`。SyberMem 的 OpenCode plugin、Codex habit hook 和 CLI 型 skills 在子进程找不到裸 `sybermem` 时会优先使用这个固定 launcher；安装脚本默认不修改持久 PATH。
 
 ### 本地插件验证
 
@@ -151,7 +153,7 @@ claude --plugin-dir .
 2. 再进入已有项目运行 `/sybermem-update`。
 3. 新项目运行 `/sybermem-init-project`。
 
-全局刷新只更新用户级 runtime、Claude/OpenCode/Codex skills 和 OpenCode plugin；项目内的 `.sybermem/`、hooks、模板和说明文件需要 `/sybermem-update` 才会刷新。Codex Phase 1.5 的健康检查会把 `~/.agents/skills/sybermem-init-project/project-files` 作为模板来源之一，因此 Codex 安装路径也能参与项目 freshness 检查。若修复的是 CLI launcher、OpenCode plugin 或 skill 指令链路，按上面的顺序重跑全局安装/更新，再进项目跑 `/sybermem-update` 即可让现有项目生效。
+全局刷新只更新用户级 runtime、Claude/OpenCode/Codex skills、OpenCode plugin 和 Codex 用户级 habit hook；项目内的 `.sybermem/`、hooks、模板和说明文件需要 `/sybermem-update` 才会刷新。Codex 的健康检查会把 `~/.agents/skills/sybermem-init-project/project-files` 作为模板来源之一，因此 Codex 安装路径也能参与项目 freshness 检查。老用户要拿到 OpenCode 新的 habit reminder 注入链路或 Codex 新的 `UserPromptSubmit` hook，先重跑全局安装/更新，再进项目跑 `/sybermem-update`。若修复的是 CLI launcher、OpenCode plugin、Codex hook 或 skill 指令链路，也按这个顺序生效。
 
 ## 初始化项目
 
@@ -229,7 +231,7 @@ packages/core/                       # Core memory / Team publication logic
 packages/cli/                        # sybermem CLI
 packages/opencode-plugin/            # OpenCode plugin
 .codex-plugin/                       # Codex marketplace/entry metadata
-.codex/                              # Codex Phase 1 install notes
+.codex/                              # Codex install notes and bounded habit hook
 scripts/                             # 安装、更新、卸载与打包校验脚本
 ```
 
@@ -259,7 +261,7 @@ sybermem project uninstall
 
 - `.sybermem/` 是当前规范目录。
 - 如果项目仍使用旧 `ADR/`，首次运行相关 SyberMem workflow 时会迁移到 `.sybermem/`。
-- Claude 的 prompt-time recall 只适用于受管 Claude hooks；OpenCode 和 Codex 不声明同类逐次注入。
+- Claude 的 prompt-time recall 适用于受管 Claude hooks；OpenCode 使用 `chat.message` + `experimental.chat.system.transform` 提供高信号项目召回，并在同一条 transform 注入保守的 User Habit Memory 提醒；Codex 只通过 `UserPromptSubmit` + `hookSpecificOutput.additionalContext` 提供保守的 habit 提醒，不声明 project recall 或其他 lifecycle 自动化。
 - 更多安装、升级和兼容细节见 [INSTALL.md](INSTALL.md)。
 
 ## License

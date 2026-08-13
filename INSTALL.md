@@ -40,9 +40,9 @@ The repository already includes `.claude-plugin/plugin.json` and `.claude-plugin
 
 ### Claude Code / OpenCode / Codex 脚本安装（兼容模式）
 
-Script install remains supported as the compatibility path. These commands refresh the user-level Claude Code skills, OpenCode skills, Codex skills, OpenCode plugin, and the CLI/Core runtime. User Habit Memory ships through the Core/CLI runtime plus `/sybermem-habit`, and stores data in the user-owned `~/.sybermem/user-habits/` tree, so it does not require a project `.sybermem/` migration.
+Script install remains supported as the compatibility path. These commands refresh the user-level Claude Code skills, OpenCode skills, Codex skills, the OpenCode plugin, the Codex `UserPromptSubmit` habit hook, and the CLI/Core runtime. User Habit Memory ships through the Core/CLI runtime plus `/sybermem-habit`, and stores data in the user-owned `~/.sybermem/user-habits/` tree, so it does not require a project `.sybermem/` migration.
 
-Installers also create an agent-safe fixed CLI launcher: `$HOME/.claude/sybermem/cli/sybermem` on macOS / Linux and `%USERPROFILE%\.claude\sybermem\cli\sybermem.cmd` on Windows. OpenCode plugin code and CLI-using skills prefer that launcher when a child agent process cannot resolve bare `sybermem`. The scripts do not modify persistent PATH by default; adding the launcher directory to PATH is optional user configuration.
+Installers also create an agent-safe fixed CLI launcher: `$HOME/.claude/sybermem/cli/sybermem` on macOS / Linux and `%USERPROFILE%\.claude\sybermem\cli\sybermem.cmd` on Windows. OpenCode plugin code, the Codex habit hook, and CLI-using skills prefer that launcher when a child agent process cannot resolve bare `sybermem`. The scripts do not modify persistent PATH by default; adding the launcher directory to PATH is optional user configuration.
 
 #### One-liner install
 
@@ -86,13 +86,13 @@ For OpenCode plugin installation and lifecycle details, see [`.opencode/INSTALL.
 
 Project initialization still uses `/sybermem-init-project` after the global install or plugin setup.
 
-On OpenCode, `/sybermem-resume` is a manual, read-only entrypoint. Use it to rebuild current context, use `/sybermem-search` when you need explicit historical evidence, and rely on the supported compaction flow for automatic memory carry-forward during compaction only. Do not expect unsupported prompt-time injection, hidden auto-resume, or background execution.
+On OpenCode, `/sybermem-resume` is a manual, read-only entrypoint. Use it to rebuild current context, use `/sybermem-search` when you need explicit historical evidence, and use `sybermem context session|prompt|habit` when you want explicit copy/paste-safe context. OpenCode now supports prompt-time project recall plus conservative User Habit Memory reminders through `chat.message` + `experimental.chat.system.transform`. Do not expect hidden auto-resume or unsupported background execution.
 
 ### Codex
 
-Codex support is Phase 1.5 user skills with verification. The global install/update scripts copy `packages/claude-skills` to `~/.agents/skills` on macOS / Linux and `%USERPROFILE%\.agents\skills` on Windows with the `Codex` target label. Project setup still uses `/sybermem-init-project` or `/sybermem-update`, which refresh `.sybermem/` and `AGENTS.md` for Codex agents. Project health checks can also discover current templates from the Codex-installed `~/.agents/skills/sybermem-init-project/project-files` tree.
+Codex support is Phase 2 user skills plus bounded habit reminders. The global install/update scripts copy `packages/claude-skills` to `~/.agents/skills` on macOS / Linux and `%USERPROFILE%\.agents\skills` on Windows with the `Codex` target label, and they install `~/.codex/hooks/sybermem_user_prompt.py` plus a `UserPromptSubmit` merge in `~/.codex/hooks.json`. Project setup still uses `/sybermem-init-project` or `/sybermem-update`, which refresh `.sybermem/` and `AGENTS.md` for Codex agents. Project health checks can also discover current templates from the Codex-installed `~/.agents/skills/sybermem-init-project/project-files` tree.
 
-For Codex-specific boundaries and verification, see [`.codex/INSTALL.md`](.codex/INSTALL.md). Do not expect Codex hooks, `.codex/config.toml`, prompt-time injection, hidden auto-resume, or background automation in Phase 1.
+For Codex-specific boundaries and verification, see [`.codex/INSTALL.md`](.codex/INSTALL.md). Codex now supports conservative User Habit Memory reminders through `UserPromptSubmit` + `hookSpecificOutput.additionalContext`, but do not expect project recall, `.codex/config.toml`, hidden auto-resume, background automation, or prompt/agent handler runtimes.
 
 ## Update
 
@@ -104,6 +104,7 @@ Re-run the one-liner install command. This is a real global runtime refresh, not
 - OpenCode skills
 - Codex skills
 - OpenCode plugin
+- Codex habit hook
 - CLI / Core runtime
 
 This includes `/sybermem-habit` and `sybermem habit add/list/search/pause/delete/remind/inject`. Habit data stays in user-level storage and is not copied into existing project records by `/sybermem-update`.
@@ -128,7 +129,7 @@ That follow-up is where project-local hook files, templates, instruction blocks,
 
 That same project-local refresh is also how older Claude projects pick up updated guidance and managed prompt hooks, including `/sybermem-resume` routing, read-only recall, and User Habit Memory reminders.
 
-For CLI availability fixes, OpenCode plugin fixes, or skill instruction fixes, use the same propagation path: re-run the global installer/updater to refresh the runtime, fixed launcher, OpenCode plugin, and user-level skills; then run `/sybermem-update` inside each existing project so project-local instructions and managed files are refreshed.
+For CLI availability fixes, OpenCode plugin fixes, Codex hook fixes, or skill instruction fixes, use the same propagation path: re-run the global installer/updater to refresh the runtime, fixed launcher, OpenCode plugin, Codex hook, and user-level skills; then run `/sybermem-update` inside each existing project so project-local instructions and managed files are refreshed.
 
 ## Subdirectory Hook Fix
 
@@ -165,9 +166,11 @@ For existing projects, `/sybermem-update` should now deliver both parts of `usin
 - **Claude record-intent capture says Core is unavailable**
   Use the bounded diagnostic path, then rerun `/sybermem-update` or reinstall the managed Claude hook. This diagnostic should not store prompt content.
 - **OpenCode looks stale after an upgrade**
-  Re-run the remote install command or the local update script. That refreshes the OpenCode skills and plugin, then run `/sybermem-update` in the project if project-local managed files also need refresh.
+  Re-run the remote install command or the local update script. That refreshes the OpenCode skills and plugin, including the prompt-time habit reminder path, then run `/sybermem-update` in the project if project-local managed files also need refresh.
 - **Codex skills are missing after an upgrade**
-  Re-run the remote install command or the local update script. That refreshes `~/.agents/skills`; then run `/sybermem-update` in the project if `AGENTS.md` or `.sybermem/` needs refresh. From a checkout, use `python -m pytest packages/core/tests/test_package_integrity_scripts.py packages/core/tests/test_init_project_distribution.py -q` and `python scripts/check-plugin-package.py` as the non-mutating Codex Phase 1.5 smoke set.
+  Re-run the remote install command or the local update script. That refreshes `~/.agents/skills`; then run `/sybermem-update` in the project if `AGENTS.md` or `.sybermem/` needs refresh. From a checkout, use `python -m pytest packages/core/tests/test_package_integrity_scripts.py packages/core/tests/test_init_project_distribution.py -q` and `python scripts/check-plugin-package.py` as the non-mutating Codex package smoke set.
+- **Codex habit reminders are missing after an upgrade**
+  Re-run the remote install command or the local update script so `~/.codex/hooks/sybermem_user_prompt.py` and `~/.codex/hooks.json` are refreshed. Then run `/sybermem-update` in the project if project-managed files also need refresh.
 - **`sybermem habit` is missing**
   Re-run the global install/update command. Habit commands are part of the CLI/Core runtime refresh, not project-local templates.
 
@@ -175,6 +178,6 @@ For existing projects, `/sybermem-update` should now deliver both parts of `usin
 
 Type `/sybermem-init-project` or `/sybermem-update` in Claude Code, OpenCode, or Codex. If the project gets the `.sybermem/` directory structure, reports that an existing `ADR/` directory will be auto-migrated, or offers to refresh stale `AGENTS.md` / `CLAUDE.md`, the installation was successful.
 
-For Claude Code specifically, a successful refresh also means the project can receive `.sybermem/hooks/task_recall.py` plus the managed `UserPromptSubmit` wiring without losing unrelated custom settings. For OpenCode, success still does not imply unsupported prompt-time automatic injection.
+For Claude Code specifically, a successful refresh also means the project can receive `.sybermem/hooks/task_recall.py` plus the managed `UserPromptSubmit` wiring without losing unrelated custom settings. For OpenCode, success means the supported chat transform path can carry project recall and conservative habit reminders, not unsupported hidden automation.
 
-For Claude Code, OpenCode, and Codex, `/sybermem-resume` remains a user-invoked skill. Successful installation does not imply hidden auto-resume, background execution, or a second persistent memory store.
+For Claude Code, OpenCode, and Codex, `/sybermem-resume` remains a user-invoked skill. Successful installation does not imply hidden auto-resume, background execution, or a second persistent memory store. In Codex specifically, successful installation also does not imply project recall or `.codex/config.toml` management.
