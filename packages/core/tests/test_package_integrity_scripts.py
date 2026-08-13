@@ -23,8 +23,8 @@ def test_package_integrity_checks_all_runtime_refresh_scripts() -> None:
     ]
 
 
-def test_package_integrity_checks_codex_phase_one_point_five_distribution() -> None:
-    # Given: Codex Phase 1.5 installs skills plus a bounded UserPromptSubmit reminder hook
+def test_package_integrity_checks_codex_runtime_distribution() -> None:
+    # Given: Codex installs skills plus bounded managed lifecycle hooks
     checker = runpy.run_path(str(CHECK_SCRIPT))
 
     # When / Then: the integrity checker tracks Codex skill scripts, hook scripts, public docs, and metadata honesty
@@ -42,25 +42,25 @@ def test_package_integrity_checks_codex_phase_one_point_five_distribution() -> N
     assert callable(checker["check_codex_skill_install_wiring"])
     assert callable(checker["check_codex_user_prompt_hook_install_wiring"])
     assert callable(checker["check_codex_metadata_honesty"])
-    assert callable(checker["check_codex_phase_one_point_five_discoverability"])
+    assert callable(checker["check_codex_runtime_discoverability"])
     assert Path("CONTRIBUTING.md") in checker["UNSUPPORTED_CLAIM_DOCS"]
     assert Path("CHANGELOG.md") in checker["UNSUPPORTED_CLAIM_DOCS"]
     assert Path("docs/feature_map.md") in checker["UNSUPPORTED_CLAIM_DOCS"]
 
 
-def test_package_integrity_calls_dedicated_codex_phase_one_point_five_guards_from_main() -> None:
-    # Given: Codex Phase 1.5 has dedicated integrity guards for install wiring and honest claims
+def test_package_integrity_calls_dedicated_codex_runtime_guards_from_main() -> None:
+    # Given: Codex runtime support has dedicated integrity guards for install wiring and honest claims
     script = CHECK_SCRIPT.read_text(encoding="utf-8")
 
     # When / Then: main() invokes both Codex-specific guards as part of package verification
     assert "def check_codex_user_prompt_hook_install_wiring(root: Path) -> None:" in script
     assert "check_codex_user_prompt_hook_install_wiring(root)" in script
-    assert "def check_codex_phase_one_point_five_discoverability(root: Path) -> None:" in script
-    assert "check_codex_phase_one_point_five_discoverability(root)" in script
+    assert "def check_codex_runtime_discoverability(root: Path) -> None:" in script
+    assert "check_codex_runtime_discoverability(root)" in script
 
 
-def test_codex_phase_one_installers_include_user_skill_targets() -> None:
-    # Given: Codex Phase 1 installs the canonical skills into the user-level Codex skill path
+def test_codex_installers_include_user_skill_targets() -> None:
+    # Given: Codex installs the canonical skills into the user-level Codex skill path
     checker = runpy.run_path(str(CHECK_SCRIPT))
 
     # When / Then: every install/update script names the Codex target path and label
@@ -85,35 +85,67 @@ def test_codex_plugin_metadata_keeps_supported_scope_narrow() -> None:
     assert "prompt-time" not in metadata.lower()
 
 
-def test_codex_install_documents_manual_project_context_workflow() -> None:
-    # Given: Codex project context remains manual even though bounded habit reminders use UserPromptSubmit
+def test_codex_install_documents_hook_backed_project_context_workflow() -> None:
+    # Given: Codex project context is bounded to supported lifecycle hooks
     install_doc = (ROOT / ".codex" / "INSTALL.md").read_text(encoding="utf-8")
 
     # When / Then: the docs expose the shared context helper while preserving the unsupported boundary
     assert "sybermem context prompt --query" in install_doc
-    assert "manual" in install_doc.lower()
+    assert "SessionStart" in install_doc
+    assert "UserPromptSubmit" in install_doc
     assert "Codex support does not add broad Codex runtime automation" in install_doc
     assert "hidden auto-resume" in install_doc
     assert "background automation" in install_doc
-    assert "prompt-time injection" in install_doc
+    assert "direct compaction prompt injection" in install_doc
     assert ".codex/config.toml" in install_doc
 
 
-def test_codex_user_prompt_hook_source_stays_habit_only() -> None:
-    # Given: Codex support uses one bounded user prompt hook for habit reminders only
+def test_codex_user_prompt_hook_source_captures_prompt_context() -> None:
+    # Given: Codex support uses one bounded user prompt hook for recall, habits, and record intent
     hook_source = (ROOT / ".codex" / "hooks" / "user_prompt.py").read_text(encoding="utf-8")
 
-    # When / Then: the source keeps the documented Codex hook contract and avoids project recall automation
+    # When / Then: the source keeps the documented Codex hook contract and bounded prompt context routes
     assert "UserPromptSubmit" in hook_source
     assert "hookSpecificOutput" in hook_source
     assert "additionalContext" in hook_source
     assert '"context"' in hook_source
+    assert '"recall"' in hook_source
     assert '"habit"' in hook_source
     assert "--delivery" in hook_source
     assert "prompt-time" in hook_source
-    assert "context recall" not in hook_source
-    assert "project recall" not in hook_source.lower()
+    assert "classify_record_intent" in hook_source
+    assert ".record-intent.json" in hook_source
     assert "auto-resume" not in hook_source.lower()
+
+
+def test_codex_session_start_hook_source_exists() -> None:
+    # Given: Codex SessionStart is the supported seam for startup project context
+    hook_source = (ROOT / ".codex" / "hooks" / "session_start.py").read_text(encoding="utf-8")
+
+    # When / Then: the source emits SessionStart additionalContext from shared session context CLI
+    assert "SessionStart" in hook_source
+    assert "hookSpecificOutput" in hook_source
+    assert "additionalContext" in hook_source
+    assert '"context"' in hook_source
+    assert '"session"' in hook_source
+    assert "auto-resume" not in hook_source.lower()
+
+
+def test_codex_stop_and_post_compact_hook_sources_exist() -> None:
+    # Given: Codex uses supported Stop/PostCompact events for bounded lifecycle follow-up
+    stop_source = (ROOT / ".codex" / "hooks" / "stop.py").read_text(encoding="utf-8")
+    post_compact_source = (ROOT / ".codex" / "hooks" / "post_compact.py").read_text(encoding="utf-8")
+
+    # When / Then: Stop can nudge once, while PostCompact only marks later re-seed
+    assert "Stop" in stop_source
+    assert "stop_hook_active" in stop_source
+    assert '"decision"' in stop_source
+    assert '"block"' in stop_source
+    assert "/sybermem-record" in stop_source
+    assert ".nudge-state.json" in stop_source
+    assert "PostCompact" in post_compact_source
+    assert ".codex-compact-marker.json" in post_compact_source
+    assert "additionalContext" not in post_compact_source
 
 
 def test_package_integrity_checks_cli_using_skills_with_fixed_launcher_guidance() -> None:
@@ -196,7 +228,7 @@ def test_platform_docs_keep_unsupported_claims_in_limitation_sections() -> None:
 
     # When / Then: current platform docs satisfy the machine-enforced honesty guard
     checker["check_unsupported_platform_claims"](ROOT)
-    assert "per-prompt additionalContext" in guarded_fragments
+    assert '"prompt" handler' in guarded_fragments
     assert "background automation" in guarded_fragments
 
 
