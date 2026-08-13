@@ -151,6 +151,27 @@ def test_cli_context_habit_json_supports_prompt_time_delivery_metadata(
     assert payload["reminded"] == ["habit-xyz"]
 
 
+def test_cli_record_intent_json_uses_core_classifier(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    # Given: a SyberMem project root is available to the CLI classifier route
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    monkeypatch.setattr(main_module, "resolve_project_root", lambda: project_root)
+
+    # When: record intent is classified through the real CLI parser
+    exit_code = run_cli(["record", "intent", "--prompt", "Record this decision about plugin modules", "--format", "json"], monkeypatch)
+
+    # Then: the route exposes bounded classifier metadata without prompt text
+    payload = json.loads(capsys.readouterr().out)
+    assert exit_code == 0
+    assert payload["classification"] == "decision"
+    assert payload["action"] == "/sybermem-record"
+    assert "plugin modules" not in json.dumps(payload)
+
+
 def test_cli_context_returns_error_without_project_root(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
