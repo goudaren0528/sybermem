@@ -103,6 +103,8 @@ OPENCODE_PLUGIN_SOURCE_MODULES: Final = [
     Path("packages/opencode-plugin/src/recall_debug.ts"),
     Path("packages/opencode-plugin/src/startup_context.ts"),
     Path("packages/opencode-plugin/src/recall_health_signal.ts"),
+    Path("packages/opencode-plugin/src/session_activity.ts"),
+    Path("packages/opencode-plugin/src/recall_outcome.ts"),
 ]
 CLI_USING_SKILLS: Final = [
     Path("packages/claude-skills/using-sybermem/SKILL.md"),
@@ -793,6 +795,43 @@ def check_opencode_memory_feedback_wiring(root: Path) -> None:
         fail(f"packages/opencode-plugin/sybermem.ts is missing memory feedback wiring: {', '.join(missing)}")
 
 
+def check_opencode_recall_relevance_wiring(root: Path) -> None:
+    """Guard the edit-aware recall relevance feedback loop end to end.
+
+    The bundle must subscribe to the edit/activity seams, remember injected
+    records, and flush a bounded recall-outcome journal at idle; the record-files
+    CLI and precision-backed recall_health must exist so relevance is measurable.
+    """
+    plugin_path = root / "packages" / "opencode-plugin" / "sybermem.ts"
+    if not plugin_path.is_file():
+        fail("Missing file: packages/opencode-plugin/sybermem.ts")
+    plugin_text = plugin_path.read_text(encoding="utf-8")
+    required_bundle = [
+        "file.edited",
+        "todo.updated",
+        "tool.execute.after",
+        "recordInjectedRecords",
+        "flushRecallOutcome",
+        ".recall-outcomes.jsonl",
+        "project record-files",
+        "triggerReason",
+    ]
+    missing = [fragment for fragment in required_bundle if fragment not in plugin_text]
+    if missing:
+        fail(f"packages/opencode-plugin/sybermem.ts is missing recall relevance wiring: {', '.join(missing)}")
+    # Core/CLI backing: related_files parsing, the record-files command, and a
+    # precision-aware recall_health verdict must all be present.
+    records_text = (root / "packages" / "core" / "sybermem_core" / "records.py").read_text(encoding="utf-8")
+    if "related_files" not in records_text or "related_files_by_record" not in records_text:
+        fail("packages/core/sybermem_core/records.py must parse related_files and expose related_files_by_record")
+    memory_stats_text = (root / "packages" / "core" / "sybermem_core" / "memory_stats.py").read_text(encoding="utf-8")
+    if "low_relevance" not in memory_stats_text or "precision" not in memory_stats_text:
+        fail("packages/core/sybermem_core/memory_stats.py must expose a precision-backed low_relevance verdict")
+    cli_text = (root / "packages" / "cli" / "sybermem_cli" / "main.py").read_text(encoding="utf-8")
+    if "record-files" not in cli_text or "related_files_by_record" not in cli_text:
+        fail("packages/cli/sybermem_cli/main.py must register the project record-files command")
+
+
 def check_opencode_prompt_privacy(root: Path) -> None:
     record_intent = (root / "packages" / "opencode-plugin" / "src" / "record_intent.ts").read_text(encoding="utf-8")
     recall_debug = (root / "packages" / "opencode-plugin" / "src" / "recall_debug.ts").read_text(encoding="utf-8")
@@ -973,6 +1012,7 @@ def main(root: Path = ROOT) -> int:
     check_opencode_plugin_cli_resolution(root)
     check_opencode_plugin_prompt_recall(root)
     check_opencode_memory_feedback_wiring(root)
+    check_opencode_recall_relevance_wiring(root)
     check_opencode_prompt_privacy(root)
     names = check_skill_tree_parity(root)
     check_skill_cli_resolution_guidance(root)

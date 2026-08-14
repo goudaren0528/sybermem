@@ -341,6 +341,34 @@ def test_opencode_plugin_injects_user_habits_only_during_compaction() -> None:
     assert "sybermem habit remind" not in plugin
 
 
+def test_package_integrity_calls_recall_relevance_guard_from_main() -> None:
+    # Given: the edit-aware recall relevance loop is a distribution contract
+    script = CHECK_SCRIPT.read_text(encoding="utf-8")
+
+    # When / Then: main() defines and invokes the dedicated relevance guard
+    assert "def check_opencode_recall_relevance_wiring(root: Path) -> None:" in script
+    assert "check_opencode_recall_relevance_wiring(root)" in script
+
+
+def test_recall_relevance_wiring_guard_passes_on_repo() -> None:
+    # Given: the guard function loaded from the checker
+    checker = runpy.run_path(str(CHECK_SCRIPT))
+    guard = checker["check_opencode_recall_relevance_wiring"]
+
+    # When / Then: it passes against the real repo (bundle + core + cli are wired)
+    guard(ROOT)
+
+
+def test_opencode_plugin_source_modules_include_relevance_modules() -> None:
+    # Given: new source modules must be tracked so the bundle stays reproducible
+    checker = runpy.run_path(str(CHECK_SCRIPT))
+    modules = checker["OPENCODE_PLUGIN_SOURCE_MODULES"]
+
+    # When / Then: both edit-aware modules are enumerated
+    assert Path("packages/opencode-plugin/src/session_activity.ts") in modules
+    assert Path("packages/opencode-plugin/src/recall_outcome.ts") in modules
+
+
 def test_package_integrity_exposes_unsupported_platform_claim_guard() -> None:
     # Given: OpenCode and Codex support must stay honest about unsupported runtime seams
     checker = runpy.run_path(str(CHECK_SCRIPT))
@@ -397,6 +425,8 @@ def test_package_integrity_exposes_opencode_source_bundle_and_privacy_guards() -
         Path("packages/opencode-plugin/src/recall_debug.ts"),
         Path("packages/opencode-plugin/src/startup_context.ts"),
         Path("packages/opencode-plugin/src/recall_health_signal.ts"),
+        Path("packages/opencode-plugin/src/session_activity.ts"),
+        Path("packages/opencode-plugin/src/recall_outcome.ts"),
     ]
     assert callable(checker["check_opencode_plugin_source_bundle"])
     assert callable(checker["check_opencode_prompt_privacy"])
