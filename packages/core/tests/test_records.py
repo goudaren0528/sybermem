@@ -251,6 +251,97 @@ def test_parse_record_file_unwraps_quoted_scalars_and_topics(tmp_path: Path) -> 
     assert record["topics"] == "arch,quality"
 
 
+def test_parse_record_file_reads_inline_related_files(tmp_path: Path) -> None:
+    # Given: a record declaring related_files as an inline list (the common shape)
+    record_path = tmp_path / "2026-08-15-001-inline-related.md"
+    record_path.write_text(
+        "\n".join(
+            [
+                "---",
+                "type: change",
+                "record_id: change-dddddddddddddddddddddddddddddddd",
+                "date: 2026-08-15",
+                "title: Inline related files",
+                "related_files: [packages/core/sybermem_core/memory_stats.py, packages/core/sybermem_core/records.py]",
+                "---",
+                "",
+                "## Change Content",
+                "Body.",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    # When: parsed
+    record = parse_record_file(record_path, "project-1", "demo")
+
+    # Then: related_files becomes a comma-joined path string, distinct from `related`
+    assert record["related_files"] == "packages/core/sybermem_core/memory_stats.py,packages/core/sybermem_core/records.py"
+    assert record["related"] == ""
+
+
+def test_parse_record_file_reads_multiline_related_files(tmp_path: Path) -> None:
+    # Given: a record declaring related_files as a multiline YAML list
+    record_path = tmp_path / "2026-08-15-002-multiline-related.md"
+    record_path.write_text(
+        "\n".join(
+            [
+                "---",
+                "type: change",
+                "record_id: change-eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+                "date: 2026-08-15",
+                "title: Multiline related files",
+                "related_files:",
+                "  - src/auth.ts",
+                "  - src/token.ts",
+                "topics:",
+                "  - auth",
+                "---",
+                "",
+                "## Change Content",
+                "Body.",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    # When: parsed
+    record = parse_record_file(record_path, "project-1", "demo")
+
+    # Then: multiline entries are collected and a following field still parses
+    assert record["related_files"] == "src/auth.ts,src/token.ts"
+    assert record["topics"] == "auth"
+
+
+def test_parse_record_file_defaults_related_files_to_empty_for_legacy_records(tmp_path: Path) -> None:
+    # Given: a legacy record with no related_files field
+    record_path = tmp_path / "2026-08-15-003-no-related.md"
+    record_path.write_text(
+        "\n".join(
+            [
+                "---",
+                "type: bug",
+                "date: 2026-08-15",
+                "title: No related files",
+                "---",
+                "",
+                "## Summary",
+                "Body.",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    # When: parsed
+    record = parse_record_file(record_path, "project-1", "demo")
+
+    # Then: the field defaults to empty so old records simply do not participate in relevance
+    assert record["related_files"] == ""
+
+
 def test_unwrap_scalar_strips_only_matching_quote_pairs() -> None:
     assert unwrap_scalar("  'hi'  ") == "hi"
     assert unwrap_scalar('"hi"') == "hi"

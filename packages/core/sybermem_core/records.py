@@ -172,6 +172,7 @@ def parse_record_file(path: Path, project_id: str, slug: str) -> dict[str, str]:
     fixes = ""
     implements = ""
     related = ""
+    related_files: list[str] = []
     source_kind = ""
     authority = ""
     lifecycle = ""
@@ -219,6 +220,20 @@ def parse_record_file(path: Path, project_id: str, slug: str) -> dict[str, str]:
             fixes = unwrap_scalar(line.split(":", 1)[1])
         elif line.startswith("implements:"):
             implements = unwrap_scalar(line.split(":", 1)[1])
+        elif line.startswith("related_files:"):
+            related_files_value = line.split(":", 1)[1]
+            related_files = _parse_topic_items(related_files_value)
+            if not related_files:
+                collected_files: list[str] = []
+                next_index = index + 1
+                while next_index < len(frontmatter):
+                    match = TOPIC_LIST_ITEM_PATTERN.fullmatch(frontmatter[next_index])
+                    if match is None:
+                        break
+                    collected_files.append(unwrap_scalar(match.group(1)))
+                    next_index += 1
+                related_files = collected_files
+                index = next_index - 1
         elif line.startswith("related:"):
             related = unwrap_scalar(line.split(":", 1)[1])
         elif line.startswith("source_kind:"):
@@ -253,6 +268,7 @@ def parse_record_file(path: Path, project_id: str, slug: str) -> dict[str, str]:
         "fixes": fixes,
         "implements": implements,
         "related": related,
+        "related_files": ",".join(related_files),
         "source_kind": source_kind,
         "authority": authority,
         "lifecycle": lifecycle,
