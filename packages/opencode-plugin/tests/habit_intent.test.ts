@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test"
-import { captureHabitIntentWithCli } from "../src/habit_intent"
+import { captureHabitIntentWithCli, looksLikeHabitIntent } from "../src/habit_intent"
 import type { Shell } from "../src/runtime"
 
 // Minimal Shell stub: records the command and returns a canned stdout.
@@ -28,27 +28,41 @@ describe("habit intent capture", () => {
     expect(result.habitType).toBe("communication")
   })
 
-  it("routes through the habit intent CLI with the prompt", async () => {
+  it("routes through the habit intent CLI with an argparse-safe --prompt= form", async () => {
     // Given
     const { shell, commands } = stubShell(JSON.stringify({ captured: true, candidate: { habit_type: "workflow" } }))
 
     // When
     await captureHabitIntentWithCli(shell, "/root", "always prefer plans")
 
-    // Then: the command targets `habit intent --prompt ... --format json`
-    expect(commands.some((c) => c.includes("habit intent --prompt") && c.includes("always prefer plans"))).toBe(true)
+    // Then: the command uses `--prompt=` so a leading-dash prompt is not mis-parsed
+    expect(commands.some((c) => c.includes("habit intent --prompt=") && c.includes("always prefer plans"))).toBe(true)
   })
 
-  it("returns no-capture for a non-candidate prompt", async () => {
-    const { shell } = stubShell(JSON.stringify({ captured: false, candidate: null }))
-    const result = await captureHabitIntentWithCli(shell, "/root", "fix the crash")
+  it("skips the CLI entirely for a non-preference prompt (hot-path cost guard)", async () => {
+    // Given
+    const { shell, commands } = stubShell(JSON.stringify({ captured: false, candidate: null }))
+
+    // When: an ordinary work prompt with no preference language
+    const result = await captureHabitIntentWithCli(shell, "/root", "fix the crash in the parser")
+
+    // Then: no subprocess was spawned and no capture occurred
     expect(result.captured).toBe(false)
-    expect(result.habitType).toBe("")
+    expect(commands).toEqual([])
+  })
+
+  it("prefilter recognizes ASCII and CJK preference language only", () => {
+    expect(looksLikeHabitIntent("always prefer plans")).toBe(true)
+    expect(looksLikeHabitIntent("remember this")).toBe(true)
+    expect(looksLikeHabitIntent("以后都用中文回复我")).toBe(true)
+    expect(looksLikeHabitIntent("fix the crash in the parser")).toBe(false)
+    expect(looksLikeHabitIntent("")).toBe(false)
   })
 
   it("fails open on empty text and on malformed CLI output", async () => {
     const empty = await captureHabitIntentWithCli(stubShell("").shell, "/root", "")
     expect(empty.captured).toBe(false)
+    // Malformed output on a prompt that DOES pass the prefilter still fails open.
     const malformed = await captureHabitIntentWithCli(stubShell("not json").shell, "/root", "always do X")
     expect(malformed.captured).toBe(false)
   })

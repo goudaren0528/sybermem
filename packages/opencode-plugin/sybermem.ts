@@ -191,7 +191,7 @@ async function sybermemText($, root, args) {
       return $`${sybermem} next-step ${args[1]} ${args[2]}`.cwd(root).text();
     case "habit":
       if (args[1] === "intent")
-        return $`${sybermem} habit intent --prompt ${args[3]} --format json`.cwd(root).nothrow().text();
+        return $`${sybermem} habit intent --prompt=${args[3]} --format json`.cwd(root).nothrow().text();
       if (args[1] === "awareness")
         return $`${sybermem} habit awareness --format json`.cwd(root).nothrow().text();
       return $`${sybermem} habit inject ${args[2]} ${args[3]} ${args[4]} ${args[5]}`.cwd(root).text();
@@ -933,8 +933,13 @@ async function flushRecallOutcome($, root, activity, sessionID, timestamp = new 
 
 // packages/opencode-plugin/src/habit_intent.ts
 var NO_CAPTURE = { captured: false, habitType: "" };
+var HABIT_INTENT_HINT_RE = /\b(always|habit|preference|prefer|remember)\b/i;
+var CJK_HABIT_INTENT_HINTS = ["\u4EE5\u540E", "\u504F\u597D", "\u4E60\u60EF", "\u8BB0\u4F4F"];
+function looksLikeHabitIntent(text) {
+  return HABIT_INTENT_HINT_RE.test(text) || CJK_HABIT_INTENT_HINTS.some((hint) => text.includes(hint));
+}
 async function captureHabitIntentWithCli($, root, text) {
-  if (!text)
+  if (!text || !looksLikeHabitIntent(text))
     return NO_CAPTURE;
   try {
     const parsed = JSON.parse(await sybermemText($, root, ["habit", "intent", "--prompt", text, "--format", "json"]));
