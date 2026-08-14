@@ -38,12 +38,45 @@ export function stashPromptPackets(sessionID: string, packets: readonly string[]
   else RECALL_STASH.delete(sessionID)
 }
 
-export function injectStashedPromptPackets(sessionID: string, output: SystemTransformOutput): boolean {
+export interface InjectionSummary {
+  readonly injected: boolean
+  readonly recallCount: number
+  readonly habitCount: number
+  readonly habitCandidate: boolean
+}
+
+const NO_INJECTION: InjectionSummary = { injected: false, recallCount: 0, habitCount: 0, habitCandidate: false }
+
+export function classifyPackets(packets: readonly string[]): InjectionSummary {
+  if (packets.length === 0) return NO_INJECTION
+  let recallCount = 0
+  let habitCount = 0
+  let habitCandidate = false
+  for (const packet of packets) {
+    const trimmed = packet.trim()
+    if (trimmed.startsWith("## SyberMem Recall Hints")) {
+      recallCount += countBullets(trimmed)
+    } else if (trimmed.startsWith("## User Habit Reminder")) {
+      const habitLines = trimmed.split("\n").filter((line) => line.startsWith("- [habit-"))
+      habitCount += habitLines.length
+      // A habit packet with no concrete habit reference is a "preference candidate":
+      // the prompt looked like a reusable preference but no stored habit matched.
+      if (habitLines.length === 0) habitCandidate = true
+    }
+  }
+  return { injected: recallCount > 0 || habitCount > 0 || habitCandidate, recallCount, habitCount, habitCandidate }
+}
+
+function countBullets(packet: string): number {
+  return packet.split("\n").filter((line) => /^-\s/.test(line.trim())).length
+}
+
+export function injectStashedPromptPackets(sessionID: string, output: SystemTransformOutput): InjectionSummary {
   const packets = RECALL_STASH.get(sessionID)
   RECALL_STASH.delete(sessionID)
-  if (!packets || packets.length === 0) return false
+  if (!packets || packets.length === 0) return NO_INJECTION
   const hints = packets.join("\n\n")
   if (output.system && output.system.length > 0) output.system[0] = `${hints}\n\n${output.system[0]}`
   else output.system = [hints, ...(output.system ?? [])]
-  return true
+  return classifyPackets(packets)
 }
