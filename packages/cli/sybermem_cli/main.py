@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 
 from pathlib import Path
@@ -8,6 +9,7 @@ from sybermem_core.formats import dump_json
 from sybermem_core.project import resolve_project_root, ensure_project_yaml
 from sybermem_core.project_refresh import refresh_project
 from sybermem_core.project_index import RECORD_TYPES, DuplicateRecordIdError, InvalidRecordMetadataError, check_project_index, write_project_index
+from sybermem_core.phase_index import PhaseConfirmError, analyze_phases, confirm_phases_from_payload
 from sybermem_core.records import generate_record_id
 from sybermem_core.registry import register_project
 from sybermem_core.identity import git_remote
@@ -422,6 +424,42 @@ def cmd_project_refresh(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_project_phase_analyze(args: argparse.Namespace) -> int:
+    root = resolve_project_root()
+    if root is None:
+        print("No SyberMem project root found.", file=sys.stderr)
+        return 1
+    result = analyze_phases(root)
+    if args.format == "json":
+        print(dump_json(result))
+    else:
+        print(f"{result['status']}: {len(result['phases'])} phase(s)")
+    return 0
+
+
+def cmd_project_phase_confirm(args: argparse.Namespace) -> int:
+    root = resolve_project_root()
+    if root is None:
+        print("No SyberMem project root found.", file=sys.stderr)
+        return 1
+    try:
+        raw = sys.stdin.read() if args.from_json == "-" else Path(args.from_json).read_text(encoding="utf-8")
+        payload = json.loads(raw)
+    except (OSError, ValueError) as exc:
+        print(f"Failed to read phase payload: {exc}", file=sys.stderr)
+        return 1
+    try:
+        result = confirm_phases_from_payload(root, payload)
+    except PhaseConfirmError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    if args.format == "json":
+        print(dump_json(result))
+    else:
+        print(f"{result['status']}: {len(result['phases'])} phase(s)")
+    return 0
+
+
 def main() -> int:
     # Emit UTF-8 regardless of console locale. Record titles/conclusions and governance
     # markers can contain non-ASCII (CJK titles, ⚠/✓/⭐), which a locale like GBK on
@@ -459,6 +497,16 @@ def main() -> int:
     refresh_cmd = project_sub.add_parser("refresh")
     refresh_cmd.add_argument("--format", choices=["text", "json"], default="text")
     refresh_cmd.set_defaults(func=cmd_project_refresh)
+
+    project_phase = project_sub.add_parser("phase")
+    project_phase_sub = project_phase.add_subparsers(dest="project_phase_command", required=True)
+    phase_analyze = project_phase_sub.add_parser("analyze")
+    phase_analyze.add_argument("--format", choices=["text", "json"], default="text")
+    phase_analyze.set_defaults(func=cmd_project_phase_analyze)
+    phase_confirm = project_phase_sub.add_parser("confirm")
+    phase_confirm.add_argument("--from-json", required=True)
+    phase_confirm.add_argument("--format", choices=["text", "json"], default="text")
+    phase_confirm.set_defaults(func=cmd_project_phase_confirm)
 
     project_index = project_sub.add_parser("index")
     project_index_sub = project_index.add_subparsers(dest="project_index_command", required=True)
