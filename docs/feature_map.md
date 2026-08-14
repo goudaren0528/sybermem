@@ -1,6 +1,6 @@
 # SyberMem Feature Map
 
-Last updated: 2026-08-15
+Last updated: 2026-08-15 (habit awareness)
 
 This is the source-of-truth feature map for SyberMem project capabilities and
 platform support claims. Public READMEs and platform install docs should stay
@@ -71,7 +71,9 @@ consistent with this file.
 | Workspace/Hub | Full | `sybermem index build`, workspace `sybermem search`, `sybermem portfolio` | SQLite FTS5 workspace index with project/type/status filters and stale-index detection. |
 | Digest Governance | Full | `/sybermem-digest`, `/sybermem-theme-digest`, `sybermem digest status` | Phase/theme digests with coverage hash and current/stale/unknown verdicts. |
 | Team Memory | Full | `sybermem team init`, `sybermem publish status`, `sybermem team summary`, `/sybermem-team-publish`, `/sybermem-team-summary` | Preview hash protection, Team overview, management summary, and digest-history sync. |
-| User Habit Memory | Full | `/sybermem-habit`, `sybermem habit add/list/search/pause/delete/remind/inject` | User-owned storage under `~/.sybermem/user-habits` or `SYBERMEM_HOME/user-habits`; not project or Team memory. |
+| User Habit Memory | Full | `/sybermem-habit`, `sybermem habit add/list/search/pause/delete/remind/inject/intent/intent-status/intent-clear/awareness` | User-owned storage under `~/.sybermem/user-habits` or `SYBERMEM_HOME/user-habits`; not project or Team memory. |
+| Habit intent capture | Full (candidate-only) | `sybermem habit intent`, OpenCode `chat.message`, `~/.sybermem/.habit-intent.json` | Passively classifies a reusable-preference prompt into a candidate-only intent written to the user-level intent file. NEVER creates an active habit and never persists secrets/injection text; `/sybermem-habit` turns a pending candidate into a habit only after user confirmation, then clears it. |
+| Habit awareness surface | Full | `sybermem habit awareness`, OpenCode startup context, `habit_awareness_summary` | Surfaces habit PRESENCE (active count, type distribution, latest confirmation, pending-candidate flag) in the first-turn startup context and stats without exposing habit statements on the hot path or duplicating prompt-time reminders. |
 | Context Helpers | Full | `sybermem context session|prompt|recall|habit` | Shared host-neutral context contract. OpenCode/Codex automation reuses the same conservative CLI behavior where supported. |
 | Record Authoring | Skill-orchestrated | `/sybermem-record`; CLI helper `sybermem record id --type ...` | CLI mints IDs and validates indexes; full record writing remains skill workflow. |
 | Distribution/Verification | Full | install/update scripts, `scripts/check-plugin-package.py`, pytest package integrity tests | Installers refresh Claude/OpenCode/Codex skills, OpenCode plugin, Codex hook, CLI/Core runtime, fixed launchers, and guards. |
@@ -89,11 +91,13 @@ consistent with this file.
 | Recall relevance feedback | Full | `session.idle` -> `sybermem project record-files` -> `.sybermem/.recall-outcomes.jsonl` | Injected records this session are matched against edited files via their declared `related_files`; a bounded per-session outcome (injected / hit / precision / hit+miss ids) is appended, feeding the precision-backed `low_relevance` verdict. Fail-open and prompt-text-free. |
 | Prompt-time project recall | Full | `chat.message` -> `sybermem context recall` -> `experimental.chat.system.transform` | Same-turn system prompt injection; only high-signal recall qualifies. |
 | Prompt-time habit reminder | Full | `chat.message` -> `sybermem context habit --delivery prompt-time` -> system transform | Bounded, fail-open, active/high-confidence/directly relevant/prompt-ok habits only. |
+| Habit intent capture | Full (candidate-only) | `chat.message` -> `sybermem habit intent --prompt` | Passively classifies a reusable-preference prompt into a candidate written to the user-level `~/.sybermem/.habit-intent.json`; never an active habit, never persists secrets/injection text. |
+| Habit awareness in startup | Full | `session.created` + first `experimental.chat.system.transform` -> `sybermem habit awareness` | Adds a bounded "User Habits" line (active count + pending-candidate flag only, never statements) so habits are visible on the first turn without duplicating prompt-time reminders. |
 | Compaction carry-forward | Full | `experimental.session.compacting` | Includes session context, phase/status, digest heads-up, next-step, and compaction habit inject. |
 | Record-intent capture | Full | `chat.message` | Writes `.sybermem/.record-intent.json` only for explicit `change` / `decision` / `requirement` / `bug` write intent metadata; raw prompt text is never persisted. |
 | Recall debug log | Full | `chat.message` | Appends bounded `.sybermem/.recall-debug.jsonl` inject/abstain entries with source, timestamp, record IDs, match classes, and reason codes only; raw prompt text is never persisted. |
 | Recall-health advisory | Full | `session.idle` -> `sybermem project memory-stats --format json` | Reads the `recall_health` verdict and emits one throttled, fail-open toast only when recent recall is `low_signal`; `healthy`/`no_activity`/`no_log` stay silent. |
-| Injection visibility toasts | Full | `chat.message` + `experimental.chat.system.transform` | Throttled (~30s/type) and fail-open toasts. `⭐ SyberMem: injected N recall hint(s) [ + habit reminder(s)]` fires only at the moment context actually reaches the model; `💡 Detected a reusable preference — save it with /sybermem-habit` fires when the CLI reports `habit_preference_candidate`. Never block or spam the prompt flow. |
+| Injection visibility toasts | Full | `chat.message` + `experimental.chat.system.transform` | Throttled (~30s/type) and fail-open toasts, one per injection kind so habits are as perceptible as recall: `⭐ SyberMem: injected N recall hint(s) into this prompt` for recall, a SEPARATE `🧠 SyberMem: applied N user habit reminder(s) to this prompt` for habits, and `💡 SyberMem captured a reusable preference — confirm it with /sybermem-habit` when a candidate intent is captured. Never block or spam the prompt flow. |
 
 ### OpenCode Research Notes And Next Work
 

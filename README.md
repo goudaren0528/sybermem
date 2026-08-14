@@ -101,6 +101,9 @@ implements: [requirement-002]
 - 查看与治理：`sybermem habit list`、`search`、`pause`、`delete`
 - 可见提醒：`sybermem habit remind --context planning --format markdown` 与 `/sybermem-habit`
 - 手动/compaction 注入：`sybermem habit inject --context planning --format markdown`
+- 被动候选捕获（仅候选，永不自动写入）：OpenCode `chat.message` 检测到"以后都…/我习惯…"这类可复用偏好时，调用 `sybermem habit intent --prompt <text>` 把候选写入用户级 `~/.sybermem/.habit-intent.json`（绝不创建 active habit，绝不持久化密钥/注入文本）；`/sybermem-habit` 读取 `habit intent-status` 后经用户确认一键转为 habit，再 `habit intent-clear` 清除
+- 独立醒目的注入提示：OpenCode 里 recall 与 habit 各弹独立 toast——recall 用 `⭐`，应用的用户习惯用单独的 `🧠`（不再混在一条里），捕获到候选偏好时弹 `💡`
+- 感知层：`sybermem habit awareness` 及 OpenCode 首轮 startup context 展示 active 习惯数量、类型分布与是否有待确认候选（只报数量，不暴露 habit 内容，也不与逐 prompt 提醒重复）
 - 保守门槛：只注入 active、高置信、未被排除、与上下文直接相关的习惯，最多 3 条
 - 默认不进入项目 `.sybermem/` records，也不发布到 Team memory
 
