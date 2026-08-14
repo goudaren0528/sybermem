@@ -6,7 +6,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from sybermem_core import next_step_router
 from sybermem_core.next_step_router import recommend_next_step
-from sybermem_core.status import project_status
+from sybermem_core import memory_stats as memory_stats_module
+from sybermem_core.status import project_memory_stats, project_status
 
 
 def write_project_with_team(root: Path, team_root: Path) -> None:
@@ -138,3 +139,122 @@ def test_project_status_exposes_team_trust_metadata_for_unpublished_local_change
         "conflict": False,
         "review_required": True,
     }
+
+
+def test_project_memory_stats_counts_records_by_type_and_window(tmp_path: Path, monkeypatch) -> None:
+    # Given: a project with records spread across recent and older windows
+    project_root = tmp_path / "project"
+    sybermem = project_root / ".sybermem"
+    sybermem.mkdir(parents=True)
+    (sybermem / "project.yaml").write_text("project_id: project-1\nslug: demo\n", encoding="utf-8")
+    monkeypatch.setattr(memory_stats_module, "now_iso", lambda: "2026-08-14T12:00:00+08:00")
+
+    def write_record(folder: str, name: str, record_type: str, date: str) -> None:
+        records = sybermem / folder
+        records.mkdir(exist_ok=True)
+        (records / f"{date}-{name}.md").write_text(
+            "\n".join(
+                [
+                    "---",
+                    f"type: {record_type}",
+                    f"record_id: {record_type}-{name}",
+                    f"date: {date}",
+                    f"title: {name}",
+                    "---",
+                    "",
+                    "body",
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+    write_record("changes", "recent", "change", "2026-08-13")
+    write_record("decisions", "week", "decision", "2026-08-08")
+    write_record("bugs", "month", "bug", "2026-07-20")
+    write_record("requirements", "old", "requirement", "2026-06-01")
+    write_record("digests", "digest", "digest", "2026-08-01")
+    write_record("theme-digests", "theme", "theme-digest", "2026-08-10")
+    write_record("changes", "future", "change", "2026-08-20")
+
+    # When: memory stats are computed
+    stats = project_memory_stats(project_root)
+
+    # Then: totals and 7d/30d windows use canonical record dates and types
+    assert stats["totals"]["records"]["total"] == 7
+    assert stats["totals"]["records"]["by_type"] == {
+        "change": 2,
+        "decision": 1,
+        "requirement": 1,
+        "bug": 1,
+        "digest": 1,
+        "theme-digest": 1,
+    }
+    assert stats["windows"]["7d"]["records"]["total"] == 3
+    assert stats["windows"]["7d"]["records"]["by_type"]["bug"] == 0
+    assert stats["windows"]["30d"]["records"]["total"] == 5
+    assert stats["windows"]["30d"]["records"]["by_type"]["requirement"] == 0
+    assert stats["windows"]["30d"]["records"]["by_type"]["change"] == 1
+
+
+def test_project_memory_stats_summarizes_recall_debug_windows(tmp_path: Path, monkeypatch) -> None:
+    # Given: recall debug entries with injects, abstains, match classes, and malformed lines
+    project_root = tmp_path / "project"
+    sybermem = project_root / ".sybermem"
+    sybermem.mkdir(parents=True)
+    (sybermem / "project.yaml").write_text("project_id: project-1\nslug: demo\n", encoding="utf-8")
+    monkeypatch.setattr(memory_stats_module, "now_iso", lambda: "2026-08-14T12:00:00+08:00")
+    (sybermem / ".recall-debug.jsonl").write_text(
+        "\n".join(
+            [
+                json.dumps({"timestamp": "2026-08-14T09:00:00+08:00", "event": "inject", "record_ids": ["change-a", "change-a"], "match_classes": ["topic"], "reason": "high-signal-recall"}),
+                json.dumps({"timestamp": "2026-08-13T09:00:00+08:00", "event": "abstain", "record_ids": [], "match_classes": [], "reason": "no-high-signal-recall"}),
+                json.dumps({"timestamp": "2026-07-20T09:00:00+08:00", "event": "inject", "record_ids": ["decision-b"], "match_classes": ["record-id", "topic"], "reason": "high-signal-recall"}),
+                json.dumps({"timestamp": "2026-08-20T09:00:00+08:00", "event": "inject", "record_ids": ["change-future"], "match_classes": ["semantic"], "reason": "high-signal-recall"}),
+                "not json",
+                json.dumps({"timestamp": "2026-06-01T09:00:00+08:00", "event": "inject", "record_ids": ["bug-old"], "match_classes": ["keyword"], "reason": "high-signal-recall"}),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    # When: memory stats are computed
+    stats = project_memory_stats(project_root)
+
+    # Then: recall rates and distributions are computed per window from valid log entries
+    recall_7d = stats["windows"]["7d"]["recall"]
+    assert recall_7d["status"] == "available"
+    assert recall_7d["events"] == 2
+    assert recall_7d["injected"] == 1
+    assert recall_7d["abstained"] == 1
+    assert recall_7d["recall_rate"] == 0.5
+    assert recall_7d["match_classes"] == {"topic": 1}
+    assert recall_7d["top_matched_records"] == [{"record_id": "change-a", "count": 2}]
+    assert recall_7d["abstain_reasons"] == {"no-high-signal-recall": 1}
+
+    recall_30d = stats["windows"]["30d"]["recall"]
+    assert recall_30d["events"] == 3
+    assert recall_30d["injected"] == 2
+    assert recall_30d["recall_rate"] == 2 / 3
+    assert recall_30d["match_classes"] == {"topic": 2, "record-id": 1}
+    assert recall_30d["top_matched_records"] == [{"record_id": "change-a", "count": 2}, {"record_id": "decision-b", "count": 1}]
+    assert recall_30d["malformed_lines"] == 1
+
+
+def test_project_memory_stats_marks_recall_unavailable_without_debug_log(tmp_path: Path, monkeypatch) -> None:
+    # Given: a SyberMem project with no recall debug log
+    project_root = tmp_path / "project"
+    sybermem = project_root / ".sybermem"
+    sybermem.mkdir(parents=True)
+    (sybermem / "project.yaml").write_text("project_id: project-1\nslug: demo\n", encoding="utf-8")
+    monkeypatch.setattr(memory_stats_module, "now_iso", lambda: "2026-08-14T12:00:00+08:00")
+
+    # When: memory stats are computed
+    stats = project_memory_stats(project_root)
+
+    # Then: recall stats are explicitly unavailable rather than fabricated as zero activity
+    assert stats["totals"]["recall"]["status"] == "no_log"
+    assert stats["windows"]["7d"]["recall"]["events"] == 0
+    assert stats["windows"]["7d"]["recall"]["recall_rate"] is None
+    assert stats["windows"]["30d"]["recall"]["status"] == "no_log"
