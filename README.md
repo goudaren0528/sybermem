@@ -71,7 +71,8 @@ implements: [requirement-002]
 - phase digest 与 theme digest，用于阶段和主题级压缩
 - record 关系：`implements` / `fixes` / `related` / `superseded_by`
 - 只读续接：`/sybermem-resume` 与 `sybermem resume`
-- 记忆统计：`sybermem project memory-stats` 默认打印最近 7 天 / 30 天的终端表格，`--format json` 输出结构化统计供 `/sybermem-summary` 使用
+- 记忆统计：`sybermem project memory-stats` 默认打印最近 7 天 / 30 天的终端表格（含召回精准度列），`--format json` 输出结构化统计供 `/sybermem-summary` 使用
+- 召回相关性反馈：OpenCode 通过 `file.edited` / `todo.updated` / `tool.execute.after` 累积每轮编辑焦点、任务完成与测试/构建信号，`session.idle` 据此把召回注入过的记录与实际编辑的文件（按记录的 `related_files`）比对，写入有界 `.sybermem/.recall-outcomes.jsonl`，得出频率之外的 `low_relevance`（精准度）判定；record 提醒也据此带上语义化触发原因
 - 项目内检索：`/sybermem-search` 与 `sybermem search`
 - 下一步建议：`/using-sybermem` 与 `sybermem next-step`
 
@@ -206,7 +207,8 @@ claude --plugin-dir .
 
 - `.sybermem/INDEX.md` 是项目内派生导航文件，由 `sybermem project index build` 重建，由 `sybermem project index check` 校验。
 - `sybermem project phase analyze` 会确定性地对记录分组并原子写回 `.sybermem/analysis/phase-index.md`（confirmed phases + coverage map + `status: analyzed`），使阶段分析结果不会因为手写 Markdown 而静默丢失；`sybermem project phase confirm --from-json <file>` 可把 agent 产出的高质量分组在校验覆盖后确定性落盘。`/sybermem-phase-analyze` 优先走该 CLI，仅在 CLI 缺失、执行失败或输出非 JSON 时回退 agent 编排。
-- `sybermem project memory-stats` 以表格展示最近 7 天 / 30 天的 record 数量、类型分布、recall events、injected/abstained 和 recall rate；`--format json` 给 skill 和自动化消费。recall 指标只来自 `.sybermem/.recall-debug.jsonl`，没有该日志表示统计不可用，不代表召回活动为 0。
+- `sybermem project memory-stats` 以表格展示最近 7 天 / 30 天的 record 数量、类型分布、recall events、injected/abstained、recall rate 和召回精准度；`--format json` 给 skill 和自动化消费。召回频率指标来自 `.sybermem/.recall-debug.jsonl`，召回精准度来自 `.sybermem/.recall-outcomes.jsonl`；没有对应日志表示统计不可用，不代表召回活动为 0。`recall_health` 的 `low_relevance` 判定在注入样本足够且精准度低于阈值时才触发，与频率型 `low_signal` 区分。
+- `sybermem project record-files --ids <a,b> --format json` 把记录 id 映射到其 `related_files`，供 OpenCode 召回相关性判定复用 Core 的 Markdown 解析。
 - `sybermem index build` 构建 workspace 级 SQLite FTS5 索引，服务于跨项目搜索。
 - 项目内检索默认基于已解析 Markdown records 的词法匹配和打分；需要跨项目搜索时使用 workspace index。
 - 可选的 `SYBERMEM_SEMANTIC_RECALL=1` 会启用本地 char n-gram 召回补充，用于显式检索，不会自动注入每轮提示。

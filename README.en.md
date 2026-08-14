@@ -71,7 +71,8 @@ implements: [requirement-002]
 - phase digests and theme digests for phase/topic compression
 - record relations: `implements` / `fixes` / `related` / `superseded_by`
 - read-only resume: `/sybermem-resume` and `sybermem resume`
-- memory stats: `sybermem project memory-stats` prints 7d/30d terminal tables by default, and `--format json` emits structured stats for `/sybermem-summary`
+- memory stats: `sybermem project memory-stats` prints 7d/30d terminal tables by default (including a recall precision column), and `--format json` emits structured stats for `/sybermem-summary`
+- recall relevance feedback: OpenCode accumulates per-session edit focus, todo-batch completion, and test/build signals via `file.edited` / `todo.updated` / `tool.execute.after`, then at `session.idle` matches injected records against edited files (through each record's `related_files`) into a bounded `.sybermem/.recall-outcomes.jsonl`, producing a precision-based `low_relevance` verdict distinct from frequency; record nudges also carry a semantic trigger reason
 - project search: `/sybermem-search` and `sybermem search`
 - next-step guidance: `/using-sybermem` and `sybermem next-step`
 
@@ -206,7 +207,8 @@ If a project already has custom `.claude/settings.json` content, SyberMem patche
 
 - `.sybermem/INDEX.md` is a derived project navigation file rebuilt by `sybermem project index build` and checked by `sybermem project index check`.
 - `sybermem project phase analyze` deterministically groups records and atomically rewrites `.sybermem/analysis/phase-index.md` (confirmed phases + coverage map + `status: analyzed`), so phase analysis is never silently lost to a hand-written Markdown step; `sybermem project phase confirm --from-json <file>` persists an agent-provided high-quality grouping after validating record coverage. `/sybermem-phase-analyze` prefers this CLI and falls back to agent orchestration only when the CLI is missing, broken, or emits invalid JSON.
-- `sybermem project memory-stats` renders 7d/30d tables for record counts, type distribution, recall events, injected/abstained counts, and recall rate; `--format json` is available for skills and automation. Recall metrics come only from `.sybermem/.recall-debug.jsonl`; a missing log means stats are unavailable, not that recall activity was zero.
+- `sybermem project memory-stats` renders 7d/30d tables for record counts, type distribution, recall events, injected/abstained counts, recall rate, and recall precision; `--format json` is available for skills and automation. Recall frequency comes from `.sybermem/.recall-debug.jsonl` and recall precision from `.sybermem/.recall-outcomes.jsonl`; a missing log means stats are unavailable, not that recall activity was zero. The `recall_health` `low_relevance` verdict fires only when injected samples are sufficient and precision is below the floor, distinct from frequency-based `low_signal`.
+- `sybermem project record-files --ids <a,b> --format json` maps record ids to their `related_files`, so OpenCode recall relevance reuses Core's Markdown parsing.
 - `sybermem index build` builds the workspace SQLite FTS5 index for cross-project search.
 - Project search defaults to lexical matching and scoring over parsed Markdown records; use the workspace index for cross-project search.
 - Optional `SYBERMEM_SEMANTIC_RECALL=1` enables a local char n-gram recall supplement for explicit search. It does not automatically inject recall into every prompt.
