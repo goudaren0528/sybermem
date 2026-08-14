@@ -26,10 +26,22 @@ Do NOT treat a summary as a digest. If the user wants a durable conclusion, redi
 - `/sybermem-summary` — Show the current-state panel for the most recently active confirmed phase
 - `/sybermem-summary weekly` — Force the weekly fallback report
 - `/sybermem-summary monthly` — Force the monthly fallback report
+- Terminal equivalent: `sybermem project memory-stats` for a table view, or `sybermem project memory-stats --format json` for structured 7d/30d memory and recall metrics
 
 ## Directory Resolution
 
 Resolve project root by walking up from cwd to find `.sybermem/` + `.claude/settings.json`. Auto-migrate `ADR/` if found. Full rules in the session protocol block in AGENTS.md/CLAUDE.md.
+
+## CLI Resolution
+
+This skill uses the SyberMem CLI when available. Resolve it in this order:
+
+1. Try the fixed launcher at `%USERPROFILE%\.claude\sybermem\cli\sybermem.cmd` on Windows.
+2. Try the fixed launcher at `$HOME/.claude/sybermem/cli/sybermem` on macOS/Linux.
+3. If `SYBERMEM_CLI` is set to an absolute path and the user explicitly provided or approved that override for this run, use it.
+4. Try bare `sybermem` only as the final fallback when the fixed launcher is unavailable.
+
+Implementation note for PowerShell examples: store the chosen executable in `$SyberMemCli`. Do not modify persistent PATH automatically.
 
 ## Flow
 
@@ -43,6 +55,8 @@ You MUST complete these steps in order:
    - If user explicitly passes `monthly` → force monthly fallback mode
    - If no confirmed phase structure exists after analysis → fall back to weekly mode
 3. **Collect data**:
+   - **CLI-first memory stats**: before manual file scanning, run `sybermem project memory-stats --format json` using the CLI resolution rules above. If it succeeds and stdout is valid JSON, use it for the Memory Health and Recall Stats sections.
+   - Fall back to agent file scanning only when the CLI is missing, broken, or emits invalid JSON. Do not fall back merely because recall status is `no_log`.
    - Phase-aware mode: read phase-index, identify most recently active confirmed phase, collect covered raw records, inspect recent raw records as supporting detail
    - **Check for existing digest**: read `.sybermem/digests/` for any digest whose source phase matches the current active phase. If a digest exists, reference it as the canonical conclusion and note any divergence between the digest's conclusion and the current raw-record state.
    - Fallback time-window mode: scan `.sybermem/` records in the requested time range, reference git log for commit history
@@ -61,6 +75,19 @@ You MUST complete these steps in order:
 - last record date: <date>
 - digest status: <digest exists|no digest yet>
 
+## Memory Health
+- total records: <count>
+- records in last 7d / 30d: <7d count> / <30d count>
+- by type: change <n>, decision <n>, requirement <n>, bug <n>, digest <n>, theme-digest <n>
+
+## Recall Stats
+- recall debug log: <available|unavailable>
+- 7d: events <n>, injected <n>, abstained <n>, recall rate <percent or n/a>
+- 30d: events <n>, injected <n>, abstained <n>, recall rate <percent or n/a>
+- match classes: <top class counts or "none">
+- top matched records: <record IDs/counts or "none">
+- abstain reasons: <reason counts or "none">
+
 ## Open Issues
 - open bugs: <bug-001, bug-002 or "none">
 - open requirements: <requirement-001 or "none">
@@ -74,6 +101,8 @@ You MUST complete these steps in order:
 ```
 
 In fallback weekly/monthly mode, keep the current time-window report shape.
+
+When `sybermem project memory-stats --format json` reports `recall.status == "no_log"`, state that recall observability is unavailable because `.sybermem/.recall-debug.jsonl` is missing. Do not present no-log as a 0% recall rate or claim platform recall statistics that are not backed by the debug log.
 
 ## Design Principles
 
@@ -92,6 +121,7 @@ If you catch yourself doing any of these, STOP:
 - Ignoring confirmed phase structure when it exists in the phase-index
 - Generating a summary without reading any actual `.sybermem/` records
 - Generating a summary without checking whether a phase digest already exists for the active phase
+- Claiming recall rate or recall activity when `sybermem project memory-stats --format json` reports `no_log`
 
 **All of these mean: go back to the relevant step and re-verify.**
 
