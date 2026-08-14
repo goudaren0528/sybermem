@@ -8,9 +8,12 @@ from sybermem_core.user_habit_model import Habit, HabitSearchResult
 from sybermem_core.user_habits import (
     InvalidHabitError,
     add_habit,
+    capture_habit_intent,
+    clear_habit_intent,
     delete_habit,
     list_habits,
     pause_habit,
+    read_habit_intent,
     render_habit_markdown,
     render_habit_reminder_markdown,
     search_habits,
@@ -141,6 +144,38 @@ def cmd_habit_remind(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_habit_intent(args: argparse.Namespace) -> int:
+    metadata = capture_habit_intent(args.prompt)
+    payload = {"captured": metadata is not None, "candidate": metadata}
+    if args.format == "json":
+        print(dump_json(payload))
+    elif metadata is not None:
+        print(f"captured habit candidate ({metadata['habit_type']}): confirm with /sybermem-habit")
+    return 0
+
+
+def cmd_habit_intent_status(args: argparse.Namespace) -> int:
+    candidate = read_habit_intent()
+    payload = {"pending": candidate is not None, "candidate": candidate}
+    if args.format == "json":
+        print(dump_json(payload))
+    elif candidate is not None:
+        print(f"pending habit candidate ({candidate.get('habit_type', 'workflow')}): confirm with /sybermem-habit")
+    else:
+        print("no pending habit candidate")
+    return 0
+
+
+def cmd_habit_intent_clear(args: argparse.Namespace) -> int:
+    cleared = clear_habit_intent()
+    payload = {"cleared": cleared}
+    if args.format == "json":
+        print(dump_json(payload))
+    else:
+        print("cleared pending habit candidate" if cleared else "no pending habit candidate to clear")
+    return 0
+
+
 def register_habit_commands(sub) -> None:
     habit = sub.add_parser("habit")
     habit_sub = habit.add_subparsers(dest="habit_command", required=True)
@@ -186,3 +221,16 @@ def register_habit_commands(sub) -> None:
     remind.add_argument("--higher-authority-text", default="")
     remind.add_argument("--format", choices=["text", "json", "markdown"], default="text")
     remind.set_defaults(func=cmd_habit_remind)
+
+    intent = habit_sub.add_parser("intent")
+    intent.add_argument("--prompt", required=True)
+    intent.add_argument("--format", choices=["text", "json"], default="text")
+    intent.set_defaults(func=cmd_habit_intent)
+
+    intent_status = habit_sub.add_parser("intent-status")
+    intent_status.add_argument("--format", choices=["text", "json"], default="text")
+    intent_status.set_defaults(func=cmd_habit_intent_status)
+
+    intent_clear = habit_sub.add_parser("intent-clear")
+    intent_clear.add_argument("--format", choices=["text", "json"], default="text")
+    intent_clear.set_defaults(func=cmd_habit_intent_clear)
