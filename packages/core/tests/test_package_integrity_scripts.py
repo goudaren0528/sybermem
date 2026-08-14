@@ -163,10 +163,42 @@ def test_package_integrity_checks_cli_using_skills_with_fixed_launcher_guidance(
         Path("packages/claude-skills/sybermem-init-project/SKILL.md"),
         Path("packages/claude-skills/sybermem-update/SKILL.md"),
         Path("packages/claude-skills/sybermem-summary/SKILL.md"),
+        Path("packages/claude-skills/sybermem-phase-analyze/SKILL.md"),
     ]
     assert callable(checker["check_skill_cli_resolution_guidance"])
     assert callable(checker["check_project_refresh_contract"])
     assert callable(checker["check_project_memory_stats_contract"])
+    assert callable(checker["check_project_phase_contract"])
+
+
+def test_package_integrity_guards_cli_first_phase_contract() -> None:
+    # Given: phase analysis must persist deterministically via the CLI, not a hand-written step
+    checker = runpy.run_path(str(CHECK_SCRIPT))
+
+    # When / Then: docs, skill contract, and CLI parser all carry the phase commands
+    assert callable(checker["check_project_phase_contract"])
+    for relative_path in [
+        Path("README.md"),
+        Path("README.en.md"),
+        Path("docs/feature_map.md"),
+        Path("packages/claude-skills/sybermem-phase-analyze/SKILL.md"),
+        Path("skills/sybermem-phase-analyze/SKILL.md"),
+    ]:
+        text = (ROOT / relative_path).read_text(encoding="utf-8")
+        assert "sybermem project phase analyze" in text
+
+    for relative_path in [
+        Path("packages/claude-skills/sybermem-phase-analyze/SKILL.md"),
+        Path("skills/sybermem-phase-analyze/SKILL.md"),
+    ]:
+        text = (ROOT / relative_path).read_text(encoding="utf-8")
+        assert "sybermem project phase confirm --from-json" in text
+        assert "missing, broken, or emits invalid JSON" in text
+
+    cli_main = (ROOT / "packages" / "cli" / "sybermem_cli" / "main.py").read_text(encoding="utf-8")
+    assert "cmd_project_phase_analyze" in cli_main
+    assert "cmd_project_phase_confirm" in cli_main
+    assert 'project_sub.add_parser("phase")' in cli_main
 
 
 def test_cli_using_skills_include_fixed_launcher_contract_fragments() -> None:
