@@ -138,23 +138,31 @@ export const SyberMemPlugin: Plugin = async ({ $, directory, client }: PluginArg
       if (!root) return
       const sessionID = event.properties?.info?.id ?? ""
       if (event.type === "session.created") await handleSessionCreated(args, root, sessionID)
+      // Edit/activity accumulation must never reject the event callback, so each
+      // in-memory mutation path is independently fail-open.
       if (event.type === "file.edited") {
-        const file = extractEditedFile(event.properties)
-        if (file && sessionID) recordEditedFile(sessionID, file)
+        try {
+          const file = extractEditedFile(event.properties)
+          if (file && sessionID) recordEditedFile(sessionID, file)
+        } catch { /* activity capture is best-effort */ }
       }
-      if (event.type === "todo.updated" && sessionID) recordTodoUpdate(sessionID, event.properties)
+      if (event.type === "todo.updated" && sessionID) {
+        try { recordTodoUpdate(sessionID, event.properties) } catch { /* best-effort */ }
+      }
       if (event.type === "session.idle") {
-        // Recall-health advisory runs independently of the file-change nudge path,
-        // so it is not suppressed by "no changed files" / duplicate-fingerprint gates.
-        await handleSessionIdle(args, root, sessionID)
+        // Each idle step is independently fail-open so an auto-trail/git failure
+        // cannot suppress relevance flushing or the recall-health advisory.
+        try { await handleSessionIdle(args, root, sessionID) } catch { /* nudge is advisory */ }
         await flushSessionRelevance(args, root, sessionID)
         await maybeToastRecallHealth(args, root)
       }
     },
     "tool.execute.after": async (input: unknown, output: unknown) => {
       if (!root) return
-      const sessionID = readSessionID(input)
-      if (sessionID) recordToolExecution(sessionID, input, output)
+      try {
+        const sessionID = readSessionID(input)
+        if (sessionID) recordToolExecution(sessionID, input, output)
+      } catch { /* tool-signal capture is best-effort */ }
     },
     "chat.message": async ({ sessionID }: { readonly sessionID: string }, output: ChatMessageOutput) => {
       if (!root) return
