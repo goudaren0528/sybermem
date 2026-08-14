@@ -2,15 +2,17 @@ import type { Plugin } from "@opencode-ai/plugin"
 import { appendAutoTrailJournal, classifyFollowup, countCommitsSinceLastRecord, detectHighLevelAreas, getChangedFiles, overlapsRecentAutoTrails, THEME_WINDOW_SIZE, trailFiles } from "./followup"
 import { buildCompactionContext } from "./compaction"
 import { detectStaleSignal, parseIndex } from "./project_state"
-import { resolveRoot } from "./runtime"
+import { memoryStatsText, resolveRoot } from "./runtime"
 import { loadNudgeState, saveNudgeState } from "./state"
 import { appendRecallDebug } from "./recall_debug"
 import { captureRecordIntentWithCli } from "./record_intent"
 import { classifyPackets, collectPromptPackets, extractPromptText, injectStashedPromptPackets, stashPromptPackets, type ChatMessageOutput, type InjectionSummary, type SystemTransformOutput } from "./prompt_context"
+import { buildStartupContext, consumePendingStartup, markPendingStartup, prependStartupContext } from "./startup_context"
+import { lowSignalRecallToast, parseRecallHealth } from "./recall_health_signal"
 
 interface ToastClient { readonly tui: { readonly showToast: (input: { readonly body: { readonly message: string; readonly variant: "info" } }) => Promise<void> } }
 interface PluginArgs { readonly $: import("./runtime").Shell; readonly directory: string; readonly client: ToastClient }
-interface EventInput { readonly event: { readonly type: string } }
+interface EventInput { readonly event: { readonly type: string; readonly properties?: { readonly info?: { readonly id?: string } } } }
 
 async function showToast(client: ToastClient, message: string): Promise<void> {
   try {
@@ -41,15 +43,29 @@ function describeInjection(summary: InjectionSummary): string {
   return parts.join(" + ")
 }
 
-async function handleSessionCreated(args: PluginArgs, root: string): Promise<void> {
+async function handleSessionCreated(args: PluginArgs, root: string, sessionID: string): Promise<void> {
   const parsed = parseIndex(root)
   if (!parsed || parsed.conclusions.length === 0) return
+  // Mark this session so the first system-transform turn injects model-visible
+  // startup context (key conclusions / phase / next-step), not just a toast.
+  if (sessionID) markPendingStartup(sessionID)
   const stale = await detectStaleSignal(args.$, root)
   const staleNote = stale.stale ? ` (phase-index ${stale.commitsAhead} commits behind)` : ""
   const commitsSinceRecord = await countCommitsSinceLastRecord(args.$, root)
   const recordNote = commitsSinceRecord >= 3 ? `. ${commitsSinceRecord} commits since last record — consider /sybermem-record` : ""
   const ahaMarker = stale.stale || commitsSinceRecord >= 3 ? "⭐ " : ""
   await args.client.tui.showToast({ body: { message: `${ahaMarker}SyberMem: loaded ${parsed.conclusions.length} key conclusions${staleNote}${recordNote}`, variant: "info" } })
+}
+
+async function maybeToastRecallHealth(args: PluginArgs, root: string): Promise<void> {
+  try {
+    const health = parseRecallHealth(await memoryStatsText(args.$, root))
+    if (!health) return
+    const message = lowSignalRecallToast(health)
+    if (message) throttledToast(args.client, "recall-health", message)
+  } catch {
+    // Advisory only: recall-health must never block or reject the idle handler.
+  }
 }
 
 async function handleSessionIdle(args: PluginArgs, root: string): Promise<void> {
@@ -80,8 +96,13 @@ export const SyberMemPlugin: Plugin = async ({ $, directory, client }: PluginArg
   return {
     event: async ({ event }: EventInput) => {
       if (!root) return
-      if (event.type === "session.created") await handleSessionCreated(args, root)
-      if (event.type === "session.idle") await handleSessionIdle(args, root)
+      if (event.type === "session.created") await handleSessionCreated(args, root, event.properties?.info?.id ?? "")
+      if (event.type === "session.idle") {
+        // Recall-health advisory runs independently of the file-change nudge path,
+        // so it is not suppressed by "no changed files" / duplicate-fingerprint gates.
+        await handleSessionIdle(args, root)
+        await maybeToastRecallHealth(args, root)
+      }
     },
     "chat.message": async ({ sessionID }: { readonly sessionID: string }, output: ChatMessageOutput) => {
       if (!root) return
@@ -100,7 +121,19 @@ export const SyberMemPlugin: Plugin = async ({ $, directory, client }: PluginArg
     },
     "experimental.chat.system.transform": async ({ sessionID }: { readonly sessionID?: string }, output: SystemTransformOutput) => {
       if (!root) return
+      // Inject per-prompt recall/habit packets first, THEN prepend startup context,
+      // so on a fresh session's first turn the startup packet ends up on top rather
+      // than being buried under recall hints.
       const summary = injectStashedPromptPackets(sessionID ?? "", output)
+      // First turn of a freshly created session: prepend bounded startup context so
+      // key conclusions/phase/next-step are model-visible, not just a toast. One-shot.
+      if (consumePendingStartup(sessionID ?? "")) {
+        const startup = await buildStartupContext(args.$, root)
+        if (startup) {
+          prependStartupContext(output, startup)
+          throttledToast(args.client, "startup-context", "⭐ SyberMem: injected project startup context into this session")
+        }
+      }
       // Toast at injection time (not capture time) so the user only sees a
       // notice when context actually reached the model — makes recall/habit
       // injection perceptible in-session, not just at session start. The

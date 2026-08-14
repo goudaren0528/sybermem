@@ -181,6 +181,10 @@ async function digestStatusText($, root) {
   const sybermem = resolveSybermemCommand();
   return $`${sybermem} digest status --format json`.cwd(root).nothrow().text();
 }
+async function memoryStatsText($, root) {
+  const sybermem = resolveSybermemCommand();
+  return $`${sybermem} project memory-stats --format json`.cwd(root).nothrow().text();
+}
 
 // packages/opencode-plugin/src/project_state.ts
 import { existsSync as existsSync3, readFileSync as readFileSync2 } from "fs";
@@ -598,6 +602,117 @@ ${output.system[0]}`;
   return classifyPackets(packets);
 }
 
+// packages/opencode-plugin/src/startup_context.ts
+var PENDING_STARTUP = new Set;
+function markPendingStartup(sessionID) {
+  PENDING_STARTUP.add(sessionID);
+}
+function consumePendingStartup(sessionID) {
+  return PENDING_STARTUP.delete(sessionID);
+}
+function prependStartupContext(output, startup) {
+  const trimmed = startup.trim();
+  if (!trimmed)
+    return;
+  if (output.system && output.system.length > 0)
+    output.system[0] = `${trimmed}
+
+${output.system[0]}`;
+  else
+    output.system = [trimmed, ...output.system ?? []];
+}
+function numberField2(value, key) {
+  if (typeof value !== "object" || value === null)
+    return null;
+  const field = Reflect.get(value, key);
+  return typeof field === "number" ? field : null;
+}
+function stringField2(value, key) {
+  if (typeof value !== "object" || value === null)
+    return "";
+  const field = Reflect.get(value, key);
+  return typeof field === "string" ? field.trim() : "";
+}
+async function buildStartupContext($, root) {
+  const parsed = parseIndex(root);
+  if (!parsed || parsed.conclusions.length === 0)
+    return null;
+  const phaseInfo = parsePhaseIndex(root);
+  const identity = parseProjectIdentity(root);
+  const stale = await detectStaleSignal($, root);
+  let context = `## SyberMem Startup Context
+
+`;
+  if (identity.exists && identity.slug)
+    context += `Project: ${identity.slug} (${identity.projectId ?? "no id"}).
+
+`;
+  context += `### Key Conclusions
+`;
+  for (const c of parsed.conclusions)
+    context += `${c}
+`;
+  if (phaseInfo.exists) {
+    context += `
+### Phase Index
+Status: ${phaseInfo.status}. ${phaseInfo.confirmedCount} confirmed phases.
+`;
+    if (phaseInfo.activePhase)
+      context += `Active phase: ${phaseInfo.activePhase}.
+`;
+  }
+  if (stale.stale)
+    context += `
+\u2B50 Heads-up: phase index trails HEAD by ${stale.commitsAhead} commits \u2014 conclusions may lag your latest work. Consider /sybermem-phase-analyze.
+`;
+  try {
+    const staleDigestCount = numberField2(JSON.parse(await digestStatusText($, root)), "stale");
+    if (staleDigestCount !== null && staleDigestCount > 0)
+      context += `
+\u2B50 Digest heads-up: ${staleDigestCount} digest(s) are stale \u2014 run /sybermem-digest to regenerate.
+`;
+  } catch {}
+  try {
+    const rec = JSON.parse(await sybermemText($, root, ["next-step", "--format", "json"]));
+    const action = stringField2(rec, "action");
+    const reason = stringField2(rec, "reason");
+    if (action)
+      context += `
+### Recommended Next Step
+${action}${reason ? ` \u2014 ${reason}` : ""}
+`;
+  } catch {}
+  return context.length > 2500 ? `${context.substring(0, 2497)}...` : context;
+}
+
+// packages/opencode-plugin/src/recall_health_signal.ts
+function parseRecallHealth(json) {
+  const trimmed = json.trim();
+  if (!trimmed)
+    return null;
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (typeof parsed !== "object" || parsed === null)
+      return null;
+    const health = Reflect.get(parsed, "recall_health");
+    if (typeof health !== "object" || health === null)
+      return null;
+    const status = Reflect.get(health, "status");
+    const hint = Reflect.get(health, "hint");
+    if (typeof status !== "string")
+      return null;
+    return { status, hint: typeof hint === "string" ? hint : "" };
+  } catch {
+    return null;
+  }
+}
+function lowSignalRecallToast(health) {
+  if (health.status !== "low_signal")
+    return null;
+  const hint = health.hint ? ` \u2014 ${health.hint}` : "";
+  return `\uD83D\uDCA1 SyberMem: recall quality is low${hint}`;
+}
+
 // packages/opencode-plugin/src/plugin.ts
 async function showToast(client, message) {
   try {
@@ -624,16 +739,28 @@ function describeInjection(summary) {
     return "";
   return parts.join(" + ");
 }
-async function handleSessionCreated(args, root) {
+async function handleSessionCreated(args, root, sessionID) {
   const parsed = parseIndex(root);
   if (!parsed || parsed.conclusions.length === 0)
     return;
+  if (sessionID)
+    markPendingStartup(sessionID);
   const stale = await detectStaleSignal(args.$, root);
   const staleNote = stale.stale ? ` (phase-index ${stale.commitsAhead} commits behind)` : "";
   const commitsSinceRecord = await countCommitsSinceLastRecord(args.$, root);
   const recordNote = commitsSinceRecord >= 3 ? `. ${commitsSinceRecord} commits since last record \u2014 consider /sybermem-record` : "";
   const ahaMarker = stale.stale || commitsSinceRecord >= 3 ? "\u2B50 " : "";
   await args.client.tui.showToast({ body: { message: `${ahaMarker}SyberMem: loaded ${parsed.conclusions.length} key conclusions${staleNote}${recordNote}`, variant: "info" } });
+}
+async function maybeToastRecallHealth(args, root) {
+  try {
+    const health = parseRecallHealth(await memoryStatsText(args.$, root));
+    if (!health)
+      return;
+    const message = lowSignalRecallToast(health);
+    if (message)
+      throttledToast(args.client, "recall-health", message);
+  } catch {}
 }
 async function handleSessionIdle(args, root) {
   const trail = trailFiles(await getChangedFiles(args.$, root));
@@ -668,9 +795,11 @@ var SyberMemPlugin = async ({ $, directory, client }) => {
       if (!root)
         return;
       if (event.type === "session.created")
-        await handleSessionCreated(args, root);
-      if (event.type === "session.idle")
+        await handleSessionCreated(args, root, event.properties?.info?.id ?? "");
+      if (event.type === "session.idle") {
         await handleSessionIdle(args, root);
+        await maybeToastRecallHealth(args, root);
+      }
     },
     "chat.message": async ({ sessionID }, output) => {
       if (!root)
@@ -691,6 +820,13 @@ var SyberMemPlugin = async ({ $, directory, client }) => {
       if (!root)
         return;
       const summary = injectStashedPromptPackets(sessionID ?? "", output);
+      if (consumePendingStartup(sessionID ?? "")) {
+        const startup = await buildStartupContext(args.$, root);
+        if (startup) {
+          prependStartupContext(output, startup);
+          throttledToast(args.client, "startup-context", "\u2B50 SyberMem: injected project startup context into this session");
+        }
+      }
       if (summary.injected && !summary.habitCandidate) {
         throttledToast(args.client, "recall-injected", `\u2B50 SyberMem: injected ${describeInjection(summary)} into this prompt`);
       }
