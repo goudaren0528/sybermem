@@ -205,6 +205,7 @@ If a project already has custom `.claude/settings.json` content, SyberMem patche
 ## Indexing and Search
 
 - `.sybermem/INDEX.md` is a derived project navigation file rebuilt by `sybermem project index build` and checked by `sybermem project index check`.
+- `sybermem project phase analyze` deterministically groups records and atomically rewrites `.sybermem/analysis/phase-index.md` (confirmed phases + coverage map + `status: analyzed`), so phase analysis is never silently lost to a hand-written Markdown step; `sybermem project phase confirm --from-json <file>` persists an agent-provided high-quality grouping after validating record coverage. `/sybermem-phase-analyze` prefers this CLI and falls back to agent orchestration only when the CLI is missing, broken, or emits invalid JSON.
 - `sybermem project memory-stats` renders 7d/30d tables for record counts, type distribution, recall events, injected/abstained counts, and recall rate; `--format json` is available for skills and automation. Recall metrics come only from `.sybermem/.recall-debug.jsonl`; a missing log means stats are unavailable, not that recall activity was zero.
 - `sybermem index build` builds the workspace SQLite FTS5 index for cross-project search.
 - Project search defaults to lexical matching and scoring over parsed Markdown records; use the workspace index for cross-project search.
