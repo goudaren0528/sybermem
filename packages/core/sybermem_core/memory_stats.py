@@ -12,6 +12,9 @@ from .records import iter_record_files, parse_project_yaml, parse_record_file
 
 RECORD_TYPES: Final = ("change", "decision", "requirement", "bug", "digest", "theme-digest")
 WINDOWS: Final = {"7d": 7, "30d": 30}
+# Recent recall injection rate below this is treated as low-signal: prompts are
+# arriving but the high-signal gate rarely finds anything worth injecting.
+LOW_SIGNAL_RECALL_RATE: Final = 0.2
 
 
 def project_memory_stats(root: Path) -> dict:
@@ -36,6 +39,48 @@ def project_memory_stats(root: Path) -> dict:
             "recall": _recall_counts(recall_entries, malformed_lines, recall_status),
         },
         "windows": windows,
+        "recall_health": _recall_health_from_windows(windows, recall_status),
+    }
+
+
+def recall_health(root: Path) -> dict:
+    """Return an advisory recall-health verdict for the project.
+
+    Derives status from the same 7d/30d recall windows the stats command exposes,
+    so hosts can surface a bounded, actionable signal without re-reading the log.
+    """
+    return project_memory_stats(root)["recall_health"]
+
+
+def _recall_health_from_windows(windows: dict, recall_status: str) -> dict:
+    if recall_status == "no_log":
+        return {
+            "status": "no_log",
+            "recall_rate": None,
+            "hint": "No recall debug log yet (.sybermem/.recall-debug.jsonl); recall observability is unavailable until prompts run on a recall-capable host.",
+        }
+    recall_7d = windows["7d"]["recall"]
+    recall_30d = windows["30d"]["recall"]
+    events_7d = recall_7d["events"]
+    events_30d = recall_30d["events"]
+    if events_7d == 0 and events_30d == 0:
+        return {
+            "status": "no_activity",
+            "recall_rate": None,
+            "hint": "No prompt-time recall events in the last 30 days; recent recall quality cannot be assessed yet.",
+        }
+    window = recall_7d if events_7d > 0 else recall_30d
+    rate = window["recall_rate"]
+    if rate is not None and rate < LOW_SIGNAL_RECALL_RATE:
+        return {
+            "status": "low_signal",
+            "recall_rate": rate,
+            "hint": "Recent recall injection rate is low; consider adding topics to key records or running /sybermem-digest so high-signal recall can match more prompts.",
+        }
+    return {
+        "status": "healthy",
+        "recall_rate": rate,
+        "hint": "Recent recall injection rate is healthy.",
     }
 
 
