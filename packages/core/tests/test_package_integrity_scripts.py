@@ -369,6 +369,30 @@ def test_opencode_plugin_source_modules_include_relevance_modules() -> None:
     assert Path("packages/opencode-plugin/src/recall_outcome.ts") in modules
 
 
+def test_package_integrity_calls_habit_awareness_guard_from_main() -> None:
+    # Given: candidate-only habit intent + distinct toast + awareness are a contract
+    script = CHECK_SCRIPT.read_text(encoding="utf-8")
+
+    # When / Then: main() defines and invokes the dedicated habit awareness guard
+    assert "def check_habit_awareness_wiring(root: Path) -> None:" in script
+    assert "check_habit_awareness_wiring(root)" in script
+
+
+def test_habit_awareness_wiring_guard_passes_on_repo() -> None:
+    # Given: the guard loaded from the checker
+    checker = runpy.run_path(str(CHECK_SCRIPT))
+    guard = checker["check_habit_awareness_wiring"]
+
+    # When / Then: it passes against the real repo (bundle + core + cli are wired)
+    guard(ROOT)
+
+
+def test_opencode_plugin_source_modules_include_habit_intent_module() -> None:
+    checker = runpy.run_path(str(CHECK_SCRIPT))
+    modules = checker["OPENCODE_PLUGIN_SOURCE_MODULES"]
+    assert Path("packages/opencode-plugin/src/habit_intent.ts") in modules
+
+
 def test_package_integrity_exposes_unsupported_platform_claim_guard() -> None:
     # Given: OpenCode and Codex support must stay honest about unsupported runtime seams
     checker = runpy.run_path(str(CHECK_SCRIPT))
@@ -427,6 +451,7 @@ def test_package_integrity_exposes_opencode_source_bundle_and_privacy_guards() -
         Path("packages/opencode-plugin/src/recall_health_signal.ts"),
         Path("packages/opencode-plugin/src/session_activity.ts"),
         Path("packages/opencode-plugin/src/recall_outcome.ts"),
+        Path("packages/opencode-plugin/src/habit_intent.ts"),
     ]
     assert callable(checker["check_opencode_plugin_source_bundle"])
     assert callable(checker["check_opencode_prompt_privacy"])

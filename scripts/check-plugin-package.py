@@ -105,6 +105,7 @@ OPENCODE_PLUGIN_SOURCE_MODULES: Final = [
     Path("packages/opencode-plugin/src/recall_health_signal.ts"),
     Path("packages/opencode-plugin/src/session_activity.ts"),
     Path("packages/opencode-plugin/src/recall_outcome.ts"),
+    Path("packages/opencode-plugin/src/habit_intent.ts"),
 ]
 CLI_USING_SKILLS: Final = [
     Path("packages/claude-skills/using-sybermem/SKILL.md"),
@@ -832,6 +833,45 @@ def check_opencode_recall_relevance_wiring(root: Path) -> None:
         fail("packages/cli/sybermem_cli/main.py must register the project record-files command")
 
 
+def check_habit_awareness_wiring(root: Path) -> None:
+    """Guard candidate-only habit intent capture, distinct habit toast, and awareness.
+
+    Habit perception must stay honest and privacy-safe: capture is candidate-only
+    (never an active habit, never persists secrets), the applied-habit toast is
+    distinct from recall, and awareness surfaces only counts, not statements.
+    """
+    plugin_path = root / "packages" / "opencode-plugin" / "sybermem.ts"
+    if not plugin_path.is_file():
+        fail("Missing file: packages/opencode-plugin/sybermem.ts")
+    plugin_text = plugin_path.read_text(encoding="utf-8")
+    required_bundle = [
+        "captureHabitIntentWithCli",
+        "habit intent --prompt",
+        "habit awareness",
+        "user habit reminder",  # distinct habit toast text (lowercased check below)
+    ]
+    lowered = plugin_text.lower()
+    missing = [fragment for fragment in required_bundle if fragment.lower() not in lowered]
+    if missing:
+        fail(f"packages/opencode-plugin/sybermem.ts is missing habit awareness wiring: {', '.join(missing)}")
+    # The habit toast must be its own message, not merged into the recall toast.
+    if "applied" not in lowered or "habit" not in lowered:
+        fail("packages/opencode-plugin/sybermem.ts must emit a distinct applied-habit toast")
+    # Core: candidate-only capture with a blocked-secret guard and awareness summary.
+    habits_text = (root / "packages" / "core" / "sybermem_core" / "user_habits.py").read_text(encoding="utf-8")
+    required_core = ["classify_habit_intent", "capture_habit_intent", "candidate_only", "habit_awareness_summary", "_BLOCKED_INTENT_RE", ".habit-intent.json"]
+    missing_core = [fragment for fragment in required_core if fragment not in habits_text]
+    if missing_core:
+        fail(f"packages/core/sybermem_core/user_habits.py is missing habit-intent capture/awareness: {', '.join(missing_core)}")
+    # Habit intent must never auto-create an active habit (candidate-only invariant).
+    if "add_habit" in habits_text.split("def capture_habit_intent", 1)[-1].split("def read_habit_intent", 1)[0]:
+        fail("capture_habit_intent must not create an active habit (candidate-only)")
+    cli_text = (root / "packages" / "cli" / "sybermem_cli" / "habits.py").read_text(encoding="utf-8")
+    for fragment in ("cmd_habit_intent", "intent-status", "intent-clear", "awareness"):
+        if fragment not in cli_text:
+            fail(f"packages/cli/sybermem_cli/habits.py must register habit {fragment}")
+
+
 def check_opencode_prompt_privacy(root: Path) -> None:
     record_intent = (root / "packages" / "opencode-plugin" / "src" / "record_intent.ts").read_text(encoding="utf-8")
     recall_debug = (root / "packages" / "opencode-plugin" / "src" / "recall_debug.ts").read_text(encoding="utf-8")
@@ -1013,6 +1053,7 @@ def main(root: Path = ROOT) -> int:
     check_opencode_plugin_prompt_recall(root)
     check_opencode_memory_feedback_wiring(root)
     check_opencode_recall_relevance_wiring(root)
+    check_habit_awareness_wiring(root)
     check_opencode_prompt_privacy(root)
     names = check_skill_tree_parity(root)
     check_skill_cli_resolution_guidance(root)

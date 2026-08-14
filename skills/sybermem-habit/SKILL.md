@@ -34,6 +34,9 @@ Before running SyberMem CLI commands, resolve a command variable first. On Windo
 | Delete | `$SyberMemCli habit delete <habit-id>` / `"$SYBERMEM_CLI" habit delete <habit-id>` |
 | Visible reminder | `$SyberMemCli habit remind --context "<bounded context>" --format markdown` / `"$SYBERMEM_CLI" habit remind --context "<bounded context>" --format markdown` |
 | Manual injection | `$SyberMemCli habit inject --context "<bounded context>" --format markdown` / `"$SYBERMEM_CLI" habit inject --context "<bounded context>" --format markdown` |
+| Pending candidate status | `$SyberMemCli habit intent-status --format json` / `"$SYBERMEM_CLI" habit intent-status --format json` |
+| Clear a candidate | `$SyberMemCli habit intent-clear` / `"$SYBERMEM_CLI" habit intent-clear` |
+| Awareness snapshot | `$SyberMemCli habit awareness --format json` / `"$SYBERMEM_CLI" habit awareness --format json` |
 
 Types: `workflow`, `style`, `tooling`, `communication`, `review`, `avoidance`.
 
@@ -41,11 +44,23 @@ Use `--injection-policy prompt_ok_when_supported` only when the user explicitly 
 
 ## Workflow
 
-1. Classify the request: add, list, search, pause, delete, remind, or inject.
-2. For add requests, normalize the habit into one short statement and choose type/tags.
-3. If the user did not explicitly authorize saving, ask one confirmation question and stop.
-4. Run the matching CLI command.
-5. Summarize the result with habit id and current status.
+1. **Check for a pending candidate first.** Run `habit intent-status --format json`. A pending candidate means a supported host (e.g. OpenCode `chat.message`) passively detected a reusable-preference phrase and wrote a candidate-only intent (it is NOT an active habit). If one is pending, surface it and offer to confirm it in one step (see "Confirming a pending candidate" below) before treating the request as a fresh add.
+2. Classify the request: confirm-candidate, add, list, search, pause, delete, remind, or inject.
+3. For add requests, normalize the habit into one short statement and choose type/tags.
+4. If the user did not explicitly authorize saving, ask one confirmation question and stop.
+5. Run the matching CLI command.
+6. Summarize the result with habit id and current status.
+
+## Confirming a pending candidate
+
+The passive capture is candidate-only and never creates a habit on its own. To turn a pending candidate into a real habit in one confirmed step:
+
+1. Read it: `$SyberMemCli habit intent-status --format json`. The candidate JSON carries a suggested `habit_type` but no statement.
+2. Propose ONE normalized statement to the user based on the recent conversation, plus the suggested type. Ask them to confirm (confirmation-first still applies — the passive candidate is a hint, not authorization).
+3. On confirmation, add it: `$SyberMemCli habit add --type <type> --applies-to <tag> "<normalized statement>"`.
+4. Clear the candidate so it does not linger: `$SyberMemCli habit intent-clear`.
+
+If the user declines, just clear the candidate with `habit intent-clear` and do not add anything.
 
 ## Examples
 
