@@ -740,10 +740,15 @@ function parseRecallHealth(json) {
   }
 }
 function lowSignalRecallToast(health) {
-  if (health.status !== "low_signal")
-    return null;
-  const hint = health.hint ? ` \u2014 ${health.hint}` : "";
-  return `\uD83D\uDCA1 SyberMem: recall quality is low${hint}`;
+  if (health.status === "low_signal") {
+    const hint = health.hint ? ` \u2014 ${health.hint}` : "";
+    return `\uD83D\uDCA1 SyberMem: recall quality is low${hint}`;
+  }
+  if (health.status === "low_relevance") {
+    const hint = health.hint ? ` \u2014 ${health.hint}` : "";
+    return `\uD83D\uDCA1 SyberMem: recall relevance is low${hint}`;
+  }
+  return null;
 }
 
 // packages/opencode-plugin/src/session_activity.ts
@@ -1028,14 +1033,21 @@ var SyberMemPlugin = async ({ $, directory, client }) => {
       if (event.type === "session.created")
         await handleSessionCreated(args, root, sessionID);
       if (event.type === "file.edited") {
-        const file = extractEditedFile(event.properties);
-        if (file && sessionID)
-          recordEditedFile(sessionID, file);
+        try {
+          const file = extractEditedFile(event.properties);
+          if (file && sessionID)
+            recordEditedFile(sessionID, file);
+        } catch {}
       }
-      if (event.type === "todo.updated" && sessionID)
-        recordTodoUpdate(sessionID, event.properties);
+      if (event.type === "todo.updated" && sessionID) {
+        try {
+          recordTodoUpdate(sessionID, event.properties);
+        } catch {}
+      }
       if (event.type === "session.idle") {
-        await handleSessionIdle(args, root, sessionID);
+        try {
+          await handleSessionIdle(args, root, sessionID);
+        } catch {}
         await flushSessionRelevance(args, root, sessionID);
         await maybeToastRecallHealth(args, root);
       }
@@ -1043,9 +1055,11 @@ var SyberMemPlugin = async ({ $, directory, client }) => {
     "tool.execute.after": async (input, output) => {
       if (!root)
         return;
-      const sessionID = readSessionID(input);
-      if (sessionID)
-        recordToolExecution(sessionID, input, output);
+      try {
+        const sessionID = readSessionID(input);
+        if (sessionID)
+          recordToolExecution(sessionID, input, output);
+      } catch {}
     },
     "chat.message": async ({ sessionID }, output) => {
       if (!root)
