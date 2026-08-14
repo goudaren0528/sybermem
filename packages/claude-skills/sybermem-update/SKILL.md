@@ -135,6 +135,8 @@ Current behavior note: `sybermem project memory-stats` and the `/sybermem-summar
 
 Current behavior note: the OpenCode first-turn startup-context injection and the `session.idle` recall-health advisory require a refreshed global OpenCode plugin only (re-run the global install/update to refresh `~/.config/opencode/plugins/sybermem.ts`). They do not create, refresh, or migrate any project-local managed files through `sybermem project refresh --format json`; they read existing `.sybermem/` records and the optional `.sybermem/.recall-debug.jsonl` metadata.
 
+Current behavior note: `sybermem project phase analyze` / `phase confirm --from-json` (used by `/sybermem-phase-analyze`) require refreshed global CLI/Core and skill instructions. `sybermem project refresh --format json` does not itself rewrite the phase index, but running `/sybermem-phase-analyze` DOES change the project-local file `.sybermem/analysis/phase-index.md` (it persists confirmed phases + coverage map). This is expected and is the whole point of making phase analysis durable rather than a hand-written step.
+
 ### Managed-file propagation check
 
 Before declaring an upgrade complete, verify for the current project:

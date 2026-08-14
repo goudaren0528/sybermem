@@ -7,12 +7,34 @@ description: Use when building or incrementally refreshing the project phase ind
 
 **Announce at start:** "I'm using the sybermem-phase-analyze skill to build or refresh the project phase index."
 
-Analyze the project's full `.sybermem/` record history, update `.sybermem/analysis/phase-index.md`, and propose candidate phases without auto-confirming them.
+Analyze the project's full `.sybermem/` record history and deterministically persist confirmed phases into `.sybermem/analysis/phase-index.md`.
+
+Prefer the CLI-first path: `sybermem project phase analyze --format json` performs deterministic grouping and atomically writes the phase index, so analysis can never be silently lost by a hand-written Markdown step. Fall back to agent orchestration only when the CLI is missing, broken, or emits invalid JSON.
+
+## CLI Resolution
+
+This skill uses the SyberMem CLI when available. Resolve it in this order:
+
+1. Try the fixed launcher at `%USERPROFILE%\.claude\sybermem\cli\sybermem.cmd` on Windows.
+2. Try the fixed launcher at `$HOME/.claude/sybermem/cli/sybermem` on macOS/Linux.
+3. If `SYBERMEM_CLI` is set to an absolute path and the user explicitly provided or approved that override for this run, use it.
+4. Try bare `sybermem` only as the final fallback when the fixed launcher is unavailable.
+
+Implementation note for PowerShell examples: store the chosen executable in `$SyberMemCli`. Do not modify persistent PATH automatically.
 
 ## Core Invariants
 
-- **Phase analysis proposes and auto-confirms structure. The user can later adjust via `/sybermem-phase-confirm`.**
+- **CLI-first: `sybermem project phase analyze --format json` deterministically writes confirmed phases; the agent-orchestrated flow is a fallback only when the CLI is missing, broken, or emits invalid JSON.**
+- **Phase analysis auto-confirms structure. The user can later adjust via `/sybermem-phase-confirm`.**
 - **No re-analysis may append contradictory duplicate candidates blindly.**
+
+## CLI-First Flow
+
+1. Resolve the SyberMem CLI using the CLI Resolution rules above.
+2. Run `sybermem project phase analyze --format json`. This reads all `.sybermem/` records, groups them deterministically, and atomically writes confirmed phases + coverage map + `status: analyzed` to `.sybermem/analysis/phase-index.md`.
+3. If it exits successfully and emits valid JSON, summarize the returned phases and STOP — do not hand-edit the phase index.
+4. Optional smarter grouping: if you produce a higher-quality semantic grouping, write it as JSON `{ "phases": [ { "title": "...", "covered_records": ["change-001", ...] } ] }` and persist it deterministically with `sybermem project phase confirm --from-json <file>`. Core validates that every covered record exists and is covered by exactly one phase.
+5. Fall back to the agent-orchestrated flow below ONLY when the CLI is missing, broken, or emits invalid JSON.
 
 <HARD-GATE>
 Do NOT declare analysis complete unless ALL of the following are true:
@@ -37,9 +59,9 @@ Before analysis, verify all of the following:
 
 If `.sybermem/analysis/phase-index.md` does not exist, create it from the starter template (create the `analysis/` directory first if needed). The starter template should contain empty `## Analysis Progress`, `## Phase Candidates`, `## Confirmed Phases`, and `## Coverage Map` sections with `status: not_yet_analyzed`. This is the normal first-run path — do not ask the user to run `/sybermem-update` just because the phase index has never been created.
 
-## Flow
+## Fallback Flow (agent orchestration)
 
-You MUST complete these steps in order:
+Use this only when the CLI-first path is unavailable, broken, or emits invalid JSON. You MUST complete these steps in order:
 
 1. **Resolve project root** — apply Step 0 directory resolution rules above
 2. **Verify preconditions** — `.sybermem/INDEX.md` exists, at least one raw record exists. If `.sybermem/analysis/phase-index.md` does not exist, create it from the starter template with `status: not_yet_analyzed`.
