@@ -11,6 +11,7 @@ from sybermem_core.user_habits import (
     capture_habit_intent,
     clear_habit_intent,
     delete_habit,
+    habit_awareness_summary,
     list_habits,
     pause_habit,
     read_habit_intent,
@@ -176,6 +177,20 @@ def cmd_habit_intent_clear(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_habit_awareness(args: argparse.Namespace) -> int:
+    summary = habit_awareness_summary()
+    if args.format == "json":
+        print(dump_json(summary))
+    else:
+        if summary["active"] == 0 and not summary["pending_intent"]:
+            print("no active user habits")
+        else:
+            types = ", ".join(f"{name} {count}" for name, count in summary["by_type"].items())
+            pending = " (1 pending candidate)" if summary["pending_intent"] else ""
+            print(f"{summary['active']} active user habits [{types}]{pending}")
+    return 0
+
+
 def register_habit_commands(sub) -> None:
     habit = sub.add_parser("habit")
     habit_sub = habit.add_subparsers(dest="habit_command", required=True)
@@ -234,3 +249,7 @@ def register_habit_commands(sub) -> None:
     intent_clear = habit_sub.add_parser("intent-clear")
     intent_clear.add_argument("--format", choices=["text", "json"], default="text")
     intent_clear.set_defaults(func=cmd_habit_intent_clear)
+
+    awareness = habit_sub.add_parser("awareness")
+    awareness.add_argument("--format", choices=["text", "json"], default="text")
+    awareness.set_defaults(func=cmd_habit_awareness)
