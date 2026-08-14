@@ -7,6 +7,7 @@ from .project import project_source_snapshot, read_team_from_project_yaml
 from .records import parse_project_yaml, iter_record_files, parse_record_file
 from .retrieval import is_open_status
 from .identity import now_iso
+from .memory_stats import project_memory_stats
 
 
 def publication_readiness(root: Path) -> dict:
