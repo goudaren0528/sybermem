@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 from sybermem_core.formats import dump_json
 from sybermem_core.project import resolve_project_root, ensure_project_yaml
+from sybermem_core.project_refresh import refresh_project
 from sybermem_core.project_index import RECORD_TYPES, DuplicateRecordIdError, InvalidRecordMetadataError, check_project_index, write_project_index
 from sybermem_core.records import generate_record_id
 from sybermem_core.registry import register_project
@@ -385,6 +386,28 @@ def cmd_project_index_check(args: argparse.Namespace) -> int:
     return 0 if is_current else 1
 
 
+def cmd_project_refresh(args: argparse.Namespace) -> int:
+    root = resolve_project_root()
+    if root is None:
+        print("No SyberMem project root found.", file=sys.stderr)
+        return 1
+
+    try:
+        report = refresh_project(root)
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    if args.format == "json":
+        print(dump_json(report))
+    else:
+        print(
+            f"{report['overall']}: applied {len(report['actions_applied'])} action(s), "
+            f"skipped {len(report['actions_skipped'])}, "
+            f"preserved custom {len(report['preserved_custom'])}"
+        )
+    return 0
+
+
 def main() -> int:
     # Emit UTF-8 regardless of console locale. Record titles/conclusions and governance
     # markers can contain non-ASCII (CJK titles, ⚠/✓/⭐), which a locale like GBK on
@@ -414,6 +437,10 @@ def main() -> int:
     uninstall_cmd = project_sub.add_parser("uninstall")
     uninstall_cmd.add_argument("--format", choices=["text", "json"], default="text")
     uninstall_cmd.set_defaults(func=cmd_project_uninstall)
+
+    refresh_cmd = project_sub.add_parser("refresh")
+    refresh_cmd.add_argument("--format", choices=["text", "json"], default="text")
+    refresh_cmd.set_defaults(func=cmd_project_refresh)
 
     project_index = project_sub.add_parser("index")
     project_index_sub = project_index.add_subparsers(dest="project_index_command", required=True)
