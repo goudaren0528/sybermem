@@ -68,5 +68,19 @@ export async function buildStartupContext($: Shell, root: string): Promise<strin
   } catch {
     // Next-step routing is advisory and must not block startup context.
   }
+  try {
+    // Habit AWARENESS only (a count, never the statements): tells the model that
+    // user habits exist without duplicating the prompt-time habit reminder that
+    // the same first prompt already injects.
+    const awareness: unknown = JSON.parse(await sybermemText($, root, ["habit", "awareness", "--format", "json"]))
+    const activeHabits = numberField(awareness, "active") ?? 0
+    const pendingIntent = typeof awareness === "object" && awareness !== null && Reflect.get(awareness, "pending_intent") === true
+    if (activeHabits > 0 || pendingIntent) {
+      const pendingNote = pendingIntent ? " A reusable preference is pending — confirm with /sybermem-habit." : ""
+      context += `\n### User Habits\n${activeHabits} active user habit${activeHabits === 1 ? "" : "s"} may apply; manage with /sybermem-habit.${pendingNote}\n`
+    }
+  } catch {
+    // Habit awareness is advisory and must not block startup context.
+  }
   return context.length > 2500 ? `${context.substring(0, 2497)}...` : context
 }

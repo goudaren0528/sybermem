@@ -39,6 +39,8 @@ export function resolveSybermemCommand(): string {
 export type SybermemRoute =
   | readonly ["next-step", "--format", "json"]
   | readonly ["habit", "inject", "--context", string, "--format", "markdown"]
+  | readonly ["habit", "intent", "--prompt", string, "--format", "json"]
+  | readonly ["habit", "awareness", "--format", "json"]
   | readonly ["context", "session", "--format", "markdown"]
   | readonly ["context", "recall", "--query", string, "--format", "markdown"]
   | readonly ["context", "habit", "--context", string, "--delivery", "prompt-time", "--format", "markdown"]
@@ -50,6 +52,8 @@ export async function sybermemText($: Shell, root: string, args: SybermemRoute):
     case "next-step":
       return $`${sybermem} next-step ${args[1]} ${args[2]}`.cwd(root).text()
     case "habit":
+      if (args[1] === "intent") return $`${sybermem} habit intent --prompt ${args[3]} --format json`.cwd(root).nothrow().text()
+      if (args[1] === "awareness") return $`${sybermem} habit awareness --format json`.cwd(root).nothrow().text()
       return $`${sybermem} habit inject ${args[2]} ${args[3]} ${args[4]} ${args[5]}`.cwd(root).text()
     case "context":
       switch (args[1]) {

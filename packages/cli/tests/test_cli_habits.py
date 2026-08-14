@@ -162,6 +162,24 @@ def test_cli_habit_intent_ignores_non_preference_prompt(tmp_path: Path, monkeypa
     assert captured == {"captured": False, "candidate": None}
 
 
+def test_cli_habit_awareness_reports_counts_and_pending(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    # Given: one active habit and one pending candidate
+    monkeypatch.setenv("SYBERMEM_HOME", str(tmp_path))
+    run_cli(["habit", "add", "--type", "communication", "--format", "json", "Reply in Chinese"], monkeypatch)
+    capsys.readouterr()
+    run_cli(["habit", "intent", "--prompt", "always prefer plans", "--format", "json"], monkeypatch)
+    capsys.readouterr()
+
+    # When: awareness is requested
+    assert run_cli(["habit", "awareness", "--format", "json"], monkeypatch) == 0
+    summary = json.loads(capsys.readouterr().out)
+
+    # Then: counts, type distribution, and the pending flag are surfaced
+    assert summary["active"] == 1
+    assert summary["by_type"] == {"communication": 1}
+    assert summary["pending_intent"] is True
+
+
 def test_cli_habit_pause_unknown_id_returns_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
     # Given: an empty habit store
     monkeypatch.setenv("SYBERMEM_HOME", str(tmp_path))

@@ -190,6 +190,10 @@ async function sybermemText($, root, args) {
     case "next-step":
       return $`${sybermem} next-step ${args[1]} ${args[2]}`.cwd(root).text();
     case "habit":
+      if (args[1] === "intent")
+        return $`${sybermem} habit intent --prompt ${args[3]} --format json`.cwd(root).nothrow().text();
+      if (args[1] === "awareness")
+        return $`${sybermem} habit awareness --format json`.cwd(root).nothrow().text();
       return $`${sybermem} habit inject ${args[2]} ${args[3]} ${args[4]} ${args[5]}`.cwd(root).text();
     case "context":
       switch (args[1]) {
@@ -715,6 +719,18 @@ Status: ${phaseInfo.status}. ${phaseInfo.confirmedCount} confirmed phases.
 ${action}${reason ? ` \u2014 ${reason}` : ""}
 `;
   } catch {}
+  try {
+    const awareness = JSON.parse(await sybermemText($, root, ["habit", "awareness", "--format", "json"]));
+    const activeHabits = numberField2(awareness, "active") ?? 0;
+    const pendingIntent = typeof awareness === "object" && awareness !== null && Reflect.get(awareness, "pending_intent") === true;
+    if (activeHabits > 0 || pendingIntent) {
+      const pendingNote = pendingIntent ? " A reusable preference is pending \u2014 confirm with /sybermem-habit." : "";
+      context += `
+### User Habits
+${activeHabits} active user habit${activeHabits === 1 ? "" : "s"} may apply; manage with /sybermem-habit.${pendingNote}
+`;
+    }
+  } catch {}
   return context.length > 2500 ? `${context.substring(0, 2497)}...` : context;
 }
 
@@ -915,6 +931,25 @@ async function flushRecallOutcome($, root, activity, sessionID, timestamp = new 
   return outcome;
 }
 
+// packages/opencode-plugin/src/habit_intent.ts
+var NO_CAPTURE = { captured: false, habitType: "" };
+async function captureHabitIntentWithCli($, root, text) {
+  if (!text)
+    return NO_CAPTURE;
+  try {
+    const parsed = JSON.parse(await sybermemText($, root, ["habit", "intent", "--prompt", text, "--format", "json"]));
+    if (typeof parsed !== "object" || parsed === null)
+      return NO_CAPTURE;
+    if (Reflect.get(parsed, "captured") !== true)
+      return NO_CAPTURE;
+    const candidate = Reflect.get(parsed, "candidate");
+    const habitType = typeof candidate === "object" && candidate !== null ? Reflect.get(candidate, "habit_type") : "";
+    return { captured: true, habitType: typeof habitType === "string" ? habitType : "" };
+  } catch {
+    return NO_CAPTURE;
+  }
+}
+
 // packages/opencode-plugin/src/plugin.ts
 async function showToast(client, message) {
   try {
@@ -941,15 +976,15 @@ function readSessionID(source) {
   }
   return "";
 }
-function describeInjection(summary) {
-  const parts = [];
-  if (summary.recallCount > 0)
-    parts.push(`${summary.recallCount} recall hint${summary.recallCount === 1 ? "" : "s"}`);
-  if (summary.habitCount > 0)
-    parts.push(`${summary.habitCount} habit reminder${summary.habitCount === 1 ? "" : "s"}`);
-  if (parts.length === 0)
-    return "";
-  return parts.join(" + ");
+function recallToastMessage(summary) {
+  if (summary.recallCount === 0)
+    return null;
+  return `\u2B50 SyberMem: injected ${summary.recallCount} recall hint${summary.recallCount === 1 ? "" : "s"} into this prompt`;
+}
+function habitToastMessage(summary) {
+  if (summary.habitCount === 0)
+    return null;
+  return `\uD83E\uDDE0 SyberMem: applied ${summary.habitCount} user habit reminder${summary.habitCount === 1 ? "" : "s"} to this prompt`;
 }
 async function handleSessionCreated(args, root, sessionID) {
   const parsed = parseIndex(root);
@@ -1068,14 +1103,15 @@ var SyberMemPlugin = async ({ $, directory, client }) => {
       if (!text)
         return;
       await captureRecordIntentWithCli(args.$, root, text);
+      const habitIntent = await captureHabitIntentWithCli(args.$, root, text);
       const packets = await collectPromptPackets(args.$, root, text);
       appendRecallDebug(root, packets);
       if (sessionID)
         recordInjectedRecords(sessionID, packets);
       stashPromptPackets(sessionID, packets);
       const summary = classifyPackets(packets);
-      if (summary.habitCandidate) {
-        throttledToast(args.client, "habit-candidate", "\uD83D\uDCA1 Detected a reusable preference \u2014 save it with /sybermem-habit");
+      if (habitIntent.captured || summary.habitCandidate) {
+        throttledToast(args.client, "habit-candidate", "\uD83D\uDCA1 SyberMem captured a reusable preference \u2014 confirm it with /sybermem-habit");
       }
     },
     "experimental.chat.system.transform": async ({ sessionID }, output) => {
@@ -1089,8 +1125,13 @@ var SyberMemPlugin = async ({ $, directory, client }) => {
           throttledToast(args.client, "startup-context", "\u2B50 SyberMem: injected project startup context into this session");
         }
       }
-      if (summary.injected && !summary.habitCandidate) {
-        throttledToast(args.client, "recall-injected", `\u2B50 SyberMem: injected ${describeInjection(summary)} into this prompt`);
+      if (!summary.habitCandidate) {
+        const recallMessage = recallToastMessage(summary);
+        if (recallMessage)
+          throttledToast(args.client, "recall-injected", recallMessage);
+        const habitMessage = habitToastMessage(summary);
+        if (habitMessage)
+          throttledToast(args.client, "habit-injected", habitMessage);
       }
     },
     "experimental.session.compacting": async (_input, output) => {

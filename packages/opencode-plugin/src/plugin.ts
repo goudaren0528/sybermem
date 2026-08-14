@@ -11,6 +11,7 @@ import { buildStartupContext, consumePendingStartup, markPendingStartup, prepend
 import { lowSignalRecallToast, parseRecallHealth } from "./recall_health_signal"
 import { extractEditedFile, getSessionActivity, recordEditedFile, recordInjectedRecords, recordToolExecution, recordTodoUpdate, resetSessionActivity } from "./session_activity"
 import { flushRecallOutcome } from "./recall_outcome"
+import { captureHabitIntentWithCli } from "./habit_intent"
 
 interface ToastClient { readonly tui: { readonly showToast: (input: { readonly body: { readonly message: string; readonly variant: "info" } }) => Promise<void> } }
 interface PluginArgs { readonly $: import("./runtime").Shell; readonly directory: string; readonly client: ToastClient }
@@ -46,12 +47,16 @@ function readSessionID(source: unknown): string {
   return ""
 }
 
-function describeInjection(summary: InjectionSummary): string {
-  const parts: string[] = []
-  if (summary.recallCount > 0) parts.push(`${summary.recallCount} recall hint${summary.recallCount === 1 ? "" : "s"}`)
-  if (summary.habitCount > 0) parts.push(`${summary.habitCount} habit reminder${summary.habitCount === 1 ? "" : "s"}`)
-  if (parts.length === 0) return ""
-  return parts.join(" + ")
+function recallToastMessage(summary: InjectionSummary): string | null {
+  if (summary.recallCount === 0) return null
+  return `⭐ SyberMem: injected ${summary.recallCount} recall hint${summary.recallCount === 1 ? "" : "s"} into this prompt`
+}
+
+// Habit injection gets its own distinct, brain-marked toast so an applied user
+// habit is as perceptible as recall — not buried inside a combined recall notice.
+function habitToastMessage(summary: InjectionSummary): string | null {
+  if (summary.habitCount === 0) return null
+  return `🧠 SyberMem: applied ${summary.habitCount} user habit reminder${summary.habitCount === 1 ? "" : "s"} to this prompt`
 }
 
 async function handleSessionCreated(args: PluginArgs, root: string, sessionID: string): Promise<void> {
@@ -169,17 +174,22 @@ export const SyberMemPlugin: Plugin = async ({ $, directory, client }: PluginArg
       const text = extractPromptText(output)
       if (!text) return
       await captureRecordIntentWithCli(args.$, root, text)
+      // Passively capture a candidate-only user-habit intent (Core writes it to
+      // the user-level intent file; never an active habit). This makes durable
+      // preferences discoverable without the user remembering to run a command.
+      const habitIntent = await captureHabitIntentWithCli(args.$, root, text)
       const packets = await collectPromptPackets(args.$, root, text)
       appendRecallDebug(root, packets)
       // Remember which records were injected this session so idle can later
       // check whether any of them lined up with edited files (relevance).
       if (sessionID) recordInjectedRecords(sessionID, packets)
       stashPromptPackets(sessionID, packets)
-      // Make a silently dropped "this looks like a reusable preference" signal
-      // visible, so the user knows they can persist it as a habit.
+      // Surface the "this looks like a reusable preference" signal. Prefer the
+      // Core capture (a real candidate was written), falling back to the packet
+      // heuristic, so the user knows a habit candidate is ready to confirm.
       const summary = classifyPackets(packets)
-      if (summary.habitCandidate) {
-        throttledToast(args.client, "habit-candidate", "💡 Detected a reusable preference — save it with /sybermem-habit")
+      if (habitIntent.captured || summary.habitCandidate) {
+        throttledToast(args.client, "habit-candidate", "💡 SyberMem captured a reusable preference — confirm it with /sybermem-habit")
       }
     },
     "experimental.chat.system.transform": async ({ sessionID }: { readonly sessionID?: string }, output: SystemTransformOutput) => {
@@ -198,12 +208,15 @@ export const SyberMemPlugin: Plugin = async ({ $, directory, client }: PluginArg
         }
       }
       // Toast at injection time (not capture time) so the user only sees a
-      // notice when context actually reached the model — makes recall/habit
-      // injection perceptible in-session, not just at session start. The
-      // habit-candidate case is excluded here because chat.message already
-      // surfaces that as its own "save this preference" toast.
-      if (summary.injected && !summary.habitCandidate) {
-        throttledToast(args.client, "recall-injected", `⭐ SyberMem: injected ${describeInjection(summary)} into this prompt`)
+      // notice when context actually reached the model. Recall and habit get
+      // SEPARATE, distinctly-marked toasts so an applied user habit is as
+      // perceptible as recall, instead of being merged into one notice. The
+      // habit-candidate case stays on chat.message's own "save this" toast.
+      if (!summary.habitCandidate) {
+        const recallMessage = recallToastMessage(summary)
+        if (recallMessage) throttledToast(args.client, "recall-injected", recallMessage)
+        const habitMessage = habitToastMessage(summary)
+        if (habitMessage) throttledToast(args.client, "habit-injected", habitMessage)
       }
     },
     "experimental.session.compacting": async (_input: unknown, output: { readonly context: string[] }) => {
