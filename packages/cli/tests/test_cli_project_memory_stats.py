@@ -30,6 +30,7 @@ def _memory_stats_payload(project_root: Path) -> dict:
                 "recall": {"status": "available", "events": 5, "injected": 3, "abstained": 2, "recall_rate": 0.6, "match_classes": {"topic": 2, "record-id": 1}, "top_matched_records": [{"record_id": "change-a", "count": 3}], "abstain_reasons": {"no-high-signal-recall": 2}, "malformed_lines": 0},
             },
         },
+        "recall_health": {"status": "healthy", "recall_rate": 0.5, "hint": "Recent recall injection rate is healthy."},
     }
 
 
@@ -80,6 +81,7 @@ def test_cli_project_memory_stats_text_prints_tables(tmp_path: Path, monkeypatch
     assert "30d" in captured.out
     assert "Recall Rate" in captured.out
     assert "change-a" in captured.out
+    assert "Recall health: healthy" in captured.out
 
 
 def test_cli_project_memory_stats_text_reports_missing_recall_log(tmp_path: Path, monkeypatch, capsys) -> None:
@@ -90,6 +92,7 @@ def test_cli_project_memory_stats_text_reports_missing_recall_log(tmp_path: Path
     for window in payload["windows"].values():
         window["recall"] = {"status": "no_log", "events": 0, "injected": 0, "abstained": 0, "recall_rate": None, "match_classes": {}, "top_matched_records": [], "abstain_reasons": {}, "malformed_lines": 0}
     payload["totals"]["recall"] = {"status": "no_log", "events": 0, "injected": 0, "abstained": 0, "recall_rate": None, "malformed_lines": 0}
+    payload["recall_health"] = {"status": "no_log", "recall_rate": None, "hint": "No recall debug log yet (.sybermem/.recall-debug.jsonl); recall observability is unavailable until prompts run on a recall-capable host."}
     monkeypatch.setattr(main_module, "resolve_project_root", lambda: project_root)
     monkeypatch.setattr(main_module, "project_memory_stats", lambda root: payload)
     monkeypatch.setattr(sys, "argv", ["sybermem", "project", "memory-stats"])
@@ -103,6 +106,27 @@ def test_cli_project_memory_stats_text_reports_missing_recall_log(tmp_path: Path
     assert "7d      2        n/a" in captured.out
     assert "30d     4        n/a" in captured.out
     assert "Recall debug log: unavailable (.sybermem/.recall-debug.jsonl not found)" in captured.out
+    assert "Recall health: no_log" in captured.out
+
+
+def test_cli_project_memory_stats_text_reports_low_signal_recall_health(tmp_path: Path, monkeypatch, capsys) -> None:
+    # Given: Core flags recent recall as low_signal with an actionable hint
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    payload = _memory_stats_payload(project_root)
+    payload["recall_health"] = {"status": "low_signal", "recall_rate": 0.1, "hint": "Recent recall injection rate is low; consider adding topics to key records or running /sybermem-digest so high-signal recall can match more prompts."}
+    monkeypatch.setattr(main_module, "resolve_project_root", lambda: project_root)
+    monkeypatch.setattr(main_module, "project_memory_stats", lambda root: payload)
+    monkeypatch.setattr(sys, "argv", ["sybermem", "project", "memory-stats"])
+
+    # When: text mode is used
+    exit_code = main_module.main()
+
+    # Then: the low-signal verdict and its hint are surfaced to the user
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "Recall health: low_signal" in captured.out
+    assert "consider adding topics" in captured.out
 
 
 def test_cli_project_memory_stats_returns_1_without_project_root(monkeypatch, capsys) -> None:
