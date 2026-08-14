@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -48,9 +49,24 @@ def run_session_hook(payload: str, home: Path) -> subprocess.CompletedProcess[st
     )
 
 
+def assert_fake_launcher_home(home: Path) -> None:
+    resolved = home.resolve()
+    forbidden = {Path.home().resolve()}
+    for env_name in ("USERPROFILE", "HOME"):
+        value = os.environ.get(env_name)
+        if value:
+            forbidden.add(Path(value).resolve())
+    if resolved in forbidden:
+        raise AssertionError(f"fake launcher home must not be a live profile: {resolved}")
+    temp_root = Path(tempfile.gettempdir()).resolve()
+    if not resolved.is_relative_to(temp_root):
+        raise AssertionError(f"fake launcher home must stay under temp dir: {resolved}")
+
+
 def write_fixed_launcher(home: Path, markdown: str, exit_code: int = 0) -> Path:
+    assert_fake_launcher_home(home)
     launcher = home / ".claude" / "sybermem" / "cli" / ("sybermem.cmd" if os.name == "nt" else "sybermem")
-    launcher.parent.mkdir(parents=True)
+    launcher.parent.mkdir(parents=True, exist_ok=True)
     escaped_markdown = markdown.replace("'", "'\"'\"'")
     if os.name == "nt":
         launcher.write_text(
@@ -71,8 +87,9 @@ def write_fixed_launcher(home: Path, markdown: str, exit_code: int = 0) -> Path:
 
 
 def write_routed_launcher(home: Path, outputs: dict[str, str], exit_code: int = 0) -> Path:
+    assert_fake_launcher_home(home)
     launcher = home / ".claude" / "sybermem" / "cli" / ("sybermem.cmd" if os.name == "nt" else "sybermem")
-    launcher.parent.mkdir(parents=True)
+    launcher.parent.mkdir(parents=True, exist_ok=True)
     script = home / "launcher.py"
     script.write_text(
         "from __future__ import annotations\n"
@@ -101,6 +118,32 @@ def write_routed_launcher(home: Path, outputs: dict[str, str], exit_code: int = 
         launcher.write_text(f"#!/bin/sh\nexec {sys.executable!r} {str(script)!r} \"$@\"\n", encoding="utf-8")
         launcher.chmod(0o700)
     return launcher
+
+
+def test_fake_launcher_helpers_reject_live_profile(monkeypatch, tmp_path: Path) -> None:
+    live_profile = tmp_path / "live-profile"
+    live_profile.mkdir()
+    monkeypatch.setenv("USERPROFILE", str(live_profile))
+    monkeypatch.setenv("HOME", str(live_profile))
+
+    for writer in (write_fixed_launcher, write_routed_launcher):
+        try:
+            if writer is write_fixed_launcher:
+                writer(live_profile, "## User Habit Reminder\n\n- no live writes")
+            else:
+                writer(live_profile, {"context habit": "## User Habit Reminder\n\n- no live writes"})
+        except AssertionError:
+            continue
+        raise AssertionError("fake launcher helper accepted live profile")
+
+
+def test_fake_launcher_helpers_write_only_under_tmp_path(tmp_path: Path) -> None:
+    fixed = write_fixed_launcher(tmp_path, "## User Habit Reminder\n\n- isolated")
+    routed = write_routed_launcher(tmp_path, {"context habit": "## User Habit Reminder\n\n- isolated"})
+
+    assert fixed.is_relative_to(tmp_path)
+    assert routed.is_relative_to(tmp_path)
+    assert fixed.parent == tmp_path / ".claude" / "sybermem" / "cli"
 
 
 def create_sybermem_project(root: Path) -> Path:
