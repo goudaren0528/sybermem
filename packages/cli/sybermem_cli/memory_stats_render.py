@@ -1,0 +1,89 @@
+from __future__ import annotations
+
+
+def render_project_memory_stats_text(payload: dict) -> None:
+    print(f"Memory stats for {payload['slug']}")
+    print("")
+    _print_table(
+        ["Window", "Records", "Recall Events", "Injected", "Abstained", "Recall Rate"],
+        [
+            _window_summary_row("7d", payload["windows"]["7d"]),
+            _window_summary_row("30d", payload["windows"]["30d"]),
+        ],
+    )
+    print("")
+    print("Records by type")
+    _print_table(
+        ["Type", "Total", "7d", "30d"],
+        [
+            [
+                record_type,
+                str(payload["totals"]["records"]["by_type"].get(record_type, 0)),
+                str(payload["windows"]["7d"]["records"]["by_type"].get(record_type, 0)),
+                str(payload["windows"]["30d"]["records"]["by_type"].get(record_type, 0)),
+            ]
+            for record_type in ["change", "decision", "requirement", "bug", "digest", "theme-digest"]
+        ],
+    )
+    if payload["totals"]["recall"].get("status") == "no_log":
+        print("")
+        print("Recall debug log: unavailable (.sybermem/.recall-debug.jsonl not found)")
+        return
+    _print_recall_detail_tables(payload)
+
+
+def _window_summary_row(label: str, window: dict) -> list[str]:
+    recall = window["recall"]
+    if recall.get("status") == "no_log":
+        return [label, str(window["records"]["total"]), "n/a", "n/a", "n/a", "n/a"]
+    return [
+        label,
+        str(window["records"]["total"]),
+        str(recall["events"]),
+        str(recall["injected"]),
+        str(recall["abstained"]),
+        _format_rate(recall.get("recall_rate")),
+    ]
+
+
+def _print_recall_detail_tables(payload: dict) -> None:
+    print("")
+    print("Recall match classes")
+    _print_table(["Class", "7d", "30d"], _counter_rows(payload, "match_classes"))
+    print("")
+    print("Top matched records")
+    _print_table(["Record ID", "7d", "30d"], _top_record_rows(payload))
+    print("")
+    print("Abstain reasons")
+    _print_table(["Reason", "7d", "30d"], _counter_rows(payload, "abstain_reasons"))
+
+
+def _counter_rows(payload: dict, key: str) -> list[list[str]]:
+    counts_7d = payload["windows"]["7d"]["recall"].get(key, {})
+    counts_30d = payload["windows"]["30d"]["recall"].get(key, {})
+    names = sorted(set(counts_7d) | set(counts_30d))
+    return [[name, str(counts_7d.get(name, 0)), str(counts_30d.get(name, 0))] for name in names] or [["none", "0", "0"]]
+
+
+def _top_record_rows(payload: dict) -> list[list[str]]:
+    counts_7d = {row["record_id"]: row["count"] for row in payload["windows"]["7d"]["recall"].get("top_matched_records", [])}
+    counts_30d = {row["record_id"]: row["count"] for row in payload["windows"]["30d"]["recall"].get("top_matched_records", [])}
+    names = sorted(set(counts_7d) | set(counts_30d))
+    return [[name, str(counts_7d.get(name, 0)), str(counts_30d.get(name, 0))] for name in names] or [["none", "0", "0"]]
+
+
+def _format_rate(value) -> str:
+    if value is None:
+        return "n/a"
+    return f"{float(value) * 100:.1f}%"
+
+
+def _print_table(headers: list[str], rows: list[list[str]]) -> None:
+    widths = [len(header) for header in headers]
+    for row in rows:
+        for index, cell in enumerate(row):
+            widths[index] = max(widths[index], len(cell))
+    print("  ".join(header.ljust(widths[index]) for index, header in enumerate(headers)).rstrip())
+    print("  ".join("-" * width for width in widths).rstrip())
+    for row in rows:
+        print("  ".join(cell.ljust(widths[index]) for index, cell in enumerate(row)).rstrip())

@@ -13,7 +13,7 @@ from sybermem_core.registry import register_project
 from sybermem_core.identity import git_remote
 from sybermem_core.index import rebuild_index
 from sybermem_core.search import ProjectRootNotFoundError, WorkspaceIndexIncompatibleError, search_project, search_workspace, workspace_index_staleness
-from sybermem_core.status import project_status
+from sybermem_core.status import project_memory_stats, project_status
 from sybermem_core.resume import build_resume_checkpoint
 from sybermem_core.next_step_router import classify_record_intent, recommend_next_step
 from sybermem_core.digest_governance import build_digest_governance_report
@@ -24,6 +24,7 @@ from sybermem_core.team_summary import build_team_management_summary
 from sybermem_core.uninstall import deactivate_project_sybermem
 from sybermem_cli.habits import register_habit_commands
 from sybermem_cli.context import register_context_commands
+from sybermem_cli.memory_stats_render import render_project_memory_stats_text
 from sybermem_cli.publish_render import render_publish_status_text
 from sybermem_cli.search_render import render_search_text
 
@@ -276,6 +277,19 @@ def cmd_publish_status(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_project_memory_stats(args: argparse.Namespace) -> int:
+    root = resolve_project_root()
+    if root is None:
+        print("No SyberMem project root found.", file=sys.stderr)
+        return 1
+    payload = project_memory_stats(root)
+    if args.format == "json":
+        print(dump_json(payload))
+    else:
+        render_project_memory_stats_text(payload)
+    return 0
+
+
 def cmd_record_intent(args: argparse.Namespace) -> int:
     root = resolve_project_root()
     if root is None:
@@ -433,6 +447,10 @@ def main() -> int:
     status_cmd = project_sub.add_parser("status")
     status_cmd.add_argument("--format", choices=["text", "json"], default="text")
     status_cmd.set_defaults(func=cmd_project_status)
+
+    memory_stats_cmd = project_sub.add_parser("memory-stats")
+    memory_stats_cmd.add_argument("--format", choices=["text", "json"], default="text")
+    memory_stats_cmd.set_defaults(func=cmd_project_memory_stats)
 
     uninstall_cmd = project_sub.add_parser("uninstall")
     uninstall_cmd.add_argument("--format", choices=["text", "json"], default="text")
