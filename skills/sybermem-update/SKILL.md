@@ -131,6 +131,8 @@ The protocol block gives automatic session-entry guidance; the visible `/using-s
 
 Every new managed behavior introduced by SyberMem must explicitly say whether `sybermem project refresh --format json` changes any project-local files at all. If it does, name the exact files that are created, refreshed, or migrated. If it does not, say that the behavior is classification-only or otherwise has no project-local file action. Update `docs/feature_map.md` in the same feature change when platform support claims change.
 
+Current behavior note: `sybermem project memory-stats` and the `/sybermem-summary` Memory Health / Recall Stats panel require refreshed global CLI/Core and skill instructions only. They do not create, refresh, or migrate any project-local managed files through `sybermem project refresh --format json`; the command reads existing `.sybermem/` records and optional `.sybermem/.recall-debug.jsonl` metadata.
+
 ### Managed-file propagation check
 
 Before declaring an upgrade complete, verify for the current project:
