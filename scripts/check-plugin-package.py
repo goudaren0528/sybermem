@@ -114,6 +114,7 @@ CLI_USING_SKILLS: Final = [
     Path("packages/claude-skills/sybermem-init-project/SKILL.md"),
     Path("packages/claude-skills/sybermem-update/SKILL.md"),
     Path("packages/claude-skills/sybermem-summary/SKILL.md"),
+    Path("packages/claude-skills/sybermem-phase-analyze/SKILL.md"),
 ]
 CODEX_HEALTH_CHECK_FILES: Final = [
     Path("packages/claude-skills/sybermem-init-project/project-files/.sybermem/hooks/check_project_health.py"),
@@ -616,6 +617,46 @@ def check_project_memory_stats_contract(root: Path) -> None:
             fail(f"{relative_path.as_posix()} is missing project memory-stats summary contract: {', '.join(missing)}")
 
 
+def check_project_phase_contract(root: Path) -> None:
+    required_docs = [
+        Path("README.md"),
+        Path("README.en.md"),
+        Path("docs/feature_map.md"),
+    ]
+    for relative_path in required_docs:
+        text = (root / relative_path).read_text(encoding="utf-8")
+        if "sybermem project phase analyze" not in text:
+            fail(f"{relative_path.as_posix()} must document CLI-first phase analysis")
+
+    cli_main = (root / "packages" / "cli" / "sybermem_cli" / "main.py").read_text(encoding="utf-8")
+    required_cli = [
+        "cmd_project_phase_analyze",
+        "cmd_project_phase_confirm",
+        'project_sub.add_parser("phase")',
+        "analyze_phases(root)",
+        "confirm_phases_from_payload(root",
+    ]
+    missing_cli = [fragment for fragment in required_cli if fragment not in cli_main]
+    if missing_cli:
+        fail(f"packages/cli/sybermem_cli/main.py is missing project phase CLI wiring: {', '.join(missing_cli)}")
+
+    for relative_path in (
+        Path("packages/claude-skills/sybermem-phase-analyze/SKILL.md"),
+        Path("skills/sybermem-phase-analyze/SKILL.md"),
+    ):
+        text = (root / relative_path).read_text(encoding="utf-8")
+        required = [
+            "sybermem project phase analyze --format json",
+            "sybermem project phase confirm --from-json",
+            "missing, broken, or emits invalid JSON",
+            "Do not modify persistent PATH automatically",
+            "Try bare `sybermem` only as the final fallback",
+        ]
+        missing = [fragment for fragment in required if fragment not in text]
+        if missing:
+            fail(f"{relative_path.as_posix()} is missing CLI-first phase contract: {', '.join(missing)}")
+
+
 def check_opencode_plugin_cli_resolution(root: Path) -> None:
     plugin_path = root / "packages" / "opencode-plugin" / "sybermem.ts"
     if not plugin_path.is_file():
@@ -937,6 +978,7 @@ def main(root: Path = ROOT) -> int:
     check_skill_cli_resolution_guidance(root)
     check_project_refresh_contract(root)
     check_project_memory_stats_contract(root)
+    check_project_phase_contract(root)
     check_distribution_script_coverage(root, names)
     check_opencode_plugin_update_wiring(root)
     check_codex_skill_install_wiring(root)
