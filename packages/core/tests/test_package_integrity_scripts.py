@@ -161,8 +161,10 @@ def test_package_integrity_checks_cli_using_skills_with_fixed_launcher_guidance(
         Path("packages/claude-skills/sybermem-team-publish/SKILL.md"),
         Path("packages/claude-skills/sybermem-team-summary/SKILL.md"),
         Path("packages/claude-skills/sybermem-init-project/SKILL.md"),
+        Path("packages/claude-skills/sybermem-update/SKILL.md"),
     ]
     assert callable(checker["check_skill_cli_resolution_guidance"])
+    assert callable(checker["check_project_refresh_contract"])
 
 
 def test_cli_using_skills_include_fixed_launcher_contract_fragments() -> None:
@@ -177,6 +179,29 @@ def test_cli_using_skills_include_fixed_launcher_contract_fragments() -> None:
         assert "Do not modify persistent PATH automatically" in text
         assert "$SyberMemCli" in text
         assert "SYBERMEM_CLI" in text
+
+
+def test_package_integrity_guards_cli_first_project_refresh_contract() -> None:
+    # Given: /sybermem-update must stay fast and deterministic when the CLI is healthy
+    checker = runpy.run_path(str(CHECK_SCRIPT))
+
+    # When / Then: docs, skill contract, and CLI parser all carry the project refresh command
+    assert callable(checker["check_project_refresh_contract"])
+    for relative_path in [
+        Path("README.md"),
+        Path("README.en.md"),
+        Path("docs/feature_map.md"),
+        Path(".opencode/INSTALL.md"),
+        Path(".codex/INSTALL.md"),
+        Path("packages/claude-skills/sybermem-update/SKILL.md"),
+        Path("skills/sybermem-update/SKILL.md"),
+    ]:
+        text = (ROOT / relative_path).read_text(encoding="utf-8")
+        assert "sybermem project refresh --format json" in text
+
+    cli_main = (ROOT / "packages" / "cli" / "sybermem_cli" / "main.py").read_text(encoding="utf-8")
+    assert "cmd_project_refresh" in cli_main
+    assert 'project_sub.add_parser("refresh")' in cli_main
 
 
 def test_local_install_and_update_scripts_force_refresh_core_and_cli_packages() -> None:
@@ -197,6 +222,50 @@ def test_local_install_and_update_scripts_force_refresh_core_and_cli_packages() 
         assert cli_fragment in text
         assert "--upgrade" in text
         assert "--force-reinstall" in text
+
+
+def test_package_integrity_exposes_cli_wrapper_wiring_check() -> None:
+    # Given: fixed launcher pollution is prevented by a package integrity guard
+    checker = runpy.run_path(str(CHECK_SCRIPT))
+
+    # When / Then: the guard is exported for the checker main path
+    assert callable(checker["check_cli_wrapper_wiring"])
+
+
+def test_distribution_scripts_install_fixed_sybermem_cli_wrappers() -> None:
+    # Given: global install/update scripts own the fixed sybermem launcher body
+    windows_scripts = (
+        ROOT / "scripts" / "install.ps1",
+        ROOT / "scripts" / "update.ps1",
+        ROOT / "scripts" / "install-remote.ps1",
+    )
+    posix_scripts = (
+        ROOT / "scripts" / "install.sh",
+        ROOT / "scripts" / "update.sh",
+        ROOT / "scripts" / "install-remote.sh",
+    )
+
+    # When / Then: Windows wrappers call venv\Scripts\sybermem.exe, never smoke output stubs
+    for script in windows_scripts:
+        text = script.read_text(encoding="utf-8")
+        assert ".claude\\sybermem\\cli" in text
+        assert "sybermem.cmd" in text
+        assert "python -m venv $CliVenv" in text
+        assert "venv\\Scripts\\sybermem.exe" in text
+        assert "Set-Content -Path $CliWrapper -Encoding ASCII" in text
+        assert "sys.stdout.write(" not in text
+        assert "Smoke habit applies" not in text
+
+    # When / Then: POSIX wrappers call venv/bin/sybermem, never smoke output stubs
+    for script in posix_scripts:
+        text = script.read_text(encoding="utf-8")
+        assert ".claude/sybermem/cli" in text
+        assert 'CLI_WRAPPER="$CLI_DIR/sybermem"' in text
+        assert 'python -m venv "$CLI_VENV"' in text
+        assert "venv/bin/sybermem" in text
+        assert 'cat > "$CLI_WRAPPER"' in text
+        assert "sys.stdout.write(" not in text
+        assert "Smoke habit applies" not in text
 
 
 def test_opencode_plugin_injects_user_habits_only_during_compaction() -> None:

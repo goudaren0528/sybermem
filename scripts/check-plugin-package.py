@@ -110,6 +110,7 @@ CLI_USING_SKILLS: Final = [
     Path("packages/claude-skills/sybermem-team-publish/SKILL.md"),
     Path("packages/claude-skills/sybermem-team-summary/SKILL.md"),
     Path("packages/claude-skills/sybermem-init-project/SKILL.md"),
+    Path("packages/claude-skills/sybermem-update/SKILL.md"),
 ]
 CODEX_HEALTH_CHECK_FILES: Final = [
     Path("packages/claude-skills/sybermem-init-project/project-files/.sybermem/hooks/check_project_health.py"),
@@ -464,6 +465,41 @@ def check_runtime_refresh_wiring(root: Path) -> None:
             fail(f"{script.as_posix()} is missing runtime refresh wiring: {', '.join(missing)}")
 
 
+def check_cli_wrapper_wiring(root: Path) -> None:
+    windows_scripts = [Path("scripts/install.ps1"), Path("scripts/update.ps1"), Path("scripts/install-remote.ps1")]
+    posix_scripts = [Path("scripts/install.sh"), Path("scripts/update.sh"), Path("scripts/install-remote.sh")]
+    for script in windows_scripts:
+        text = (root / script).read_text(encoding="utf-8")
+        required = [
+            ".claude\\sybermem\\cli",
+            "sybermem.cmd",
+            "python -m venv $CliVenv",
+            "venv\\Scripts\\sybermem.exe",
+            "Set-Content -Path $CliWrapper -Encoding ASCII",
+        ]
+        missing = [fragment for fragment in required if fragment not in text]
+        if missing:
+            fail(f"{script.as_posix()} is missing Windows CLI wrapper wiring: {', '.join(missing)}")
+    for script in posix_scripts:
+        text = (root / script).read_text(encoding="utf-8")
+        required = [
+            '.claude/sybermem/cli',
+            'CLI_WRAPPER="$CLI_DIR/sybermem"',
+            'python -m venv "$CLI_VENV"',
+            'venv/bin/sybermem',
+            'cat > "$CLI_WRAPPER"',
+        ]
+        missing = [fragment for fragment in required if fragment not in text]
+        if missing:
+            fail(f"{script.as_posix()} is missing POSIX CLI wrapper wiring: {', '.join(missing)}")
+    fake_fragments = ["Smoke habit applies", "sys.stdout.write("]
+    for script in [*windows_scripts, *posix_scripts]:
+        text = (root / script).read_text(encoding="utf-8")
+        found = [fragment for fragment in fake_fragments if fragment in text]
+        if found:
+            fail(f"{script.as_posix()} contains fake launcher fragments: {', '.join(found)}")
+
+
 def check_no_python_cache_artifacts(root: Path) -> None:
     offenders: list[str] = []
     for relative_root in NO_CACHE_ROOTS:
@@ -502,6 +538,43 @@ def check_skill_cli_resolution_guidance(root: Path) -> None:
         missing = [fragment for fragment in required_fragments if fragment not in skill_text]
         if missing:
             fail(f"{relative_path.as_posix()} is missing CLI resolution guidance: {', '.join(missing)}")
+
+
+def check_project_refresh_contract(root: Path) -> None:
+    required_docs = [
+        Path("README.md"),
+        Path("README.en.md"),
+        Path("docs/feature_map.md"),
+        Path(".opencode/INSTALL.md"),
+        Path(".codex/INSTALL.md"),
+    ]
+    for relative_path in required_docs:
+        text = (root / relative_path).read_text(encoding="utf-8")
+        if "sybermem project refresh --format json" not in text:
+            fail(f"{relative_path.as_posix()} must document CLI-first project refresh")
+
+    cli_main = (root / "packages" / "cli" / "sybermem_cli" / "main.py").read_text(encoding="utf-8")
+    required_cli = ["cmd_project_refresh", 'project_sub.add_parser("refresh")', "refresh_project(root)"]
+    missing_cli = [fragment for fragment in required_cli if fragment not in cli_main]
+    if missing_cli:
+        fail(f"packages/cli/sybermem_cli/main.py is missing project refresh CLI wiring: {', '.join(missing_cli)}")
+
+    for relative_path in (
+        Path("packages/claude-skills/sybermem-update/SKILL.md"),
+        Path("skills/sybermem-update/SKILL.md"),
+    ):
+        text = (root / relative_path).read_text(encoding="utf-8")
+        required = [
+            "sybermem project refresh --format json",
+            "fixed launcher",
+            "missing, broken, or emits invalid JSON",
+            "/sybermem-init-project",
+            "$SyberMemCli",
+            "SYBERMEM_CLI",
+        ]
+        missing = [fragment for fragment in required if fragment not in text]
+        if missing:
+            fail(f"{relative_path.as_posix()} is missing project refresh fallback contract: {', '.join(missing)}")
 
 
 def check_opencode_plugin_cli_resolution(root: Path) -> None:
@@ -797,6 +870,7 @@ def main(root: Path = ROOT) -> int:
     check_opencode_prompt_privacy(root)
     names = check_skill_tree_parity(root)
     check_skill_cli_resolution_guidance(root)
+    check_project_refresh_contract(root)
     check_distribution_script_coverage(root, names)
     check_opencode_plugin_update_wiring(root)
     check_codex_skill_install_wiring(root)
@@ -805,6 +879,7 @@ def main(root: Path = ROOT) -> int:
     check_codex_runtime_discoverability(root)
     check_unsupported_platform_claims(root)
     check_runtime_refresh_wiring(root)
+    check_cli_wrapper_wiring(root)
 
     claude_cli = shutil.which("claude")
     if claude_cli:
