@@ -101,6 +101,8 @@ OPENCODE_PLUGIN_SOURCE_MODULES: Final = [
     Path("packages/opencode-plugin/src/compaction.ts"),
     Path("packages/opencode-plugin/src/record_intent.ts"),
     Path("packages/opencode-plugin/src/recall_debug.ts"),
+    Path("packages/opencode-plugin/src/startup_context.ts"),
+    Path("packages/opencode-plugin/src/recall_health_signal.ts"),
 ]
 CLI_USING_SKILLS: Final = [
     Path("packages/claude-skills/using-sybermem/SKILL.md"),
@@ -725,6 +727,31 @@ def check_opencode_plugin_prompt_recall(root: Path) -> None:
         fail(f"packages/opencode-plugin/sybermem.ts uses non-standard toast contract: {', '.join(found)}")
 
 
+def check_opencode_memory_feedback_wiring(root: Path) -> None:
+    """Guard the OpenCode first-turn context injection and recall-health advisory.
+
+    Both are model/user-visible memory seams: `session.created` must stash a one-shot
+    startup context that the first `chat.system.transform` prepends, and `session.idle`
+    must consume `sybermem project memory-stats` recall health for a bounded advisory.
+    """
+    plugin_path = root / "packages" / "opencode-plugin" / "sybermem.ts"
+    if not plugin_path.is_file():
+        fail("Missing file: packages/opencode-plugin/sybermem.ts")
+    plugin_text = plugin_path.read_text(encoding="utf-8")
+    required_fragments = [
+        "markPendingStartup",
+        "consumePendingStartup",
+        "buildStartupContext",
+        "## SyberMem Startup Context",
+        "project memory-stats --format json",
+        "recall_health",
+        "low_signal",
+    ]
+    missing = [fragment for fragment in required_fragments if fragment not in plugin_text]
+    if missing:
+        fail(f"packages/opencode-plugin/sybermem.ts is missing memory feedback wiring: {', '.join(missing)}")
+
+
 def check_opencode_prompt_privacy(root: Path) -> None:
     record_intent = (root / "packages" / "opencode-plugin" / "src" / "record_intent.ts").read_text(encoding="utf-8")
     recall_debug = (root / "packages" / "opencode-plugin" / "src" / "recall_debug.ts").read_text(encoding="utf-8")
@@ -904,6 +931,7 @@ def main(root: Path = ROOT) -> int:
     check_opencode_plugin_source_bundle(root)
     check_opencode_plugin_cli_resolution(root)
     check_opencode_plugin_prompt_recall(root)
+    check_opencode_memory_feedback_wiring(root)
     check_opencode_prompt_privacy(root)
     names = check_skill_tree_parity(root)
     check_skill_cli_resolution_guidance(root)

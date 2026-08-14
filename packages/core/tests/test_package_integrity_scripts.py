@@ -363,10 +363,28 @@ def test_package_integrity_exposes_opencode_source_bundle_and_privacy_guards() -
         Path("packages/opencode-plugin/src/compaction.ts"),
         Path("packages/opencode-plugin/src/record_intent.ts"),
         Path("packages/opencode-plugin/src/recall_debug.ts"),
+        Path("packages/opencode-plugin/src/startup_context.ts"),
+        Path("packages/opencode-plugin/src/recall_health_signal.ts"),
     ]
     assert callable(checker["check_opencode_plugin_source_bundle"])
     assert callable(checker["check_opencode_prompt_privacy"])
     assert "scripts/build-opencode-plugin.mjs" in CHECK_SCRIPT.read_text(encoding="utf-8")
+
+
+def test_package_integrity_guards_opencode_first_turn_and_recall_health() -> None:
+    # Given: OpenCode first-turn context and recall-health feedback are model-visible seams
+    checker = runpy.run_path(str(CHECK_SCRIPT))
+    plugin = (ROOT / "packages" / "opencode-plugin" / "sybermem.ts").read_text(encoding="utf-8")
+
+    # When / Then: the bundled plugin wires first-turn startup injection and recall-health advisory
+    assert callable(checker["check_opencode_memory_feedback_wiring"])
+    assert "markPendingStartup" in plugin
+    assert "consumePendingStartup" in plugin
+    assert "buildStartupContext" in plugin
+    assert "## SyberMem Startup Context" in plugin
+    assert "project memory-stats --format json" in plugin
+    assert "recall_health" in plugin
+    assert "low_signal" in plugin
 
 
 def test_opencode_plugin_uses_resolver_backed_cli_commands() -> None:
