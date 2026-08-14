@@ -76,3 +76,8 @@ export async function memoryStatsText($: Shell, root: string): Promise<string> {
   const sybermem = resolveSybermemCommand()
   return $`${sybermem} project memory-stats --format json`.cwd(root).nothrow().text()
 }
+
+export async function recordFilesText($: Shell, root: string, ids: string): Promise<string> {
+  const sybermem = resolveSybermemCommand()
+  return $`${sybermem} project record-files --ids ${ids} --format json`.cwd(root).nothrow().text()
+}

@@ -10,7 +10,7 @@ from sybermem_core.project import resolve_project_root, ensure_project_yaml
 from sybermem_core.project_refresh import refresh_project
 from sybermem_core.project_index import RECORD_TYPES, DuplicateRecordIdError, InvalidRecordMetadataError, check_project_index, write_project_index
 from sybermem_core.phase_index import PhaseConfirmError, analyze_phases, confirm_phases_from_payload
-from sybermem_core.records import generate_record_id
+from sybermem_core.records import generate_record_id, related_files_by_record
 from sybermem_core.registry import register_project
 from sybermem_core.identity import git_remote
 from sybermem_core.index import rebuild_index
@@ -424,6 +424,22 @@ def cmd_project_refresh(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_project_record_files(args: argparse.Namespace) -> int:
+    root = resolve_project_root()
+    if root is None:
+        print("No SyberMem project root found.", file=sys.stderr)
+        return 1
+
+    ids = [item.strip() for item in (args.ids or "").split(",") if item.strip()] or None
+    mapping = related_files_by_record(root, ids)
+    if args.format == "json":
+        print(dump_json({"records": mapping}))
+    else:
+        for record_id, files in sorted(mapping.items()):
+            print(f"{record_id}: {', '.join(files) if files else '(none)'}")
+    return 0
+
+
 def cmd_project_phase_analyze(args: argparse.Namespace) -> int:
     root = resolve_project_root()
     if root is None:
@@ -497,6 +513,11 @@ def main() -> int:
     refresh_cmd = project_sub.add_parser("refresh")
     refresh_cmd.add_argument("--format", choices=["text", "json"], default="text")
     refresh_cmd.set_defaults(func=cmd_project_refresh)
+
+    record_files_cmd = project_sub.add_parser("record-files")
+    record_files_cmd.add_argument("--ids", default="", help="Comma-separated record ids; empty means all records.")
+    record_files_cmd.add_argument("--format", choices=["text", "json"], default="text")
+    record_files_cmd.set_defaults(func=cmd_project_record_files)
 
     project_phase = project_sub.add_parser("phase")
     project_phase_sub = project_phase.add_subparsers(dest="project_phase_command", required=True)

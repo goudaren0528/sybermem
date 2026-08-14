@@ -13,7 +13,20 @@ export const THEME_WINDOW_SIZE = 10
 const DIGEST_CLUSTER_THRESHOLD = 2
 const DIGEST_SIGNAL_FILE_FLOOR = 3
 
-export interface FollowupResult { readonly type: "record" | "digest" | "none"; readonly themeKey: string; readonly message: string | null }
+export interface FollowupResult { readonly type: "record" | "digest" | "none"; readonly themeKey: string; readonly message: string | null; readonly triggerReason: string }
+
+// Edit-aware signals that indicate a natural stopping point, independent of raw
+// file counts. Presence of any of these makes a record nudge feel well-timed.
+export interface ActivitySignal { readonly toolSignal: "tests_passed" | "build_ok" | null; readonly todoCompletedBatches: number; readonly editFocus: string | null }
+
+function activityTriggerReason(activity: ActivitySignal | undefined): string | null {
+  if (!activity) return null
+  if (activity.toolSignal === "tests_passed") return "tests_passed"
+  if (activity.toolSignal === "build_ok") return "build_ok"
+  if (activity.todoCompletedBatches > 0) return "todo_batch_done"
+  if (activity.editFocus) return "edit_focus"
+  return null
+}
 
 export async function getChangedFiles($: Shell, cwd: string): Promise<string[]> {
   const files = new Set<string>()
@@ -48,7 +61,7 @@ function slugifyAreas(areas: Set<string>): string {
   return [...areas].sort().join("-") || "misc"
 }
 
-export function classifyFollowup(files: readonly string[], commitsSinceRecord: number, state: NudgeState): FollowupResult {
+export function classifyFollowup(files: readonly string[], commitsSinceRecord: number, state: NudgeState, activity?: ActivitySignal): FollowupResult {
   const highSignal = files.filter(matchesHighSignal)
   const areas = detectHighLevelAreas(files)
   const themeKey = slugifyAreas(areas)
@@ -56,14 +69,26 @@ export function classifyFollowup(files: readonly string[], commitsSinceRecord: n
   const presentQualifies = highSignal.length > 0 || areas.size >= 2 || files.length >= DIGEST_SIGNAL_FILE_FLOOR
   const nudgedAt = state.digest_nudged_at_window_len?.[themeKey]
   if (recentStops.length >= DIGEST_CLUSTER_THRESHOLD && presentQualifies && !(nudgedAt !== undefined && recentStops.length <= nudgedAt)) {
-    return { type: "digest", themeKey, message: "SyberMem: recent records around this area may now be enough for a /sybermem-digest if this phase has reached a stable stopping point." }
+    return { type: "digest", themeKey, message: "SyberMem: recent records around this area may now be enough for a /sybermem-digest if this phase has reached a stable stopping point.", triggerReason: "digest_cluster" }
   }
-  const shouldRecord = highSignal.length > 0 || areas.size >= 2 || files.length >= RECORD_FILE_THRESHOLD || commitsSinceRecord >= COMMIT_GAP_THRESHOLD
+  const activityReason = activityTriggerReason(activity)
+  const shouldRecord = activityReason !== null || highSignal.length > 0 || areas.size >= 2 || files.length >= RECORD_FILE_THRESHOLD || commitsSinceRecord >= COMMIT_GAP_THRESHOLD
   if (shouldRecord && !(state.last_nudge_type === "record" && state.last_theme === themeKey)) {
     const gapNote = commitsSinceRecord >= COMMIT_GAP_THRESHOLD ? ` (${commitsSinceRecord} commits since last record)` : ""
-    return { type: "record", themeKey, message: `SyberMem: this change looks important enough for a manual /sybermem-record so the reason and impact are preserved.${gapNote}` }
+    const reason = activityReason ?? (highSignal.length > 0 || areas.size >= 2 ? "high_signal_files" : commitsSinceRecord >= COMMIT_GAP_THRESHOLD ? "commit_gap" : "file_count")
+    const stopNote = describeActivity(activity, activityReason)
+    return { type: "record", themeKey, message: `SyberMem: this change looks important enough for a manual /sybermem-record so the reason and impact are preserved.${stopNote}${gapNote}`, triggerReason: reason }
   }
-  return { type: "none", themeKey, message: null }
+  return { type: "none", themeKey, message: null, triggerReason: "none" }
+}
+
+function describeActivity(activity: ActivitySignal | undefined, reason: string | null): string {
+  if (!activity || reason === null) return ""
+  if (reason === "tests_passed") return " (tests passed this session)"
+  if (reason === "build_ok") return " (build succeeded this session)"
+  if (reason === "todo_batch_done") return " (a batch of tasks just completed)"
+  if (reason === "edit_focus" && activity.editFocus) return ` (focused edits on ${activity.editFocus})`
+  return ""
 }
 
 export async function countCommitsSinceLastRecord($: Shell, root: string): Promise<number> {
