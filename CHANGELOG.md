@@ -17,6 +17,9 @@
 - Edit-aware recall relevance feedback for OpenCode: `file.edited` / `todo.updated` / `tool.execute.after` accumulate per-session edit focus, todo-batch completion, and test/build signals; `session.idle` matches injected records against edited files (via each record's `related_files`) into a bounded `.sybermem/.recall-outcomes.jsonl`, feeding a precision-backed `low_relevance` recall-health verdict distinct from frequency-based `low_signal`. Record nudges carry a semantic `trigger_reason`, and the `session.idle` advisory now surfaces both `low_signal` and `low_relevance`.
 - `sybermem project record-files --ids <a,b> --format json` maps record ids to their declared `related_files`, keeping Markdown parsing in Core for the OpenCode relevance loop.
 - `sybermem project memory-stats` now reports a recall precision column/field and the `low_relevance` verdict, backed by `.sybermem/.recall-outcomes.jsonl`.
+- Candidate-only User Habit Memory intent capture: OpenCode `chat.message` classifies reusable-preference prompts and calls `sybermem habit intent --prompt`, writing a candidate to the user-level `~/.sybermem/.habit-intent.json`. It never creates an active habit and never persists secrets/injection text; `/sybermem-habit` confirms a pending candidate into a habit in one step and then clears it. New CLI: `sybermem habit intent`, `intent-status`, `intent-clear`, `awareness`.
+- Distinct habit injection visibility on OpenCode: applied user habits now get their own `🧠` toast, separate from the recall `⭐` toast, and a captured candidate raises a `💡` toast.
+- User-habit awareness surface: `sybermem habit awareness` and the OpenCode first-turn startup context report active-habit counts, type distribution, and a pending-candidate flag (counts only, never habit statements, no duplication of prompt-time reminders).
 
 ### Changed
 - `using-sybermem` now includes a `<SUBAGENT-STOP>` guard

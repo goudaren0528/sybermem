@@ -101,6 +101,9 @@ implements: [requirement-002]
 - review and governance: `sybermem habit list`, `search`, `pause`, and `delete`
 - visible reminders: `sybermem habit remind --context planning --format markdown` and `/sybermem-habit`
 - manual/compaction injection: `sybermem habit inject --context planning --format markdown`
+- passive candidate capture (candidate-only, never auto-written): when OpenCode `chat.message` detects reusable-preference language ("always…", "I prefer…"), it calls `sybermem habit intent --prompt <text>` to write a candidate to the user-level `~/.sybermem/.habit-intent.json` (never an active habit, never persists secrets/injection text); `/sybermem-habit` reads `habit intent-status` and, after user confirmation, turns it into a habit in one step, then runs `habit intent-clear`
+- distinct injection toasts: recall and habit each get their own OpenCode toast — `⭐` for recall and a separate `🧠` for an applied user habit (no longer merged), plus `💡` when a candidate preference is captured
+- awareness surface: `sybermem habit awareness` and the OpenCode first-turn startup context report the active-habit count, type distribution, and whether a candidate is pending (counts only, never statements, never duplicating prompt-time reminders)
 - conservative gates: only active, high-confidence, directly relevant, non-excluded habits are injected, with a maximum of three
 - habits are not stored in project `.sybermem/` records and are not published to Team memory by default
 
