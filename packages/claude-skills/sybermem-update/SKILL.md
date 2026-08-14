@@ -133,6 +133,8 @@ Every new managed behavior introduced by SyberMem must explicitly say whether `s
 
 Current behavior note: `sybermem project memory-stats` and the `/sybermem-summary` Memory Health / Recall Stats panel require refreshed global CLI/Core and skill instructions only. They do not create, refresh, or migrate any project-local managed files through `sybermem project refresh --format json`; the command reads existing `.sybermem/` records and optional `.sybermem/.recall-debug.jsonl` metadata.
 
+Current behavior note: the OpenCode first-turn startup-context injection and the `session.idle` recall-health advisory require a refreshed global OpenCode plugin only (re-run the global install/update to refresh `~/.config/opencode/plugins/sybermem.ts`). They do not create, refresh, or migrate any project-local managed files through `sybermem project refresh --format json`; they read existing `.sybermem/` records and the optional `.sybermem/.recall-debug.jsonl` metadata.
+
 ### Managed-file propagation check
 
 Before declaring an upgrade complete, verify for the current project:
