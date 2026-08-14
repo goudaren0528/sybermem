@@ -153,7 +153,7 @@ claude --plugin-dir .
 2. 再进入已有项目运行 `/sybermem-update`。
 3. 新项目运行 `/sybermem-init-project`。
 
-全局刷新只更新用户级 runtime、Claude/OpenCode/Codex skills、OpenCode plugin 和 Codex 用户级 hooks；项目内的 `.sybermem/`、hooks、模板和说明文件需要 `/sybermem-update` 才会刷新。Codex 的健康检查会把 `~/.agents/skills/sybermem-init-project/project-files` 作为模板来源之一，因此 Codex 安装路径也能参与项目 freshness 检查。老用户要拿到 OpenCode 新的 habit reminder、record-intent metadata 或 recall debug logging 链路，先重跑全局安装/更新以刷新 `~/.config/opencode/plugins/sybermem.ts`，再进项目跑 `/sybermem-update`。若修复的是 CLI launcher、OpenCode plugin、Codex hook 或 skill 指令链路，也按这个顺序生效。
+全局刷新只更新用户级 runtime、Claude/OpenCode/Codex skills、OpenCode plugin 和 Codex 用户级 hooks；项目内的 `.sybermem/`、hooks、模板和说明文件需要 `/sybermem-update` 才会刷新。`/sybermem-update` 会优先调用 `sybermem project refresh --format json` 做可脚本化的项目内刷新，只有 CLI 缺失、执行失败或输出非 JSON 时才回退到 agent 编排的 `/sybermem-init-project`。Codex 的健康检查会把 `~/.agents/skills/sybermem-init-project/project-files` 作为模板来源之一，因此 Codex 安装路径也能参与项目 freshness 检查。老用户要拿到 OpenCode 新的 habit reminder、record-intent metadata 或 recall debug logging 链路，先重跑全局安装/更新以刷新 `~/.config/opencode/plugins/sybermem.ts`，再进项目跑 `/sybermem-update`。若修复的是 CLI launcher、OpenCode plugin、Codex hook 或 skill 指令链路，也按这个顺序生效。
 
 ## 初始化项目
 

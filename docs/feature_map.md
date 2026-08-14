@@ -34,7 +34,7 @@ consistent with this file.
 | User-level skills | Full: plugin/user skills | Full: copied to `~/.config/opencode/skills` | Full: copied to `~/.agents/skills` | Metadata/entry only | Metadata only | Metadata only |
 | CLI/Core access | Full | Full; plugin and CLI-using skills prefer the fixed launcher | Full when invoked manually or from skills; hook also prefers fixed launcher | Manual only if `sybermem` is installed | Manual only if `sybermem` is installed | Manual only if `sybermem` is installed |
 | Project memory records | Full via `.sybermem/` | Full via the same project `.sybermem/` | Full via manual skills/CLI and `AGENTS.md` guidance | Manual only | Manual only | Manual only |
-| Project init/update | Full: `/sybermem-init-project`, `/sybermem-update` | Full through skills | Full through user skills | Manual/entry guidance only | Manual/entry guidance only | Manual/entry guidance only |
+| Project init/update | Full: `/sybermem-init-project`, CLI-first `/sybermem-update` using `sybermem project refresh --format json` | Full through skills; project update uses the same CLI-first refresh | Full through user skills; project update uses the same CLI-first refresh | Manual/entry guidance only | Manual/entry guidance only | Manual/entry guidance only |
 | Session-start project context | Full: `SessionStart` hook | Partial automatic: `session.created` loads key-conclusion/stale/commit-gap signals | Partial runtime: managed `SessionStart` hook emits `sybermem context session --format markdown` through `hookSpecificOutput.additionalContext` | Unsupported | Unsupported | Unsupported |
 | Stop/idle change nudge | Full: `Stop` hook | Full on OpenCode seam: `session.idle` record/digest nudges and bounded auto-trail journal | Partial runtime: managed `Stop` hook emits one bounded record nudge and respects `stop_hook_active` loop prevention | Unsupported | Unsupported | Unsupported |
 | Prompt-time project recall | Full: `UserPromptSubmit` task recall | Full on OpenCode seam: `chat.message` plus `experimental.chat.system.transform` | Partial runtime: managed `UserPromptSubmit` hook delegates to `sybermem context recall --query <prompt>` and injects only high-signal recall hints | Unsupported | Unsupported | Unsupported |
@@ -57,6 +57,7 @@ consistent with this file.
 |---|---|---|---|
 | Project Memory | Full | `.sybermem/changes`, `.sybermem/decisions`, `.sybermem/requirements`, `.sybermem/bugs` | Canonical Markdown records with UUID-backed `record_id`, relation fields, source/trust metadata, and legacy ID compatibility. |
 | Derived Project Index | Full | `sybermem project index build`, `sybermem project index check` | `.sybermem/INDEX.md` is generated from canonical records and can be mechanically checked. |
+| Project Refresh | Full | `sybermem project refresh --format json`, `/sybermem-update` | Deterministic project-local managed-file propagation for `.sybermem/`, hooks, templates, instruction protocol blocks, `.claude/settings.json`, and `project.yaml`; `/sybermem-update` falls back to agent orchestration only when CLI refresh is unavailable or invalid. |
 | Resume | Full | `/sybermem-resume`, `sybermem resume --mode fast|standard|deep` | Read-only restart brief with phase, progress, risks, confidence, freshness, and next action. |
 | Search | Full | `/sybermem-search`, `sybermem search` | Supports project/workspace search, record-id/topic/keyword/relation matching, successor guidance, conflict notes, and stale-index warnings. |
 | High-signal Recall | Full | Claude `UserPromptSubmit`, OpenCode `chat.message`/transform, Codex `UserPromptSubmit`, `sybermem context recall` | Automatic only on Claude/OpenCode/Codex supported prompt seams. Uses stricter gate than explicit search. |
@@ -74,6 +75,7 @@ consistent with this file.
 |---|---|---|---|
 | Skills | Full | `~/.config/opencode/skills` | Refreshed by global install/update. |
 | Plugin | Full | `~/.config/opencode/plugins/sybermem.ts` | Refreshed by global install/update. |
+| Project update | Full | `/sybermem-update` -> `sybermem project refresh --format json` | CLI-first project-local refresh; falls back to `/sybermem-init-project` only if CLI refresh is missing, broken, or non-JSON. |
 | Session-start context | Partial automatic | `session.created` | Toast-level load/stale/commit-gap signals; hidden auto-resume is unsupported. |
 | Idle nudge | Full | `session.idle` | Mirrors Claude Stop follow-up thresholds using OpenCode lifecycle seam. |
 | Prompt-time project recall | Full | `chat.message` -> `sybermem context recall` -> `experimental.chat.system.transform` | Same-turn system prompt injection; only high-signal recall qualifies. |
@@ -104,7 +106,7 @@ Next OpenCode candidates, in priority order:
 | Capability | Status | Mechanism | Boundary |
 |---|---|---|---|
 | User skills | Full | `~/.agents/skills` | Same SyberMem skill set as other hosts when Codex loads user skills. |
-| Project setup/update | Full manual | `/sybermem-init-project`, `/sybermem-update` | Refreshes `.sybermem/` and `AGENTS.md`; no Codex project runtime required. |
+| Project setup/update | Full manual | `/sybermem-init-project`, CLI-first `/sybermem-update` | Refreshes `.sybermem/` and `AGENTS.md` via `sybermem project refresh --format json` before any agent fallback; no Codex project runtime required. |
 | Session-start project context | Partial runtime | `.codex/hooks/session_start.py` registered under `SessionStart` | Emits shared `sybermem context session --format markdown` only when available; fail-open and bounded. |
 | Habit prompt reminder | Partial runtime | `.codex/hooks/user_prompt.py` registered under `UserPromptSubmit` | Composed with recall in one `hookSpecificOutput.additionalContext` packet; only bounded `## User Habit Reminder` output qualifies. |
 | Project memory prompt recall | Partial runtime | `UserPromptSubmit` -> `sybermem context recall --query <prompt>` | Uses shared high-signal recall gate and `⭐`/`💡` markers; abstentions emit no context. |
