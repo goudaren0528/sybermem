@@ -29,6 +29,15 @@ lifecycle-hook and prompt-time recall behavior:
   silent and every injected recall hint carries a visible marker. Habit reminders
   stay conservative and fail open: only active, high-confidence, directly relevant,
   prompt-ok-when-supported habits are included, with bounded output.
+- To make in-session injection perceptible (not just the `session.created` toast),
+  `experimental.chat.system.transform` shows a throttled `⭐ SyberMem: injected N
+  recall hint(s) [ + habit reminder(s)] into this prompt` toast at the moment
+  context actually reaches the model. `chat.message` shows a `💡 Detected a
+  reusable preference — save it with /sybermem-habit` toast when a prompt looks
+  like a preference but no stored habit matched (the CLI's `habit_preference_candidate`
+  outcome), turning an otherwise silently-dropped signal into a discoverable action.
+  Both toasts are cooldown-throttled (~30s per type) and fail open, so they never
+  block or spam the prompt flow.
 - `session.idle` classifies changed files into a record nudge, a digest nudge, or
   no nudge using the same thresholds and high-signal / high-level-area heuristics
   as the Claude `Stop` hook, tracks a per-theme window for digest clustering, and
