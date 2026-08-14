@@ -262,7 +262,7 @@ def test_project_memory_stats_marks_recall_unavailable_without_debug_log(tmp_pat
     assert stats["recall_health"]["status"] == "no_log"
 
 
-def _make_recall_health_project(tmp_path: Path, lines: list[str], monkeypatch) -> Path:
+def _make_recall_health_project(tmp_path: Path, lines: list[str], monkeypatch, outcome_lines: list[str] | None = None) -> Path:
     project_root = tmp_path / "project"
     sybermem = project_root / ".sybermem"
     sybermem.mkdir(parents=True)
@@ -270,7 +270,18 @@ def _make_recall_health_project(tmp_path: Path, lines: list[str], monkeypatch) -
     monkeypatch.setattr(memory_stats_module, "now_iso", lambda: "2026-08-14T12:00:00+08:00")
     if lines:
         (sybermem / ".recall-debug.jsonl").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    if outcome_lines:
+        (sybermem / ".recall-outcomes.jsonl").write_text("\n".join(outcome_lines) + "\n", encoding="utf-8")
     return project_root
+
+
+def _healthy_recall_lines() -> list[str]:
+    # Recent 7d window with a strong injection rate so relevance, not frequency,
+    # decides the verdict.
+    return [
+        json.dumps({"timestamp": f"2026-08-1{day}T09:00:00+08:00", "event": "inject", "record_ids": ["change-a"], "match_classes": ["topic"], "reason": "high-signal-recall"})
+        for day in range(0, 4)
+    ]
 
 
 def test_recall_health_reports_no_log_when_debug_log_missing(tmp_path: Path, monkeypatch) -> None:
@@ -331,3 +342,62 @@ def test_recall_health_reports_low_signal_when_abstains_dominate_recent_window(t
     # Then: the low injection rate is flagged as low_signal with an actionable hint
     assert health["status"] == "low_signal"
     assert health["hint"]
+
+
+def test_relevance_counts_aggregate_precision_across_outcome_windows(tmp_path: Path, monkeypatch) -> None:
+    # Given: recall-outcome sessions with injected/hit counts in and out of window
+    outcome_lines = [
+        json.dumps({"timestamp": "2026-08-13T09:00:00+08:00", "session": "s1", "injected": 3, "hit": 1, "precision": 1 / 3}),
+        json.dumps({"timestamp": "2026-08-12T09:00:00+08:00", "session": "s2", "injected": 2, "hit": 2, "precision": 1.0}),
+        json.dumps({"timestamp": "2026-07-20T09:00:00+08:00", "session": "s3", "injected": 4, "hit": 0, "precision": 0.0}),
+        "not json",
+    ]
+    project_root = _make_recall_health_project(tmp_path, _healthy_recall_lines(), monkeypatch, outcome_lines)
+
+    # When: memory stats are computed
+    stats = project_memory_stats(project_root)
+
+    # Then: 7d precision counts only in-window sessions; 30d includes the older one
+    # (30d window = today-29d = 2026-07-16, so the 2026-07-20 session is in 30d only)
+    relevance_7d = stats["windows"]["7d"]["relevance"]
+    assert relevance_7d["injected"] == 5
+    assert relevance_7d["hit"] == 3
+    assert relevance_7d["precision"] == 3 / 5
+    relevance_30d = stats["windows"]["30d"]["relevance"]
+    assert relevance_30d["injected"] == 9
+    assert relevance_30d["hit"] == 3
+    assert relevance_30d["precision"] == 3 / 9
+    # Totals include every valid session regardless of window.
+    assert stats["totals"]["relevance"]["injected"] == 9
+
+
+def test_recall_health_reports_low_relevance_when_injected_records_miss_edits(tmp_path: Path, monkeypatch) -> None:
+    # Given: a healthy injection rate but injected records rarely match edited files
+    outcome_lines = [
+        json.dumps({"timestamp": "2026-08-13T09:00:00+08:00", "session": "s1", "injected": 4, "hit": 1, "precision": 0.25}),
+        json.dumps({"timestamp": "2026-08-12T09:00:00+08:00", "session": "s2", "injected": 4, "hit": 0, "precision": 0.0}),
+    ]
+    project_root = _make_recall_health_project(tmp_path, _healthy_recall_lines(), monkeypatch, outcome_lines)
+
+    # When: recall health is derived
+    health = recall_health(project_root)
+
+    # Then: high frequency with low precision is flagged as low_relevance, not healthy
+    assert health["status"] == "low_relevance"
+    assert health["precision"] == 1 / 8
+    assert health["hint"]
+
+
+def test_recall_health_stays_healthy_when_precision_sample_is_too_small(tmp_path: Path, monkeypatch) -> None:
+    # Given: a healthy injection rate but only 2 injected-record samples (below floor)
+    outcome_lines = [
+        json.dumps({"timestamp": "2026-08-13T09:00:00+08:00", "session": "s1", "injected": 2, "hit": 0, "precision": 0.0}),
+    ]
+    project_root = _make_recall_health_project(tmp_path, _healthy_recall_lines(), monkeypatch, outcome_lines)
+
+    # When: recall health is derived
+    health = recall_health(project_root)
+
+    # Then: a couple of misses never look like a systemic problem; precision stays advisory-only
+    assert health["status"] == "healthy"
+    assert health["precision"] is None

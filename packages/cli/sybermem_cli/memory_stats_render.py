@@ -5,7 +5,7 @@ def render_project_memory_stats_text(payload: dict) -> None:
     print(f"Memory stats for {payload['slug']}")
     print("")
     _print_table(
-        ["Window", "Records", "Recall Events", "Injected", "Abstained", "Recall Rate"],
+        ["Window", "Records", "Recall Events", "Injected", "Abstained", "Recall Rate", "Recall Precision"],
         [
             _window_summary_row("7d", payload["windows"]["7d"]),
             _window_summary_row("30d", payload["windows"]["30d"]),
@@ -40,14 +40,17 @@ def _print_recall_health(payload: dict) -> None:
         return
     print("")
     hint = health.get("hint", "")
-    line = f"Recall health: {health.get('status', 'unknown')}"
+    precision = health.get("precision")
+    precision_note = f" (precision {_format_rate(precision)})" if precision is not None else ""
+    line = f"Recall health: {health.get('status', 'unknown')}{precision_note}"
     print(f"{line} — {hint}" if hint else line)
 
 
 def _window_summary_row(label: str, window: dict) -> list[str]:
     recall = window["recall"]
+    precision = window.get("relevance", {}).get("precision")
     if recall.get("status") == "no_log":
-        return [label, str(window["records"]["total"]), "n/a", "n/a", "n/a", "n/a"]
+        return [label, str(window["records"]["total"]), "n/a", "n/a", "n/a", "n/a", _format_rate(precision)]
     return [
         label,
         str(window["records"]["total"]),
@@ -55,6 +58,7 @@ def _window_summary_row(label: str, window: dict) -> list[str]:
         str(recall["injected"]),
         str(recall["abstained"]),
         _format_rate(recall.get("recall_rate")),
+        _format_rate(precision),
     ]
 
 

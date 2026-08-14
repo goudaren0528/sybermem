@@ -15,6 +15,13 @@ WINDOWS: Final = {"7d": 7, "30d": 30}
 # Recent recall injection rate below this is treated as low-signal: prompts are
 # arriving but the high-signal gate rarely finds anything worth injecting.
 LOW_SIGNAL_RECALL_RATE: Final = 0.2
+# Recent recall precision below this is treated as low-relevance: recall is
+# injecting records, but few of them line up with what was actually edited.
+LOW_RELEVANCE_PRECISION: Final = 0.34
+# Minimum injected-record samples before precision can lower the verdict. Below
+# this, precision stays advisory-only so a couple of misses never look like a
+# systemic relevance problem.
+MIN_PRECISION_SAMPLES: Final = 3
 
 
 def project_memory_stats(root: Path) -> dict:
@@ -22,12 +29,14 @@ def project_memory_stats(root: Path) -> dict:
     today = _current_date()
     records = _record_rows(root, meta.get("project_id", ""), meta.get("slug", root.name))
     recall_entries, malformed_lines, recall_status = _recall_debug_entries(root)
+    outcome_entries = _recall_outcome_entries(root)
     windows = {}
     for label, days in WINDOWS.items():
         since = today - timedelta(days=days - 1)
         windows[label] = {
             "records": _record_counts([row for row in records if _date_in_window(row.get("created_at", ""), since, today)]),
             "recall": _recall_counts([entry for entry in recall_entries if _date_in_window(str(entry.get("timestamp", "")), since, today)], malformed_lines, recall_status),
+            "relevance": _relevance_counts([entry for entry in outcome_entries if _date_in_window(str(entry.get("timestamp", "")), since, today)]),
         }
     return {
         "project_id": meta.get("project_id", ""),
@@ -37,6 +46,7 @@ def project_memory_stats(root: Path) -> dict:
         "totals": {
             "records": _record_counts(records),
             "recall": _recall_counts(recall_entries, malformed_lines, recall_status),
+            "relevance": _relevance_counts(outcome_entries),
         },
         "windows": windows,
         "recall_health": _recall_health_from_windows(windows, recall_status),
@@ -57,6 +67,7 @@ def _recall_health_from_windows(windows: dict, recall_status: str) -> dict:
         return {
             "status": "no_log",
             "recall_rate": None,
+            "precision": None,
             "hint": "No recall debug log yet (.sybermem/.recall-debug.jsonl); recall observability is unavailable until prompts run on a recall-capable host.",
         }
     recall_7d = windows["7d"]["recall"]
@@ -67,6 +78,7 @@ def _recall_health_from_windows(windows: dict, recall_status: str) -> dict:
         return {
             "status": "no_activity",
             "recall_rate": None,
+            "precision": None,
             "hint": "No prompt-time recall events in the last 30 days; recent recall quality cannot be assessed yet.",
         }
     window = recall_7d if events_7d > 0 else recall_30d
@@ -75,11 +87,27 @@ def _recall_health_from_windows(windows: dict, recall_status: str) -> dict:
         return {
             "status": "low_signal",
             "recall_rate": rate,
+            "precision": None,
             "hint": "Recent recall injection rate is low; consider adding topics to key records or running /sybermem-digest so high-signal recall can match more prompts.",
+        }
+    # Injection rate looks healthy; now check whether injected records line up
+    # with what was actually edited (relevance), using the recall-outcome log.
+    relevance_7d = windows["7d"].get("relevance", {})
+    relevance_30d = windows["30d"].get("relevance", {})
+    relevance = relevance_7d if relevance_7d.get("injected", 0) > 0 else relevance_30d
+    precision = relevance.get("precision")
+    injected_samples = relevance.get("injected", 0)
+    if precision is not None and injected_samples >= MIN_PRECISION_SAMPLES and precision < LOW_RELEVANCE_PRECISION:
+        return {
+            "status": "low_relevance",
+            "recall_rate": rate,
+            "precision": precision,
+            "hint": "Recall is firing, but most injected records did not line up with edited files; refresh stale related_files on key records or tighten high-signal recall so noise drops.",
         }
     return {
         "status": "healthy",
         "recall_rate": rate,
+        "precision": precision if injected_samples >= MIN_PRECISION_SAMPLES else None,
         "hint": "Recent recall injection rate is healthy.",
     }
 
@@ -140,6 +168,52 @@ def _recall_debug_entries(root: Path) -> tuple[list[dict], int, str]:
         else:
             malformed_lines += 1
     return entries, malformed_lines, "available"
+
+
+def _recall_outcome_entries(root: Path) -> list[dict]:
+    """Read bounded recall-outcome entries; malformed/non-dict lines are skipped.
+
+    Absence of the log is not an error: it just means no edit-aware relevance
+    evidence has been produced yet, so relevance stays unknown (fail-open).
+    """
+    path = root / ".sybermem" / ".recall-outcomes.jsonl"
+    if not path.is_file():
+        return []
+    entries = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        try:
+            parsed = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(parsed, dict):
+            entries.append(parsed)
+    return entries
+
+
+def _relevance_counts(entries: list[dict]) -> dict:
+    """Aggregate injected/hit counts into a precision measure.
+
+    precision = hit injected records / all injected records across the window.
+    Returns precision=None when there is no injected-record evidence, so callers
+    never divide by zero and unknown relevance stays explicitly unknown.
+    """
+    injected = 0
+    hit = 0
+    for entry in entries:
+        injected += _non_negative_int(entry.get("injected"))
+        hit += _non_negative_int(entry.get("hit"))
+    return {
+        "sessions": len(entries),
+        "injected": injected,
+        "hit": hit,
+        "precision": hit / injected if injected else None,
+    }
+
+
+def _non_negative_int(value) -> int:
+    return value if isinstance(value, int) and value >= 0 else 0
 
 
 def _recall_counts(entries: list[dict], malformed_lines: int, status: str) -> dict:
