@@ -556,11 +556,36 @@ function stashPromptPackets(sessionID, packets) {
   else
     RECALL_STASH.delete(sessionID);
 }
+var NO_INJECTION = { injected: false, recallCount: 0, habitCount: 0, habitCandidate: false };
+function classifyPackets(packets) {
+  if (packets.length === 0)
+    return NO_INJECTION;
+  let recallCount = 0;
+  let habitCount = 0;
+  let habitCandidate = false;
+  for (const packet of packets) {
+    const trimmed = packet.trim();
+    if (trimmed.startsWith("## SyberMem Recall Hints")) {
+      recallCount += countBullets(trimmed);
+    } else if (trimmed.startsWith("## User Habit Reminder")) {
+      const habitLines = trimmed.split(`
+`).filter((line) => line.startsWith("- [habit-"));
+      habitCount += habitLines.length;
+      if (habitLines.length === 0)
+        habitCandidate = true;
+    }
+  }
+  return { injected: recallCount > 0 || habitCount > 0 || habitCandidate, recallCount, habitCount, habitCandidate };
+}
+function countBullets(packet) {
+  return packet.split(`
+`).filter((line) => /^-\s/.test(line.trim())).length;
+}
 function injectStashedPromptPackets(sessionID, output) {
   const packets = RECALL_STASH.get(sessionID);
   RECALL_STASH.delete(sessionID);
   if (!packets || packets.length === 0)
-    return false;
+    return NO_INJECTION;
   const hints = packets.join(`
 
 `);
@@ -570,10 +595,35 @@ function injectStashedPromptPackets(sessionID, output) {
 ${output.system[0]}`;
   else
     output.system = [hints, ...output.system ?? []];
-  return true;
+  return classifyPackets(packets);
 }
 
 // packages/opencode-plugin/src/plugin.ts
+async function showToast(client, message) {
+  try {
+    await client.tui.showToast({ body: { message, variant: "info" } });
+  } catch {}
+}
+var LAST_TOAST = new Map;
+var TOAST_COOLDOWN_MS = 30000;
+function throttledToast(client, key, message) {
+  const now = Date.now();
+  const last = LAST_TOAST.get(key) ?? 0;
+  if (now - last < TOAST_COOLDOWN_MS)
+    return;
+  LAST_TOAST.set(key, now);
+  showToast(client, message);
+}
+function describeInjection(summary) {
+  const parts = [];
+  if (summary.recallCount > 0)
+    parts.push(`${summary.recallCount} recall hint${summary.recallCount === 1 ? "" : "s"}`);
+  if (summary.habitCount > 0)
+    parts.push(`${summary.habitCount} habit reminder${summary.habitCount === 1 ? "" : "s"}`);
+  if (parts.length === 0)
+    return "";
+  return parts.join(" + ");
+}
 async function handleSessionCreated(args, root) {
   const parsed = parseIndex(root);
   if (!parsed || parsed.conclusions.length === 0)
@@ -632,11 +682,18 @@ var SyberMemPlugin = async ({ $, directory, client }) => {
       const packets = await collectPromptPackets(args.$, root, text);
       appendRecallDebug(root, packets);
       stashPromptPackets(sessionID, packets);
+      const summary = classifyPackets(packets);
+      if (summary.habitCandidate) {
+        throttledToast(args.client, "habit-candidate", "\uD83D\uDCA1 Detected a reusable preference \u2014 save it with /sybermem-habit");
+      }
     },
     "experimental.chat.system.transform": async ({ sessionID }, output) => {
       if (!root)
         return;
-      injectStashedPromptPackets(sessionID ?? "", output);
+      const summary = injectStashedPromptPackets(sessionID ?? "", output);
+      if (summary.injected && !summary.habitCandidate) {
+        throttledToast(args.client, "recall-injected", `\u2B50 SyberMem: injected ${describeInjection(summary)} into this prompt`);
+      }
     },
     "experimental.session.compacting": async (_input, output) => {
       if (!root)

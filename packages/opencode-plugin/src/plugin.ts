@@ -6,11 +6,40 @@ import { resolveRoot } from "./runtime"
 import { loadNudgeState, saveNudgeState } from "./state"
 import { appendRecallDebug } from "./recall_debug"
 import { captureRecordIntentWithCli } from "./record_intent"
-import { collectPromptPackets, extractPromptText, injectStashedPromptPackets, stashPromptPackets, type ChatMessageOutput, type SystemTransformOutput } from "./prompt_context"
+import { classifyPackets, collectPromptPackets, extractPromptText, injectStashedPromptPackets, stashPromptPackets, type ChatMessageOutput, type InjectionSummary, type SystemTransformOutput } from "./prompt_context"
 
 interface ToastClient { readonly tui: { readonly showToast: (input: { readonly body: { readonly message: string; readonly variant: "info" } }) => Promise<void> } }
 interface PluginArgs { readonly $: import("./runtime").Shell; readonly directory: string; readonly client: ToastClient }
 interface EventInput { readonly event: { readonly type: string } }
+
+async function showToast(client: ToastClient, message: string): Promise<void> {
+  try {
+    await client.tui.showToast({ body: { message, variant: "info" } })
+  } catch {
+    // Fail open: toasts are optional UX, never block the prompt flow.
+  }
+}
+
+// In-memory throttle keyed by message type so we never toast-spam the TUI. The
+// plugin process lives for the session; a fresh process resets the counter.
+const LAST_TOAST = new Map<string, number>()
+const TOAST_COOLDOWN_MS = 30_000
+
+function throttledToast(client: ToastClient, key: string, message: string): void {
+  const now = Date.now()
+  const last = LAST_TOAST.get(key) ?? 0
+  if (now - last < TOAST_COOLDOWN_MS) return
+  LAST_TOAST.set(key, now)
+  void showToast(client, message)
+}
+
+function describeInjection(summary: InjectionSummary): string {
+  const parts: string[] = []
+  if (summary.recallCount > 0) parts.push(`${summary.recallCount} recall hint${summary.recallCount === 1 ? "" : "s"}`)
+  if (summary.habitCount > 0) parts.push(`${summary.habitCount} habit reminder${summary.habitCount === 1 ? "" : "s"}`)
+  if (parts.length === 0) return ""
+  return parts.join(" + ")
+}
 
 async function handleSessionCreated(args: PluginArgs, root: string): Promise<void> {
   const parsed = parseIndex(root)
@@ -62,10 +91,24 @@ export const SyberMemPlugin: Plugin = async ({ $, directory, client }: PluginArg
       const packets = await collectPromptPackets(args.$, root, text)
       appendRecallDebug(root, packets)
       stashPromptPackets(sessionID, packets)
+      // Make a silently dropped "this looks like a reusable preference" signal
+      // visible, so the user knows they can persist it as a habit.
+      const summary = classifyPackets(packets)
+      if (summary.habitCandidate) {
+        throttledToast(args.client, "habit-candidate", "💡 Detected a reusable preference — save it with /sybermem-habit")
+      }
     },
     "experimental.chat.system.transform": async ({ sessionID }: { readonly sessionID?: string }, output: SystemTransformOutput) => {
       if (!root) return
-      injectStashedPromptPackets(sessionID ?? "", output)
+      const summary = injectStashedPromptPackets(sessionID ?? "", output)
+      // Toast at injection time (not capture time) so the user only sees a
+      // notice when context actually reached the model — makes recall/habit
+      // injection perceptible in-session, not just at session start. The
+      // habit-candidate case is excluded here because chat.message already
+      // surfaces that as its own "save this preference" toast.
+      if (summary.injected && !summary.habitCandidate) {
+        throttledToast(args.client, "recall-injected", `⭐ SyberMem: injected ${describeInjection(summary)} into this prompt`)
+      }
     },
     "experimental.session.compacting": async (_input: unknown, output: { readonly context: string[] }) => {
       if (!root) return
