@@ -205,6 +205,7 @@ claude --plugin-dir .
 ## 索引与检索
 
 - `.sybermem/INDEX.md` 是项目内派生导航文件，由 `sybermem project index build` 重建，由 `sybermem project index check` 校验。
+- `sybermem project phase analyze` 会确定性地对记录分组并原子写回 `.sybermem/analysis/phase-index.md`（confirmed phases + coverage map + `status: analyzed`），使阶段分析结果不会因为手写 Markdown 而静默丢失；`sybermem project phase confirm --from-json <file>` 可把 agent 产出的高质量分组在校验覆盖后确定性落盘。`/sybermem-phase-analyze` 优先走该 CLI，仅在 CLI 缺失、执行失败或输出非 JSON 时回退 agent 编排。
 - `sybermem project memory-stats` 以表格展示最近 7 天 / 30 天的 record 数量、类型分布、recall events、injected/abstained 和 recall rate；`--format json` 给 skill 和自动化消费。recall 指标只来自 `.sybermem/.recall-debug.jsonl`，没有该日志表示统计不可用，不代表召回活动为 0。
 - `sybermem index build` 构建 workspace 级 SQLite FTS5 索引，服务于跨项目搜索。
 - 项目内检索默认基于已解析 Markdown records 的词法匹配和打分；需要跨项目搜索时使用 workspace index。
