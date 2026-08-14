@@ -7,11 +7,13 @@ description: Use when explicitly confirming, renaming, adjusting, or rejecting c
 
 **Announce at start:** "I'm using the sybermem-phase-confirm skill to update the phase index."
 
-Promote a candidate phase into a confirmed phase, or explicitly adjust/reject candidate phases in `.sybermem/analysis/phase-index.md`.
+Adjust, rename, reject, or re-scope phases in `.sybermem/analysis/phase-index.md`, or change a phase's lifecycle. This is an optional refinement step: `/sybermem-phase-analyze` already deterministically persists confirmed phases via `sybermem project phase analyze`, so confirmation is no longer required before downstream skills like `/sybermem-digest`.
+
+For a bulk deterministic rewrite of the whole phase set (for example when you have a higher-quality semantic grouping), prefer the CLI: write the grouping as JSON `{ "phases": [ { "title": "...", "covered_records": ["change-001", ...] } ] }` and run `sybermem project phase confirm --from-json <file>`. Core validates every covered record exists and is covered by exactly one phase, then atomically rewrites the phase index. Use the in-place Markdown edits below for small, targeted adjustments (rename one phase, change one lifecycle, move a few records).
 
 ## Core Invariant
 
-- **Only explicit confirmation may turn a candidate phase into a canonical phase.**
+- **Phase edits stay within the existing `## Phase Candidates`, `## Confirmed Phases`, and `## Coverage Map` sections; never add a second `## Coverage Map` heading.**
 
 <HARD-GATE>
 Do NOT auto-create digests during confirmation. Confirmation only updates the phase index.
@@ -28,7 +30,7 @@ Before confirmation, verify:
 - `.sybermem/analysis/phase-index.md` exists
 - the file contains at least one candidate phase or confirmed phase
 
-If the phase index is missing, ask the user to run `/sybermem-update`.
+If the phase index is missing or still `not_yet_analyzed`, run `/sybermem-phase-analyze` first (which persists a phase structure via the CLI); do not ask the user to run `/sybermem-update` just for this.
 
 ## Flow
 
