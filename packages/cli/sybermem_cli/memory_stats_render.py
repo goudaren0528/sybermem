@@ -28,8 +28,20 @@ def render_project_memory_stats_text(payload: dict) -> None:
     if payload["totals"]["recall"].get("status") == "no_log":
         print("")
         print("Recall debug log: unavailable (.sybermem/.recall-debug.jsonl not found)")
+        _print_recall_health(payload)
         return
     _print_recall_detail_tables(payload)
+    _print_recall_health(payload)
+
+
+def _print_recall_health(payload: dict) -> None:
+    health = payload.get("recall_health")
+    if not health:
+        return
+    print("")
+    hint = health.get("hint", "")
+    line = f"Recall health: {health.get('status', 'unknown')}"
+    print(f"{line} — {hint}" if hint else line)
 
 
 def _window_summary_row(label: str, window: dict) -> list[str]:
