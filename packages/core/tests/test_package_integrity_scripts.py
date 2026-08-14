@@ -162,9 +162,11 @@ def test_package_integrity_checks_cli_using_skills_with_fixed_launcher_guidance(
         Path("packages/claude-skills/sybermem-team-summary/SKILL.md"),
         Path("packages/claude-skills/sybermem-init-project/SKILL.md"),
         Path("packages/claude-skills/sybermem-update/SKILL.md"),
+        Path("packages/claude-skills/sybermem-summary/SKILL.md"),
     ]
     assert callable(checker["check_skill_cli_resolution_guidance"])
     assert callable(checker["check_project_refresh_contract"])
+    assert callable(checker["check_project_memory_stats_contract"])
 
 
 def test_cli_using_skills_include_fixed_launcher_contract_fragments() -> None:
@@ -202,6 +204,34 @@ def test_package_integrity_guards_cli_first_project_refresh_contract() -> None:
     cli_main = (ROOT / "packages" / "cli" / "sybermem_cli" / "main.py").read_text(encoding="utf-8")
     assert "cmd_project_refresh" in cli_main
     assert 'project_sub.add_parser("refresh")' in cli_main
+
+
+def test_package_integrity_guards_cli_first_project_memory_stats_contract() -> None:
+    # Given: /sybermem-summary consumes deterministic CLI memory and recall stats when available
+    checker = runpy.run_path(str(CHECK_SCRIPT))
+
+    # When / Then: docs, skill contract, and CLI parser all carry the memory-stats command
+    assert callable(checker["check_project_memory_stats_contract"])
+    for relative_path in [
+        Path("README.md"),
+        Path("README.en.md"),
+        Path("docs/feature_map.md"),
+        Path("packages/cli/README.md"),
+        Path("packages/claude-skills/sybermem-summary/SKILL.md"),
+        Path("skills/sybermem-summary/SKILL.md"),
+    ]:
+        text = (ROOT / relative_path).read_text(encoding="utf-8")
+        assert "sybermem project memory-stats" in text
+
+    summary_skill = (ROOT / "packages" / "claude-skills" / "sybermem-summary" / "SKILL.md").read_text(encoding="utf-8")
+    assert "missing, broken, or emits invalid JSON" in summary_skill
+    assert 'recall.status == "no_log"' in summary_skill
+    assert ".sybermem/.recall-debug.jsonl" in summary_skill
+    assert "Try bare `sybermem` only as the final fallback" in summary_skill
+
+    cli_main = (ROOT / "packages" / "cli" / "sybermem_cli" / "main.py").read_text(encoding="utf-8")
+    assert "cmd_project_memory_stats" in cli_main
+    assert 'project_sub.add_parser("memory-stats")' in cli_main
 
 
 def test_local_install_and_update_scripts_force_refresh_core_and_cli_packages() -> None:
