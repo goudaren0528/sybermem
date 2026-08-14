@@ -71,6 +71,7 @@ implements: [requirement-002]
 - phase digests and theme digests for phase/topic compression
 - record relations: `implements` / `fixes` / `related` / `superseded_by`
 - read-only resume: `/sybermem-resume` and `sybermem resume`
+- memory stats: `sybermem project memory-stats` prints 7d/30d terminal tables by default, and `--format json` emits structured stats for `/sybermem-summary`
 - project search: `/sybermem-search` and `sybermem search`
 - next-step guidance: `/using-sybermem` and `sybermem next-step`
 
@@ -108,7 +109,7 @@ SyberMem has two execution paths with different reliability properties:
 
 | Path | Representative capabilities | Notes |
 |---|---|---|
-| CLI / Core | `sybermem resume`, `search`, `next-step`, `portfolio`, `index build`, `project index build/check`, `record id`, `habit add/list/search/pause/delete/remind/inject`, `team init/summary`, `publish status`, `project uninstall` | Programmatic and scriptable; best for deterministic queries and publication flows |
+| CLI / Core | `sybermem resume`, `search`, `next-step`, `portfolio`, `index build`, `project index build/check`, `project memory-stats`, `record id`, `habit add/list/search/pause/delete/remind/inject`, `team init/summary`, `publish status`, `project uninstall` | Programmatic and scriptable; best for deterministic queries and publication flows |
 | Skill orchestration | `/sybermem-record`, `/sybermem-habit`, `/sybermem-link`, `/sybermem-digest`, `/sybermem-theme-digest`, `/sybermem-phase-analyze`, `/sybermem-phase-confirm` | AI edits `.sybermem/` Markdown or invokes user-level habit CLI according to skill instructions; best for work that requires judgment and synthesis |
 
 `sybermem record id --type <change|decision|requirement|bug>` only mints a canonical record ID. Full record creation still happens through `/sybermem-record`.
@@ -204,6 +205,7 @@ If a project already has custom `.claude/settings.json` content, SyberMem patche
 ## Indexing and Search
 
 - `.sybermem/INDEX.md` is a derived project navigation file rebuilt by `sybermem project index build` and checked by `sybermem project index check`.
+- `sybermem project memory-stats` renders 7d/30d tables for record counts, type distribution, recall events, injected/abstained counts, and recall rate; `--format json` is available for skills and automation. Recall metrics come only from `.sybermem/.recall-debug.jsonl`; a missing log means stats are unavailable, not that recall activity was zero.
 - `sybermem index build` builds the workspace SQLite FTS5 index for cross-project search.
 - Project search defaults to lexical matching and scoring over parsed Markdown records; use the workspace index for cross-project search.
 - Optional `SYBERMEM_SEMANTIC_RECALL=1` enables a local char n-gram recall supplement for explicit search. It does not automatically inject recall into every prompt.

@@ -71,6 +71,7 @@ implements: [requirement-002]
 - phase digest 与 theme digest，用于阶段和主题级压缩
 - record 关系：`implements` / `fixes` / `related` / `superseded_by`
 - 只读续接：`/sybermem-resume` 与 `sybermem resume`
+- 记忆统计：`sybermem project memory-stats` 默认打印最近 7 天 / 30 天的终端表格，`--format json` 输出结构化统计供 `/sybermem-summary` 使用
 - 项目内检索：`/sybermem-search` 与 `sybermem search`
 - 下一步建议：`/using-sybermem` 与 `sybermem next-step`
 
@@ -108,7 +109,7 @@ SyberMem 有两类执行路径，可靠性不同：
 
 | 路径 | 代表能力 | 说明 |
 |---|---|---|
-| CLI / Core | `sybermem resume`、`search`、`next-step`、`portfolio`、`index build`、`project index build/check`、`record id`、`habit add/list/search/pause/delete/remind/inject`、`team init/summary`、`publish status`、`project uninstall` | 程序执行，可脚本化，适合确定性查询和发布流程 |
+| CLI / Core | `sybermem resume`、`search`、`next-step`、`portfolio`、`index build`、`project index build/check`、`project memory-stats`、`record id`、`habit add/list/search/pause/delete/remind/inject`、`team init/summary`、`publish status`、`project uninstall` | 程序执行，可脚本化，适合确定性查询和发布流程 |
 | Skill 编排 | `/sybermem-record`、`/sybermem-habit`、`/sybermem-link`、`/sybermem-digest`、`/sybermem-theme-digest`、`/sybermem-phase-analyze`、`/sybermem-phase-confirm` | 由 AI 按 skill 指令编辑 `.sybermem/` Markdown 或调用用户级 habit CLI，适合需要判断和整理的工作 |
 
 `sybermem record id --type <change|decision|requirement|bug>` 只生成 canonical record ID；完整 record 创建仍通过 `/sybermem-record` 完成。
@@ -204,6 +205,7 @@ claude --plugin-dir .
 ## 索引与检索
 
 - `.sybermem/INDEX.md` 是项目内派生导航文件，由 `sybermem project index build` 重建，由 `sybermem project index check` 校验。
+- `sybermem project memory-stats` 以表格展示最近 7 天 / 30 天的 record 数量、类型分布、recall events、injected/abstained 和 recall rate；`--format json` 给 skill 和自动化消费。recall 指标只来自 `.sybermem/.recall-debug.jsonl`，没有该日志表示统计不可用，不代表召回活动为 0。
 - `sybermem index build` 构建 workspace 级 SQLite FTS5 索引，服务于跨项目搜索。
 - 项目内检索默认基于已解析 Markdown records 的词法匹配和打分；需要跨项目搜索时使用 workspace index。
 - 可选的 `SYBERMEM_SEMANTIC_RECALL=1` 会启用本地 char n-gram 召回补充，用于显式检索，不会自动注入每轮提示。
