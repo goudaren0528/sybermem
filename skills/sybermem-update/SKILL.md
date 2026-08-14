@@ -7,7 +7,7 @@ description: Use when refreshing installed SyberMem skills in an existing projec
 
 **Announce at start:** "I'm using the sybermem-update skill to refresh global skills and re-check this project."
 
-Refresh the installed SyberMem skills, then re-check the current project with `/sybermem-init-project`.
+Refresh the installed SyberMem skills, then re-check the current project with the deterministic `sybermem project refresh --format json` CLI path. Fall back to `/sybermem-init-project` orchestration only when the CLI is unavailable, broken, or does not emit valid JSON.
 
 ## Quick guide (for humans)
 
@@ -16,23 +16,25 @@ Refresh the installed SyberMem skills, then re-check the current project with `/
 > and win on any conflict.
 
 **What it does:** one maintenance command — refreshes the globally installed
-SyberMem skills, then re-runs the project check so this project picks up the
-newest managed-file behavior.
+SyberMem skills, then runs the project-local refresh through Core/CLI so this
+project picks up the newest managed-file behavior quickly and deterministically.
 
 **When to run:** after upgrading SyberMem, or when the project still shows old
 `ADR/` wording or stale managed files.
 
-**What you get:** up-to-date global skills plus a project re-check that creates,
-refreshes, or migrates only the local files that actually need to change (and
-says so explicitly when nothing needs changing).
+**What you get:** up-to-date global skills plus a JSON-backed project re-check
+that creates, refreshes, or migrates only the local files that actually need to
+change (and says so explicitly when nothing needs changing). If the CLI path is
+unhealthy, the skill uses the older agent-guided `/sybermem-init-project` path
+as a recovery fallback.
 
 ## Core Invariant
 
-- **No behavior change is complete unless `/sybermem-update` can carry an existing managed project to that behavior in operational terms: by re-running the project check, classifying each relevant local managed file, and then creating, refreshing, or migrating only the files that actually need a project-local change. If the new behavior is classification-only or otherwise requires no project-local file change, the update flow must say so explicitly.**
+- **No behavior change is complete unless `/sybermem-update` can carry an existing managed project to that behavior in operational terms: by running `sybermem project refresh --format json` first, parsing its managed-file report, and then creating, refreshing, or migrating only the files that actually need a project-local change. If the CLI path is unavailable or invalid, fall back to `/sybermem-init-project`; if the new behavior is classification-only or otherwise requires no project-local file change, the update flow must say so explicitly.**
 
 <HARD-GATE>
 Do NOT declare the upgrade complete without running the managed-file propagation check.
-Do NOT skip the `/sybermem-init-project` follow-up step after updating global skills.
+Do NOT skip the project-local follow-up after updating global skills: run CLI refresh first, or run `/sybermem-init-project` only as fallback.
 Do NOT leave the old direct-hook command in `.claude/settings.json` when the launcher should have replaced it.
 </HARD-GATE>
 
@@ -66,11 +68,48 @@ Choose the update path in this order:
 
 The remote install path is also the update path for globally installed skills.
 
-### Step 2: Run `/sybermem-init-project` in the current project
+### Step 2: Run CLI-first project refresh in the current project
 
-**REQUIRED SUB-SKILL:** After the global refresh completes, run `/sybermem-init-project` in the current project.
+After the global refresh completes, resolve a SyberMem CLI command and run project refresh. Before running SyberMem CLI commands, resolve a command variable first. On Windows PowerShell, prefer `$env:USERPROFILE\.claude\sybermem\cli\sybermem.cmd` and store the chosen command in `$SyberMemCli`; on Unix, prefer `$HOME/.claude/sybermem/cli/sybermem` and store the chosen command in `"$SYBERMEM_CLI"`. If the fixed launcher is unavailable, fall back to bare `sybermem`. Do not modify persistent PATH automatically. Command examples below use `$SyberMemCli` / `"$SYBERMEM_CLI"`.
 
-That second step is responsible for:
+1. Prefer bare `sybermem`.
+2. If bare `sybermem` is unavailable, try the fixed launcher:
+   - Windows PowerShell: `$env:USERPROFILE\.claude\sybermem\cli\sybermem.cmd`
+   - macOS / Linux: `$HOME/.claude/sybermem/cli/sybermem`
+3. Run:
+
+```bash
+$SYBERMEM_CLI project refresh --format json
+```
+
+```powershell
+& $SyberMemCli project refresh --format json
+```
+
+The command is the primary project-local update path. It is responsible for:
+- classifying managed files as fresh, missing, stale, custom, or preserved
+- creating missing project-managed files from templates
+- refreshing stale SyberMem-managed hooks/templates with backups
+- inserting or replacing the marker-bounded `using-sybermem` protocol block in managed instruction files without overwriting custom content
+- surgically repairing `.claude/settings.json` SyberMem hook/env entries while preserving unrelated custom hooks, env, and instructions
+- creating `.sybermem/project.yaml` when missing
+- emitting valid JSON with `overall`, `files`, `actions_needed`, `actions_applied`, `actions_skipped`, and `preserved_custom`
+
+If the CLI exits successfully and emits valid JSON, summarize that JSON and **do not** run `/sybermem-init-project`. The project-local refresh is complete when the report is `fresh` or `updated` and any applied/skipped/preserved actions are reported to the user.
+
+### Step 3: Fall back only when CLI refresh is unavailable or invalid
+
+**REQUIRED FALLBACK SUB-SKILL:** Run `/sybermem-init-project` only if the CLI path is unusable.
+
+Fallback triggers are limited to:
+- bare `sybermem` and the fixed launcher are both missing or not executable
+- `sybermem project refresh --format json` exits nonzero
+- stdout is empty, non-JSON, or missing the required report keys
+- CLI refresh is missing, broken, or emits invalid JSON
+
+Do not fall back merely because the CLI report says it changed files or preserved custom files. Those are successful outcomes.
+
+The fallback step is responsible for the same managed-file propagation semantics when Core/CLI cannot run:
 - migrating legacy `ADR/` to `.sybermem/`
 - checking whether local `AGENTS.md` / `CLAUDE.md` are stale, including pre-digest SyberMem-managed files that still need the digest-aware guidance refresh
 - enabling digest support by creating `.sybermem/digests/`, creating the digest template, and inserting the `Phase Digests` section when missing
@@ -90,7 +129,7 @@ That second step is responsible for:
 
 The protocol block gives automatic session-entry guidance; the visible `/using-sybermem` skill gives a manual diagnostic entrypoint.
 
-Every new managed behavior introduced by SyberMem must explicitly say whether `/sybermem-update` changes any project-local files at all. If it does, name the exact files that are created, refreshed, or migrated. If it does not, say that the behavior is classification-only or otherwise has no project-local file action.
+Every new managed behavior introduced by SyberMem must explicitly say whether `sybermem project refresh --format json` changes any project-local files at all. If it does, name the exact files that are created, refreshed, or migrated. If it does not, say that the behavior is classification-only or otherwise has no project-local file action. Update `docs/feature_map.md` in the same feature change when platform support claims change.
 
 ### Managed-file propagation check
 
@@ -107,8 +146,9 @@ Before declaring an upgrade complete, verify for the current project:
 
 If you catch yourself doing any of these, STOP:
 
-- Declaring the upgrade complete without running the managed-file propagation check
-- Skipping the `/sybermem-init-project` follow-up step after updating global skills
+- Declaring the upgrade complete without running `sybermem project refresh --format json` or the documented fallback
+- Skipping the project-local follow-up step after updating global skills
+- Running `/sybermem-init-project` even though CLI refresh succeeded with valid JSON
 - Leaving the old direct-hook command in `.claude/settings.json` when the launcher should have replaced it
 - Claiming a behavior change is shipped when project-local files have not been created or refreshed
 
@@ -118,22 +158,23 @@ If you catch yourself doing any of these, STOP:
 
 | Excuse | Reality |
 |--------|---------|
-| "Global skills updated, so the project is updated too" | Project-local files (hooks, settings.json, CLAUDE.md) don't update automatically. Run init-project. |
-| "The init-project step is redundant, nothing changed" | New features may add new managed files. The fast-path check handles this in seconds. |
+| "Global skills updated, so the project is updated too" | Project-local files (hooks, settings.json, CLAUDE.md) don't update automatically. Run CLI refresh. |
+| "CLI refresh changed files, so I should also run init-project" | Changed files are a successful CLI outcome. Fall back only for missing/broken/non-JSON CLI failures. |
 | "I already ran update last week" | Skills may have been updated since then. Each update is idempotent and fast with the health check. |
 
 ## Terminal State
 
 This skill is complete when:
 - global skills have been refreshed
-- the `/sybermem-init-project` follow-up has run on the current project
+- `sybermem project refresh --format json` succeeded with valid JSON, or `/sybermem-init-project` fallback ran because CLI refresh was unavailable or invalid
 - all managed files are classified, created, refreshed, or preserved as appropriate
 - the user has been told what was updated
 
 ## Safety Rules
 
 - Do not silently overwrite custom project instruction files.
-- Do not skip the `/sybermem-init-project` follow-up step.
+- Do not skip the project-local follow-up step.
+- Do not use agent orchestration when CLI refresh succeeded with valid JSON.
 - If the update command fails, stop and report the failure instead of pretending the project was refreshed.
 - Do not silently enable digest support by overwriting user-owned files; only create missing digest capability structure.
 - Do not rewrite unrelated custom settings; only surgically replace recognized old SyberMem Stop hook commands.
@@ -142,8 +183,8 @@ This skill is complete when:
 
 ## Integration
 
-**Required sub-skills:**
-- **sybermem-init-project** — Called in Step 2 for project-level managed-file propagation
+**Fallback sub-skills:**
+- **sybermem-init-project** — Called only when CLI-first project refresh is missing, broken, or emits invalid JSON
 
 **Related skills:**
 - **sybermem-record** — Available after update
