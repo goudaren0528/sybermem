@@ -7,6 +7,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from sybermem_core import next_step_router
 from sybermem_core.next_step_router import recommend_next_step
 from sybermem_core import memory_stats as memory_stats_module
+from sybermem_core.memory_stats import recall_health
 from sybermem_core.status import project_memory_stats, project_status
 
 
@@ -258,3 +259,75 @@ def test_project_memory_stats_marks_recall_unavailable_without_debug_log(tmp_pat
     assert stats["windows"]["7d"]["recall"]["events"] == 0
     assert stats["windows"]["7d"]["recall"]["recall_rate"] is None
     assert stats["windows"]["30d"]["recall"]["status"] == "no_log"
+    assert stats["recall_health"]["status"] == "no_log"
+
+
+def _make_recall_health_project(tmp_path: Path, lines: list[str], monkeypatch) -> Path:
+    project_root = tmp_path / "project"
+    sybermem = project_root / ".sybermem"
+    sybermem.mkdir(parents=True)
+    (sybermem / "project.yaml").write_text("project_id: project-1\nslug: demo\n", encoding="utf-8")
+    monkeypatch.setattr(memory_stats_module, "now_iso", lambda: "2026-08-14T12:00:00+08:00")
+    if lines:
+        (sybermem / ".recall-debug.jsonl").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return project_root
+
+
+def test_recall_health_reports_no_log_when_debug_log_missing(tmp_path: Path, monkeypatch) -> None:
+    # Given: a project with no recall debug log
+    project_root = _make_recall_health_project(tmp_path, [], monkeypatch)
+
+    # When: recall health is derived
+    health = recall_health(project_root)
+
+    # Then: it is explicitly unavailable, not a zero-rate claim
+    assert health["status"] == "no_log"
+    assert health["hint"]
+
+
+def test_recall_health_reports_no_activity_when_no_recent_events(tmp_path: Path, monkeypatch) -> None:
+    # Given: a debug log whose only entry is far outside the 30d window
+    lines = [json.dumps({"timestamp": "2026-05-01T09:00:00+08:00", "event": "inject", "record_ids": ["change-a"], "match_classes": ["topic"], "reason": "high-signal-recall"})]
+    project_root = _make_recall_health_project(tmp_path, lines, monkeypatch)
+
+    # When: recall health is derived
+    health = recall_health(project_root)
+
+    # Then: no recent activity is distinguished from a low-signal problem
+    assert health["status"] == "no_activity"
+    assert health["hint"]
+
+
+def test_recall_health_reports_healthy_when_recent_injection_rate_is_strong(tmp_path: Path, monkeypatch) -> None:
+    # Given: recent windows with mostly successful injections
+    lines = [
+        json.dumps({"timestamp": "2026-08-13T09:00:00+08:00", "event": "inject", "record_ids": ["change-a"], "match_classes": ["topic"], "reason": "high-signal-recall"}),
+        json.dumps({"timestamp": "2026-08-12T09:00:00+08:00", "event": "inject", "record_ids": ["decision-b"], "match_classes": ["record-id"], "reason": "high-signal-recall"}),
+        json.dumps({"timestamp": "2026-08-11T09:00:00+08:00", "event": "abstain", "record_ids": [], "match_classes": [], "reason": "no candidate records matched the prompt"}),
+    ]
+    project_root = _make_recall_health_project(tmp_path, lines, monkeypatch)
+
+    # When: recall health is derived
+    health = recall_health(project_root)
+
+    # Then: a strong recent injection rate is healthy
+    assert health["status"] == "healthy"
+
+
+def test_recall_health_reports_low_signal_when_abstains_dominate_recent_window(tmp_path: Path, monkeypatch) -> None:
+    # Given: recent windows dominated by low-signal abstentions (0/5 injected in 7d)
+    lines = [
+        json.dumps({"timestamp": "2026-08-14T09:00:00+08:00", "event": "abstain", "record_ids": [], "match_classes": [], "reason": "matched rows were keyword-only and below the high-signal floor"}),
+        json.dumps({"timestamp": "2026-08-13T09:00:00+08:00", "event": "abstain", "record_ids": [], "match_classes": [], "reason": "matches did not cross compact recall reliability threshold"}),
+        json.dumps({"timestamp": "2026-08-12T09:00:00+08:00", "event": "abstain", "record_ids": [], "match_classes": [], "reason": "matched rows were keyword-only and below the high-signal floor"}),
+        json.dumps({"timestamp": "2026-08-11T09:00:00+08:00", "event": "abstain", "record_ids": [], "match_classes": [], "reason": "no candidate records matched the prompt"}),
+        json.dumps({"timestamp": "2026-08-10T09:00:00+08:00", "event": "abstain", "record_ids": [], "match_classes": [], "reason": "matched rows were keyword-only and below the high-signal floor"}),
+    ]
+    project_root = _make_recall_health_project(tmp_path, lines, monkeypatch)
+
+    # When: recall health is derived
+    health = recall_health(project_root)
+
+    # Then: the low injection rate is flagged as low_signal with an actionable hint
+    assert health["status"] == "low_signal"
+    assert health["hint"]
