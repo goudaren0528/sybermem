@@ -26,6 +26,11 @@ EnumValue = TypeVar("EnumValue", bound=Enum)
 HABIT_DIR: Final = "user-habits"
 HABITS_FILE: Final = "habits.jsonl"
 INJECTION_LOG_FILE: Final = "injection-log.jsonl"
+# Candidate-only intent capture. Lives at the user-level SyberMem home (next to
+# user-habits/), never in a project's .sybermem/, because habits are user-scoped
+# and must not pollute project memory. Capturing writes a candidate for the user
+# to confirm via /sybermem-habit; it NEVER creates an active habit on its own.
+HABIT_INTENT_FILE: Final = ".habit-intent.json"
 MAX_INJECTED_HABITS: Final = 3
 MAX_LOG_EVENTS: Final = 200
 MAX_STATEMENT_CHARS: Final = 300
@@ -40,6 +45,22 @@ HABIT_INTENT_TERMS: Final = {
     "习惯",
     "记住",
 }
+# Map an intent phrase to a habit_type so the captured candidate is pre-classified.
+HABIT_TYPE_HINTS: Final = (
+    ("review", ("review", "pr", "评审", "审查", "代码审查")),
+    ("tooling", ("tool", "cli", "command", "工具", "命令", "脚本")),
+    ("communication", ("reply", "message", "language", "沟通", "回复", "语言", "中文", "english")),
+    ("style", ("style", "format", "naming", "风格", "格式", "命名", "缩进")),
+    ("avoidance", ("never", "avoid", "don't", "do not", "不要", "禁止", "避免")),
+)
+# Never persist secrets or prompt-injection control text as a habit candidate.
+# Mirrors the OpenCode record-intent guard so capture stays privacy-safe.
+_BLOCKED_INTENT_RE: Final = re.compile(
+    r"(password\s*=|token\s*=|secret\s*=|bearer\s+[a-z0-9._-]+|api[_ -]?key\s*=|"
+    r"begin\s+(?:rsa\s+)?private\s+key|ignore\s+(?:all\s+)?previous|system\s+prompt|"
+    r"developer\s+message|</?(?:system|developer|tool)[^>]*>)",
+    re.IGNORECASE,
+)
 
 
 def user_habit_home() -> Path:
@@ -347,3 +368,109 @@ def _score_habit(habit: Habit, terms: set[str]) -> int:
 
 def _now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+
+def _habit_intent_path() -> Path:
+    # One level above user-habits/ so it sits at the SyberMem user home root.
+    return user_habit_home().parent / HABIT_INTENT_FILE
+
+
+def _classify_habit_type(text: str) -> str:
+    terms = _terms(text)
+    lowered = text.lower()
+    for habit_type, hints in HABIT_TYPE_HINTS:
+        for hint in hints:
+            # ASCII single-word hints match a tokenized term; multi-word and CJK
+            # hints match as a substring (CJK has no term boundaries under _terms).
+            if hint in terms or (not hint.isascii() and hint in lowered) or (" " in hint and hint in lowered):
+                return habit_type
+    return "workflow"
+
+
+def classify_habit_intent(text: str) -> dict | None:
+    """Return a candidate-only habit-intent classification, or None.
+
+    A match means the prompt LOOKS like a durable personal preference worth
+    remembering. It is deliberately candidate-only: the returned metadata never
+    contains an active habit and callers must not auto-create one. Blocked
+    (secret / injection) text is never classified.
+    """
+    if not text or _BLOCKED_INTENT_RE.search(text):
+        return None
+    if not _looks_like_habit_intent(text):
+        return None
+    return {
+        "habit_intent": True,
+        "candidate_only": True,
+        "action": "/sybermem-habit",
+        "habit_type": _classify_habit_type(text),
+        "reason": "prompt looks like a reusable user preference",
+        "created_at": _now(),
+    }
+
+
+def capture_habit_intent(text: str) -> dict | None:
+    """Persist a candidate-only habit intent to the user-level intent file.
+
+    Writes ~/.sybermem/.habit-intent.json (or SYBERMEM_HOME/.habit-intent.json).
+    Never creates an active habit. Returns the candidate metadata on capture,
+    or None when the prompt does not look like a durable preference. Fail-open:
+    a write error yields None rather than raising into the caller's hot path.
+    """
+    metadata = classify_habit_intent(text)
+    if metadata is None:
+        return None
+    try:
+        path = _habit_intent_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(metadata, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    except OSError:
+        return None
+    return metadata
+
+
+def read_habit_intent() -> dict | None:
+    """Read the pending candidate habit intent, or None if absent/malformed."""
+    path = _habit_intent_path()
+    if not path.is_file():
+        return None
+    try:
+        parsed = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None
+    return parsed if isinstance(parsed, dict) else None
+
+
+def clear_habit_intent() -> bool:
+    """Delete the pending candidate intent file after it has been acted on."""
+    path = _habit_intent_path()
+    try:
+        if path.is_file():
+            path.unlink()
+            return True
+    except OSError:
+        return False
+    return False
+
+
+def habit_awareness_summary() -> dict:
+    """Return a bounded, privacy-safe snapshot of user-habit state for hosts.
+
+    Surfaces habit presence in awareness surfaces (startup context, memory
+    stats, resume) WITHOUT exposing statements on the hot path: only counts, a
+    type distribution, the most recent confirmation date, and whether a
+    candidate intent is pending.
+    """
+    active = list_habits(status=HabitStatus.ACTIVE)
+    by_type: dict[str, int] = {}
+    latest_confirmed = ""
+    for habit in active:
+        by_type[habit.habit_type.value] = by_type.get(habit.habit_type.value, 0) + 1
+        if habit.last_confirmed_at > latest_confirmed:
+            latest_confirmed = habit.last_confirmed_at
+    return {
+        "active": len(active),
+        "by_type": dict(sorted(by_type.items())),
+        "latest_confirmed_at": latest_confirmed,
+        "pending_intent": read_habit_intent() is not None,
+    }

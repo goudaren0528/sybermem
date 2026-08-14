@@ -126,6 +126,42 @@ def test_cli_habit_remind_suggests_visible_skill_without_creating_habit(tmp_path
     assert listed["habits"] == []
 
 
+def test_cli_habit_intent_captures_candidate_and_status_and_clear(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    # Given: a clean user habit home
+    monkeypatch.setenv("SYBERMEM_HOME", str(tmp_path))
+
+    # When: a preference-shaped prompt is passed to habit intent
+    assert run_cli(["habit", "intent", "--prompt", "以后都用中文回复我", "--format", "json"], monkeypatch) == 0
+    captured = json.loads(capsys.readouterr().out)
+    assert run_cli(["habit", "intent-status", "--format", "json"], monkeypatch) == 0
+    status = json.loads(capsys.readouterr().out)
+    assert run_cli(["habit", "list", "--all", "--format", "json"], monkeypatch) == 0
+    listed = json.loads(capsys.readouterr().out)
+
+    # Then: a candidate is captured and visible, but NO habit is created
+    assert captured["captured"] is True
+    assert captured["candidate"]["candidate_only"] is True
+    assert status["pending"] is True
+    assert listed["habits"] == []
+
+    # When: the candidate is cleared
+    assert run_cli(["habit", "intent-clear", "--format", "json"], monkeypatch) == 0
+    cleared = json.loads(capsys.readouterr().out)
+    assert run_cli(["habit", "intent-status", "--format", "json"], monkeypatch) == 0
+    status_after = json.loads(capsys.readouterr().out)
+
+    # Then: the pending candidate is gone
+    assert cleared["cleared"] is True
+    assert status_after["pending"] is False
+
+
+def test_cli_habit_intent_ignores_non_preference_prompt(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    monkeypatch.setenv("SYBERMEM_HOME", str(tmp_path))
+    assert run_cli(["habit", "intent", "--prompt", "fix the crash", "--format", "json"], monkeypatch) == 0
+    captured = json.loads(capsys.readouterr().out)
+    assert captured == {"captured": False, "candidate": None}
+
+
 def test_cli_habit_pause_unknown_id_returns_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
     # Given: an empty habit store
     monkeypatch.setenv("SYBERMEM_HOME", str(tmp_path))
