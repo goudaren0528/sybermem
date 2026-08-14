@@ -114,6 +114,10 @@ templates, or instruction files inside the project. Older users should re-run
 the global install or update first to get the new bundled OpenCode plugin
 (`~/.config/opencode/plugins/sybermem.ts`) with prompt-time record-intent and
 recall debug support, then run `/sybermem-update` so project-managed files stay fresh.
+`/sybermem-update` now uses the deterministic `sybermem project refresh --format json`
+CLI path first for project-local files. It falls back to agent-orchestrated
+`/sybermem-init-project` only when the CLI is missing, exits nonzero, or emits
+invalid JSON.
 
 Project initialization still uses `/sybermem-init-project`.
 
@@ -128,7 +132,7 @@ refresh delivers regardless of project-local Claude hooks.
 Use this workflow:
 
 1. run the global install or global update first
-2. run `/sybermem-update` inside an existing project
+2. run `/sybermem-update` inside an existing project; it should report the CLI refresh JSON summary when the CLI is healthy
 3. run `/sybermem-init-project` when initialization is still missing
 
 The OpenCode plugin does not replace project `.sybermem/` files. It complements the project-managed `.sybermem/`, `AGENTS.md`, and `.claude/settings.json` setup.

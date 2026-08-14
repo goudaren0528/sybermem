@@ -85,6 +85,10 @@ Those project-local skills create or refresh `.sybermem/`, `AGENTS.md`, and the
 shared project instructions that are useful to Codex agents. `AGENTS.md` is the
 main cross-agent utility file for Codex because it exposes the SyberMem session
 protocol and project-local guidance without requiring a Codex-specific runtime.
+`/sybermem-update` prefers the deterministic `sybermem project refresh --format json`
+CLI path for this project-local refresh. It falls back to agent-orchestrated
+`/sybermem-init-project` only when the CLI is missing, exits nonzero, or emits
+invalid JSON.
 
 ## Hook-backed and manual context workflow
 
@@ -125,7 +129,9 @@ Test-Path "$env:USERPROFILE\.agents\skills\sybermem-record"
 ```
 
 Then run `/sybermem-init-project` or `/sybermem-update` in a target project. A
-successful project setup creates or refreshes `.sybermem/` and `AGENTS.md`.
+successful project setup creates or refreshes `.sybermem/` and `AGENTS.md`; a
+healthy `/sybermem-update` reports the `sybermem project refresh --format json`
+summary rather than performing a slow file-by-file agent refresh.
 
 Verify the Codex managed hooks too:
 
@@ -183,7 +189,7 @@ For an installed user environment, verify both layers:
 - **Codex sees stale project guidance after a global refresh**
   Run `/sybermem-update` inside the project. Global refresh updates user-level
   skills and runtime files; project-local `.sybermem/` and `AGENTS.md` refresh
-  only when the project update skill runs.
+  only when the project update skill runs the CLI-first project refresh.
 - **Codex startup context or prompt context never appears after an upgrade**
   Re-run the global installer or updater so `~/.codex/hooks/sybermem_user_prompt.py`,
   `~/.codex/hooks/sybermem_session_start.py`, `~/.codex/hooks/sybermem_stop.py`,
