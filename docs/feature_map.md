@@ -1,6 +1,6 @@
 # SyberMem Feature Map
 
-Last updated: 2026-08-14
+Last updated: 2026-08-15
 
 This is the source-of-truth feature map for SyberMem project capabilities and
 platform support claims. Public READMEs and platform install docs should stay
@@ -41,6 +41,8 @@ consistent with this file.
 | Prompt-time recall markers | Full: `⭐` important and `💡` ordinary recall hints | Full: same markers injected on qualifying prompts | Full for qualifying Codex recall output: same shared CLI recall markdown | Unsupported | Unsupported | Unsupported |
 | Prompt-time recall observability log | Full where Claude prompt hook logs recall injection/abstention | Full on OpenCode seam: `.sybermem/.recall-debug.jsonl` appends bounded inject/abstain metadata without prompt text | Unsupported | Unsupported | Unsupported | Unsupported |
 | Recall-health self-feedback | Manual via `sybermem project memory-stats` | Full: `session.idle` surfaces a throttled advisory when recent recall is `low_signal`, derived from the same `recall_health` verdict | Manual via `sybermem project memory-stats` | Manual only | Manual only | Manual only |
+| Edit-aware auto-trail signals | Unsupported | Full on OpenCode seam: `file.edited` / `todo.updated` / `tool.execute.after` accumulate per-session edit focus, todo-batch completion, and test/build signals so record nudges carry a semantic `trigger_reason` instead of raw file counts | Unsupported | Unsupported | Unsupported | Unsupported |
+| Recall relevance feedback | Manual via `sybermem project memory-stats` precision | Full on OpenCode seam: `session.idle` flushes a bounded `.recall-outcomes.jsonl` measuring whether injected records' `related_files` were edited, feeding a precision-backed `low_relevance` verdict distinct from `low_signal` | Manual via `sybermem project memory-stats` precision | Manual only | Manual only | Manual only |
 | In-session injection visibility | N/A (Claude injects into visible `UserPromptSubmit` context) | Full on OpenCode seam: throttled `⭐` toast on successful recall/habit injection at `experimental.chat.system.transform` time; `💡` toast when a prompt looks like a reusable preference but no habit matched (`habit_preference_candidate`) | N/A | Unsupported | Unsupported | Unsupported |
 | Prompt-time User Habit Memory reminder | Full: managed `UserPromptSubmit` hook | Full on OpenCode seam: same chat transform path as recall | Partial runtime: composed into the same managed `UserPromptSubmit` `additionalContext` packet as recall | Unsupported | Unsupported | Unsupported |
 | Prompt-time record-intent capture | Full: `UserPromptSubmit` captures explicit record intent into `.record-intent.json` | Full on OpenCode seam: `chat.message` writes bounded classifier metadata to `.sybermem/.record-intent.json` for explicit write classifications | Partial runtime: managed `UserPromptSubmit` writes bounded classifier metadata to `.sybermem/.record-intent.json` for explicit write classifications | Unsupported | Unsupported | Unsupported |
@@ -61,7 +63,8 @@ consistent with this file.
 | Derived Project Index | Full | `sybermem project index build`, `sybermem project index check` | `.sybermem/INDEX.md` is generated from canonical records and can be mechanically checked. |
 | Phase Index | Full | `sybermem project phase analyze`, `sybermem project phase confirm --from-json`, `/sybermem-phase-analyze`, `/sybermem-phase-confirm` | CLI-first deterministic phase persistence: `phase analyze` groups records and atomically writes confirmed phases + coverage map + `status: analyzed` to `.sybermem/analysis/phase-index.md`, so analysis is never silently lost. `phase confirm --from-json` persists an agent-provided semantic grouping after validating record coverage. This is the one Project-memory capability that DOES change a project-local file (`phase-index.md`); the skills fall back to agent orchestration only when the CLI is missing, broken, or emits invalid JSON. |
 | Project Refresh | Full | `sybermem project refresh --format json`, `/sybermem-update` | Deterministic project-local managed-file propagation for `.sybermem/`, hooks, templates, instruction protocol blocks, `.claude/settings.json`, and `project.yaml`; `/sybermem-update` falls back to agent orchestration only when CLI refresh is unavailable or invalid. |
-| Project Memory Stats | Full | `sybermem project memory-stats`, `sybermem project memory-stats --format json`, `/sybermem-summary` | Deterministic 7d/30d memory and recall observability plus a `recall_health` verdict (`healthy`/`low_signal`/`no_activity`/`no_log`). Text mode prints terminal tables and a recall-health line; JSON mode feeds `/sybermem-summary` and host advisories. Recall metrics are backed only by `.sybermem/.recall-debug.jsonl`; no-log means unavailable, not zero recall activity. |
+| Project Memory Stats | Full | `sybermem project memory-stats`, `sybermem project memory-stats --format json`, `/sybermem-summary` | Deterministic 7d/30d memory and recall observability plus a `recall_health` verdict (`healthy`/`low_signal`/`low_relevance`/`no_activity`/`no_log`) with a `precision` measure. Text mode prints terminal tables (including a recall precision column) and a recall-health line; JSON mode feeds `/sybermem-summary` and host advisories. Recall frequency is backed by `.sybermem/.recall-debug.jsonl` and recall precision by `.sybermem/.recall-outcomes.jsonl`; a missing log means unavailable, not zero activity. |
+| Recall Relevance | Full | `sybermem project record-files`, `.sybermem/.recall-outcomes.jsonl`, OpenCode `file.edited`/`todo.updated`/`tool.execute.after` | Edit-aware relevance: injected records whose declared `related_files` were edited count as hits; precision below a floor (with a minimum sample size) yields a `low_relevance` verdict distinct from frequency-based `low_signal`. Records without a `related_files` anchor are excluded from the denominator rather than counted as misses. |
 | Resume | Full | `/sybermem-resume`, `sybermem resume --mode fast|standard|deep` | Read-only restart brief with phase, progress, risks, confidence, freshness, and next action. |
 | Search | Full | `/sybermem-search`, `sybermem search` | Supports project/workspace search, record-id/topic/keyword/relation matching, successor guidance, conflict notes, and stale-index warnings. |
 | High-signal Recall | Full | Claude `UserPromptSubmit`, OpenCode `chat.message`/transform, Codex `UserPromptSubmit`, `sybermem context recall` | Automatic only on Claude/OpenCode/Codex supported prompt seams. Uses stricter gate than explicit search. |
@@ -81,7 +84,9 @@ consistent with this file.
 | Plugin | Full | `~/.config/opencode/plugins/sybermem.ts` | Refreshed by global install/update. |
 | Project update | Full | `/sybermem-update` -> `sybermem project refresh --format json` | CLI-first project-local refresh; falls back to `/sybermem-init-project` only if CLI refresh is missing, broken, or non-JSON. |
 | Session-start context | Full model-visible | `session.created` + `experimental.chat.system.transform` | `session.created` toasts loaded conclusions and stashes a one-shot startup packet (key conclusions, phase, stale/digest heads-up, next-step) that the first system transform prepends. Habits are excluded from the startup packet because the same first prompt already triggers prompt-time habit injection. Hidden auto-resume is still unsupported. |
-| Idle nudge | Full | `session.idle` | Mirrors Claude Stop follow-up thresholds using OpenCode lifecycle seam; also emits a throttled recall-health advisory when recent recall is `low_signal`. |
+| Idle nudge | Full | `session.idle` | Mirrors Claude Stop follow-up thresholds using OpenCode lifecycle seam; also emits a throttled recall-health advisory when recent recall is `low_signal`. Record nudges now carry a semantic `trigger_reason` (tests passed / todo batch done / edit focus) derived from edit-aware signals, falling back to the existing file-count heuristic. |
+| Edit-aware activity signals | Full | `file.edited`, `todo.updated`, `tool.execute.after` | Per-session in-memory accumulation of edit frequency (edit focus), completed todo batches, and passing-test/clean-build signals. Events only mutate in-memory state; the computation and disk write happen at `session.idle`. No hidden background worker. Payload shapes are read defensively and any missing field degrades to "no signal". |
+| Recall relevance feedback | Full | `session.idle` -> `sybermem project record-files` -> `.sybermem/.recall-outcomes.jsonl` | Injected records this session are matched against edited files via their declared `related_files`; a bounded per-session outcome (injected / hit / precision / hit+miss ids) is appended, feeding the precision-backed `low_relevance` verdict. Fail-open and prompt-text-free. |
 | Prompt-time project recall | Full | `chat.message` -> `sybermem context recall` -> `experimental.chat.system.transform` | Same-turn system prompt injection; only high-signal recall qualifies. |
 | Prompt-time habit reminder | Full | `chat.message` -> `sybermem context habit --delivery prompt-time` -> system transform | Bounded, fail-open, active/high-confidence/directly relevant/prompt-ok habits only. |
 | Compaction carry-forward | Full | `experimental.session.compacting` | Includes session context, phase/status, digest heads-up, next-step, and compaction habit inject. |
@@ -102,14 +107,17 @@ compaction context.
 
 Next OpenCode candidates, in priority order:
 
-1. Explore `file.edited`, `todo.updated`, and `tool.execute.after` as inputs to a
-   richer auto-trail, without creating hidden background workers.
-2. Feed recall-hit outcomes (were injected records actually edited?) back into the
-   recall-health signal for a stronger relevance measure.
+1. Broaden edit-aware signals beyond git-diff trails (e.g. `file.edited` sequence
+   ordering) to pre-fill richer auto-trail entries, still without hidden workers.
+2. Use accumulated recall-precision history to auto-tune the high-signal recall
+   gate, deprioritizing record types that are consistently injected but never edited.
 
 Recently shipped: model-visible first-turn startup context via `session.created` +
-`experimental.chat.system.transform`, and a `session.idle` recall-health advisory
-derived from `sybermem project memory-stats` `recall_health`.
+`experimental.chat.system.transform`; a `session.idle` recall-health advisory
+derived from `sybermem project memory-stats` `recall_health`; edit-aware auto-trail
+signals (`file.edited` / `todo.updated` / `tool.execute.after`) that give record
+nudges a semantic `trigger_reason`; and an edit-aware recall relevance feedback loop
+(`.sybermem/.recall-outcomes.jsonl` + precision-backed `low_relevance`).
 
 ## Codex Detail
 
