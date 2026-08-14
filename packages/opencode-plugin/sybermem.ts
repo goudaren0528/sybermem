@@ -17,6 +17,19 @@ var COMMIT_GAP_THRESHOLD = 5;
 var THEME_WINDOW_SIZE = 10;
 var DIGEST_CLUSTER_THRESHOLD = 2;
 var DIGEST_SIGNAL_FILE_FLOOR = 3;
+function activityTriggerReason(activity) {
+  if (!activity)
+    return null;
+  if (activity.toolSignal === "tests_passed")
+    return "tests_passed";
+  if (activity.toolSignal === "build_ok")
+    return "build_ok";
+  if (activity.todoCompletedBatches > 0)
+    return "todo_batch_done";
+  if (activity.editFocus)
+    return "edit_focus";
+  return null;
+}
 async function getChangedFiles($, cwd) {
   const files = new Set;
   try {
@@ -48,7 +61,7 @@ function detectHighLevelAreas(files) {
 function slugifyAreas(areas) {
   return [...areas].sort().join("-") || "misc";
 }
-function classifyFollowup(files, commitsSinceRecord, state) {
+function classifyFollowup(files, commitsSinceRecord, state, activity) {
   const highSignal = files.filter(matchesHighSignal);
   const areas = detectHighLevelAreas(files);
   const themeKey = slugifyAreas(areas);
@@ -56,14 +69,30 @@ function classifyFollowup(files, commitsSinceRecord, state) {
   const presentQualifies = highSignal.length > 0 || areas.size >= 2 || files.length >= DIGEST_SIGNAL_FILE_FLOOR;
   const nudgedAt = state.digest_nudged_at_window_len?.[themeKey];
   if (recentStops.length >= DIGEST_CLUSTER_THRESHOLD && presentQualifies && !(nudgedAt !== undefined && recentStops.length <= nudgedAt)) {
-    return { type: "digest", themeKey, message: "SyberMem: recent records around this area may now be enough for a /sybermem-digest if this phase has reached a stable stopping point." };
+    return { type: "digest", themeKey, message: "SyberMem: recent records around this area may now be enough for a /sybermem-digest if this phase has reached a stable stopping point.", triggerReason: "digest_cluster" };
   }
-  const shouldRecord = highSignal.length > 0 || areas.size >= 2 || files.length >= RECORD_FILE_THRESHOLD || commitsSinceRecord >= COMMIT_GAP_THRESHOLD;
+  const activityReason = activityTriggerReason(activity);
+  const shouldRecord = activityReason !== null || highSignal.length > 0 || areas.size >= 2 || files.length >= RECORD_FILE_THRESHOLD || commitsSinceRecord >= COMMIT_GAP_THRESHOLD;
   if (shouldRecord && !(state.last_nudge_type === "record" && state.last_theme === themeKey)) {
     const gapNote = commitsSinceRecord >= COMMIT_GAP_THRESHOLD ? ` (${commitsSinceRecord} commits since last record)` : "";
-    return { type: "record", themeKey, message: `SyberMem: this change looks important enough for a manual /sybermem-record so the reason and impact are preserved.${gapNote}` };
+    const reason = activityReason ?? (highSignal.length > 0 || areas.size >= 2 ? "high_signal_files" : commitsSinceRecord >= COMMIT_GAP_THRESHOLD ? "commit_gap" : "file_count");
+    const stopNote = describeActivity(activity, activityReason);
+    return { type: "record", themeKey, message: `SyberMem: this change looks important enough for a manual /sybermem-record so the reason and impact are preserved.${stopNote}${gapNote}`, triggerReason: reason };
   }
-  return { type: "none", themeKey, message: null };
+  return { type: "none", themeKey, message: null, triggerReason: "none" };
+}
+function describeActivity(activity, reason) {
+  if (!activity || reason === null)
+    return "";
+  if (reason === "tests_passed")
+    return " (tests passed this session)";
+  if (reason === "build_ok")
+    return " (build succeeded this session)";
+  if (reason === "todo_batch_done")
+    return " (a batch of tasks just completed)";
+  if (reason === "edit_focus" && activity.editFocus)
+    return ` (focused edits on ${activity.editFocus})`;
+  return "";
 }
 async function countCommitsSinceLastRecord($, root) {
   try {
@@ -184,6 +213,10 @@ async function digestStatusText($, root) {
 async function memoryStatsText($, root) {
   const sybermem = resolveSybermemCommand();
   return $`${sybermem} project memory-stats --format json`.cwd(root).nothrow().text();
+}
+async function recordFilesText($, root, ids) {
+  const sybermem = resolveSybermemCommand();
+  return $`${sybermem} project record-files --ids ${ids} --format json`.cwd(root).nothrow().text();
 }
 
 // packages/opencode-plugin/src/project_state.ts
@@ -713,6 +746,170 @@ function lowSignalRecallToast(health) {
   return `\uD83D\uDCA1 SyberMem: recall quality is low${hint}`;
 }
 
+// packages/opencode-plugin/src/session_activity.ts
+var RECORD_ID_RE2 = /\b(?:change|decision|requirement|bug|digest)-[a-z0-9-]+\b/gi;
+var SKIP_PREFIXES2 = [".git/", ".sybermem/", "ADR/", ".claude/", ".opencode/", "node_modules/"];
+var SESSIONS = new Map;
+function freshActivity() {
+  return { editedFiles: new Map, todoCompletedBatches: 0, lastToolSignal: null, injectedRecords: new Set };
+}
+function getSessionActivity(sessionID) {
+  let activity = SESSIONS.get(sessionID);
+  if (!activity) {
+    activity = freshActivity();
+    SESSIONS.set(sessionID, activity);
+  }
+  return activity;
+}
+function resetSessionActivity(sessionID) {
+  SESSIONS.delete(sessionID);
+}
+function normalizePath(raw) {
+  return raw.trim().replace(/\\/g, "/");
+}
+function isTracked(file) {
+  return file.length > 0 && !SKIP_PREFIXES2.some((p) => file.startsWith(p));
+}
+function readString(source, keys) {
+  if (typeof source !== "object" || source === null)
+    return "";
+  for (const key of keys) {
+    const value = Reflect.get(source, key);
+    if (typeof value === "string" && value)
+      return value;
+  }
+  return "";
+}
+function extractEditedFile(properties) {
+  const raw = readString(properties, ["file", "path", "filePath", "filename"]);
+  return raw ? normalizePath(raw) : "";
+}
+function recordEditedFile(sessionID, file) {
+  const normalized = normalizePath(file);
+  if (!isTracked(normalized))
+    return;
+  const activity = getSessionActivity(sessionID);
+  activity.editedFiles.set(normalized, (activity.editedFiles.get(normalized) ?? 0) + 1);
+}
+function isTodoBatchComplete(properties) {
+  if (typeof properties !== "object" || properties === null)
+    return false;
+  const todos = Reflect.get(properties, "todos") ?? Reflect.get(properties, "items");
+  if (!Array.isArray(todos) || todos.length === 0)
+    return false;
+  return todos.every((item) => {
+    const status = readString(item, ["status", "state"]).toLowerCase();
+    return status === "completed" || status === "done";
+  });
+}
+function recordTodoUpdate(sessionID, properties) {
+  if (isTodoBatchComplete(properties))
+    getSessionActivity(sessionID).todoCompletedBatches += 1;
+}
+function classifyToolSignal(input, output) {
+  const tool = readString(input, ["tool"]);
+  if (tool !== "bash")
+    return null;
+  const args = Reflect.get(input, "args");
+  const command = readString(args, ["command"]).toLowerCase();
+  if (!command)
+    return null;
+  const exit = Reflect.get(output, "exit") ?? Reflect.get(output, "exitCode") ?? Reflect.get(output, "code");
+  if (typeof exit === "number" && exit !== 0)
+    return null;
+  if (/\b(pytest|vitest|jest|bun test|go test|cargo test|npm test|yarn test|pnpm test)\b/.test(command))
+    return "tests_passed";
+  if (/\b(build|tsc|cargo build|go build|make)\b/.test(command))
+    return "build_ok";
+  return null;
+}
+function recordToolExecution(sessionID, input, output) {
+  const signal = classifyToolSignal(input, output);
+  if (signal)
+    getSessionActivity(sessionID).lastToolSignal = signal;
+}
+function recordInjectedRecords(sessionID, packets) {
+  const recallPacket = packets.find((packet) => packet.trim().startsWith("## SyberMem Recall Hints"));
+  if (!recallPacket)
+    return;
+  const activity = getSessionActivity(sessionID);
+  for (const match of recallPacket.matchAll(RECORD_ID_RE2))
+    activity.injectedRecords.add(match[0].toLowerCase());
+}
+
+// packages/opencode-plugin/src/recall_outcome.ts
+var EMPTY_OUTCOME = { injected: 0, hit: 0, precision: null, hitRecords: [], missRecords: [] };
+function normalize(path) {
+  return path.trim().replace(/\\/g, "/");
+}
+function computeRecallOutcome(injected, relatedFilesByRecord, editedFiles) {
+  const edited = new Set([...editedFiles].map(normalize));
+  const hitRecords = [];
+  const missRecords = [];
+  for (const rawId of injected) {
+    const id = rawId.toLowerCase();
+    const related = (relatedFilesByRecord[id] ?? relatedFilesByRecord[rawId] ?? []).map(normalize);
+    if (related.length === 0)
+      continue;
+    if (related.some((file) => edited.has(file)))
+      hitRecords.push(id);
+    else
+      missRecords.push(id);
+  }
+  const injectedCount = hitRecords.length + missRecords.length;
+  if (injectedCount === 0)
+    return EMPTY_OUTCOME;
+  return {
+    injected: injectedCount,
+    hit: hitRecords.length,
+    precision: hitRecords.length / injectedCount,
+    hitRecords,
+    missRecords
+  };
+}
+function parseRecordFilesJson(raw) {
+  try {
+    const parsed = JSON.parse(raw.trim());
+    if (typeof parsed !== "object" || parsed === null)
+      return {};
+    const records = Reflect.get(parsed, "records");
+    if (typeof records !== "object" || records === null)
+      return {};
+    const mapping = {};
+    for (const [key, value] of Object.entries(records)) {
+      if (Array.isArray(value))
+        mapping[key.toLowerCase()] = value.filter((item) => typeof item === "string");
+    }
+    return mapping;
+  } catch {
+    return {};
+  }
+}
+async function flushRecallOutcome($, root, activity, sessionID, timestamp = new Date().toISOString()) {
+  const injected = [...activity.injectedRecords];
+  if (injected.length === 0 || activity.editedFiles.size === 0)
+    return EMPTY_OUTCOME;
+  let mapping = {};
+  try {
+    mapping = parseRecordFilesJson(await recordFilesText($, root, injected.join(",")));
+  } catch {
+    return EMPTY_OUTCOME;
+  }
+  const outcome = computeRecallOutcome(injected, mapping, new Set(activity.editedFiles.keys()));
+  if (outcome.injected === 0)
+    return EMPTY_OUTCOME;
+  boundedJsonlAppend(root, ".recall-outcomes.jsonl", {
+    timestamp,
+    session: sessionID,
+    injected: outcome.injected,
+    hit: outcome.hit,
+    precision: outcome.precision,
+    hit_records: outcome.hitRecords,
+    miss_records: outcome.missRecords
+  }, 200);
+  return outcome;
+}
+
 // packages/opencode-plugin/src/plugin.ts
 async function showToast(client, message) {
   try {
@@ -728,6 +925,16 @@ function throttledToast(client, key, message) {
     return;
   LAST_TOAST.set(key, now);
   showToast(client, message);
+}
+function readSessionID(source) {
+  if (typeof source !== "object" || source === null)
+    return "";
+  for (const key of ["sessionID", "sessionId", "session"]) {
+    const value = Reflect.get(source, key);
+    if (typeof value === "string" && value)
+      return value;
+  }
+  return "";
 }
 function describeInjection(summary) {
   const parts = [];
@@ -762,7 +969,29 @@ async function maybeToastRecallHealth(args, root) {
       throttledToast(args.client, "recall-health", message);
   } catch {}
 }
-async function handleSessionIdle(args, root) {
+async function flushSessionRelevance(args, root, sessionID) {
+  if (!sessionID)
+    return;
+  try {
+    const activity = getSessionActivity(sessionID);
+    await flushRecallOutcome(args.$, root, activity, sessionID);
+  } catch {} finally {
+    resetSessionActivity(sessionID);
+  }
+}
+function deriveActivitySignal(sessionID) {
+  const activity = getSessionActivity(sessionID);
+  let editFocus = null;
+  let topCount = 1;
+  for (const [file, count] of activity.editedFiles) {
+    if (count > topCount) {
+      topCount = count;
+      editFocus = file;
+    }
+  }
+  return { toolSignal: activity.lastToolSignal, todoCompletedBatches: activity.todoCompletedBatches, editFocus };
+}
+async function handleSessionIdle(args, root, sessionID) {
   const trail = trailFiles(await getChangedFiles(args.$, root));
   if (trail.length === 0)
     return;
@@ -775,7 +1004,8 @@ async function handleSessionIdle(args, root) {
     return;
   }
   const commitsSince = await countCommitsSinceLastRecord(args.$, root);
-  const followup = classifyFollowup(trail, commitsSince, state);
+  const activity = sessionID ? deriveActivitySignal(sessionID) : undefined;
+  const followup = classifyFollowup(trail, commitsSince, state, activity);
   const today = new Date().toISOString().split("T")[0];
   appendAutoTrailJournal(root, today, trail, detectHighLevelAreas(trail), followup.type);
   const windows = { ...state.theme_recent_stops ?? {} };
@@ -794,12 +1024,28 @@ var SyberMemPlugin = async ({ $, directory, client }) => {
     event: async ({ event }) => {
       if (!root)
         return;
+      const sessionID = event.properties?.info?.id ?? "";
       if (event.type === "session.created")
-        await handleSessionCreated(args, root, event.properties?.info?.id ?? "");
+        await handleSessionCreated(args, root, sessionID);
+      if (event.type === "file.edited") {
+        const file = extractEditedFile(event.properties);
+        if (file && sessionID)
+          recordEditedFile(sessionID, file);
+      }
+      if (event.type === "todo.updated" && sessionID)
+        recordTodoUpdate(sessionID, event.properties);
       if (event.type === "session.idle") {
-        await handleSessionIdle(args, root);
+        await handleSessionIdle(args, root, sessionID);
+        await flushSessionRelevance(args, root, sessionID);
         await maybeToastRecallHealth(args, root);
       }
+    },
+    "tool.execute.after": async (input, output) => {
+      if (!root)
+        return;
+      const sessionID = readSessionID(input);
+      if (sessionID)
+        recordToolExecution(sessionID, input, output);
     },
     "chat.message": async ({ sessionID }, output) => {
       if (!root)
@@ -810,6 +1056,8 @@ var SyberMemPlugin = async ({ $, directory, client }) => {
       await captureRecordIntentWithCli(args.$, root, text);
       const packets = await collectPromptPackets(args.$, root, text);
       appendRecallDebug(root, packets);
+      if (sessionID)
+        recordInjectedRecords(sessionID, packets);
       stashPromptPackets(sessionID, packets);
       const summary = classifyPackets(packets);
       if (summary.habitCandidate) {

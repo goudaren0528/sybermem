@@ -137,6 +137,27 @@ def iter_record_files(root: Path) -> list[Path]:
     return files
 
 
+def related_files_by_record(root: Path, record_ids: list[str] | None = None) -> dict[str, list[str]]:
+    """Map record_id -> declared related_files for the given ids (or all records).
+
+    Used by edit-aware recall relevance: an injected record "hits" when any of
+    its related_files was edited in the session. Records without related_files
+    map to an empty list so callers can decide to exclude them from precision.
+    """
+    wanted = {rid.lower() for rid in record_ids} if record_ids else None
+    mapping: dict[str, list[str]] = {}
+    for path in iter_record_files(root):
+        row = parse_record_file(path, "", "")
+        rid = row.get("record_id", "")
+        if not rid:
+            continue
+        if wanted is not None and rid.lower() not in wanted:
+            continue
+        related = row.get("related_files", "")
+        mapping[rid] = [item for item in related.split(",") if item]
+    return mapping
+
+
 def _frontmatter_lines(text: str) -> list[str]:
     lines = text.splitlines()
     if not lines or lines[0] != "---":
