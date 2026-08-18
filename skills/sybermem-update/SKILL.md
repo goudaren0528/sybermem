@@ -19,8 +19,8 @@ Refresh the installed SyberMem skills, then re-check the current project with th
 SyberMem skills, then runs the project-local refresh through Core/CLI so this
 project picks up the newest managed-file behavior quickly and deterministically.
 
-**When to run:** after upgrading SyberMem, or when the project still shows old
-`ADR/` wording or stale managed files.
+**When to run:** after upgrading SyberMem, or when the project still has stale
+managed files.
 
 **What you get:** up-to-date global skills plus a JSON-backed project re-check
 that creates, refreshes, or migrates only the local files that actually need to
@@ -41,12 +41,12 @@ Do NOT leave the old direct-hook command in `.claude/settings.json` when the lau
 ## When to Use
 
 - You upgraded SyberMem and want the current project to pick up the newest behavior
-- The project still answers with old `ADR/` or generic `/init-project` wording
+- The project still answers with stale managed-file wording
 - You want one maintenance command instead of updating globally and then running project init separately
 
 ## Directory Resolution
 
-Resolve project root by walking up from cwd to find `.sybermem/` + `.claude/settings.json`. Auto-migrate `ADR/` if found. Full rules in the session protocol block in AGENTS.md/CLAUDE.md.
+Resolve project root by walking up from cwd to find `.sybermem/` + `.claude/settings.json`.
 
 ## Flow
 
@@ -90,7 +90,8 @@ The command is the primary project-local update path. It is responsible for:
 - classifying managed files as fresh, missing, stale, custom, or preserved
 - creating missing project-managed files from templates
 - refreshing stale SyberMem-managed hooks/templates with backups
-- inserting or replacing the marker-bounded `using-sybermem` protocol block in managed instruction files without overwriting custom content
+- removing any legacy SyberMem protocol block from `CLAUDE.md` / `AGENTS.md` (whole file when purely SyberMem-managed, otherwise only the block) without overwriting custom content
+- adding or refreshing the marker-bounded SyberMem `.gitignore` block for git projects (ignores machine-local runtime/scripts; keeps records committable; skipped for non-git projects) without overwriting unrelated ignore rules
 - surgically repairing `.claude/settings.json` SyberMem hook/env entries while preserving unrelated custom hooks, env, and instructions
 - creating `.sybermem/project.yaml` when missing
 - emitting valid JSON with `overall`, `files`, `actions_needed`, `actions_applied`, `actions_skipped`, and `preserved_custom`
@@ -110,8 +111,7 @@ Fallback triggers are limited to:
 Do not fall back merely because the CLI report says it changed files or preserved custom files. Those are successful outcomes.
 
 The fallback step is responsible for the same managed-file propagation semantics when Core/CLI cannot run:
-- migrating legacy `ADR/` to `.sybermem/`
-- checking whether local `AGENTS.md` / `CLAUDE.md` are stale, including pre-digest SyberMem-managed files that still need the digest-aware guidance refresh
+- checking whether local `AGENTS.md` / `CLAUDE.md` still carry a legacy SyberMem protocol block that must be removed
 - enabling digest support by creating `.sybermem/digests/`, creating the digest template, and inserting the `Phase Digests` section when missing
 - enabling analysis support by creating `.sybermem/analysis/` and `.sybermem/analysis/phase-index.md` from the starter template when missing
 - creating or refreshing the default project-level `.claude/settings.json`, `.sybermem/hooks/record_change_on_stop.py`, and `.sybermem/hooks/user_prompt.py` (the merged UserPromptSubmit hook), keeping `.sybermem/hooks/detect_record_intent.py` and `.sybermem/hooks/task_recall.py` as the backward-compatible modules `user_prompt.py` reuses, when the project uses the SyberMem-managed hook template
@@ -122,12 +122,12 @@ The fallback step is responsible for the same managed-file propagation semantics
 - applying that migration even when `.claude/settings.json` is otherwise custom, as long as the old Stop hook command is recognizably SyberMem-managed
 - repairing missing or stale SyberMem-managed `UserPromptSubmit` hook wiring so the same hook performs both natural-language record-intent capture and read-only task recall
 - applying that `UserPromptSubmit` repair surgically even when `.claude/settings.json` is otherwise custom, without overwriting unrelated custom hooks, env, or instructions
-- inserting or refreshing the marker-bounded `using-sybermem` session-entry protocol block in managed instruction files
-- ensuring existing projects receive both the marker-bounded `using-sybermem` protocol block and the visible `/using-sybermem` skill after upgrade
+- removing any legacy SyberMem protocol block from `CLAUDE.md` / `AGENTS.md` (whole file when purely SyberMem-managed, otherwise only the block) without overwriting custom content
+- ensuring existing projects receive the visible `/using-sybermem` skill after upgrade
 - refreshing stale SyberMem-managed project instructions with backups
 - leaving custom project instructions and custom hook settings alone unless the user approves replacement
 
-The protocol block gives automatic session-entry guidance; the visible `/using-sybermem` skill gives a manual diagnostic entrypoint.
+The visible `/using-sybermem` skill gives a manual diagnostic entrypoint; no instruction-file injection is needed.
 
 Every new managed behavior introduced by SyberMem must explicitly say whether `sybermem project refresh --format json` changes any project-local files at all. If it does, name the exact files that are created, refreshed, or migrated. If it does not, say that the behavior is classification-only or otherwise has no project-local file action. Update `docs/feature_map.md` in the same feature change when platform support claims change.
 
@@ -144,7 +144,7 @@ Before declaring an upgrade complete, verify for the current project:
 - whether each file is missing, fresh, stale SyberMem-managed, or custom
 - whether stale SyberMem-managed files will be backed up before replacement
 - whether custom files will be preserved unless the user explicitly approves replacement
-- whether the `using-sybermem` protocol block was inserted or refreshed non-destructively when applicable
+- whether any legacy SyberMem protocol block was removed from `CLAUDE.md` / `AGENTS.md` non-destructively when present
 - whether recognized old SyberMem Stop hook commands were surgically replaced with the global launcher path when present in otherwise custom settings files.
 - whether recognized SyberMem-managed `UserPromptSubmit` entries were added or repaired surgically when missing or stale, while leaving unrelated custom hooks, env, and instructions untouched.
 
@@ -185,7 +185,7 @@ This skill is complete when:
 - Do not silently enable digest support by overwriting user-owned files; only create missing digest capability structure.
 - Do not rewrite unrelated custom settings; only surgically replace recognized old SyberMem Stop hook commands.
 - Do not rewrite unrelated custom settings; only surgically add or repair recognized SyberMem-managed `UserPromptSubmit` entries.
-- Do not rewrite the rest of `CLAUDE.md` / `AGENTS.md` when the `using-sybermem` markers already exist; only refresh the bounded protocol block.
+- Do not rewrite the rest of `CLAUDE.md` / `AGENTS.md` when removing a legacy `using-sybermem` protocol block; remove only the bounded block (or the whole file when purely SyberMem-managed).
 
 ## Integration
 

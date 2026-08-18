@@ -131,9 +131,10 @@ invalid JSON.
 Project initialization still uses `/sybermem-init-project`.
 
 The project-local distribution path is still important on OpenCode: `/sybermem-init-project`
-or `/sybermem-update` can create or refresh `.sybermem/`, `AGENTS.md`,
+or `/sybermem-update` can create or refresh `.sybermem/`,
 `.claude/settings.json`, `.sybermem/hooks/detect_record_intent.py`, and
-`.sybermem/hooks/task_recall.py` for Claude-compatible project sharing. That does
+`.sybermem/hooks/task_recall.py` for Claude-compatible project sharing, and removes
+any legacy SyberMem protocol block from `AGENTS.md` / `CLAUDE.md`. That does
 not change the OpenCode recall path above: OpenCode uses its own `chat.message` +
 `experimental.chat.system.transform` hooks for per-prompt recall, which the plugin
 refresh delivers regardless of project-local Claude hooks.
@@ -144,4 +145,14 @@ Use this workflow:
 2. run `/sybermem-update` inside an existing project; it should report the CLI refresh JSON summary when the CLI is healthy
 3. run `/sybermem-init-project` when initialization is still missing
 
-The OpenCode plugin does not replace project `.sybermem/` files. It complements the project-managed `.sybermem/`, `AGENTS.md`, and `.claude/settings.json` setup.
+The OpenCode plugin does not replace project `.sybermem/` files. It complements the project-managed `.sybermem/` and `.claude/settings.json` setup.
+
+### Optional: reply marker (default OFF)
+
+By default, SyberMem signals recall/habit injection with throttled TUI toasts
+(`⭐`/`🧠`/`💡`). If you want a guaranteed, model-independent signal in the reply
+itself, set `SYBERMEM_REPLY_MARKER=1` in the OpenCode environment. When enabled,
+the plugin prepends ONE line to the first assistant text part of any turn that
+actually received injected recall/habit context (e.g. `> SyberMem: 本轮参考了 ⭐2 条记忆`).
+It is OFF by default because it uses the experimental `experimental.text.complete`
+seam and the marker persists in message history.

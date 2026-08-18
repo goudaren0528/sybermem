@@ -1,14 +1,12 @@
 # Installation Guide
 
-## Upgrading existing ADR/ projects
+## Upgrading existing projects
 
-If a project already uses `ADR/`, do not rename directories manually. The first run of `/sybermem-init-project`, `/sybermem-record`, `/sybermem-summary`, `/sybermem-digest`, `/sybermem-phase-analyze`, or `/sybermem-phase-confirm` automatically migrates `ADR/` to `.sybermem/`.
-
-If both `.sybermem/` and `ADR/` exist, the skills use `.sybermem/` and warn that the legacy `ADR/` directory was ignored.
-
-Refreshing the global install alone does not automatically refresh project-local `AGENTS.md`, `CLAUDE.md`, hooks, templates, or managed settings patches. After every global install or update, open each target project and run `/sybermem-update`.
+Refreshing the global install alone does not automatically refresh project-local hooks, templates, or managed settings patches. After every global install or update, open each target project and run `/sybermem-update`.
 
 That matters for resume, search, and Team publish behavior too. A global refresh makes the latest skills and runtime available to the user, but existing projects still need `/sybermem-update` when you want refreshed managed instructions, hook files, templates, or settings surgery inside the project.
+
+Installers write the installed version to `~/.claude/sybermem/VERSION`, and `sybermem project refresh` stamps `sybermem_version` into each project's `.sybermem/project.yaml`. When a project trails the installed SyberMem, session-start surfaces a throttled, fail-open `⭐ run /sybermem-update` nudge (OpenCode `session.created` toast; Claude/Codex `SessionStart` additionalContext). Run `sybermem doctor` to see installed vs project version on demand. Unknown/empty versions never nag.
 
 If the project is not initialized yet, run `/sybermem-init-project`. If the project already exists, the safe order is:
 
@@ -90,7 +88,7 @@ On OpenCode, `/sybermem-resume` is a manual, read-only entrypoint. Use it to reb
 
 ### Codex
 
-Codex support is partial runtime integration plus user skills. The global install/update scripts copy `packages/claude-skills` to `~/.agents/skills` on macOS / Linux and `%USERPROFILE%\.agents\skills` on Windows with the `Codex` target label, and they install `~/.codex/hooks/sybermem_session_start.py`, `sybermem_user_prompt.py`, `sybermem_stop.py`, and `sybermem_post_compact.py` plus `SessionStart` / `UserPromptSubmit` / `Stop` / `PostCompact` merges in `~/.codex/hooks.json`. Project setup still uses `/sybermem-init-project` or `/sybermem-update`, which refresh `.sybermem/` and `AGENTS.md` for Codex agents. Project health checks can also discover current templates from the Codex-installed `~/.agents/skills/sybermem-init-project/project-files` tree.
+Codex support is partial runtime integration plus user skills. The global install/update scripts copy `packages/claude-skills` to `~/.agents/skills` on macOS / Linux and `%USERPROFILE%\.agents\skills` on Windows with the `Codex` target label, and they install `~/.codex/hooks/sybermem_session_start.py`, `sybermem_user_prompt.py`, `sybermem_stop.py`, and `sybermem_post_compact.py` plus `SessionStart` / `UserPromptSubmit` / `Stop` / `PostCompact` merges in `~/.codex/hooks.json`. Project setup still uses `/sybermem-init-project` or `/sybermem-update`, which refresh `.sybermem/` for Codex agents and remove any legacy SyberMem protocol block from `AGENTS.md`. Project health checks can also discover current templates from the Codex-installed `~/.agents/skills/sybermem-init-project/project-files` tree.
 
 For Codex-specific boundaries and verification, see [`.codex/INSTALL.md`](.codex/INSTALL.md). Codex now supports bounded startup context through `SessionStart`, high-signal project recall/User Habit Memory reminders/record-intent capture through `UserPromptSubmit` + `hookSpecificOutput.additionalContext`, loop-safe record nudges through `Stop`, and compact re-seed markers through `PostCompact`, but do not expect `.codex/config.toml`, hidden auto-resume, background automation, prompt/agent handler runtimes, or direct compaction prompt injection.
 
@@ -125,7 +123,7 @@ cd sybermem; git pull; .\scripts\update.ps1
 ```
 
 After the script finishes, open the target project and run `/sybermem-update`.
-That follow-up is where project-local hook files, templates, instruction blocks, and settings entries are actually created, refreshed, or migrated.
+That follow-up is where project-local hook files, templates, and settings entries are created or refreshed, the `.gitignore` SyberMem block is added (git projects), the `sybermem_version` stamp is updated, and any legacy `CLAUDE.md` / `AGENTS.md` protocol block is removed (migration).
 
 That same project-local refresh is also how older Claude projects pick up updated guidance and managed prompt hooks, including `/sybermem-resume` routing, read-only recall, and User Habit Memory reminders.
 
@@ -151,9 +149,9 @@ For existing projects, `/sybermem-update` now performs a Stop hook command migra
 
 For existing projects, `/sybermem-update` should also repair missing or stale `.sybermem/hooks/detect_record_intent.py` and `.sybermem/hooks/task_recall.py` files, and surgically patch recognized SyberMem-managed `UserPromptSubmit` settings entries instead of replacing the whole `.claude/settings.json` file.
 
-For existing projects, `/sybermem-update` should also insert or refresh the marker-bounded `using-sybermem` protocol block in managed instruction files. This is how the new session-entry rules reach old projects without requiring full document replacement.
+For existing projects, `/sybermem-update` should also remove any legacy marker-bounded `using-sybermem` protocol block from managed instruction files. This is how old projects are migrated to the no-injection model without requiring full document replacement.
 
-For existing projects, `/sybermem-update` should now deliver both parts of `using-sybermem`: the marker-bounded protocol block in instruction files and the visible `/using-sybermem` skill in the global install.
+For existing projects, `/sybermem-update` should now deliver the visible `/using-sybermem` skill in the global install; no instruction-file protocol block is injected.
 
 ## Release / update troubleshooting
 
@@ -168,7 +166,7 @@ For existing projects, `/sybermem-update` should now deliver both parts of `usin
 - **OpenCode looks stale after an upgrade**
   Re-run the remote install command or the local update script. That refreshes the OpenCode skills and the single-file plugin at `~/.config/opencode/plugins/sybermem.ts`, including prompt-time habit reminders, record-intent metadata, and recall debug logging. Then run `/sybermem-update` in the project if project-local managed files also need refresh.
 - **Codex skills are missing after an upgrade**
-  Re-run the remote install command or the local update script. That refreshes `~/.agents/skills`; then run `/sybermem-update` in the project if `AGENTS.md` or `.sybermem/` needs refresh. From a checkout, use `python -m pytest packages/core/tests/test_package_integrity_scripts.py packages/core/tests/test_init_project_distribution.py -q` and `python scripts/check-plugin-package.py` as the non-mutating Codex package smoke set.
+  Re-run the remote install command or the local update script. That refreshes `~/.agents/skills`; then run `/sybermem-update` in the project if `.sybermem/` needs refresh. From a checkout, use `python -m pytest packages/core/tests/test_package_integrity_scripts.py packages/core/tests/test_init_project_distribution.py -q` and `python scripts/check-plugin-package.py` as the non-mutating Codex package smoke set.
 - **Codex runtime hooks are missing after an upgrade**
   Re-run the remote install command or the local update script so `~/.codex/hooks/sybermem_session_start.py`, `~/.codex/hooks/sybermem_user_prompt.py`, `~/.codex/hooks/sybermem_stop.py`, `~/.codex/hooks/sybermem_post_compact.py`, and `~/.codex/hooks.json` are refreshed. Then run `/sybermem-update` in the project if project-managed files also need refresh.
 - **`sybermem habit` is missing**
@@ -176,7 +174,7 @@ For existing projects, `/sybermem-update` should now deliver both parts of `usin
 
 ## Verify Installation
 
-Type `/sybermem-init-project` or `/sybermem-update` in Claude Code, OpenCode, or Codex. If the project gets the `.sybermem/` directory structure, reports that an existing `ADR/` directory will be auto-migrated, or offers to refresh stale `AGENTS.md` / `CLAUDE.md`, the installation was successful.
+Type `/sybermem-init-project` or `/sybermem-update` in Claude Code, OpenCode, or Codex. If the project gets the `.sybermem/` directory structure or removes a legacy SyberMem protocol block from `AGENTS.md` / `CLAUDE.md`, the installation was successful.
 
 For Claude Code specifically, a successful refresh also means the project can receive `.sybermem/hooks/task_recall.py` plus the managed `UserPromptSubmit` wiring without losing unrelated custom settings. For OpenCode, success means the supported chat transform path can carry project recall and conservative habit reminders, not unsupported hidden automation.
 

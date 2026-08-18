@@ -158,6 +158,8 @@ claude --plugin-dir .
 2. 再进入已有项目运行 `/sybermem-update`。
 3. 新项目运行 `/sybermem-init-project`。
 
+安装器会把已安装版本写入 `~/.claude/sybermem/VERSION`；`sybermem project refresh` 会在项目 `.sybermem/project.yaml` 写入 `sybermem_version`。当某个项目落后于已安装版本时，会话启动会给出一条节流、fail-open 的 `⭐ 运行 /sybermem-update` 提醒（OpenCode `session.created` toast；Claude/Codex `SessionStart` 上下文）。随时可用 `sybermem doctor` 查看已安装版本与当前项目版本。
+
 全局刷新只更新用户级 runtime、Claude/OpenCode/Codex skills、OpenCode plugin 和 Codex 用户级 hooks；项目内的 `.sybermem/`、hooks、模板和说明文件需要 `/sybermem-update` 才会刷新。`/sybermem-update` 会优先调用 `sybermem project refresh --format json` 做可脚本化的项目内刷新，只有 CLI 缺失、执行失败或输出非 JSON 时才回退到 agent 编排的 `/sybermem-init-project`。Codex 的健康检查会把 `~/.agents/skills/sybermem-init-project/project-files` 作为模板来源之一，因此 Codex 安装路径也能参与项目 freshness 检查。老用户要拿到 OpenCode 新的 habit reminder、record-intent metadata 或 recall debug logging 链路，先重跑全局安装/更新以刷新 `~/.config/opencode/plugins/sybermem.ts`，再进项目跑 `/sybermem-update`。若修复的是 CLI launcher、OpenCode plugin、Codex hook 或 skill 指令链路，也按这个顺序生效。
 
 ## 初始化项目
@@ -176,11 +178,9 @@ claude --plugin-dir .
 - `.sybermem/analysis/phase-index.md`
 - `.sybermem/project.yaml`
 - `.sybermem/hooks/`
-- `CLAUDE.md`
-- `AGENTS.md`
 - `.claude/settings.json`
 
-如果项目已有自定义 `.claude/settings.json`，SyberMem 只会补丁可识别的受管项，不覆盖无关 hooks、env 或说明。
+如果项目已有自定义 `.claude/settings.json`，SyberMem 只会补丁可识别的受管项，不覆盖无关 hooks、env 或说明。SyberMem 不再向 `CLAUDE.md` / `AGENTS.md` 注入内容；init/update 会移除旧版本遗留的 SyberMem 协议块（若文件仅含该块则删除整个文件，否则只移除块并保留用户内容）。
 
 ## 日常使用
 
@@ -267,8 +267,7 @@ sybermem project uninstall
 
 ## 兼容说明
 
-- `.sybermem/` 是当前规范目录。
-- 如果项目仍使用旧 `ADR/`，首次运行相关 SyberMem workflow 时会迁移到 `.sybermem/`。
+- `.sybermem/` 是规范项目数据目录。
 - Claude 的 prompt-time recall 适用于受管 Claude hooks；OpenCode 使用 `chat.message` + `experimental.chat.system.transform` 提供高信号项目召回，并在同一条 transform 注入保守的 User Habit Memory 提醒，同时通过 `chat.message` 写入 prompt-free record-intent 与 recall debug metadata；Codex 通过 `SessionStart` / `UserPromptSubmit` / `Stop` / `PostCompact` 提供 bounded startup context、prompt-time recall、habit reminder、record-intent capture、loop-safe record nudge 和 compact re-seed marker，但仍不支持 hidden auto-resume、后台自动化或 direct compaction prompt injection。
 - 更多安装、升级和兼容细节见 [INSTALL.md](INSTALL.md)。
 

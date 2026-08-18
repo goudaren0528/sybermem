@@ -18,10 +18,10 @@ def test_cli_project_refresh_json_calls_core_and_emits_json_only(tmp_path: Path,
         "root": str(project_root).replace("\\", "/"),
         "overall": "updated",
         "files": {"AGENTS.md": {"status": "updated"}},
-        "actions_needed": ["replace protocol block in AGENTS.md (preserve content outside block)"],
-        "actions_applied": ["replace protocol block in AGENTS.md (preserve content outside block)"],
+        "actions_needed": ["remove protocol block from AGENTS.md (preserve content outside block)"],
+        "actions_applied": ["remove protocol block from AGENTS.md (preserve content outside block)"],
         "actions_skipped": [],
-        "preserved_custom": ["AGENTS.md"],
+        "preserved_custom": [],
     }
     called: dict[str, Path] = {}
 
@@ -56,10 +56,10 @@ def test_cli_project_refresh_text_prints_concise_summary(tmp_path: Path, monkeyp
             "root": str(root).replace("\\", "/"),
             "overall": "updated",
             "files": {"AGENTS.md": {"status": "updated"}},
-            "actions_needed": ["replace protocol block in AGENTS.md (preserve content outside block)"],
-            "actions_applied": ["replace protocol block in AGENTS.md (preserve content outside block)"],
+            "actions_needed": ["remove protocol block from AGENTS.md (preserve content outside block)"],
+            "actions_applied": ["remove protocol block from AGENTS.md (preserve content outside block)"],
             "actions_skipped": [],
-            "preserved_custom": ["AGENTS.md"],
+            "preserved_custom": [],
         },
     )
     monkeypatch.setattr(sys, "argv", ["sybermem", "project", "refresh"])
@@ -71,7 +71,7 @@ def test_cli_project_refresh_text_prints_concise_summary(tmp_path: Path, monkeyp
     captured = capsys.readouterr()
     assert exit_code == 0
     assert captured.err == ""
-    assert captured.out == "updated: applied 1 action(s), skipped 0, preserved custom 1\n"
+    assert captured.out == "updated: applied 1 action(s), skipped 0, preserved custom 0\n"
 
 
 def test_cli_project_refresh_returns_1_without_project_root(monkeypatch, capsys) -> None:

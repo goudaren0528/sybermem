@@ -12,13 +12,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from sybermem_core.project_refresh import refresh_project
 
 
-PROTOCOL_BLOCK = """<!-- SYBERMEM_SESSION_PROTOCOL:START -->
-## SyberMem Session Protocol
-
-Current protocol body.
-<!-- SYBERMEM_SESSION_PROTOCOL:END -->"""
-
-
 def write_template(template_root: Path, relative_path: str, content: str) -> None:
     target = template_root / relative_path
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -26,8 +19,6 @@ def write_template(template_root: Path, relative_path: str, content: str) -> Non
 
 
 def seed_templates(template_root: Path) -> None:
-    write_template(template_root, "CLAUDE.md", f"# Claude Instructions\n\n{PROTOCOL_BLOCK}\n\n## Core Rule\nTemplate rule.\n")
-    write_template(template_root, "AGENTS.md", f"# Agent Instructions\n\n{PROTOCOL_BLOCK}\n\n## Core Rule\nTemplate rule.\n")
     write_template(
         template_root,
         ".claude/settings.json",
@@ -101,8 +92,8 @@ def test_refresh_project_backs_up_and_replaces_stale_managed_file(tmp_path: Path
     assert "replace .sybermem/hooks/user_prompt.py from template" in report["actions_applied"]
 
 
-def test_refresh_project_preserves_custom_instruction_content_while_refreshing_protocol(tmp_path: Path) -> None:
-    # Given: AGENTS.md has custom content and an obsolete SyberMem protocol block
+def test_refresh_project_removes_protocol_block_preserving_custom_content(tmp_path: Path) -> None:
+    # Given: AGENTS.md has custom content and a legacy SyberMem protocol block
     template_root = tmp_path / "templates"
     project_root = tmp_path / "project"
     seed_templates(template_root)
@@ -119,39 +110,63 @@ def test_refresh_project_preserves_custom_instruction_content_while_refreshing_p
     # When: the project is refreshed
     report = refresh_project(project_root, template_roots=(template_root,))
 
-    # Then: custom content remains and the marker-bounded block is current
+    # Then: custom content remains and the protocol block is removed
     content = agents.read_text(encoding="utf-8")
     assert "Keep this local workflow." in content
     assert "Custom footer." in content
-    assert PROTOCOL_BLOCK in content
+    assert "SYBERMEM_SESSION_PROTOCOL" not in content
     assert "old protocol" not in content
-    assert report["preserved_custom"] == ["AGENTS.md"]
+    assert report["files"]["AGENTS.md"]["status"] == "updated"
+    assert "remove protocol block from AGENTS.md (preserve content outside block)" in report["actions_applied"]
 
 
-def test_refresh_project_preserves_custom_instruction_with_workflow_heading(tmp_path: Path) -> None:
-    # Given: AGENTS.md has a user-owned Workflow section plus stale protocol text
+def test_refresh_project_removes_purely_sybermem_instruction_file(tmp_path: Path) -> None:
+    # Given: AGENTS.md is purely the SyberMem-managed template (no user content)
     template_root = tmp_path / "templates"
     project_root = tmp_path / "project"
     seed_templates(template_root)
     agents = project_root / "AGENTS.md"
     agents.parent.mkdir(parents=True, exist_ok=True)
     agents.write_text(
-        "# Team Agent Guide\n\n"
-        "## Workflow\n\n"
-        "Custom release workflow that must never be overwritten.\n\n"
-        "<!-- SYBERMEM_SESSION_PROTOCOL:START -->\nstale\n<!-- SYBERMEM_SESSION_PROTOCOL:END -->\n",
+        "# SyberMem Project Record System\n\n"
+        "<!-- SYBERMEM_SESSION_PROTOCOL:START -->\nold protocol\n<!-- SYBERMEM_SESSION_PROTOCOL:END -->\n\n"
+        "## Core Rule\n\nAfter completing meaningful work, run `/sybermem-record` to create a record.\n\n"
+        "## Directories\n\n- `.sybermem/changes/` — Feature changes\n"
+        "- `.sybermem/decisions/` — Technical decisions\n"
+        "- `.sybermem/requirements/` — Requirements / discussions\n"
+        "- `.sybermem/bugs/` — Bug fixes\n"
+        "- `.sybermem/INDEX.md` — Master index\n\n"
+        "## No Record Needed\n\nFormatting adjustments, comment edits, config tweaks with no functional impact.\n",
         encoding="utf-8",
     )
 
     # When: the project is refreshed
     report = refresh_project(project_root, template_roots=(template_root,))
 
-    # Then: the custom workflow remains and no whole-file replacement backup is created
+    # Then: the purely SyberMem-managed file is deleted (with a backup)
+    assert not agents.exists()
+    assert agents.with_suffix(".md.bak").exists()
+    assert report["files"]["AGENTS.md"]["status"] == "removed"
+    assert "remove AGENTS.md (purely SyberMem-managed)" in report["actions_applied"]
+
+
+def test_refresh_project_leaves_instruction_file_without_protocol_untouched(tmp_path: Path) -> None:
+    # Given: AGENTS.md has user content and no SyberMem protocol block
+    template_root = tmp_path / "templates"
+    project_root = tmp_path / "project"
+    seed_templates(template_root)
+    agents = project_root / "AGENTS.md"
+    agents.parent.mkdir(parents=True, exist_ok=True)
+    agents.write_text("# Team Agent Guide\n\n## Workflow\n\nCustom release workflow.\n", encoding="utf-8")
+
+    # When: the project is refreshed
+    report = refresh_project(project_root, template_roots=(template_root,))
+
+    # Then: the file is left untouched and reported fresh
     content = agents.read_text(encoding="utf-8")
-    assert "Custom release workflow that must never be overwritten." in content
-    assert PROTOCOL_BLOCK in content
+    assert "Custom release workflow." in content
+    assert report["files"]["AGENTS.md"]["status"] == "fresh"
     assert not agents.with_suffix(".md.bak").exists()
-    assert report["files"]["AGENTS.md"]["status"] == "custom_preserved"
 
 
 def test_refresh_project_creates_missing_claude_settings_from_template(tmp_path: Path) -> None:
@@ -283,3 +298,76 @@ def test_refresh_project_rejects_managed_symlink_targets(tmp_path: Path) -> None
     with pytest.raises(ValueError, match="managed path is a symlink"):
         refresh_project(project_root, template_roots=(template_root,))
     assert outside.read_text(encoding="utf-8") == "# outside\n"
+
+
+def test_refresh_project_adds_gitignore_block_for_git_repo(tmp_path: Path) -> None:
+    # Given: a git-tracked project with no .gitignore
+    template_root = tmp_path / "templates"
+    project_root = tmp_path / "project"
+    seed_templates(template_root)
+    (project_root / ".git").mkdir(parents=True, exist_ok=True)
+
+    # When: the project is refreshed
+    report = refresh_project(project_root, template_roots=(template_root,))
+
+    # Then: a marker-bounded SyberMem ignore block is created that ignores runtime
+    # and scripts but NOT shareable records
+    gitignore = project_root / ".gitignore"
+    content = gitignore.read_text(encoding="utf-8")
+    assert "# >>> SyberMem >>>" in content and "# <<< SyberMem <<<" in content
+    assert "/.sybermem/hooks/" in content
+    assert "/.sybermem/.recall-debug.jsonl" in content
+    assert "/.claude/settings.json" in content
+    assert "/.sybermem/changes" not in content
+    assert "/.sybermem/INDEX.md" not in content
+    assert report["files"][".gitignore"]["status"] == "created"
+    assert "create .gitignore with SyberMem ignore block" in report["actions_applied"]
+
+
+def test_refresh_project_skips_gitignore_for_non_git_project(tmp_path: Path) -> None:
+    # Given: a project that is not a git repository (no .git)
+    template_root = tmp_path / "templates"
+    project_root = tmp_path / "project"
+    seed_templates(template_root)
+
+    # When: the project is refreshed
+    report = refresh_project(project_root, template_roots=(template_root,))
+
+    # Then: no .gitignore is created and the step is reported fresh (no action)
+    assert not (project_root / ".gitignore").exists()
+    assert report["files"][".gitignore"]["status"] == "fresh"
+
+
+def test_refresh_project_gitignore_is_idempotent(tmp_path: Path) -> None:
+    # Given: a git repo refreshed once
+    template_root = tmp_path / "templates"
+    project_root = tmp_path / "project"
+    seed_templates(template_root)
+    (project_root / ".git").mkdir(parents=True, exist_ok=True)
+    refresh_project(project_root, template_roots=(template_root,))
+
+    # When: refreshed again
+    report = refresh_project(project_root, template_roots=(template_root,))
+
+    # Then: the ignore block is left untouched
+    assert report["files"][".gitignore"]["status"] == "fresh"
+
+
+def test_refresh_project_gitignore_preserves_user_content(tmp_path: Path) -> None:
+    # Given: a git repo with an existing user .gitignore
+    template_root = tmp_path / "templates"
+    project_root = tmp_path / "project"
+    seed_templates(template_root)
+    (project_root / ".git").mkdir(parents=True, exist_ok=True)
+    gitignore = project_root / ".gitignore"
+    gitignore.write_text("node_modules/\n*.log\n", encoding="utf-8")
+
+    # When: the project is refreshed
+    report = refresh_project(project_root, template_roots=(template_root,))
+
+    # Then: user content is preserved and the SyberMem block is appended
+    content = gitignore.read_text(encoding="utf-8")
+    assert "node_modules/" in content
+    assert "*.log" in content
+    assert "# >>> SyberMem >>>" in content
+    assert report["files"][".gitignore"]["status"] == "updated"

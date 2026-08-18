@@ -189,6 +189,15 @@ EOF
 chmod +x "$CLI_WRAPPER"
 echo "  [Global] installed sybermem CLI: $CLI_WRAPPER"
 
+# Installed-version marker: session-start checks this against each project's
+# .sybermem/project.yaml sybermem_version to nudge /sybermem-update when behind.
+VERSION_SOURCE="$TMPDIR/$ARCHIVE_PREFIX/VERSION"
+if [ -f "$VERSION_SOURCE" ]; then
+    mkdir -p "$LAUNCHER_DIR"
+    cp "$VERSION_SOURCE" "$LAUNCHER_DIR/VERSION"
+    echo "  [Global] recorded installed version marker: $LAUNCHER_DIR/VERSION"
+fi
+
 # Make `sybermem` resolvable without editing the user's shell rc: symlink into
 # ~/.local/bin (a conventional per-user bin dir on PATH on most systems). We never
 # rewrite shell rc files; if it is not on PATH we print honest guidance below.
@@ -242,5 +251,5 @@ echo ""
 echo "Next: open your project and run /sybermem-update"
 echo "If you only want the local project refresh check, run /sybermem-init-project"
 echo ""
-echo "Note: updating global skills does not automatically refresh project AGENTS.md / CLAUDE.md files"
+echo "Note: updating global skills does not automatically refresh project managed files; run /sybermem-update in the project (it removes legacy AGENTS.md / CLAUDE.md protocol blocks)"
 echo "Stop hook subdirectory compatibility is now provided by the global launcher at ~/.claude/sybermem/launch_record_change_on_stop.py"

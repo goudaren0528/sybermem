@@ -41,7 +41,7 @@ Do NOT ignore the resolved root and answer from the wrong directory context.
 
 ## Directory Resolution
 
-Resolve project root by walking up from cwd to find `.sybermem/` + `.claude/settings.json`. Auto-migrate `ADR/` if found. Full rules in the session protocol block in AGENTS.md/CLAUDE.md.
+Resolve project root by walking up from cwd to find `.sybermem/` + `.claude/settings.json`.
 
 ## CLI Resolution
 
@@ -62,7 +62,7 @@ Then report:
 - whether `.sybermem/INDEX.md` exists
 - whether `.sybermem/digests/` exists
 - whether `.sybermem/analysis/phase-index.md` exists
-- whether the `using-sybermem` session protocol block is present in instruction files when relevant
+- whether any legacy SyberMem protocol block remains in `CLAUDE.md` / `AGENTS.md` (should be removed by init/update)
 - whether `.sybermem/project.yaml` contains a `team:` block
 - whether the configured Team path is accessible
 - whether the current project appears Team-publishable

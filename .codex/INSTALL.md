@@ -81,10 +81,11 @@ Existing projects should run:
 /sybermem-update
 ```
 
-Those project-local skills create or refresh `.sybermem/`, `AGENTS.md`, and the
-shared project instructions that are useful to Codex agents. `AGENTS.md` is the
-main cross-agent utility file for Codex because it exposes the SyberMem session
-protocol and project-local guidance without requiring a Codex-specific runtime.
+Those project-local skills create or refresh `.sybermem/` and the shared project
+instructions that are useful to Codex agents, and remove any legacy SyberMem
+protocol block from `AGENTS.md` / `CLAUDE.md`. SyberMem no longer injects a session
+protocol into `AGENTS.md`; project-local guidance is provided by the visible
+`/using-sybermem` skill instead.
 `/sybermem-update` prefers the deterministic `sybermem project refresh --format json`
 CLI path for this project-local refresh. It falls back to agent-orchestrated
 `/sybermem-init-project` only when the CLI is missing, exits nonzero, or emits
@@ -129,7 +130,8 @@ Test-Path "$env:USERPROFILE\.agents\skills\sybermem-record"
 ```
 
 Then run `/sybermem-init-project` or `/sybermem-update` in a target project. A
-successful project setup creates or refreshes `.sybermem/` and `AGENTS.md`; a
+successful project setup creates or refreshes `.sybermem/` and removes any legacy
+SyberMem protocol block from `AGENTS.md`; a
 healthy `/sybermem-update` reports the `sybermem project refresh --format json`
 summary rather than performing a slow file-by-file agent refresh.
 
@@ -177,7 +179,7 @@ metadata remain honest about the supported boundaries.
 For an installed user environment, verify both layers:
 
 1. Global skills exist under `~/.agents/skills` or `%USERPROFILE%\.agents\skills`.
-2. The target project has fresh `.sybermem/` and `AGENTS.md` after running
+2. The target project has fresh `.sybermem/` (and no legacy SyberMem protocol block in `AGENTS.md`) after running
    `/sybermem-init-project` or `/sybermem-update`.
 
 ## Troubleshooting
@@ -188,8 +190,9 @@ For an installed user environment, verify both layers:
   home directory, check that Codex and the installer agree on the same home.
 - **Codex sees stale project guidance after a global refresh**
   Run `/sybermem-update` inside the project. Global refresh updates user-level
-  skills and runtime files; project-local `.sybermem/` and `AGENTS.md` refresh
-  only when the project update skill runs the CLI-first project refresh.
+  skills and runtime files; project-local `.sybermem/` refresh (and removal of any
+  legacy SyberMem protocol block from `AGENTS.md`) happens only when the project
+  update skill runs the CLI-first project refresh.
 - **Codex startup context or prompt context never appears after an upgrade**
   Re-run the global installer or updater so `~/.codex/hooks/sybermem_user_prompt.py`,
   `~/.codex/hooks/sybermem_session_start.py`, `~/.codex/hooks/sybermem_stop.py`,

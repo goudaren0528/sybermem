@@ -1,6 +1,6 @@
 ---
 name: sybermem-init-project
-description: Use when initializing SyberMem project records for a new or existing codebase, or when an older project still uses ADR storage or stale SyberMem instruction files.
+description: Use when initializing SyberMem project records for a new or existing codebase, or when an older project has stale SyberMem managed files.
 ---
 
 # sybermem-init-project Skill
@@ -17,8 +17,9 @@ Initialize or refresh the SyberMem project record system in the current project.
 > with those, the sections below win.
 
 **What it does:** sets up (or refreshes) `.sybermem/` in your project — the record
-directories, `INDEX.md`, hooks, templates, project identity, and the managed
-instruction blocks in `CLAUDE.md` / `AGENTS.md`.
+directories, `INDEX.md`, hooks, templates, and project identity. It also migrates
+legacy projects by removing any SyberMem-managed protocol blocks that older
+versions injected into `CLAUDE.md` / `AGENTS.md`.
 
 **When to run:** on a new project, on an existing project that has no SyberMem yet,
 or to refresh an older project after upgrading SyberMem.
@@ -26,7 +27,7 @@ or to refresh an older project after upgrading SyberMem.
 **What happens (typical):**
 1. Finds your project root (won't nest inside an existing SyberMem project without asking).
 2. On an already-set-up project, runs a fast health check and only fixes what's missing/stale.
-3. On a fresh project, creates the full `.sybermem/` structure and instruction files.
+3. On a fresh project, creates the full `.sybermem/` structure and managed config (hooks, `.claude/settings.json`, and a `.gitignore` block for git projects). It does NOT create `CLAUDE.md` / `AGENTS.md`.
 4. Prints a summary of what it created or updated, and the commands you can use next.
 
 **Safe by design:** existing records and your custom config are preserved; stale
@@ -37,8 +38,7 @@ managed files are backed up before refresh; repeated runs won't destroy valid da
 - **No file classification without file-system verification.**
 - **No nested `.sybermem/` without explicit user approval.**
 - **No stale SyberMem-managed file may remain classified as fresh if it is missing newly required managed behavior.**
-- **No protocol update should rewrite more than the bounded `using-sybermem` block when the markers already exist.**
-
+- **No legacy SyberMem protocol block may remain in `CLAUDE.md` / `AGENTS.md` after init/update: remove the block, or the whole file when it is purely SyberMem-managed, while preserving any user content outside the block.**
 <HARD-GATE>
 Do NOT classify any file without first verifying its existence on disk with a file-system tool. Do NOT infer existence from settings.json references, previous tool output, or conversation context. If the tool confirms the file does not exist, classify it as `missing` regardless of what other signals suggest.
 
@@ -67,11 +67,9 @@ Before any other operation, walk up from the current working directory to find t
 **If cwd itself is the SyberMem root:**
 - Proceed normally (this is the common case for existing projects).
 
-After resolving the project root, apply legacy directory checks:
+After resolving the project root:
 1. If the resolved root has `.sybermem/`, use it.
-2. If the resolved root has only `ADR/`, rename `ADR/` to `.sybermem/` and tell the user the legacy directory was auto-migrated.
-3. If the resolved root has both `.sybermem/` and `ADR/`, use `.sybermem/`, warn that `ADR/` was ignored.
-4. If neither exists, create `.sybermem/`.
+2. Otherwise, create `.sybermem/`.
 
 ## CLI Resolution
 
@@ -110,7 +108,7 @@ Parse the JSON output and branch:
 
 - Apply the directory resolution rules above.
 - If `.sybermem/INDEX.md` already exists after resolution, treat the project as already initialized.
-- Before scanning code or regenerating files, inspect project-root `AGENTS.md` and `CLAUDE.md`.
+- Before scanning code or regenerating files, inspect project-root `AGENTS.md` and `CLAUDE.md` for any legacy SyberMem protocol block that must be removed.
 
 Read `file-classification-rules.md` for the complete file classification logic, protocol-block handling rules, and non-destructive update rules.
 
@@ -154,9 +152,10 @@ Use the standard format, including:
 
 Read `codebase-scan-rules.md` for the existing codebase scan and record detection logic.
 
-### Step 7: Create or refresh project instruction files
+### Step 7: Handle instruction files and create/refresh managed config
 
-- Create missing `CLAUDE.md` / `AGENTS.md` from the template files.
+- Remove any legacy SyberMem protocol block from `CLAUDE.md` / `AGENTS.md`. If a file is purely SyberMem-managed (only the protocol block), delete it; if it carries user content outside the block, strip just the block and preserve the rest. Never create or inject a protocol block into these files.
+- If the project is a git repository (`.git` exists), add a marker-bounded SyberMem block to `.gitignore` that ignores machine-local runtime and scripts (`.sybermem/hooks/`, `.sybermem/` runtime dotfiles, `.claude/settings.json`) while keeping shareable memory (records, digests, analysis, templates, `INDEX.md`, `project.yaml`) committable. Preserve any existing `.gitignore` content; skip entirely for non-git projects.
 - Create missing project-level `.claude/settings.json` from the template file when the project does not already define its own hook settings.
 - Create missing `.sybermem/hooks/record_change_on_stop.py` from the template file when automatic mode is being installed.
 - Create missing `.sybermem/hooks/user_prompt.py` from the template file: this is the merged UserPromptSubmit hook that runs record-intent capture and read-only task recall in a single process. Prefer wiring `.claude/settings.json` UserPromptSubmit to this single hook.
@@ -200,7 +199,7 @@ silently write — to create one small illustrative `change` record that capture
 
 **Project type:** [New project / Existing codebase / Existing project refreshed]
 
-**Storage directory:** [.sybermem/ created / ADR/ auto-migrated to .sybermem/ / Existing .sybermem/ reused]
+**Storage directory:** [.sybermem/ created / Existing .sybermem/ reused]
 
 **Created or updated:**
 - `.sybermem/` directory structure
@@ -222,8 +221,9 @@ silently write — to create one small illustrative `change` record that capture
 - `.sybermem/project.yaml` project identity when missing
 - `~/.sybermem/projects.yaml` user Hub registry entry
 - managed SessionStart hook command updated to the launcher form when needed
-- `using-sybermem` session protocol block inserted or refreshed in `CLAUDE.md` / `AGENTS.md` when applicable
-- `CLAUDE.md` / `AGENTS.md` / project-level `.claude/settings.json`
+- legacy SyberMem protocol block removed from `CLAUDE.md` / `AGENTS.md` when present (whole file removed when purely SyberMem-managed)
+- SyberMem ignore block added to `.gitignore` for git projects (machine-local runtime/scripts ignored; records kept committable; skipped for non-git projects)
+- project-level `.claude/settings.json`
 
 **Next steps:**
 - Use `/sybermem-record` after meaningful work
@@ -268,7 +268,7 @@ This skill is complete when:
 ## Key Principles
 
 - **`.sybermem/` is canonical**: New writes always go to `.sybermem/`
-- **Legacy compatibility**: Old `ADR/` directories are auto-migrated on first use; users should not rename them manually
+- **`.sybermem/` is the only storage directory**: no legacy directory migration
 - **Instruction refresh is explicit**: stale SyberMem-managed project files should be refreshed with backups, custom files only with user approval
 - **Scan but don't auto-create records for existing code**: output suggestions and let the user decide
 - **Idempotent safety**: repeated execution should not destroy valid `.sybermem/` records or custom project instructions

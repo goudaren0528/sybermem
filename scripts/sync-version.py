@@ -2,7 +2,7 @@
 """Single-source the SyberMem version.
 
 Reads the repo-root ``VERSION`` file and rewrites the version string into every
-distribution manifest so the 8 sites can never silently diverge:
+distribution manifest so the 9 sites can never silently diverge:
 
 - packages/core/pyproject.toml   (``version = "..."``)
 - packages/cli/pyproject.toml    (``version = "..."``)
@@ -12,6 +12,7 @@ distribution manifest so the 8 sites can never silently diverge:
 - .cursor-plugin/plugin.json     (``"version": "..."``)
 - .kimi-plugin/plugin.json       (``"version": "..."``)
 - gemini-extension.json          (``"version": "..."``)
+- packages/core/sybermem_core/version.py (``FALLBACK_VERSION = "..."``)
 
 Edits are minimal regex substitutions on the version line only; unrelated
 content and formatting are preserved. Idempotent: running twice is a no-op.
@@ -35,6 +36,11 @@ JSON_FILES = [
     ROOT / ".cursor-plugin" / "plugin.json",
     ROOT / ".kimi-plugin" / "plugin.json",
     ROOT / "gemini-extension.json",
+]
+
+PY_CONST_FILES = [
+    (ROOT / "packages" / "core" / "sybermem_core" / "version.py",
+     re.compile(r'(FALLBACK_VERSION\s*=\s*")[^"]*(")')),
 ]
 
 PYPROJECT_RE = re.compile(r'(?m)^(version\s*=\s*")[^"]*(")')
@@ -66,6 +72,9 @@ def sync(version: str) -> list[str]:
             changed.append(path.relative_to(ROOT).as_posix())
     for path in JSON_FILES:
         if _apply(path, JSON_RE, version):
+            changed.append(path.relative_to(ROOT).as_posix())
+    for path, pattern in PY_CONST_FILES:
+        if _apply(path, pattern, version):
             changed.append(path.relative_to(ROOT).as_posix())
     return changed
 

@@ -174,6 +174,16 @@ set "SYBERMEM_HOME=%USERPROFILE%\.claude\sybermem\cli"
 '@ | Set-Content -Path $CliWrapper -Encoding ASCII
 Write-Host "  [Global] installed sybermem CLI: $CliWrapper"
 
+# Installed-version marker: session-start checks this against each project's
+# .sybermem/project.yaml sybermem_version to nudge /sybermem-update when behind.
+$VersionSource = Join-Path $AdrPath "VERSION"
+if (Test-Path $VersionSource) {
+    New-Item -ItemType Directory -Force -Path $LauncherDir | Out-Null
+    Copy-Item -Path $VersionSource -Destination (Join-Path $LauncherDir "VERSION") -Force
+    Write-Host "  [Global] recorded installed version marker: $(Join-Path $LauncherDir 'VERSION')"
+}
+
+
 # OpenCode: install plugin
 if (Test-Path (Join-Path $env:USERPROFILE ".config\opencode")) {
     if (-not (Test-Path $OpenCodePluginDir)) {
@@ -220,7 +230,7 @@ Write-Host ""
 Write-Host "Next: open your project and run /sybermem-update"
 Write-Host "For initialization only, run /sybermem-init-project"
 Write-Host ""
-Write-Host "Note: global updates do not refresh project AGENTS.md / CLAUDE.md; run /sybermem-update in the project"
+Write-Host "Note: global updates do not refresh project managed files; run /sybermem-update in the project (it removes legacy AGENTS.md / CLAUDE.md protocol blocks)"
 Write-Host "Note: subdirectory stop-hook support is provided by ~/.claude/sybermem/launch_record_change_on_stop.py"
 
 if ((Test-Path (Join-Path $LegacyLocalSkills "sybermem-init-project")) -or

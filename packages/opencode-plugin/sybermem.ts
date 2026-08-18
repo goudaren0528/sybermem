@@ -955,6 +955,128 @@ async function captureHabitIntentWithCli($, root, text) {
   }
 }
 
+// packages/opencode-plugin/src/version_signal.ts
+import { existsSync as existsSync5, readFileSync as readFileSync4 } from "fs";
+import { join as join6 } from "path";
+function userHome2() {
+  return process.env.USERPROFILE ?? process.env.HOME ?? null;
+}
+function readInstalledVersion() {
+  const home = userHome2();
+  if (!home)
+    return "";
+  const marker = join6(home, ".claude", "sybermem", "VERSION");
+  if (!existsSync5(marker))
+    return "";
+  try {
+    return readFileSync4(marker, "utf-8").trim();
+  } catch {
+    return "";
+  }
+}
+function isManagedProject(root) {
+  return existsSync5(join6(root, ".sybermem", "project.yaml"));
+}
+function readProjectVersion(root) {
+  const proj = join6(root, ".sybermem", "project.yaml");
+  if (!existsSync5(proj))
+    return "";
+  try {
+    for (const raw of readFileSync4(proj, "utf-8").split(`
+`)) {
+      const line = raw.trim();
+      if (line.startsWith("sybermem_version:"))
+        return line.split(":").slice(1).join(":").trim();
+    }
+  } catch {}
+  return "";
+}
+function parse(version) {
+  return version.trim().split(".").map((raw) => {
+    let digits = "";
+    for (const ch of raw) {
+      if (ch >= "0" && ch <= "9")
+        digits += ch;
+      else
+        break;
+    }
+    return digits ? Number.parseInt(digits, 10) : 0;
+  });
+}
+function compareVersions(a, b) {
+  const pa = parse(a);
+  const pb = parse(b);
+  const width = Math.max(pa.length, pb.length);
+  for (let i = 0;i < width; i++) {
+    const x = pa[i] ?? 0;
+    const y = pb[i] ?? 0;
+    if (x < y)
+      return -1;
+    if (x > y)
+      return 1;
+  }
+  return 0;
+}
+function projectNeedsUpdate(root, installed) {
+  if (!installed || !isManagedProject(root))
+    return false;
+  const project = readProjectVersion(root);
+  if (!project)
+    return true;
+  return compareVersions(project, installed) < 0;
+}
+function updateNudgeMessage(root) {
+  const installed = readInstalledVersion();
+  if (!projectNeedsUpdate(root, installed))
+    return null;
+  const project = readProjectVersion(root);
+  const wasRefreshed = project ? `this project was last refreshed with ${project}` : `this project predates SyberMem version tracking`;
+  return `\u2B50 SyberMem ${installed} is installed; ${wasRefreshed}. Run /sybermem-update to apply the latest fixes.`;
+}
+
+// packages/opencode-plugin/src/reply_marker.ts
+var PENDING = new Map;
+var MARKED = new Set;
+function replyMarkerEnabled() {
+  const raw = (process.env.SYBERMEM_REPLY_MARKER ?? "").trim().toLowerCase();
+  return raw === "1" || raw === "true" || raw === "yes" || raw === "on";
+}
+function armReplyMarker(sessionID, recallCount, habitCount) {
+  if (!sessionID)
+    return;
+  if (recallCount <= 0 && habitCount <= 0) {
+    PENDING.delete(sessionID);
+    return;
+  }
+  PENDING.set(sessionID, { recallCount, habitCount });
+}
+function formatMarker(m) {
+  const parts = [];
+  if (m.recallCount > 0)
+    parts.push(`\u2B50 ${m.recallCount} \u6761\u8BB0\u5FC6`);
+  if (m.habitCount > 0)
+    parts.push(`\uD83E\uDDE0 ${m.habitCount} \u6761\u4E60\u60EF`);
+  return `> SyberMem: \u672C\u8F6E\u53C2\u8003\u4E86 ${parts.join(" \xB7 ")}`;
+}
+function applyReplyMarker(sessionID, messageID, text) {
+  if (!replyMarkerEnabled())
+    return text;
+  if (!sessionID || !messageID)
+    return text;
+  if (MARKED.has(messageID))
+    return text;
+  const pending = PENDING.get(sessionID);
+  if (!pending)
+    return text;
+  MARKED.add(messageID);
+  PENDING.delete(sessionID);
+  if (MARKED.size > 500)
+    MARKED.clear();
+  return `${formatMarker(pending)}
+
+${text}`;
+}
+
 // packages/opencode-plugin/src/plugin.ts
 async function showToast(client, message) {
   try {
@@ -984,14 +1106,19 @@ function readSessionID(source) {
 function recallToastMessage(summary) {
   if (summary.recallCount === 0)
     return null;
-  return `\u2B50 SyberMem: injected ${summary.recallCount} recall hint${summary.recallCount === 1 ? "" : "s"} into this prompt`;
+  const n = summary.recallCount;
+  return `\u2B50 SyberMem \u8BB0\u5FC6\u5DF2\u52A0\u5165\u672C\u8F6E\u56DE\u7B54\u53C2\u8003\uFF1A${n} \u6761\u76F8\u5173\u8BB0\u5F55 (recall)`;
 }
 function habitToastMessage(summary) {
   if (summary.habitCount === 0)
     return null;
-  return `\uD83E\uDDE0 SyberMem: applied ${summary.habitCount} user habit reminder${summary.habitCount === 1 ? "" : "s"} to this prompt`;
+  const n = summary.habitCount;
+  return `\uD83E\uDDE0 SyberMem \u5DF2\u5E94\u7528\u4F60\u7684 ${n} \u6761\u4E60\u60EF (applied ${n} user habit reminder${n === 1 ? "" : "s"})`;
 }
 async function handleSessionCreated(args, root, sessionID) {
+  const versionNudge = updateNudgeMessage(root);
+  if (versionNudge)
+    throttledToast(args.client, "version-outdated", versionNudge);
   const parsed = parseIndex(root);
   if (!parsed || parsed.conclusions.length === 0)
     return;
@@ -1116,7 +1243,7 @@ var SyberMemPlugin = async ({ $, directory, client }) => {
       stashPromptPackets(sessionID, packets);
       const summary = classifyPackets(packets);
       if (habitIntent.captured || summary.habitCandidate) {
-        throttledToast(args.client, "habit-candidate", "\uD83D\uDCA1 SyberMem captured a reusable preference \u2014 confirm it with /sybermem-habit");
+        throttledToast(args.client, "habit-candidate", "\uD83D\uDCA1 SyberMem \u53D1\u73B0\u4E00\u6761\u53EF\u590D\u7528\u7684\u504F\u597D/\u89C4\u8303 \u2014 \u9700\u8981\u7684\u8BDD\u7528 /sybermem-habit \u4E00\u6B65\u786E\u8BA4");
       }
     },
     "experimental.chat.system.transform": async ({ sessionID }, output) => {
@@ -1138,6 +1265,14 @@ var SyberMemPlugin = async ({ $, directory, client }) => {
         if (habitMessage)
           throttledToast(args.client, "habit-injected", habitMessage);
       }
+      armReplyMarker(sessionID ?? "", summary.recallCount, summary.habitCount);
+    },
+    "experimental.text.complete": async (input, output) => {
+      if (!root)
+        return;
+      try {
+        output.text = applyReplyMarker(input.sessionID, input.messageID, output.text);
+      } catch {}
     },
     "experimental.session.compacting": async (_input, output) => {
       if (!root)
