@@ -6,8 +6,6 @@ This file contains the complete file classification logic, protocol-block handli
 
 Use these template files from this installed skill as the canonical refresh source:
 
-- `project-files/AGENTS.md`
-- `project-files/CLAUDE.md`
 - `project-files/.claude/settings.json`
 - `project-files/.sybermem/hooks/record_change_on_stop.py`
 - `project-files/.sybermem/hooks/check_project_health.py`
@@ -25,42 +23,21 @@ Refresh rules:
 
 1. **missing** → create it from the matching template file.
 2. **fresh** → leave it unchanged.
-3. **stale SyberMem-managed** → ask the user whether to refresh it. Before overwriting, create a same-directory backup such as `AGENTS.md.backup` or `CLAUDE.md.backup`, then replace it with the current template.
+3. **stale SyberMem-managed** → ask the user whether to refresh it. Before overwriting, create a same-directory backup (e.g. `.sybermem/hooks/<name>.py.bak`), then replace it with the current template. This applies to SyberMem-owned files (hooks, templates, `.claude/settings.json`); `CLAUDE.md` / `AGENTS.md` are NEVER replaced from a template — they are handled by protocol-block removal only (see below).
 4. **custom** → do not overwrite automatically. Explain why it appears custom and ask before replacing it.
 
-## Classification Decision Flowchart
+## Protocol-block removal
 
-```dot
-digraph file_classification {
-    "Verify file exists on disk" [shape=diamond];
-    "missing → create from template" [shape=box];
-    "Has protocol block / expected markers?" [shape=diamond];
-    "fresh → leave unchanged" [shape=box];
-    "Is recognizably SyberMem-managed?" [shape=diamond];
-    "stale → backup + ask to refresh" [shape=box];
-    "custom → explain, ask before replacing" [shape=box];
+For `CLAUDE.md` and `AGENTS.md`, SyberMem no longer injects or refreshes a session-entry protocol block. Legacy projects may still carry a marker-bounded `SYBERMEM_SESSION_PROTOCOL:START`/`END` block from older versions; init/update must remove it.
 
-    "Verify file exists on disk" -> "missing → create from template" [label="no"];
-    "Verify file exists on disk" -> "Has protocol block / expected markers?" [label="yes"];
-    "Has protocol block / expected markers?" -> "fresh → leave unchanged" [label="yes"];
-    "Has protocol block / expected markers?" -> "Is recognizably SyberMem-managed?" [label="no"];
-    "Is recognizably SyberMem-managed?" -> "stale → backup + ask to refresh" [label="yes"];
-    "Is recognizably SyberMem-managed?" -> "custom → explain, ask before replacing" [label="no"];
-}
-```
+- If the file contains `SYBERMEM_SESSION_PROTOCOL:START` and `SYBERMEM_SESSION_PROTOCOL:END`, remove only the contents inside that block.
+- If the file is purely SyberMem-managed (only the protocol block, or an old heavy SyberMem template with no user content), delete the whole file.
+- If the file has user content outside the block, strip only the block and preserve the rest verbatim.
+- If the file has no block, leave it untouched.
 
-## Protocol-block handling
+The visible `/using-sybermem` skill is the manual entrypoint; no instruction-file injection is needed.
 
-For `CLAUDE.md` and `AGENTS.md`, treat the `using-sybermem` session-entry protocol as a marker-bounded managed block.
-
-- If the file already contains `SYBERMEM_SESSION_PROTOCOL:START` and `SYBERMEM_SESSION_PROTOCOL:END`, refresh only the contents inside that block.
-- If the file is still recognizably SyberMem-managed but does not yet contain the block, insert it near the top of the file.
-- If the file is custom and does not contain the block, do not auto-insert it; explain the option and ask first.
-- If the file is custom but already contains the markers, refresh only the block and leave the rest of the file unchanged.
-
-This protocol block is the automatic entrypoint. The separately installed `/using-sybermem` skill is the visible manual entrypoint.
-
-If the project was already initialized and only instruction files needed refresh, you may skip the codebase scan and go directly to the summary.
+If the project was already initialized and only instruction-file protocol-block removal is needed, you may skip the codebase scan and go directly to the summary.
 
 ## Non-Destructive Update Rules
 
@@ -68,7 +45,8 @@ If the project was already initialized and only instruction files needed refresh
 
 | File | Allowed Update | Forbidden |
 |---|---|---|
-| `CLAUDE.md` / `AGENTS.md` | Insert or refresh the bounded `SYBERMEM_SESSION_PROTOCOL:START`/`END` block only. If the block exists, replace only its contents. If it does not exist, insert the complete block at the top of the file. All content outside the block markers is preserved verbatim. | Overwriting the entire file when it contains user content outside the protocol block. |
+| `CLAUDE.md` / `AGENTS.md` | Remove the bounded `SYBERMEM_SESSION_PROTOCOL:START`/`END` block only. If the block exists, remove only its contents. If the file is purely SyberMem-managed, delete the whole file. All content outside the block markers is preserved verbatim. | Injecting or refreshing a protocol block; overwriting the entire file when it contains user content outside the protocol block. |
+| `.gitignore` (git projects only) | Insert or refresh the bounded `# >>> SyberMem >>>` / `# <<< SyberMem <<<` block that ignores machine-local runtime/scripts (`.sybermem/hooks/`, `.sybermem/` runtime dotfiles, `.claude/settings.json`). If the block exists, replace only its contents. All content outside the markers is preserved verbatim. Skip entirely for non-git projects. | Ignoring shareable memory (records/digests/analysis/templates/`INDEX.md`/`project.yaml`); creating `.gitignore` in a non-git project; overwriting unrelated ignore rules. |
 | `.claude/settings.json` | Read with `json.load`, add/update only SyberMem-owned keys (`env.SYBERMEM_RECORD_MODE`, `hooks.SessionStart`, `hooks.Stop`), write back with `json.dump`. All other keys, env vars, and hooks are preserved. | Overwriting the entire file from template. |
 | `.sybermem/INDEX.md` | Insert missing sections (`## Phase Digests`, `## Topic Index`) at the appropriate position. All existing Key Conclusions, record tables, and user data are preserved. | Regenerating the entire file from template. |
 | `.sybermem/hooks/*.py` | Full replacement from template — these are SyberMem-owned executables with no user content. | — |

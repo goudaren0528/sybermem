@@ -24,6 +24,8 @@ from sybermem_core.team import init_team_repo
 from sybermem_core.publish_bootstrap import bootstrap_publish_status
 from sybermem_core.team_summary import build_team_management_summary
 from sybermem_core.uninstall import deactivate_project_sybermem
+from sybermem_core.version import get_installed_version
+from sybermem_core.doctor import version_report
 from sybermem_cli.habits import register_habit_commands
 from sybermem_cli.context import register_context_commands
 from sybermem_cli.memory_stats_render import render_project_memory_stats_text
@@ -212,6 +214,32 @@ def cmd_project_status(args: argparse.Namespace) -> int:
     else:
         phase = payload["phase"]
         print(f"[{payload['slug']}] {phase['id'] or phase['name']}")
+    return 0
+
+
+def cmd_version(args: argparse.Namespace) -> int:
+    installed = get_installed_version()
+    if args.format == "json":
+        print(dump_json({"installed": installed}))
+    else:
+        print(installed)
+    return 0
+
+
+def cmd_doctor(args: argparse.Namespace) -> int:
+    root = resolve_project_root()
+    report = version_report(root)
+    if args.format == "json":
+        print(dump_json(report))
+        return 0
+    installed = report["installed"]
+    project = report["project"] or "(not stamped)"
+    print(f"SyberMem installed: {installed}")
+    print(f"This project:       {project}")
+    if report["outdated"]:
+        print(f"⭐ This project trails the installed SyberMem — run {report['recommendation']} to apply updates.")
+    else:
+        print("This project is current with the installed SyberMem.")
     return 0
 
 
@@ -609,6 +637,14 @@ def main() -> int:
     publish_status_cmd.add_argument("--preview-source-hash", default=None)
     publish_status_cmd.add_argument("--format", choices=["text", "json"], default="text")
     publish_status_cmd.set_defaults(func=cmd_publish_status)
+
+    version_cmd = sub.add_parser("version")
+    version_cmd.add_argument("--format", choices=["text", "json"], default="text")
+    version_cmd.set_defaults(func=cmd_version)
+
+    doctor_cmd = sub.add_parser("doctor")
+    doctor_cmd.add_argument("--format", choices=["text", "json"], default="text")
+    doctor_cmd.set_defaults(func=cmd_doctor)
 
     register_context_commands(sub)
     register_habit_commands(sub)

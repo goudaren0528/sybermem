@@ -24,7 +24,7 @@ Do NOT silently expand into full-history reading when the user asked for a bound
 
 ## Directory Resolution
 
-Resolve project root by walking up from cwd to find `.sybermem/` + `.claude/settings.json`. Auto-migrate `ADR/` if found. Full rules in the session protocol block in AGENTS.md/CLAUDE.md.
+Resolve project root by walking up from cwd to find `.sybermem/` + `.claude/settings.json`.
 
 ## Natural-Language Triggers
 

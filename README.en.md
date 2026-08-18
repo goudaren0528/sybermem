@@ -158,6 +158,8 @@ Use this from a repository checkout to validate the Claude Code plugin, hooks, a
 2. Open each existing project and run `/sybermem-update`.
 3. For new projects, run `/sybermem-init-project`.
 
+Installers write the installed version to `~/.claude/sybermem/VERSION`, and `sybermem project refresh` stamps `sybermem_version` into the project's `.sybermem/project.yaml`. When a project trails the installed SyberMem, session-start surfaces a throttled, fail-open `⭐ run /sybermem-update` nudge (OpenCode `session.created` toast; Claude/Codex `SessionStart` context). Run `sybermem doctor` any time to see installed vs project version.
+
 The global refresh updates user-level runtime, Claude/OpenCode/Codex skills, the OpenCode plugin, and the Codex user-level hooks. Project-local `.sybermem/`, hooks, templates, and instruction files are refreshed by `/sybermem-update`. `/sybermem-update` now calls `sybermem project refresh --format json` first for scriptable project-local refresh, falling back to agent-orchestrated `/sybermem-init-project` only when the CLI is missing, exits nonzero, or emits invalid JSON. Codex health checks treat `~/.agents/skills/sybermem-init-project/project-files` as one template source, so the Codex install path participates in project freshness checks. Old users who need the new OpenCode habit-reminder, record-intent metadata, or recall debug logging path should re-run the global install/update first to refresh `~/.config/opencode/plugins/sybermem.ts`, then run `/sybermem-update` in the project. The same order applies to fixes for the CLI launcher, OpenCode plugin, Codex hook, or skill instructions.
 
 ## Initialize a Project
@@ -176,11 +178,9 @@ It creates or refreshes:
 - `.sybermem/analysis/phase-index.md`
 - `.sybermem/project.yaml`
 - `.sybermem/hooks/`
-- `CLAUDE.md`
-- `AGENTS.md`
 - `.claude/settings.json`
 
-If a project already has custom `.claude/settings.json` content, SyberMem patches only recognized managed entries and does not overwrite unrelated hooks, env, or instructions.
+If a project already has custom `.claude/settings.json` content, SyberMem patches only recognized managed entries and does not overwrite unrelated hooks, env, or instructions. SyberMem no longer injects into `CLAUDE.md` / `AGENTS.md`; init/update removes any legacy SyberMem protocol block left by older versions (deleting the whole file when it is purely SyberMem-managed, otherwise stripping only the block and preserving user content).
 
 ## Daily Usage
 
@@ -267,8 +267,7 @@ Global uninstall removes user-level skills, CLI, launchers, and the OpenCode plu
 
 ## Compatibility
 
-- `.sybermem/` is the current canonical project data directory.
-- If a project still uses legacy `ADR/`, the first relevant SyberMem workflow migrates it to `.sybermem/`.
+- `.sybermem/` is the canonical project data directory.
 - Claude prompt-time recall applies to managed Claude hooks; OpenCode uses `chat.message` + `experimental.chat.system.transform` for high-signal project recall and conservative User Habit Memory reminders, and `chat.message` writes prompt-free record-intent and recall debug metadata; Codex uses `SessionStart` / `UserPromptSubmit` / `Stop` / `PostCompact` for bounded startup context, prompt-time recall, habit reminders, record-intent capture, loop-safe record nudges, and compact re-seed markers, but still does not claim hidden auto-resume, background automation, or direct compaction prompt injection.
 - For more installation, upgrade, and compatibility details, see [INSTALL.md](INSTALL.md).
 

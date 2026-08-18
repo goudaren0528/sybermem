@@ -1,6 +1,6 @@
 ---
 name: sybermem-summary
-description: Use when generating weekly or monthly SyberMem project summaries, including projects that still have legacy ADR storage.
+description: Use when generating weekly or monthly SyberMem project summaries.
 ---
 
 # sybermem-summary Skill
@@ -30,7 +30,7 @@ Do NOT treat a summary as a digest. If the user wants a durable conclusion, redi
 
 ## Directory Resolution
 
-Resolve project root by walking up from cwd to find `.sybermem/` + `.claude/settings.json`. Auto-migrate `ADR/` if found. Full rules in the session protocol block in AGENTS.md/CLAUDE.md.
+Resolve project root by walking up from cwd to find `.sybermem/` + `.claude/settings.json`.
 
 ## CLI Resolution
 
@@ -107,7 +107,6 @@ When `sybermem project memory-stats --format json` reports `recall.status == "no
 ## Design Principles
 
 - **`.sybermem/` is canonical**: summarize records from the canonical project data directory
-- **Legacy compatibility**: old `ADR/` is auto-migrated on first use
 - **No persistent storage**: summaries are generated dynamically
 - **Prefer confirmed phase structure**: when `.sybermem/analysis/phase-index.md` contains confirmed phases, use that structure before ad hoc record grouping
 - **Current-state only**: `/sybermem-summary` answers “what is the current state of the most relevant confirmed phase?”

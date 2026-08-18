@@ -1042,6 +1042,16 @@ def check_version_consistency(root: Path) -> None:
         elif data.get("version") != expected:
             fail(f"{rel_path.as_posix()} version {data.get('version')} != VERSION {expected}; run scripts/sync-version.py")
 
+    # Core's bundled fallback (used when importlib.metadata is unavailable in a
+    # source checkout) must also track VERSION so it never silently drifts.
+    fallback_re = re.compile(r'FALLBACK_VERSION\s*=\s*"([^"]*)"')
+    version_py = root / "packages" / "core" / "sybermem_core" / "version.py"
+    text = version_py.read_text(encoding="utf-8")
+    match = fallback_re.search(text)
+    if not match or match.group(1) != expected:
+        found = match.group(1) if match else "(none)"
+        fail(f"packages/core/sybermem_core/version.py FALLBACK_VERSION {found} != VERSION {expected}; run scripts/sync-version.py")
+
 
 def main(root: Path = ROOT) -> int:
     check_required_files(root)

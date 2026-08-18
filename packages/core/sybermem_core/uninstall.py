@@ -7,6 +7,16 @@ import json
 def remove_sybermem_protocol_block(text: str) -> str:
     start = "<!-- SYBERMEM_SESSION_PROTOCOL:START -->"
     end = "<!-- SYBERMEM_SESSION_PROTOCOL:END -->"
+    return _remove_marker_block(text, start, end)
+
+
+def remove_sybermem_gitignore_block(text: str) -> str:
+    start = "# >>> SyberMem >>>"
+    end = "# <<< SyberMem <<<"
+    return _remove_marker_block(text, start, end)
+
+
+def _remove_marker_block(text: str, start: str, end: str) -> str:
     if start not in text or end not in text:
         return text
     before = text.split(start, 1)[0].rstrip()
@@ -16,6 +26,8 @@ def remove_sybermem_protocol_block(text: str) -> str:
         pieces.append(before)
     if after:
         pieces.append(after)
+    if not pieces:
+        return ""
     return "\n\n".join(pieces).rstrip() + "\n"
 
 
@@ -58,6 +70,15 @@ def deactivate_project_sybermem(root: Path) -> dict[str, object]:
             if updated != original:
                 p.write_text(updated, encoding="utf-8")
                 changed.append(str(p).replace('\\', '/'))
+
+    # 4) Remove the SyberMem ignore block from .gitignore (non-destructive)
+    gitignore_path = root / ".gitignore"
+    if gitignore_path.is_file():
+        original = gitignore_path.read_text(encoding="utf-8")
+        updated = remove_sybermem_gitignore_block(original)
+        if updated != original:
+            gitignore_path.write_text(updated, encoding="utf-8")
+            changed.append(str(gitignore_path).replace('\\', '/'))
 
     return {
         "status": "project_deactivated",

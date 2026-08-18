@@ -68,7 +68,12 @@ def read_text(path: Path) -> str | None:
 
 
 def check_instruction_file(root: Path, name: str, template_content: str) -> dict:
-    """Check CLAUDE.md or AGENTS.md status."""
+    """Check CLAUDE.md or AGENTS.md for a legacy SyberMem protocol block to remove.
+
+    SyberMem no longer injects into instruction files. A file is only actionable
+    when it still carries a legacy `SYBERMEM_SESSION_PROTOCOL` block; the migration
+    removes the block (or the whole file when it is purely SyberMem-managed).
+    """
     path = root / name
     content = read_text(path)
     if content is None:
@@ -76,51 +81,82 @@ def check_instruction_file(root: Path, name: str, template_content: str) -> dict
 
     has_block = "SYBERMEM_SESSION_PROTOCOL:START" in content and "SYBERMEM_SESSION_PROTOCOL:END" in content
 
-    # Check if file is purely SyberMem-managed (no user custom content)
-    # Strip the protocol block from both template and file, compare the rest
+    # Check if file is purely SyberMem-managed (no user custom content).
+    # Strip the protocol block and compare against the known SyberMem template body
+    # (blank-line count ignored because removing the block can leave extra blanks).
     block_pattern = re.compile(
         r"<!-- SYBERMEM_SESSION_PROTOCOL:START -->.*?<!-- SYBERMEM_SESSION_PROTOCOL:END -->",
         re.DOTALL,
     )
     file_stripped = block_pattern.sub("", content).strip()
-    template_stripped = block_pattern.sub("", template_content).strip()
-    is_sybermem_only = file_stripped == template_stripped
+    is_sybermem_only = _is_sybermem_only_instruction(file_stripped)
 
-    # Detect old SyberMem templates that have heavy sections outside the protocol block.
-    # These are NOT user custom content — they are leftover from older SyberMem versions.
-    has_old_sybermem_sections = (
-        "## Available Skills" in content
-        or "## Workflow" in content
-        or ("## Directory Resolution" in content and "## Core Rule" in content)
-    )
-    if has_old_sybermem_sections:
-        is_sybermem_only = True
-
-    # Even if protocol block exists, check if its content matches the template
-    # (detects stale/over-heavy protocol blocks from older versions)
-    block_is_current = True
-    if has_block and template_content:
-        file_block_m = block_pattern.search(content)
-        template_block_m = block_pattern.search(template_content)
-        if file_block_m and template_block_m:
-            file_block = file_block_m.group(0).strip()
-            template_block = template_block_m.group(0).strip()
-            block_is_current = file_block == template_block
-
-    # If file is entirely SyberMem-managed (including old heavy templates),
-    # compare the whole file to the current template
-    content_is_current = True
-    if is_sybermem_only and template_content:
-        content_is_current = content.strip() == template_content.strip()
-
-    status = "fresh" if (has_block and block_is_current and content_is_current) else "stale"
+    # A file is actionable only when it still carries a legacy protocol block.
+    status = "stale" if has_block else "fresh"
     return {
         "status": status,
         "has_protocol_block": has_block,
         "is_sybermem_only": is_sybermem_only,
-        "block_is_current": block_is_current,
-        "content_is_current": content_is_current,
     }
+
+
+# The exact body of the SyberMem instruction template with the protocol block
+# removed. A file whose content outside the protocol block matches this (or an
+# old heavy SyberMem template) is purely SyberMem-managed and safe to delete.
+_SYBERMEM_TEMPLATE_BODY = (
+    "# SyberMem Project Record System\n"
+    "\n"
+    "## Core Rule\n"
+    "\n"
+    "After completing meaningful work, run `/sybermem-record` to create a record.\n"
+    "\n"
+    "## Directories\n"
+    "\n"
+    "- `.sybermem/changes/` — Feature changes\n"
+    "- `.sybermem/decisions/` — Technical decisions\n"
+    "- `.sybermem/requirements/` — Requirements / discussions\n"
+    "- `.sybermem/bugs/` — Bug fixes\n"
+    "- `.sybermem/INDEX.md` — Master index\n"
+    "\n"
+    "## No Record Needed\n"
+    "\n"
+    "Formatting adjustments, comment edits, config tweaks with no functional impact."
+)
+
+
+def _normalize_blank_lines(text: str) -> str:
+    """Collapse runs of blank lines to a single blank line and strip edges."""
+    lines = [line.rstrip() for line in text.splitlines()]
+    out: list[str] = []
+    prev_blank = False
+    for line in lines:
+        blank = line.strip() == ""
+        if blank and prev_blank:
+            continue
+        out.append(line)
+        prev_blank = blank
+    return "\n".join(out).strip()
+
+
+def _is_sybermem_only_instruction(stripped_text: str) -> bool:
+    """Return True when the stripped text is only known SyberMem template content.
+
+    A file is purely SyberMem-managed when its content outside the protocol block
+    is empty, matches the current SyberMem template body, or is an old heavy
+    SyberMem template (recognized by its distinctive section headings). Any other
+    content means user content, so we must preserve the file and strip only the
+    protocol block.
+    """
+    if _normalize_blank_lines(stripped_text) == "":
+        return True
+    if _normalize_blank_lines(stripped_text) == _normalize_blank_lines(_SYBERMEM_TEMPLATE_BODY):
+        return True
+    # Old heavy SyberMem templates shipped sections that are not user content.
+    return (
+        "## Available Skills" in stripped_text
+        or "## Workflow" in stripped_text
+        or ("## Directory Resolution" in stripped_text and "## Core Rule" in stripped_text)
+    )
 
 
 def check_settings_json(root: Path) -> dict:
@@ -283,6 +319,26 @@ def check_dir_exists(path: Path) -> dict:
     return {"status": "present" if path.is_dir() else "missing"}
 
 
+def check_gitignore(root: Path) -> dict:
+    """Check whether the SyberMem ignore block is present in a git project's .gitignore.
+
+    Non-git projects are out of scope (fresh, no action). For git projects, a
+    missing or stale SyberMem marker block is actionable so runtime/scripts stay
+    out of version control while shareable records remain committable.
+    """
+    if not (root / ".git").exists():
+        return {"status": "fresh", "applicable": False}
+    content = read_text(root / ".gitignore")
+    if content is None:
+        return {"status": "missing", "applicable": True}
+    has_block = "# >>> SyberMem >>>" in content and "# <<< SyberMem <<<" in content
+    if not has_block:
+        return {"status": "missing", "applicable": True}
+    # Content-check a couple of load-bearing lines so old blocks get refreshed.
+    is_current = "/.sybermem/hooks/" in content and "/.claude/settings.json" in content
+    return {"status": "fresh" if is_current else "stale", "applicable": True}
+
+
 def check_index_md(root: Path) -> dict:
     """Check .sybermem/INDEX.md status."""
     path = root / ".sybermem" / "INDEX.md"
@@ -323,18 +379,24 @@ def generate_actions(files: dict) -> list[str]:
     """Generate the list of actions needed based on file statuses."""
     actions: list[str] = []
 
-    # Instruction files — insert or refresh protocol block, never overwrite user content
+    # .gitignore — add/refresh the SyberMem ignore block only for git projects
+    gi = files.get(".gitignore", {})
+    if gi.get("applicable"):
+        if gi.get("status") == "missing":
+            actions.append("add SyberMem ignore block to .gitignore (preserve existing content)")
+        elif gi.get("status") == "stale":
+            actions.append("refresh SyberMem ignore block in .gitignore (preserve content outside block)")
+
+    # Instruction files — remove legacy protocol blocks, never touch user content
     for name in ("CLAUDE.md", "AGENTS.md"):
         info = files.get(name, {})
         if info.get("status") == "missing":
-            actions.append(f"create {name} from template")
-        elif info.get("is_sybermem_only") and not info.get("content_is_current", True):
-            # File is entirely SyberMem-managed (or old heavy template) — safe to replace whole file
-            actions.append(f"replace {name} from template")
-        elif not info.get("has_protocol_block"):
-            actions.append(f"insert protocol block into {name} (preserve existing content)")
-        elif not info.get("block_is_current", True):
-            actions.append(f"replace protocol block in {name} (preserve content outside block)")
+            continue
+        if info.get("has_protocol_block"):
+            if info.get("is_sybermem_only"):
+                actions.append(f"remove {name} (purely SyberMem-managed)")
+            else:
+                actions.append(f"remove protocol block from {name} (preserve content outside block)")
 
     # settings.json — surgical patch only
     sj = files.get(".claude/settings.json", {})
@@ -464,24 +526,9 @@ def main() -> int:
                 raise SystemExit(result.returncode)
             break
 
-    # Load template content for comparison
-    # Templates are in the installed skill's project-files directory
-    # But this script runs from the project, so we read templates relative to the skill install
-    # For is_sybermem_only check, we need the template CLAUDE.md/AGENTS.md content
-    # Find the template by checking known global skill paths
-    template_claude = ""
-    template_agents = ""
-    for skill_base in GLOBAL_TEMPLATE_PROJECT_FILES:
-        claude_path = skill_base / "CLAUDE.md"
-        agents_path = skill_base / "AGENTS.md"
-        if claude_path.is_file() and not template_claude:
-            template_claude = read_text(claude_path) or ""
-        if agents_path.is_file() and not template_agents:
-            template_agents = read_text(agents_path) or ""
-
     files: dict = {}
-    files["CLAUDE.md"] = check_instruction_file(root, "CLAUDE.md", template_claude)
-    files["AGENTS.md"] = check_instruction_file(root, "AGENTS.md", template_agents)
+    files["CLAUDE.md"] = check_instruction_file(root, "CLAUDE.md", "")
+    files["AGENTS.md"] = check_instruction_file(root, "AGENTS.md", "")
     files[".claude/settings.json"] = check_settings_json(root)
     files[".sybermem/hooks/record_change_on_stop.py"] = check_stop_hook(root)
     files[".sybermem/hooks/session_start_context.py"] = check_session_start_hook(root)
@@ -506,6 +553,9 @@ def main() -> int:
     # Project identity
     files[".sybermem/project.yaml"] = check_file_exists(root / ".sybermem" / "project.yaml")
 
+    # .gitignore ignore block (git projects only)
+    files[".gitignore"] = check_gitignore(root)
+
     # Determine overall status
     index_status = files[".sybermem/INDEX.md"]["status"]
     if index_status == "missing":
@@ -525,7 +575,6 @@ def main() -> int:
         "analysis": files[".sybermem/analysis/phase-index.md"]["status"] != "missing",
         "auto_record_hook": files[".sybermem/hooks/record_change_on_stop.py"]["status"] != "missing",
         "session_start_hook": files[".sybermem/hooks/session_start_context.py"]["status"] != "missing",
-        "protocol_block": files["CLAUDE.md"].get("has_protocol_block", False) or files["AGENTS.md"].get("has_protocol_block", False),
     }
 
     actions = generate_actions(files) if overall == "needs_update" else []

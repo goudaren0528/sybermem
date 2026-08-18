@@ -9,11 +9,10 @@ dist/
 *.egg-info/
 *.backup
 
-# The repo's own root CLAUDE.md / AGENTS.md are SyberMem-written instances from
-# dogfooding this tool (they inject the session protocol pointing at THIS repo's
-# .sybermem/). They are local runtime config, not product docs. Root-anchored so
-# the user-facing templates under packages/**/project-files/ and
-# skills/**/project-files/ stay tracked.
+# The repo's own root CLAUDE.md / AGENTS.md are local runtime config from
+# dogfooding this tool, not product docs. SyberMem no longer injects a session
+# protocol into them. Root-anchored so the user-facing templates under
+# packages/**/project-files/ and skills/**/project-files/ stay tracked.
 /CLAUDE.md
 /AGENTS.md
 

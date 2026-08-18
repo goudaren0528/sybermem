@@ -62,6 +62,35 @@ The passive capture is candidate-only and never creates a habit on its own. To t
 
 If the user declines, just clear the candidate with `habit intent-clear` and do not add anything.
 
+## Semantic nomination (you judge intent, not keywords)
+
+A pending candidate is only ONE trigger. The keyword prefilter that writes it
+(`always/habit/prefer/以后/习惯/...`) is a cheap hot-path guard, NOT the decision:
+many reusable preferences and norms are phrased without any trigger word. YOU
+decide, from the conversation's meaning, whether something is worth fixing down.
+
+Nominate a candidate (confirmation-first) when EITHER holds:
+
+- The user states a reusable preference or a reasonable standing requirement, even
+  without a trigger word (e.g. "回复用中文", "先出计划再写代码", "PR 要小而聚焦").
+- The same constraint is expressed **two or more times** in this session/section —
+  repetition is a strong signal it should become a norm.
+
+Route by where it belongs (no new storage — use the existing homes):
+
+- Personal / cross-project preference → a **user habit** (`habit add ...`).
+- Project-specific convention/norm → suggest a **`decision` or `requirement` record**
+  via `/sybermem-record` instead (that is the norm's real home). Do not force it into
+  a user habit.
+
+Friction rules (keep it friendly, never nagging):
+
+- Only nominate when you are reasonably confident; when unsure, stay silent.
+- Never interrupt mid-task. Raise a nomination at a natural stopping point.
+- Batch multiple candidates into ONE offer; each is one-step to confirm.
+- If the user declines, drop it and do not re-raise the same nomination this session.
+- Confirmation-first always (L1): a nomination is a hint, never authorization to write.
+
 ## Examples
 
 User: "以后改代码前先给方案，帮我记住。"

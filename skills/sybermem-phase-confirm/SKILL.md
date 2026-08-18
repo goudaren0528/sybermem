@@ -22,7 +22,7 @@ Do NOT add a second `## Coverage Map` heading. Edit only within existing section
 
 ## Directory Resolution
 
-Resolve project root by walking up from cwd to find `.sybermem/` + `.claude/settings.json`. Auto-migrate `ADR/` if found. Full rules in the session protocol block in AGENTS.md/CLAUDE.md.
+Resolve project root by walking up from cwd to find `.sybermem/` + `.claude/settings.json`.
 
 ## Preconditions
 

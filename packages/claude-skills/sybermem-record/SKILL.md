@@ -1,6 +1,6 @@
 ---
 name: sybermem-record
-description: Use when creating SyberMem project records for changes, decisions, requirements, or bugs, including projects that still have legacy ADR storage.
+description: Use when creating SyberMem project records for changes, decisions, requirements, or bugs.
 ---
 
 # sybermem-record Skill
@@ -42,7 +42,7 @@ If any of these three is missing, the record is incomplete. Go back and finish i
 
 ## Directory Resolution
 
-Resolve project root by walking up from cwd to find `.sybermem/` + `.claude/settings.json`. Auto-migrate `ADR/` if found. Full rules in the session protocol block in AGENTS.md/CLAUDE.md.
+Resolve project root by walking up from cwd to find `.sybermem/` + `.claude/settings.json`.
 
 ## CLI Resolution
 
@@ -139,6 +139,21 @@ Required sections:
 - `.sybermem/` doesn't exist after resolution → prompt to initialize the project with `/sybermem-init-project`
 - `generate_record_id(type)` unavailable or project index build/check fails → stop and fix the underlying environment instead of inventing IDs or editing INDEX by hand
 - Required field missing → ask the user to provide it
+
+## Optional closing step: surface a fixable norm
+
+After the record is written and verified, do a quick semantic look-back over this
+session. If the user expressed a reusable preference or a standing requirement —
+especially one repeated **two or more times** — offer (once, batched) to fix it
+down. This is a low-friction hint, not a required step.
+
+- Personal / cross-project preference → offer to save a **user habit** (`/sybermem-habit`).
+- Project-specific convention/norm → note it likely belongs in a **`decision` or `requirement` record** and offer to capture that.
+
+Rules: only when reasonably confident; never for a one-off; one batched offer, one-step
+to accept; if the user declines or is silent, drop it and move on. Never auto-write and
+never block the record flow (L1: confirmation-first). Skip this step entirely when nothing
+qualifies.
 
 ## Terminal State
 

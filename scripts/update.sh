@@ -161,6 +161,14 @@ EOF
 chmod +x "$CLI_WRAPPER"
 echo "  [Global] 已安装 sybermem CLI: $CLI_WRAPPER"
 
+# Installed-version marker: session-start checks this against each project's
+# .sybermem/project.yaml sybermem_version to nudge /sybermem-update when behind.
+if [ -f "$ADR_PATH/VERSION" ]; then
+    mkdir -p "$LAUNCHER_DIR"
+    cp "$ADR_PATH/VERSION" "$LAUNCHER_DIR/VERSION"
+    echo "  [Global] 已记录已安装版本标记: $LAUNCHER_DIR/VERSION"
+fi
+
 # Keep the ~/.local/bin symlink current on update too (no shell-rc edit).
 LOCAL_BIN="$HOME/.local/bin"
 mkdir -p "$LOCAL_BIN"
@@ -204,7 +212,7 @@ echo ""
 echo "下一步：进入你的项目目录后执行 /sybermem-update"
 echo "如果你只想检查项目本地文档是否需要刷新，可执行 /sybermem-init-project"
 echo ""
-echo "注意：更新全局 Skills 不会自动刷新项目里的 AGENTS.md / CLAUDE.md；请在项目内运行 /sybermem-update 或 /sybermem-init-project"
+echo "注意：更新全局 Skills 不会自动刷新项目里的受管文件；请在项目内运行 /sybermem-update 或 /sybermem-init-project（会移除旧版遗留的 AGENTS.md / CLAUDE.md 协议块）"
 echo "注意：stop hook 的子目录兼容现在由全局 launcher 提供：~/.claude/sybermem/launch_record_change_on_stop.py"
 
 if [ -d "$LEGACY_LOCAL_SKILLS/sybermem-init-project" ] || [ -d "$LEGACY_LOCAL_SKILLS/sybermem-record" ] || [ -d "$LEGACY_LOCAL_SKILLS/sybermem-summary" ] || [ -d "$LEGACY_LOCAL_SKILLS/sybermem-update" ]; then

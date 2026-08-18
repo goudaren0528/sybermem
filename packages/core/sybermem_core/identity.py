@@ -42,6 +42,8 @@ def now_iso() -> str:
 
 
 def render_project_yaml(project_id: str, slug: str, root: Path) -> str:
+    from .version import get_installed_version
+
     return (
         f"schema_version: 1\n"
         f"project_id: {project_id}\n"
@@ -51,4 +53,5 @@ def render_project_yaml(project_id: str, slug: str, root: Path) -> str:
         f"  remote: {git_remote(root)}\n"
         f"  default_branch: {git_default_branch(root)}\n"
         f"created_at: {now_iso()}\n"
+        f"sybermem_version: {get_installed_version()}\n"
     )

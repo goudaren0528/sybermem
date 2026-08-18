@@ -27,7 +27,7 @@ If any of these is false, STOP. Do not write the digest file.
 
 ## Directory Resolution
 
-Resolve project root by walking up from cwd to find `.sybermem/` + `.claude/settings.json`. Auto-migrate `ADR/` if found. Full rules in the session protocol block in AGENTS.md/CLAUDE.md.
+Resolve project root by walking up from cwd to find `.sybermem/` + `.claude/settings.json`.
 
 ## Preconditions
 
@@ -94,6 +94,19 @@ If you catch yourself doing any of these, STOP:
 - Leaving the `{{coverage_hash}}` placeholder unfilled, inventing a hash, or computing it over anything other than the exact `source_records` set (this silently defeats stale-digest detection)
 
 **All of these mean: go back to Step 2 and re-verify source coverage and phase status.**
+
+## Optional closing step: surface a fixable norm
+
+A digest is a natural moment to notice conventions worth fixing down. After the
+digest is written, scan the compressed source records for a **recurring** norm or
+standing requirement (a rule that shows up across multiple records). If one stands
+out, offer (once, batched) to capture it — never auto-write:
+
+- Personal / cross-project preference → offer a **user habit** (`/sybermem-habit`).
+- Project-specific convention/norm → note it likely belongs in a **`decision` or `requirement` record**.
+
+Rules: only when it recurs and you are confident; one batched offer, one-step to accept;
+decline or silence → drop it. Confirmation-first (L1). Skip entirely when nothing recurs.
 
 ## Terminal State
 

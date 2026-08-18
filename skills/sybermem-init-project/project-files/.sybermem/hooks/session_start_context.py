@@ -150,6 +150,70 @@ def parse_project_identity(root: Path) -> dict:
     return {"exists": True, "project_id": project_id, "slug": slug}
 
 
+def _user_home() -> Path | None:
+    import os
+    home = os.environ.get("USERPROFILE") or os.environ.get("HOME")
+    return Path(home) if home else None
+
+
+def read_installed_version() -> str:
+    """Read the installed SyberMem version marker written by the install scripts."""
+    home = _user_home()
+    if home is None:
+        return ""
+    marker = home / ".claude" / "sybermem" / "VERSION"
+    text = read_text(marker)
+    return text.strip() if text else ""
+
+
+def read_project_version(root: Path) -> str:
+    """Read sybermem_version from .sybermem/project.yaml (empty if absent)."""
+    content = read_text(root / ".sybermem" / "project.yaml")
+    if content is None:
+        return ""
+    for line in content.splitlines():
+        line = line.strip()
+        if line.startswith("sybermem_version:"):
+            return line.split(":", 1)[1].strip()
+    return ""
+
+
+def _parse_version(version: str) -> tuple[int, ...]:
+    parts: list[int] = []
+    for raw in version.strip().split("."):
+        digits = ""
+        for ch in raw:
+            if ch.isdigit():
+                digits += ch
+            else:
+                break
+        parts.append(int(digits) if digits else 0)
+    return tuple(parts)
+
+
+def project_is_outdated(root: Path) -> dict:
+    """Whether a MANAGED project should be nudged to run /sybermem-update. Fail-open.
+
+    Tri-state so OLD projects bootstrap into version tracking:
+    - installed unknown (no VERSION marker) -> not outdated.
+    - not a managed project (no .sybermem/project.yaml) -> not outdated.
+    - managed but no sybermem_version stamp (predates the field) -> outdated.
+    - managed and stamp < installed -> outdated.
+    """
+    installed = read_installed_version()
+    project = read_project_version(root)
+    is_managed = (root / ".sybermem" / "project.yaml").is_file()
+    if not installed or not is_managed:
+        return {"outdated": False, "installed": installed, "project": project}
+    if not project:
+        return {"outdated": True, "installed": installed, "project": project}
+    pa, pb = _parse_version(project), _parse_version(installed)
+    width = max(len(pa), len(pb))
+    pa += (0,) * (width - len(pa))
+    pb += (0,) * (width - len(pb))
+    return {"outdated": pa < pb, "installed": installed, "project": project}
+
+
 def detect_stale_signal(root: Path, boundary_commit: str | None) -> dict:
     """Compare phase-index boundary to current HEAD."""
     if not boundary_commit:
@@ -231,11 +295,30 @@ def detect_record_gap(root: Path) -> dict:
     return {"nudge": count >= 3, "commits_since_record": count, "since": latest}
 
 
+def _version_nudge_line(root: Path) -> str | None:
+    """Return an update-available line when the project trails installed SyberMem."""
+    version = project_is_outdated(root)
+    if not version["outdated"]:
+        return None
+    was_refreshed = (
+        f"was last refreshed with {version['project']}"
+        if version["project"]
+        else "predates SyberMem version tracking"
+    )
+    return (
+        f"⭐ Update available: SyberMem {version['installed']} is installed but this "
+        f"project {was_refreshed}. Run /sybermem-update to apply the latest fixes "
+        "to this project."
+    )
+
+
 def build_context(root: Path) -> str:
     """Build the additionalContext string for Claude Code."""
     index_path = root / ".sybermem" / "INDEX.md"
+    version_line = _version_nudge_line(root)
     if not index_path.is_file():
-        return "SyberMem startup context:\nNo .sybermem/INDEX.md found. Run /sybermem-init-project to initialize."
+        base = "SyberMem startup context:\nNo .sybermem/INDEX.md found. Run /sybermem-init-project to initialize."
+        return f"{base}\n{version_line}" if version_line else base
 
     index_text = index_path.read_text(encoding="utf-8")
     conclusions = parse_conclusions(index_text)
@@ -244,6 +327,9 @@ def build_context(root: Path) -> str:
     project_info = parse_project_identity(root)
 
     lines: list[str] = ["SyberMem startup context:"]
+
+    if version_line:
+        lines.append(version_line)
 
     if project_info["exists"] and project_info.get("slug"):
         lines.append(f"Project: {project_info['slug']} ({project_info.get('project_id', 'no id')}).")

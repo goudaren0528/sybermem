@@ -12,6 +12,8 @@ import { lowSignalRecallToast, parseRecallHealth } from "./recall_health_signal"
 import { extractEditedFile, getSessionActivity, recordEditedFile, recordInjectedRecords, recordToolExecution, recordTodoUpdate, resetSessionActivity } from "./session_activity"
 import { flushRecallOutcome } from "./recall_outcome"
 import { captureHabitIntentWithCli } from "./habit_intent"
+import { updateNudgeMessage } from "./version_signal"
+import { applyReplyMarker, armReplyMarker } from "./reply_marker"
 
 interface ToastClient { readonly tui: { readonly showToast: (input: { readonly body: { readonly message: string; readonly variant: "info" } }) => Promise<void> } }
 interface PluginArgs { readonly $: import("./runtime").Shell; readonly directory: string; readonly client: ToastClient }
@@ -49,17 +51,26 @@ function readSessionID(source: unknown): string {
 
 function recallToastMessage(summary: InjectionSummary): string | null {
   if (summary.recallCount === 0) return null
-  return `⭐ SyberMem: injected ${summary.recallCount} recall hint${summary.recallCount === 1 ? "" : "s"} into this prompt`
+  const n = summary.recallCount
+  return `⭐ SyberMem 记忆已加入本轮回答参考：${n} 条相关记录 (recall)`
 }
 
 // Habit injection gets its own distinct, brain-marked toast so an applied user
 // habit is as perceptible as recall — not buried inside a combined recall notice.
 function habitToastMessage(summary: InjectionSummary): string | null {
   if (summary.habitCount === 0) return null
-  return `🧠 SyberMem: applied ${summary.habitCount} user habit reminder${summary.habitCount === 1 ? "" : "s"} to this prompt`
+  const n = summary.habitCount
+  // Keep the English "applied ... user habit reminder(s)" phrasing so the toast
+  // stays a DISTINCT applied-habit signal (also asserted by the package guard).
+  return `🧠 SyberMem 已应用你的 ${n} 条习惯 (applied ${n} user habit reminder${n === 1 ? "" : "s"})`
 }
 
 async function handleSessionCreated(args: PluginArgs, root: string, sessionID: string): Promise<void> {
+  // Version nudge fires independently of conclusions: an outdated project should
+  // be flagged even before it has any recorded memory. Fail-open and throttled.
+  const versionNudge = updateNudgeMessage(root)
+  if (versionNudge) throttledToast(args.client, "version-outdated", versionNudge)
+
   const parsed = parseIndex(root)
   if (!parsed || parsed.conclusions.length === 0) return
   // Mark this session so the first system-transform turn injects model-visible
@@ -189,7 +200,7 @@ export const SyberMemPlugin: Plugin = async ({ $, directory, client }: PluginArg
       // heuristic, so the user knows a habit candidate is ready to confirm.
       const summary = classifyPackets(packets)
       if (habitIntent.captured || summary.habitCandidate) {
-        throttledToast(args.client, "habit-candidate", "💡 SyberMem captured a reusable preference — confirm it with /sybermem-habit")
+        throttledToast(args.client, "habit-candidate", "💡 SyberMem 发现一条可复用的偏好/规范 — 需要的话用 /sybermem-habit 一步确认")
       }
     },
     "experimental.chat.system.transform": async ({ sessionID }: { readonly sessionID?: string }, output: SystemTransformOutput) => {
@@ -218,6 +229,20 @@ export const SyberMemPlugin: Plugin = async ({ $, directory, client }: PluginArg
         const habitMessage = habitToastMessage(summary)
         if (habitMessage) throttledToast(args.client, "habit-injected", habitMessage)
       }
+      // Arm the opt-in reply marker for this turn (no-op unless SYBERMEM_REPLY_MARKER
+      // is set and material was actually injected).
+      armReplyMarker(sessionID ?? "", summary.recallCount, summary.habitCount)
+    },
+    "experimental.text.complete": async (
+      input: { readonly sessionID: string; readonly messageID: string; readonly partID: string },
+      output: { text: string },
+    ) => {
+      if (!root) return
+      // Opt-in only (default OFF). Prepends one marker line to the first assistant
+      // text part of a turn that actually received injected context. Fail-open.
+      try {
+        output.text = applyReplyMarker(input.sessionID, input.messageID, output.text)
+      } catch { /* reply marker is optional UX, never block the reply */ }
     },
     "experimental.session.compacting": async (_input: unknown, output: { readonly context: string[] }) => {
       if (!root) return
