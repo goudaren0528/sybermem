@@ -9,7 +9,8 @@ from sybermem_core.formats import dump_json
 from sybermem_core.project import resolve_project_root, ensure_project_yaml
 from sybermem_core.project_refresh import refresh_project
 from sybermem_core.project_index import RECORD_TYPES, DuplicateRecordIdError, InvalidRecordMetadataError, check_project_index, write_project_index
-from sybermem_core.phase_index import PhaseConfirmError, analyze_phases, confirm_phases_from_payload
+from sybermem_core.phase_index import PhaseApplyError, analyze_phases, apply_phase_payload, resolve_record_paths
+from sybermem_core.digest_coverage import compute_coverage_hash
 from sybermem_core.records import generate_record_id, related_files_by_record
 from sybermem_core.registry import register_project
 from sybermem_core.identity import git_remote
@@ -473,7 +474,23 @@ def cmd_project_phase_analyze(args: argparse.Namespace) -> int:
     if root is None:
         print("No SyberMem project root found.", file=sys.stderr)
         return 1
-    result = analyze_phases(root)
+    if args.from_json is not None:
+        # Semantic path (primary): the agent provides a higher-quality grouping than
+        # mechanical bucketing. Core validates coverage and persists deterministically.
+        try:
+            raw = sys.stdin.read() if args.from_json == "-" else Path(args.from_json).read_text(encoding="utf-8")
+            payload = json.loads(raw)
+        except (OSError, ValueError) as exc:
+            print(f"Failed to read phase payload: {exc}", file=sys.stderr)
+            return 1
+        try:
+            result = apply_phase_payload(root, payload)
+        except PhaseApplyError as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
+    else:
+        # Mechanical fallback: month + primary-topic buckets. Never needs an agent.
+        result = analyze_phases(root)
     if args.format == "json":
         print(dump_json(result))
     else:
@@ -481,27 +498,76 @@ def cmd_project_phase_analyze(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_project_phase_confirm(args: argparse.Namespace) -> int:
+def cmd_project_coverage_hash(args: argparse.Namespace) -> int:
     root = resolve_project_root()
     if root is None:
         print("No SyberMem project root found.", file=sys.stderr)
         return 1
-    try:
-        raw = sys.stdin.read() if args.from_json == "-" else Path(args.from_json).read_text(encoding="utf-8")
-        payload = json.loads(raw)
-    except (OSError, ValueError) as exc:
-        print(f"Failed to read phase payload: {exc}", file=sys.stderr)
+    source_records: list[str]
+    if args.source_records:
+        source_records = [item.strip() for item in args.source_records.split(",") if item.strip()]
+    elif args.phase_id:
+        idx = (root / ".sybermem" / "analysis" / "phase-index.md")
+        if not idx.is_file():
+            print("No phase index found; run phase analyze first.", file=sys.stderr)
+            return 1
+        text = idx.read_text(encoding="utf-8")
+        record_ids = _covered_records_for_phase(text, args.phase_id)
+        if record_ids is None:
+            print(f"phase {args.phase_id} not found in phase index.", file=sys.stderr)
+            return 1
+        mapping = resolve_record_paths(root, record_ids)
+        missing = [rid for rid in record_ids if rid not in mapping]
+        source_records = [mapping[rid] for rid in record_ids if rid in mapping]
+    else:
+        print("Provide --source-records <relpaths> or --phase-id <phase-NNN>.", file=sys.stderr)
         return 1
-    try:
-        result = confirm_phases_from_payload(root, payload)
-    except PhaseConfirmError as exc:
-        print(str(exc), file=sys.stderr)
+    if not source_records:
+        print("No source records resolved.", file=sys.stderr)
         return 1
+    coverage_hash = compute_coverage_hash(root, source_records)
+    result = {"source_records": source_records, "coverage_hash": coverage_hash}
     if args.format == "json":
         print(dump_json(result))
     else:
-        print(f"{result['status']}: {len(result['phases'])} phase(s)")
+        print(coverage_hash)
     return 0
+
+
+def _covered_records_for_phase(phase_index_text: str, phase_id: str) -> list[str] | None:
+    """Return the covered record ids for a phase block, or None if the phase is absent."""
+    import re as _re
+
+    phase_re = _re.compile(r"^- phase_id: (phase-\d+)")
+    lines = phase_index_text.splitlines()
+    current_phase: str | None = None
+    in_covered = False
+    records: list[str] = []
+    for line in lines:
+        stripped = line.strip()
+        phase_match = phase_re.match(stripped)
+        if phase_match:
+            # We've left the target phase: return what we collected for it (if any).
+            if current_phase == phase_id:
+                return records if records else None
+            current_phase = phase_match.group(1)
+            in_covered = False
+            records = []
+            continue
+        if current_phase != phase_id:
+            continue
+        if stripped == "- covered_records:":
+            in_covered = True
+            continue
+        if in_covered:
+            if not line.startswith("  - "):
+                in_covered = False
+                continue
+            item = stripped
+            if item.startswith("- "):
+                item = item[2:].strip()
+            records.append(item)
+    return records if records else None
 
 
 def main() -> int:
@@ -550,12 +616,19 @@ def main() -> int:
     project_phase = project_sub.add_parser("phase")
     project_phase_sub = project_phase.add_subparsers(dest="project_phase_command", required=True)
     phase_analyze = project_phase_sub.add_parser("analyze")
+    phase_analyze.add_argument(
+        "--from-json",
+        default=None,
+        help="Path to a JSON phase payload {phases:[{title,covered_records}]}; use '-' for stdin. Semantic agent grouping (primary). Omit for mechanical fallback grouping.",
+    )
     phase_analyze.add_argument("--format", choices=["text", "json"], default="text")
     phase_analyze.set_defaults(func=cmd_project_phase_analyze)
-    phase_confirm = project_phase_sub.add_parser("confirm")
-    phase_confirm.add_argument("--from-json", required=True)
-    phase_confirm.add_argument("--format", choices=["text", "json"], default="text")
-    phase_confirm.set_defaults(func=cmd_project_phase_confirm)
+
+    coverage_hash_cmd = project_sub.add_parser("coverage-hash")
+    coverage_hash_cmd.add_argument("--source-records", default="", help="Comma-separated project-relative source record paths.")
+    coverage_hash_cmd.add_argument("--phase-id", default="", help="Resolve source records from this phase (e.g. phase-001) and hash them.")
+    coverage_hash_cmd.add_argument("--format", choices=["text", "json"], default="text")
+    coverage_hash_cmd.set_defaults(func=cmd_project_coverage_hash)
 
     project_index = project_sub.add_parser("index")
     project_index_sub = project_index.add_subparsers(dest="project_index_command", required=True)
