@@ -56,7 +56,8 @@ install_skills() {
     local label="$2"
     mkdir -p "$target"
     rm -rf "$target/init-project" "$target/record" "$target/summary"
-    for skill in sybermem-init-project sybermem-record sybermem-summary sybermem-resume sybermem-digest sybermem-phase-analyze sybermem-phase-confirm using-sybermem sybermem-update sybermem-search sybermem-link sybermem-theme-digest sybermem-team-publish sybermem-team-summary sybermem-habit; do
+    rm -rf "$target/sybermem-phase-confirm"
+    for skill in sybermem-init-project sybermem-record sybermem-summary sybermem-resume sybermem-digest sybermem-phase-analyze using-sybermem sybermem-update sybermem-search sybermem-link sybermem-theme-digest sybermem-team-publish sybermem-team-summary sybermem-habit; do
         if [ -d "$SKILLS_SRC/$skill" ]; then
             rm -rf "$target/$skill"
             cp -r "$SKILLS_SRC/$skill" "$target/"
@@ -230,7 +231,6 @@ echo "  /sybermem-summary       — Generate weekly/monthly reports"
 echo "  /sybermem-resume        — Build a read-only restart view for the current project"
 echo "  /sybermem-digest        — Create a durable phase digest from existing records"
 echo "  /sybermem-phase-analyze — Build or refresh the persistent phase index from project history"
-echo "  /sybermem-phase-confirm — Confirm or adjust candidate phases in the phase index"
 echo "  /using-sybermem         — Show current SyberMem status and the recommended next command"
 echo "  /sybermem-update        — Refresh global skills, then re-check the current project"
 echo "  /sybermem-search        — Search/query records by keyword, topic, phase range, date range, or record ID"

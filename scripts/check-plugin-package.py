@@ -22,6 +22,11 @@ DISTRIBUTION_SCRIPTS: Final = [
     Path("scripts/uninstall.sh"),
     Path("scripts/uninstall.ps1"),
 ]
+# Skills that were removed from the source tree. Every distribution script (install,
+# install-remote, update, uninstall) MUST clean these from existing user installs so a
+# user upgrading to a newer version never ends up with a stale retired skill. Keeping this
+# list forces us to remember retirement when we delete a skill.
+RETIRED_SKILL_NAMES: Final = ["sybermem-phase-confirm"]
 VISIBLE_SKILL_SCRIPTS: Final = [
     Path("scripts/install.sh"),
     Path("scripts/install.ps1"),
@@ -280,6 +285,24 @@ def check_distribution_script_coverage(root: Path, names: list[str]) -> None:
         missing = [name for name in names if f"/{name}" not in script_text]
         if missing:
             fail(f"{script.as_posix()} is missing user-facing skill output: {', '.join(missing)}")
+
+
+def check_retired_skill_cleanup(root: Path) -> None:
+    """Every distribution script must clean retired skills from existing user installs.
+
+    When a skill is removed from the source tree, an old user upgrading still has the
+    retired skill on disk unless the install/update/uninstall scripts explicitly remove
+    it. If a retired skill is not referenced for cleanup in every distribution script,
+    this fails so retirement is never silently forgotten.
+    """
+    if not RETIRED_SKILL_NAMES:
+        return
+    for script in DISTRIBUTION_SCRIPTS:
+        script_path = root / script
+        script_text = script_path.read_text(encoding="utf-8")
+        missing = [name for name in RETIRED_SKILL_NAMES if name not in script_text]
+        if missing:
+            fail(f"{script.as_posix()} is missing retired-skill cleanup entries: {', '.join(missing)}")
 
 
 def check_opencode_plugin_update_wiring(root: Path) -> None:
@@ -634,10 +657,12 @@ def check_project_phase_contract(root: Path) -> None:
     cli_main = (root / "packages" / "cli" / "sybermem_cli" / "main.py").read_text(encoding="utf-8")
     required_cli = [
         "cmd_project_phase_analyze",
-        "cmd_project_phase_confirm",
+        "cmd_project_coverage_hash",
         'project_sub.add_parser("phase")',
+        'project_sub.add_parser("coverage-hash")',
         "analyze_phases(root)",
-        "confirm_phases_from_payload(root",
+        "apply_phase_payload(root",
+        "resolve_record_paths(root",
     ]
     missing_cli = [fragment for fragment in required_cli if fragment not in cli_main]
     if missing_cli:
@@ -650,7 +675,7 @@ def check_project_phase_contract(root: Path) -> None:
         text = (root / relative_path).read_text(encoding="utf-8")
         required = [
             "sybermem project phase analyze --format json",
-            "sybermem project phase confirm --from-json",
+            "sybermem project coverage-hash",
             "missing, broken, or emits invalid JSON",
             "Do not modify persistent PATH automatically",
             "Try bare `sybermem` only as the final fallback",
@@ -1071,6 +1096,7 @@ def main(root: Path = ROOT) -> int:
     check_project_memory_stats_contract(root)
     check_project_phase_contract(root)
     check_distribution_script_coverage(root, names)
+    check_retired_skill_cleanup(root)
     check_opencode_plugin_update_wiring(root)
     check_codex_skill_install_wiring(root)
     check_codex_user_prompt_hook_install_wiring(root)
