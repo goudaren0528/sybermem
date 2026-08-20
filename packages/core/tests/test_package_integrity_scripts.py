@@ -192,13 +192,35 @@ def test_package_integrity_guards_cli_first_phase_contract() -> None:
         Path("skills/sybermem-phase-analyze/SKILL.md"),
     ]:
         text = (ROOT / relative_path).read_text(encoding="utf-8")
-        assert "sybermem project phase confirm --from-json" in text
+        assert "sybermem project phase analyze --format json" in text
+        assert "sybermem project coverage-hash" in text
         assert "missing, broken, or emits invalid JSON" in text
 
     cli_main = (ROOT / "packages" / "cli" / "sybermem_cli" / "main.py").read_text(encoding="utf-8")
     assert "cmd_project_phase_analyze" in cli_main
-    assert "cmd_project_phase_confirm" in cli_main
+    assert "cmd_project_coverage_hash" in cli_main
+    assert "apply_phase_payload(root" in cli_main
+    assert "resolve_record_paths(root" in cli_main
     assert 'project_sub.add_parser("phase")' in cli_main
+    assert 'project_sub.add_parser("coverage-hash")' in cli_main
+
+
+def test_package_integrity_requires_distribution_scripts_clean_retired_skills() -> None:
+    # Given: sybermem-phase-confirm was retired. Every distribution script must clean it
+    # from existing user installs so upgrading never leaves a stale retired skill.
+    checker = runpy.run_path(str(CHECK_SCRIPT))
+
+    # When / Then: the checker defines the retired-skill cleanup contract and wires it into main
+    assert checker["RETIRED_SKILL_NAMES"] == ["sybermem-phase-confirm"]
+    assert callable(checker["check_retired_skill_cleanup"])
+    script_text = CHECK_SCRIPT.read_text(encoding="utf-8")
+    assert "check_retired_skill_cleanup(root)" in script_text
+
+    # And every distribution script (install/install-remote/update/uninstall, sh+ps1)
+    # references the retired skill so it gets cleaned from old installs.
+    for relative_path in checker["DISTRIBUTION_SCRIPTS"]:
+        text = (ROOT / relative_path).read_text(encoding="utf-8")
+        assert "sybermem-phase-confirm" in text, f"{relative_path.as_posix()} must clean retired skill sybermem-phase-confirm"
 
 
 def test_cli_using_skills_include_fixed_launcher_contract_fragments() -> None:

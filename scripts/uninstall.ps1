@@ -7,9 +7,10 @@ $opencodePlugin = Join-Path $env:USERPROFILE ".config\opencode\plugins\sybermem.
 
 foreach ($name in @(
   "sybermem-init-project", "sybermem-record", "sybermem-summary", "sybermem-digest",
-  "sybermem-resume", "sybermem-phase-analyze", "sybermem-phase-confirm", "using-sybermem",
+  "sybermem-resume", "sybermem-phase-analyze", "using-sybermem",
   "sybermem-update", "sybermem-search", "sybermem-link", "sybermem-theme-digest",
-  "sybermem-team-publish", "sybermem-team-summary", "sybermem-habit"
+  "sybermem-team-publish", "sybermem-team-summary", "sybermem-habit",
+  "sybermem-phase-confirm"
 )) {
   Remove-Item -Recurse -Force (Join-Path $claudeSkills $name) -ErrorAction SilentlyContinue
   Remove-Item -Recurse -Force (Join-Path $opencodeSkills $name) -ErrorAction SilentlyContinue

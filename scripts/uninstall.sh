@@ -8,9 +8,10 @@ OPENCODE_PLUGIN="$HOME/.config/opencode/plugins/sybermem.ts"
 
 for name in \
   sybermem-init-project sybermem-record sybermem-summary sybermem-digest \
-  sybermem-resume sybermem-phase-analyze sybermem-phase-confirm using-sybermem \
+  sybermem-resume sybermem-phase-analyze using-sybermem \
   sybermem-update sybermem-search sybermem-link sybermem-theme-digest \
-  sybermem-team-publish sybermem-team-summary sybermem-habit; do
+  sybermem-team-publish sybermem-team-summary sybermem-habit \
+  sybermem-phase-confirm; do
   rm -rf "$CLAUDE_SKILLS/$name" || true
   rm -rf "$OPENCODE_SKILLS/$name" || true
 done

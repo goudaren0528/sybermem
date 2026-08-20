@@ -44,7 +44,13 @@ foreach ($target in $Targets) {
             Remove-Item -Path $legacyPath -Recurse -Force -Confirm:$false
         }
     }
-    foreach ($skill in @("sybermem-init-project", "sybermem-record", "sybermem-summary", "sybermem-resume", "sybermem-digest", "sybermem-phase-analyze", "sybermem-phase-confirm", "using-sybermem", "sybermem-update", "sybermem-search", "sybermem-link", "sybermem-theme-digest", "sybermem-team-publish", "sybermem-team-summary", "sybermem-habit")) {
+    foreach ($retiredSkill in @("sybermem-phase-confirm")) {
+        $retiredPath = Join-Path $target.Path $retiredSkill
+        if (Test-Path $retiredPath) {
+            Remove-Item -Path $retiredPath -Recurse -Force -Confirm:$false
+        }
+    }
+    foreach ($skill in @("sybermem-init-project", "sybermem-record", "sybermem-summary", "sybermem-resume", "sybermem-digest", "sybermem-phase-analyze", "using-sybermem", "sybermem-update", "sybermem-search", "sybermem-link", "sybermem-theme-digest", "sybermem-team-publish", "sybermem-team-summary", "sybermem-habit")) {
         $src = Join-Path $SkillSource $skill
         $dst = Join-Path $target.Path $skill
         if (Test-Path $src) {
@@ -195,7 +201,6 @@ Write-Host "  /sybermem-summary       - Generate weekly/monthly reports"
 Write-Host "  /sybermem-resume        - Build a read-only restart view"
 Write-Host "  /sybermem-digest        - Create a durable phase digest"
 Write-Host "  /sybermem-phase-analyze - Build or refresh the phase index"
-Write-Host "  /sybermem-phase-confirm - Confirm or adjust phase candidates"
 Write-Host "  /using-sybermem         - Show status and the recommended next command"
 Write-Host "  /sybermem-update        - Refresh global skills and the current project"
 Write-Host "  /sybermem-search        - Search records by query, topic, phase, date, or ID"
