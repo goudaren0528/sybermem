@@ -8,7 +8,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import pytest
 
 from sybermem_core import phase_index as phase_index_module
-from sybermem_core.phase_index import PhaseConfirmError, analyze_phases, confirm_phases_from_payload
+from sybermem_core.phase_index import PhaseApplyError, analyze_phases, apply_phase_payload, resolve_record_paths
 from sybermem_core.status import project_status
 
 
@@ -84,7 +84,7 @@ def test_analyze_phases_with_no_records_stays_not_yet_analyzed(tmp_path: Path, m
     assert "status: not_yet_analyzed" in text
 
 
-def test_confirm_phases_from_payload_writes_canonical_phases(tmp_path: Path, monkeypatch) -> None:
+def test_apply_phase_payload_writes_canonical_phases(tmp_path: Path, monkeypatch) -> None:
     # Given: an agent-produced high-quality grouping payload
     root = _init_project(tmp_path, monkeypatch)
     _write_record(root, "changes", "001", "change", "2026-08-13")
@@ -95,8 +95,8 @@ def test_confirm_phases_from_payload_writes_canonical_phases(tmp_path: Path, mon
         ]
     }
 
-    # When: the payload is confirmed
-    result = confirm_phases_from_payload(root, payload)
+    # When: the payload is applied
+    result = apply_phase_payload(root, payload)
 
     # Then: the phase index carries the semantic title and both records
     text = (root / PHASE_PATH).read_text(encoding="utf-8")
@@ -107,43 +107,43 @@ def test_confirm_phases_from_payload_writes_canonical_phases(tmp_path: Path, mon
     assert status["phase"]["name"] == "Auth foundation"
 
 
-def test_confirm_phases_rejects_unknown_record_ids(tmp_path: Path, monkeypatch) -> None:
+def test_apply_phase_payload_rejects_unknown_record_ids(tmp_path: Path, monkeypatch) -> None:
     # Given: a payload referencing a record that does not exist
     root = _init_project(tmp_path, monkeypatch)
     _write_record(root, "changes", "001", "change", "2026-08-13")
     payload = {"phases": [{"title": "Bad", "covered_records": ["change-999"]}]}
 
-    # When / Then: confirmation is rejected with a typed error naming the bad id
-    with pytest.raises(PhaseConfirmError) as exc:
-        confirm_phases_from_payload(root, payload)
+    # When / Then: application is rejected with a typed error naming the bad id
+    with pytest.raises(PhaseApplyError) as exc:
+        apply_phase_payload(root, payload)
     assert "change-999" in str(exc.value)
 
 
-def test_confirm_phases_rejects_non_dict_payload(tmp_path: Path, monkeypatch) -> None:
+def test_apply_phase_payload_rejects_non_dict_payload(tmp_path: Path, monkeypatch) -> None:
     # Given: valid JSON that is not an object (e.g. a list or string)
     root = _init_project(tmp_path, monkeypatch)
     _write_record(root, "changes", "001", "change", "2026-08-13")
 
-    # When / Then: confirmation raises a typed error instead of an AttributeError
+    # When / Then: application raises a typed error instead of an AttributeError
     for bad in ([], "x", 5):
-        with pytest.raises(PhaseConfirmError):
-            confirm_phases_from_payload(root, bad)
+        with pytest.raises(PhaseApplyError):
+            apply_phase_payload(root, bad)
 
 
-def test_confirm_phases_rejects_incomplete_coverage(tmp_path: Path, monkeypatch) -> None:
+def test_apply_phase_payload_rejects_incomplete_coverage(tmp_path: Path, monkeypatch) -> None:
     # Given: two records but a payload covering only one
     root = _init_project(tmp_path, monkeypatch)
     _write_record(root, "changes", "001", "change", "2026-08-13")
     _write_record(root, "changes", "002", "change", "2026-08-12")
     payload = {"phases": [{"title": "Partial", "covered_records": ["change-001"]}]}
 
-    # When / Then: confirmation refuses to persist an analyzed index that orphans records
-    with pytest.raises(PhaseConfirmError) as exc:
-        confirm_phases_from_payload(root, payload)
+    # When / Then: application refuses to persist an analyzed index that orphans records
+    with pytest.raises(PhaseApplyError) as exc:
+        apply_phase_payload(root, payload)
     assert "change-002" in str(exc.value)
 
 
-def test_confirm_phases_rejects_duplicate_coverage(tmp_path: Path, monkeypatch) -> None:
+def test_apply_phase_payload_rejects_duplicate_coverage(tmp_path: Path, monkeypatch) -> None:
     # Given: a payload covering the same record in two phases
     root = _init_project(tmp_path, monkeypatch)
     _write_record(root, "changes", "001", "change", "2026-08-13")
@@ -154,10 +154,45 @@ def test_confirm_phases_rejects_duplicate_coverage(tmp_path: Path, monkeypatch) 
         ]
     }
 
-    # When / Then: confirmation is rejected for duplicate coverage
-    with pytest.raises(PhaseConfirmError) as exc:
-        confirm_phases_from_payload(root, payload)
+    # When / Then: application is rejected for duplicate coverage
+    with pytest.raises(PhaseApplyError) as exc:
+        apply_phase_payload(root, payload)
     assert "change-001" in str(exc.value)
+
+
+def test_resolve_record_paths_uses_frontmatter_not_filename(tmp_path: Path, monkeypatch) -> None:
+    # Given: a record whose filename truncates the canonical id, plus a normal one
+    root = _init_project(tmp_path, monkeypatch)
+    # filename carries a truncated 16-hex id, but frontmatter holds the full canonical id
+    bugs = root / ".sybermem" / "bugs"
+    bugs.mkdir(exist_ok=True)
+    (bugs / "2026-08-18-bug-541a9d6211594221-bat-chinese-output.md").write_text(
+        "\n".join(
+            [
+                "---",
+                "type: bug",
+                "record_id: bug-541a9d6211594221a5ceb08950e80881",
+                "date: 2026-08-18",
+                "title: bat chinese output",
+                "---",
+                "",
+                "body",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    _write_record(root, "changes", "001", "change", "2026-08-13")
+
+    # When: resolving a mix of ids, including the truncated-filename one
+    mapping = resolve_record_paths(root, ["bug-541a9d6211594221a5ceb08950e80881", "change-001", "missing-999"])
+
+    # Then: the truncated-filename record resolves via its frontmatter id, and missing is absent
+    assert mapping == {
+        "bug-541a9d6211594221a5ceb08950e80881": "bugs/2026-08-18-bug-541a9d6211594221-bat-chinese-output.md",
+        "change-001": "changes/2026-08-13-001.md",
+    }
+    assert "missing-999" not in mapping
 
 
 def test_analyze_phases_writes_atomically_without_leaving_temp_files(tmp_path: Path, monkeypatch) -> None:

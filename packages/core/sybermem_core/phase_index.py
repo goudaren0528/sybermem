@@ -13,8 +13,8 @@ from .records import iter_record_files, parse_project_yaml, parse_record_file
 PHASE_REL: Final = Path(".sybermem") / "analysis" / "phase-index.md"
 
 
-class PhaseConfirmError(ValueError):
-    """Raised when a phase-confirm payload references unknown or duplicated records."""
+class PhaseApplyError(ValueError):
+    """Raised when an agent-provided phase payload references unknown or duplicated records."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,41 +40,69 @@ def analyze_phases(root: Path) -> dict:
     return {"status": "analyzed", "phases": phases}
 
 
-def confirm_phases_from_payload(root: Path, payload: dict) -> dict:
-    """Persist an agent-provided grouping after validating it against real records.
+def apply_phase_payload(root: Path, payload: dict) -> dict:
+    """Persist an agent-provided semantic grouping after validating it against real records.
 
-    Lets a high-quality semantic grouping land deterministically through the same
-    canonical renderer and atomic write the analyze path uses.
+    This is the primary phase-analysis path: the agent (e.g. driven by
+    ``/sybermem-digest``) reads the full record history and produces a higher-quality
+    grouping than the mechanical ``analyze_phases`` fallback. Core validates every
+    covered record exists and is covered by exactly one phase, then writes the index
+    deterministically through the same canonical renderer and atomic write both paths
+    use.
     """
     if not isinstance(payload, dict):
-        raise PhaseConfirmError("payload must be a JSON object with a 'phases' list")
+        raise PhaseApplyError("payload must be a JSON object with a 'phases' list")
     known = {rec.record_id for rec in _load_records(root)}
     raw_phases = payload.get("phases")
     if not isinstance(raw_phases, list) or not raw_phases:
-        raise PhaseConfirmError("payload must contain a non-empty 'phases' list")
+        raise PhaseApplyError("payload must contain a non-empty 'phases' list")
     phases: list[dict] = []
     seen: set[str] = set()
     for index, raw in enumerate(raw_phases, start=1):
         title = str(raw.get("title", "")).strip() if isinstance(raw, dict) else ""
         if not title:
-            raise PhaseConfirmError(f"phase #{index} is missing a title")
+            raise PhaseApplyError(f"phase #{index} is missing a title")
         covered = raw.get("covered_records") if isinstance(raw, dict) else None
         if not isinstance(covered, list) or not covered:
-            raise PhaseConfirmError(f"phase '{title}' must list at least one covered record")
+            raise PhaseApplyError(f"phase '{title}' must list at least one covered record")
         records = [str(rid).strip() for rid in covered]
         for rid in records:
             if rid not in known:
-                raise PhaseConfirmError(f"unknown record id in phase '{title}': {rid}")
+                raise PhaseApplyError(f"unknown record id in phase '{title}': {rid}")
             if rid in seen:
-                raise PhaseConfirmError(f"record covered by more than one phase: {rid}")
+                raise PhaseApplyError(f"record covered by more than one phase: {rid}")
             seen.add(rid)
         phases.append({"title": title, "covered_records": records})
     orphaned = sorted(known - seen)
     if orphaned:
-        raise PhaseConfirmError(f"payload leaves records uncovered: {', '.join(orphaned)}")
+        raise PhaseApplyError(f"payload leaves records uncovered: {', '.join(orphaned)}")
     numbered = _number_phases(phases)
     _write_phase_index(root, numbered, status="analyzed")
     return {"status": "analyzed", "phases": numbered}
+
+
+def resolve_record_paths(root: Path, record_ids: list[str]) -> dict[str, str]:
+    """Map each canonical record_id to its project-relative path under `.sybermem/`.
+
+    Resolution uses each record file's frontmatter ``record_id:`` field, never the
+    filename, because filenames may truncate or reshape the UUID (e.g. a 16-hex
+    substring) and therefore cannot be relied on to reconstruct the canonical id.
+    Returns ``{record_id: "changes/<file>.md"}``; ids with no matching record file
+    are omitted so callers can distinguish missing sources by absence.
+    """
+    wanted = set(record_ids)
+    mapping: dict[str, str] = {}
+    sybermem = root / ".sybermem"
+    for sub in ("changes", "decisions", "requirements", "bugs"):
+        d = sybermem / sub
+        if not d.is_dir():
+            continue
+        for path in sorted(d.glob("*.md")):
+            row = parse_record_file(path, "", "")
+            rid = row.get("record_id", "")
+            if rid and rid in wanted:
+                mapping[rid] = f"{sub}/{path.name}"
+    return mapping
 
 
 def _load_records(root: Path) -> list[_Record]:
