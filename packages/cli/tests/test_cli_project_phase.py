@@ -8,7 +8,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "core"))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from sybermem_cli import main as main_module
-from sybermem_core.phase_index import PhaseConfirmError
+from sybermem_core.phase_index import PhaseApplyError
 
 
 def test_cli_phase_analyze_json_calls_core_and_emits_json_only(tmp_path: Path, monkeypatch, capsys) -> None:
@@ -74,22 +74,22 @@ def test_cli_phase_analyze_returns_1_without_project_root(monkeypatch, capsys) -
     assert captured.err == "No SyberMem project root found.\n"
 
 
-def test_cli_phase_confirm_reads_json_payload_and_persists(tmp_path: Path, monkeypatch, capsys) -> None:
-    # Given: a payload file and a Core confirm result
+def test_cli_phase_analyze_with_from_json_persists_semantic_payload(tmp_path: Path, monkeypatch, capsys) -> None:
+    # Given: a payload file and a Core apply result
     project_root = tmp_path / "project"
     project_root.mkdir()
     payload_file = tmp_path / "payload.json"
     payload_file.write_text(json.dumps({"phases": [{"title": "Auth", "covered_records": ["change-001"]}]}), encoding="utf-8")
     seen: dict[str, object] = {}
 
-    def fake_confirm(root: Path, payload: dict) -> dict:
+    def fake_apply(root: Path, payload: dict) -> dict:
         seen["root"] = root
         seen["payload"] = payload
         return {"status": "analyzed", "phases": [{"phase_id": "phase-001", "title": "Auth", "covered_records": ["change-001"]}]}
 
     monkeypatch.setattr(main_module, "resolve_project_root", lambda: project_root)
-    monkeypatch.setattr(main_module, "confirm_phases_from_payload", fake_confirm)
-    monkeypatch.setattr(sys, "argv", ["sybermem", "project", "phase", "confirm", "--from-json", str(payload_file), "--format", "json"])
+    monkeypatch.setattr(main_module, "apply_phase_payload", fake_apply)
+    monkeypatch.setattr(sys, "argv", ["sybermem", "project", "phase", "analyze", "--from-json", str(payload_file), "--format", "json"])
 
     # When
     exit_code = main_module.main()
@@ -102,7 +102,7 @@ def test_cli_phase_confirm_reads_json_payload_and_persists(tmp_path: Path, monke
     assert json.loads(captured.out)["phases"][0]["title"] == "Auth"
 
 
-def test_cli_phase_confirm_non_dict_json_exits_cleanly(tmp_path: Path, monkeypatch, capsys) -> None:
+def test_cli_phase_analyze_with_from_json_non_dict_exits_cleanly(tmp_path: Path, monkeypatch, capsys) -> None:
     # Given: valid JSON that is not an object (a list) — must not leak a traceback
     project_root = tmp_path / "project"
     (project_root / ".sybermem" / "analysis").mkdir(parents=True)
@@ -111,7 +111,7 @@ def test_cli_phase_confirm_non_dict_json_exits_cleanly(tmp_path: Path, monkeypat
     payload_file.write_text("[]", encoding="utf-8")
 
     monkeypatch.setattr(main_module, "resolve_project_root", lambda: project_root)
-    monkeypatch.setattr(sys, "argv", ["sybermem", "project", "phase", "confirm", "--from-json", str(payload_file)])
+    monkeypatch.setattr(sys, "argv", ["sybermem", "project", "phase", "analyze", "--from-json", str(payload_file)])
 
     # When: the real Core path runs (not mocked)
     exit_code = main_module.main()
@@ -124,19 +124,19 @@ def test_cli_phase_confirm_non_dict_json_exits_cleanly(tmp_path: Path, monkeypat
     assert "Traceback" not in captured.err
 
 
-def test_cli_phase_confirm_reports_clean_error_for_bad_payload(tmp_path: Path, monkeypatch, capsys) -> None:
+def test_cli_phase_analyze_with_from_json_reports_clean_error_for_bad_payload(tmp_path: Path, monkeypatch, capsys) -> None:
     # Given: Core rejects the payload
     project_root = tmp_path / "project"
     project_root.mkdir()
     payload_file = tmp_path / "payload.json"
     payload_file.write_text(json.dumps({"phases": [{"title": "Bad", "covered_records": ["change-999"]}]}), encoding="utf-8")
 
-    def fail_confirm(root: Path, payload: dict) -> dict:
-        raise PhaseConfirmError("unknown record id in phase 'Bad': change-999")
+    def fail_apply(root: Path, payload: dict) -> dict:
+        raise PhaseApplyError("unknown record id in phase 'Bad': change-999")
 
     monkeypatch.setattr(main_module, "resolve_project_root", lambda: project_root)
-    monkeypatch.setattr(main_module, "confirm_phases_from_payload", fail_confirm)
-    monkeypatch.setattr(sys, "argv", ["sybermem", "project", "phase", "confirm", "--from-json", str(payload_file)])
+    monkeypatch.setattr(main_module, "apply_phase_payload", fail_apply)
+    monkeypatch.setattr(sys, "argv", ["sybermem", "project", "phase", "analyze", "--from-json", str(payload_file)])
 
     # When
     exit_code = main_module.main()
