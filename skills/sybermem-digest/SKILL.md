@@ -49,9 +49,13 @@ You MUST complete these steps in order:
 3. **Determine digest input mode**:
    - If explicit source records specified → use them directly, skip phase-index dependency
    - If no explicit source records:
-     - If `.sybermem/analysis/phase-index.md` does not exist → **REQUIRED SUB-SKILL:** run `/sybermem-phase-analyze` first, then continue
+     - If `.sybermem/analysis/phase-index.md` does not exist or is stale → **RUN `/sybermem-phase-analyze` first** (see Step 3b), then continue
      - If phase-index exists with confirmed phases → digest **all** confirmed phases without existing digests (batch mode)
      - If only candidate phases → auto-confirm all, then digest all in batch
+
+### 3b. Digest drives phase analysis (agent semantic grouping)
+
+When a phase index is missing or out of date, `/sybermem-digest` **triggers** `/sybermem-phase-analyze` rather than blocking. Phase grouping is an agent judgement: read the full `.sybermem/` record history and produce a **semantic** grouping (`{ "phases": [ { "title": "...", "covered_records": ["change-001", ...] } ] }`), then persist it with `sybermem project phase analyze --from-json <file>`. Mechanical grouping (`sybermem project phase analyze` without `--from-json`) is only a fallback when agent grouping is unavailable. Resolve record ids to files by each record's frontmatter `record_id:`, never by filename.
 
 ### Batch mode (default when no explicit source records)
 
@@ -65,10 +69,10 @@ For each phase, run Steps 4–10 independently. This is the normal batch path �
    - **Exact duplicate** → do not create, return existing digest path
    - **Partial overlap** → warn, recommend extending existing digest, only continue if user confirms
 7. **Generate metadata** — set `type: digest`, `kind: phase`, `date`, `number`, `title`, `status: completed` (default), `source_records`, `coverage.from/to`, and `coverage_hash` (see Step 7a)
-7a. **Compute `coverage_hash`** — this is a **required, deterministic** field that lets SyberMem mechanically detect when a digest has gone stale because its source records later changed. Compute it exactly as core does (`sybermem_core.digest_coverage.compute_coverage_hash`):
-   - For each project-relative path in `source_records`, sorted ascending: read the file's current bytes and take its SHA-256 hex; if the file is missing use the literal `<missing>`. Build the line `"{rel_path}:{sha256}"`.
-   - Join those lines with `\n` and take the SHA-256 hex of the UTF-8 bytes of the joined string. That hex is `coverage_hash`.
-   - Prefer calling the core helper directly (`compute_coverage_hash(root, source_records)`) instead of reimplementing it by hand, so the value always matches what the freshness check recomputes.
+7a. **Compute `coverage_hash`** — this is a **required, deterministic** field that lets SyberMem mechanically detect when a digest has gone stale because its source records later changed. Compute it with the CLI so the value always matches what the freshness check recomputes:
+   - Resolve the `source_records` project-relative paths for the phase: run `sybermem project coverage-hash --phase-id phase-NNN --format json`, which resolves the phase's covered record ids to real file paths (via frontmatter `record_id:`, never filename) and returns `{"source_records": [...], "coverage_hash": "..."}`. Use the returned `coverage_hash`.
+   - If your `source_records` differ from the phase's covered set (e.g. explicit sources), pass them directly: `sybermem project coverage-hash --source-records "changes/x.md,bugs/y.md" --format json`.
+   - If the CLI is unavailable, fall back to core semantics: for each project-relative path in `source_records`, sorted ascending, take the file's current bytes' SHA-256 hex (literal `<missing>` if absent), build `"{rel_path}:{sha256}"` lines, join with `\n`, and SHA-256 the UTF-8 bytes — but **prefer the CLI** so the value always matches `sybermem_core.digest_coverage.compute_coverage_hash`.
 8. **Write the digest file** — path: `.sybermem/digests/{YYYY-MM-DD}-{NNN}-{title}.md`. Use `.sybermem/templates/digest-template.md`. Fill `coverage_hash` with the value from Step 7a (never leave the `{{coverage_hash}}` placeholder).
 9. **Update INDEX.md** — insert row above `<!-- add new digest records here -->` in `## Phase Digests` table: `| NNN | YYYY-MM-DD | Title | <status> | X records | [link](digests/file.md) |`
 10. **Preserve Key Conclusions signal quality** — do not add to `## Key Conclusions` by default. Only add if the digest introduces a truly global project conclusion.
@@ -125,8 +129,7 @@ This skill is complete when:
 ## Integration
 
 **Required sub-skills:**
-- **sybermem-phase-analyze** — Required when phase index is missing
+- **sybermem-phase-analyze** — Required when phase index is missing or stale; digest triggers it to produce agent semantic grouping
 
 **Related skills:**
-- **sybermem-phase-confirm** — Confirm phases before digesting them
 - **sybermem-update** — Run first if project is missing digest capability

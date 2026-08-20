@@ -7,9 +7,9 @@ description: Use when building or incrementally refreshing the project phase ind
 
 **Announce at start:** "I'm using the sybermem-phase-analyze skill to build or refresh the project phase index."
 
-Analyze the project's full `.sybermem/` record history and deterministically persist confirmed phases into `.sybermem/analysis/phase-index.md`.
+Analyze the project's `.sybermem/` record history and deterministically persist phases into `.sybermem/analysis/phase-index.md`. This skill is often triggered by `/sybermem-digest` when a phase index is missing or stale, but runs standalone too.
 
-Prefer the CLI-first path: `sybermem project phase analyze --format json` performs deterministic grouping and atomically writes the phase index, so analysis can never be silently lost by a hand-written Markdown step. Fall back to agent orchestration only when the CLI is missing, broken, or emits invalid JSON.
+**Phase grouping is an agent judgement.** Read the full record history and produce a **semantic** grouping — coherent phase titles plus the records each phase covers — then persist it deterministically with the CLI so it can never be silently lost to a hand-written Markdown step. Mechanical month+topic grouping is only a **fallback** when the agent cannot produce a semantic grouping. Resolve record ids to files by each record's frontmatter `record_id:`, never by filename (filenames may truncate the UUID). Downstream `/sybermem-digest` uses `sybermem project coverage-hash` to derive the deterministic `coverage_hash` for each phase's source records.
 
 ## CLI Resolution
 
@@ -24,17 +24,18 @@ Implementation note for PowerShell examples: store the chosen executable in `$Sy
 
 ## Core Invariants
 
-- **CLI-first: `sybermem project phase analyze --format json` deterministically writes confirmed phases; the agent-orchestrated flow is a fallback only when the CLI is missing, broken, or emits invalid JSON.**
-- **Phase analysis auto-confirms structure. The user can later adjust via `/sybermem-phase-confirm`.**
+- **Agent semantic grouping is the primary path, persisted via `sybermem project phase analyze --from-json <file>`; mechanical grouping (`phase analyze` without `--from-json`) is only a fallback when agent grouping is unavailable.**
+- **Phase analysis auto-confirms structure. There is no separate confirmation step — the agent grouping IS the confirmed phase set.**
 - **No re-analysis may append contradictory duplicate candidates blindly.**
 
 ## CLI-First Flow
 
 1. Resolve the SyberMem CLI using the CLI Resolution rules above.
-2. Run `sybermem project phase analyze --format json`. This reads all `.sybermem/` records, groups them deterministically, and atomically writes confirmed phases + coverage map + `status: analyzed` to `.sybermem/analysis/phase-index.md`.
-3. If it exits successfully and emits valid JSON, summarize the returned phases and STOP — do not hand-edit the phase index.
-4. Optional smarter grouping: if you produce a higher-quality semantic grouping, write it as JSON `{ "phases": [ { "title": "...", "covered_records": ["change-001", ...] } ] }` and persist it deterministically with `sybermem project phase confirm --from-json <file>`. Core validates that every covered record exists and is covered by exactly one phase.
-5. Fall back to the agent-orchestrated flow below ONLY when the CLI is missing, broken, or emits invalid JSON.
+2. **Read the full `.sybermem/` record history** and build a semantic grouping: coherent phase titles, each with its covered records, as JSON `{ "phases": [ { "title": "...", "covered_records": ["change-001", ...] } ] }`. Cover **every** record in exactly one phase. Resolve record ids to file paths via each record's frontmatter `record_id:`, never by filename.
+3. Write the grouping to a temp JSON file and run `sybermem project phase analyze --from-json <file> --format json`. Core validates every covered record exists and is covered by exactly one phase, then atomically writes confirmed phases + coverage map + `status: analyzed` to `.sybermem/analysis/phase-index.md`.
+4. If the CLI exits successfully and emits valid JSON, summarize the returned phases and STOP — do not hand-edit the phase index.
+5. **Mechanical fallback:** only if you cannot produce a semantic grouping, run `sybermem project phase analyze --format json` (no `--from-json`) to get deterministic month+topic bucketing, and STOP.
+6. Fall back to the agent-orchestrated flow below ONLY when the CLI is missing, broken, or emits invalid JSON.
 
 <HARD-GATE>
 Do NOT declare analysis complete unless ALL of the following are true:
@@ -89,7 +90,7 @@ On re-analysis, refresh the `## Phase Candidates` section instead of appending b
 - remove stale superseded candidate proposals that no longer match the latest analysis
 - keep materially distinct candidate proposals only when they represent separate plausible groupings
 
-After proposing candidates, automatically confirm all of them as phases. The user can later adjust, rename, or reject phases via `/sybermem-phase-confirm` if needed. Manual confirmation is no longer required before downstream skills like `/sybermem-digest` can proceed.
+After proposing candidates, automatically confirm all of them as phases. There is no separate confirmation step — the agent grouping IS the confirmed phase set. Downstream skills like `/sybermem-digest` proceed directly from here.
 
 6. **Update confirmed phases and coverage map conservatively** — use this canonical Markdown block shape for every confirmed phase entry:
 
@@ -149,5 +150,4 @@ This skill is complete when:
 ## Integration
 
 **Related skills:**
-- **sybermem-phase-confirm** — Downstream: confirm or adjust candidate phases after analysis
-- **sybermem-digest** — Downstream: create durable phase digests from confirmed phases
+- **sybermem-digest** — Downstream: creates durable phase digests from the confirmed phases and triggers this skill when the phase index is missing or stale
