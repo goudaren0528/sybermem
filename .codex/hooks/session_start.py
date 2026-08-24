@@ -13,6 +13,7 @@ HOOK_EVENT_NAME: Final = "SessionStart"
 SESSION_HEADING: Final = "## SyberMem Manual Session Context"
 SYBERMEM_TIMEOUT_SECONDS: Final = 5
 COMPACT_MARKER_FILE: Final = ".codex-compact-marker.json"
+DIGEST_BACKLOG_THRESHOLD: Final = 5
 
 
 class HookSpecificOutput(TypedDict):
@@ -95,14 +96,47 @@ def _session_markdown() -> str:
     return result.stdout
 
 
+def _digest_backlog_line() -> str:
+    """Return a one-line digest-backlog heads-up, or '' when below threshold/unavailable.
+
+    Reuses `sybermem digest status --format json` (single source of truth) so Codex gets
+    the same "haven't digested accumulated work" signal as OpenCode/Claude, with no
+    duplicated coverage logic. Fail-open: any error yields no line.
+    """
+    command = _sybermem_command()
+    if command is None:
+        return ""
+    try:
+        result = subprocess.run(
+            [*command, "digest", "status", "--format", "json"],
+            env={**os.environ, "PYTHONIOENCODING": "utf-8"},
+            text=True, encoding="utf-8", errors="replace",
+            capture_output=True, check=False, timeout=SYBERMEM_TIMEOUT_SECONDS,
+        )
+        if result.returncode not in (0, 1) or not result.stdout.strip():
+            return ""
+        payload = json.loads(result.stdout)
+        backlog = payload.get("backlog") or {}
+        uncovered = int(backlog.get("uncovered", 0) or 0)
+        if uncovered < DIGEST_BACKLOG_THRESHOLD:
+            return ""
+        days = int(backlog.get("days_since_latest_digest", 0) or 0)
+        age = f" (last digest {days}d ago)" if backlog.get("has_digest") and days > 0 else ""
+        return f"\u2b50 Digest heads-up: {uncovered} records are not covered by any digest yet{age}. Consider /sybermem-digest to compress the accumulated work."
+    except Exception:
+        return ""
+
+
 def _hook_output(markdown: str) -> HookOutput | None:
     markdown = markdown.strip()
     if not markdown.startswith(SESSION_HEADING):
         return None
+    backlog_line = _digest_backlog_line()
+    context = f"{markdown}\n{backlog_line}\n" if backlog_line else f"{markdown}\n"
     return {
         "hookSpecificOutput": {
             "hookEventName": HOOK_EVENT_NAME,
-            "additionalContext": f"{markdown}\n",
+            "additionalContext": context,
         }
     }
 
