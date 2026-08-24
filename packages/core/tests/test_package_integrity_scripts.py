@@ -474,6 +474,7 @@ def test_package_integrity_exposes_opencode_source_bundle_and_privacy_guards() -
         Path("packages/opencode-plugin/src/session_activity.ts"),
         Path("packages/opencode-plugin/src/recall_outcome.ts"),
         Path("packages/opencode-plugin/src/habit_intent.ts"),
+        Path("packages/opencode-plugin/src/digest_backlog_signal.ts"),
     ]
     assert callable(checker["check_opencode_plugin_source_bundle"])
     assert callable(checker["check_opencode_prompt_privacy"])

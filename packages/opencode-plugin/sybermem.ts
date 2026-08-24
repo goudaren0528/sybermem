@@ -214,6 +214,10 @@ async function digestStatusText($, root) {
   const sybermem = resolveSybermemCommand();
   return $`${sybermem} digest status --format json`.cwd(root).nothrow().text();
 }
+async function digestLatestText($, root) {
+  const sybermem = resolveSybermemCommand();
+  return $`${sybermem} digest latest --format json`.cwd(root).nothrow().text();
+}
 async function memoryStatsText($, root) {
   const sybermem = resolveSybermemCommand();
   return $`${sybermem} project memory-stats --format json`.cwd(root).nothrow().text();
@@ -306,6 +310,27 @@ async function detectStaleSignal($, root) {
 }
 
 // packages/opencode-plugin/src/compaction.ts
+async function latestDigestSection($, root) {
+  try {
+    const parsed = JSON.parse(await digestLatestText($, root));
+    if (typeof parsed !== "object" || parsed === null)
+      return "";
+    const conclusions = Reflect.get(parsed, "conclusions");
+    if (!Array.isArray(conclusions) || conclusions.length === 0)
+      return "";
+    const title = typeof Reflect.get(parsed, "title") === "string" ? Reflect.get(parsed, "title") : "";
+    const lines = conclusions.filter((c) => typeof c === "string").slice(0, 5);
+    if (lines.length === 0)
+      return "";
+    return `
+### Latest Digest${title ? `: ${title}` : ""}
+${lines.join(`
+`)}
+`;
+  } catch {
+    return "";
+  }
+}
 function numberField(value, key) {
   if (typeof value !== "object" || value === null)
     return null;
@@ -346,6 +371,7 @@ async function buildCompactionContext($, root) {
   for (const c of parsed.conclusions)
     context += `${c}
 `;
+  context += await latestDigestSection($, root);
   if (stale.stale)
     context += `
 \u2B50 Heads-up: phase index trails HEAD by ${stale.commitsAhead} commits \u2014 the conclusions above may lag your latest work. Consider /sybermem-phase-analyze before relying on phase context.
@@ -674,6 +700,27 @@ ${output.system[0]}`;
 }
 
 // packages/opencode-plugin/src/startup_context.ts
+async function latestDigestSection2($, root) {
+  try {
+    const parsed = JSON.parse(await digestLatestText($, root));
+    if (typeof parsed !== "object" || parsed === null)
+      return "";
+    const conclusions = Reflect.get(parsed, "conclusions");
+    if (!Array.isArray(conclusions) || conclusions.length === 0)
+      return "";
+    const title = typeof Reflect.get(parsed, "title") === "string" ? Reflect.get(parsed, "title") : "";
+    const lines = conclusions.filter((c) => typeof c === "string").slice(0, 5);
+    if (lines.length === 0)
+      return "";
+    return `
+### Latest Digest${title ? `: ${title}` : ""}
+${lines.join(`
+`)}
+`;
+  } catch {
+    return "";
+  }
+}
 var PENDING_STARTUP = new Set;
 function markPendingStartup(sessionID) {
   PENDING_STARTUP.add(sessionID);
@@ -732,6 +779,7 @@ Status: ${phaseInfo.status}. ${phaseInfo.confirmedCount} confirmed phases.
       context += `Active phase: ${phaseInfo.activePhase}.
 `;
   }
+  context += await latestDigestSection2($, root);
   if (stale.stale)
     context += `
 \u2B50 Heads-up: phase index trails HEAD by ${stale.commitsAhead} commits \u2014 conclusions may lag your latest work. Consider /sybermem-phase-analyze.

@@ -19,7 +19,7 @@ from sybermem_core.search import ProjectRootNotFoundError, WorkspaceIndexIncompa
 from sybermem_core.status import project_memory_stats, project_status
 from sybermem_core.resume import build_resume_checkpoint
 from sybermem_core.next_step_router import classify_record_intent, recommend_next_step
-from sybermem_core.digest_governance import build_digest_governance_report
+from sybermem_core.digest_governance import build_digest_governance_report, latest_digest_summary
 from sybermem_core.portfolio import build_portfolio
 from sybermem_core.team import init_team_repo
 from sybermem_core.publish_bootstrap import bootstrap_publish_status
@@ -202,6 +202,24 @@ def cmd_digest_status(args: argparse.Namespace) -> int:
                     print(f"    - {drift['state']}: {drift['path']}")
     # Non-zero exit when any digest is stale, so scripts/CI can gate on governance health.
     return 1 if report["stale"] > 0 else 0
+
+
+def cmd_digest_latest(args: argparse.Namespace) -> int:
+    root = resolve_project_root()
+    if root is None:
+        print("No SyberMem project root found.", file=sys.stderr)
+        return 1
+    summary = latest_digest_summary(root)
+    if args.format == "json":
+        print(dump_json(summary or {}))
+    else:
+        if not summary:
+            print("No digest found.")
+            return 0
+        print(f"[{summary['record_id']}] {summary['title']} ({summary['date']})")
+        for line in summary["conclusions"]:
+            print(line)
+    return 0
 
 
 def cmd_project_status(args: argparse.Namespace) -> int:
@@ -674,6 +692,10 @@ def main() -> int:
     digest_status_cmd = digest_sub.add_parser("status")
     digest_status_cmd.add_argument("--format", choices=["text", "json"], default="text")
     digest_status_cmd.set_defaults(func=cmd_digest_status)
+
+    digest_latest_cmd = digest_sub.add_parser("latest")
+    digest_latest_cmd.add_argument("--format", choices=["text", "json"], default="text")
+    digest_latest_cmd.set_defaults(func=cmd_digest_latest)
 
     record = sub.add_parser("record")
     record_sub = record.add_subparsers(dest="record_command", required=True)

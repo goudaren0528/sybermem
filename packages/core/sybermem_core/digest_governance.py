@@ -219,6 +219,62 @@ def _days_between(iso_from: str, iso_to: str) -> int:
     return max((d_to - d_from).days, 0)
 
 
+class LatestDigestSummary(TypedDict):
+    record_id: str
+    title: str
+    date: str
+    conclusions: list[str]
+
+
+_MAX_DIGEST_CONCLUSIONS = 5
+
+
+def _extract_core_conclusions(text: str) -> list[str]:
+    """Return the bullet lines under a digest's '## Core Conclusions' section (bounded)."""
+    lines = text.splitlines()
+    conclusions: list[str] = []
+    in_section = False
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("## "):
+            in_section = stripped.lower() == "## core conclusions"
+            continue
+        if in_section and stripped.startswith("- "):
+            conclusions.append(stripped)
+            if len(conclusions) >= _MAX_DIGEST_CONCLUSIONS:
+                break
+    return conclusions
+
+
+def latest_digest_summary(root: Path) -> LatestDigestSummary | None:
+    """Return the most recent phase digest's title + Core Conclusions, or None.
+
+    Lets awareness surfaces (startup/compaction) inject the compression layer's actual
+    conclusions — not just a "read this" pointer. This matters because the digest flow
+    ARCHIVES source-record conclusions out of INDEX Key Conclusions, so without this the
+    startup context would lose exactly the conclusions the digest compressed.
+    """
+    latest_path: Path | None = None
+    latest_date = ""
+    for path in iter_record_files(root):
+        if "/digests/" not in str(path).replace("\\", "/"):
+            continue
+        row = parse_record_file(path, "", "")
+        created = row.get("created_at", "")
+        if created >= latest_date:
+            latest_date = created
+            latest_path = path
+    if latest_path is None:
+        return None
+    row = parse_record_file(latest_path, "", "")
+    return {
+        "record_id": row.get("record_id", ""),
+        "title": row.get("title", ""),
+        "date": row.get("created_at", ""),
+        "conclusions": _extract_core_conclusions(row["content"]),
+    }
+
+
 def digest_backlog(root: Path, *, today: str | None = None) -> DigestBacklog:
     """Measure how much undigested work has accumulated (the "should I digest?" signal).
 

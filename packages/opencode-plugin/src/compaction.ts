@@ -1,5 +1,23 @@
-import { digestStatusText, sybermemText, type Shell } from "./runtime"
+import { digestLatestText, digestStatusText, sybermemText, type Shell } from "./runtime"
 import { detectStaleSignal, parseIndex, parsePhaseIndex, parseProjectIdentity } from "./project_state"
+
+// Latest phase digest Core Conclusions for compaction carry-forward. Same rationale as
+// startup: the digest flow archives source conclusions out of INDEX, so surface the
+// digest's own conclusions so compaction keeps the compressed knowledge. Fail-open.
+async function latestDigestSection($: Shell, root: string): Promise<string> {
+  try {
+    const parsed: unknown = JSON.parse(await digestLatestText($, root))
+    if (typeof parsed !== "object" || parsed === null) return ""
+    const conclusions = Reflect.get(parsed, "conclusions")
+    if (!Array.isArray(conclusions) || conclusions.length === 0) return ""
+    const title = typeof Reflect.get(parsed, "title") === "string" ? Reflect.get(parsed, "title") : ""
+    const lines = conclusions.filter((c): c is string => typeof c === "string").slice(0, 5)
+    if (lines.length === 0) return ""
+    return `\n### Latest Digest${title ? `: ${title}` : ""}\n${lines.join("\n")}\n`
+  } catch {
+    return ""
+  }
+}
 
 export interface CompactionOutput { readonly context: string[] }
 
@@ -32,6 +50,7 @@ export async function buildCompactionContext($: Shell, root: string): Promise<st
   if (identity.exists && identity.slug) context += `Project: ${identity.slug} (${identity.projectId ?? "no id"}).\n\n`
   context += "### Key Conclusions\n"
   for (const c of parsed.conclusions) context += `${c}\n`
+  context += await latestDigestSection($, root)
   if (stale.stale) context += `\n⭐ Heads-up: phase index trails HEAD by ${stale.commitsAhead} commits — the conclusions above may lag your latest work. Consider /sybermem-phase-analyze before relying on phase context.\n`
   try {
     const staleDigestCount = numberField(JSON.parse(await digestStatusText($, root)), "stale")

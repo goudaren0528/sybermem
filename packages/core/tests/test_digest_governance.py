@@ -211,6 +211,40 @@ def test_digest_backlog_no_digest_reports_all_uncovered(tmp_path: Path) -> None:
     assert backlog["days_since_latest_digest"] == 0
 
 
+def test_latest_digest_summary_returns_title_and_conclusions(tmp_path: Path) -> None:
+    from sybermem_core.digest_governance import latest_digest_summary
+
+    root = tmp_path / "project"
+    root.mkdir()
+    write_project(root)
+    # Two digests of different dates; the newest wins
+    write_file(
+        root,
+        "digests/2026-08-01-001-old.md",
+        "---\ntype: digest\ndate: 2026-08-01\nrecord_id: digest-001\ntitle: Old\n---\n\n## Core Conclusions\n- old point\n",
+    )
+    write_file(
+        root,
+        "digests/2026-08-10-002-new.md",
+        "---\ntype: digest\ndate: 2026-08-10\nrecord_id: digest-002\ntitle: New Phase\n---\n\n## Core Conclusions\n- first\n- second\n\n## Current State\n- x\n",
+    )
+
+    summary = latest_digest_summary(root)
+    assert summary is not None
+    assert summary["record_id"] == "digest-002"
+    assert summary["title"] == "New Phase"
+    assert summary["conclusions"] == ["- first", "- second"]
+
+
+def test_latest_digest_summary_none_when_no_digest(tmp_path: Path) -> None:
+    from sybermem_core.digest_governance import latest_digest_summary
+
+    root = tmp_path / "project"
+    root.mkdir()
+    write_project(root)
+    assert latest_digest_summary(root) is None
+
+
 def test_digest_backlog_report_included(tmp_path: Path) -> None:
     root = tmp_path / "project"
     root.mkdir()

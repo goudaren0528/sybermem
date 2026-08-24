@@ -76,6 +76,11 @@ export async function digestStatusText($: Shell, root: string): Promise<string> 
   return $`${sybermem} digest status --format json`.cwd(root).nothrow().text()
 }
 
+export async function digestLatestText($: Shell, root: string): Promise<string> {
+  const sybermem = resolveSybermemCommand()
+  return $`${sybermem} digest latest --format json`.cwd(root).nothrow().text()
+}
+
 export async function memoryStatsText($: Shell, root: string): Promise<string> {
   const sybermem = resolveSybermemCommand()
   return $`${sybermem} project memory-stats --format json`.cwd(root).nothrow().text()
