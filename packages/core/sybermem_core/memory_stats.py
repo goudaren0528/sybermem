@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Final
 
 from .identity import now_iso
+from .digest_governance import digest_backlog
 from .records import iter_record_files, parse_project_yaml, parse_record_file
 
 
@@ -50,6 +51,9 @@ def project_memory_stats(root: Path) -> dict:
         },
         "windows": windows,
         "recall_health": _recall_health_from_windows(windows, recall_status),
+        # Snapshot (not windowed): how much undigested work has accumulated. Makes the
+        # compression layer's health as visible as recall health.
+        "digest_coverage": digest_backlog(root),
     }
 
 
