@@ -143,17 +143,46 @@ Required sections:
 ## Optional closing step: surface a fixable norm
 
 After the record is written and verified, do a quick semantic look-back over this
-session. If the user expressed a reusable preference or a standing requirement —
-especially one repeated **two or more times** — offer (once, batched) to fix it
-down. This is a low-friction hint, not a required step.
+session. If the user expressed a reusable preference, a standing requirement, or a
+**binding project rule** — especially one repeated **two or more times**, or a decision
+that should govern future work and not be casually re-litigated — offer (once, batched)
+to fix it down. This is a low-friction hint, not a required step.
 
 - Personal / cross-project preference → offer to save a **user habit** (`/sybermem-habit`).
-- Project-specific convention/norm → note it likely belongs in a **`decision` or `requirement` record** and offer to capture that.
+- Binding project rule / standard that must govern later work → offer to **crystallize a
+  `norm` record** (see "Crystallizing a project norm" below). This is the right home for
+  "this is decided, follow it going forward" constraints — distinct from an ordinary
+  decision, because a norm is fed back into future work (project constitution / scoped
+  recall).
+- Ordinary project convention that is NOT yet binding → an ordinary `decision`/`requirement`
+  record is enough; do not force it into a norm.
 
 Rules: only when reasonably confident; never for a one-off; one batched offer, one-step
 to accept; if the user declines or is silent, drop it and move on. Never auto-write and
 never block the record flow (L1: confirmation-first). Skip this step entirely when nothing
 qualifies.
+
+## Crystallizing a project norm
+
+A norm is a first-class binding rule stored under `.sybermem/norms/`. Crystallization is
+confirmation-first and creates a NEW norm record (it never mutates the source decision).
+
+1. Get an id: `$SyberMemCli record id --type norm` / `"$SYBERMEM_CLI" record id --type norm`.
+2. Propose to the user ONE testable imperative `statement`, a `scope`, the `rationale`, the
+   `evidence` (source record ids), and any `exceptions`. Scope values:
+   - `global` — applies to every task (enters the always-on project constitution; keep these rare).
+   - `topic:<name>` / `path:<glob>` / `tool:<name>` — scoped; surfaces via context-matched recall.
+   Confirm before writing.
+3. Write `.sybermem/norms/{YYYY-MM-DD}-{record_id}-{slug}.md` from `.sybermem/templates/norm-template.md`.
+   Set `type: norm`, `authority: authoritative`, `status: active`, `scope`, and put the
+   imperative rule in BOTH `key_conclusion` (one line, used by the constitution/recall) and
+   the `## Norm Statement` body. Add `crystallized_from: [<source decision/requirement ids>]`.
+4. Before writing, check for an existing active norm in the same scope: `$SyberMemCli norms list --scope global --format json` (or `--scope scoped --context <area>`). If it conflicts, do NOT create a second active norm — propose superseding the old one (`superseded_by` on the old record) or mark the overlap for the user to resolve.
+5. Build/check the index: `$SyberMemCli project index build` then `$SyberMemCli project index check`.
+6. Verify it surfaces: `$SyberMemCli norms list --scope global --format json` (global) or `--scope scoped --context <area>` (scoped).
+
+Keep norms scarce and testable. "Keep the architecture clean" is not a norm; "All new HTTP
+handlers must validate input at the boundary" is.
 
 ## Terminal State
 

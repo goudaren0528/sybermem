@@ -32,18 +32,18 @@ Resolve project root by walking up from cwd to find `.sybermem/` + `.claude/sett
 /sybermem-link decision-003 superseded-by decision-007
 ```
 
-`<relation>` must be one of: `implements`, `fixes`, `related`, `superseded-by`.
+`<relation>` must be one of: `implements`, `fixes`, `related`, `superseded-by`, `crystallized-from`.
 
 ## Flow
 
 You MUST complete these steps in order:
 
 1. **Resolve project root** — apply directory resolution rules above.
-2. **Parse arguments** — `<source-id> <relation> <target-id>`. If `<relation>` is not one of `implements`/`fixes`/`related`/`superseded-by`, stop and tell the user the valid relations.
-3. **Verify both records exist** — use a file-system tool to find the source and target record files under the real SyberMem record directories (`.sybermem/changes/`, `.sybermem/decisions/`, `.sybermem/requirements/`, `.sybermem/bugs/`). Match the requested record IDs against the actual filenames (`YYYY-MM-DD-NNN-title.md`). If either does not exist, stop and report which one is missing.
+2. **Parse arguments** — `<source-id> <relation> <target-id>`. If `<relation>` is not one of `implements`/`fixes`/`related`/`superseded-by`/`crystallized-from`, stop and tell the user the valid relations.
+3. **Verify both records exist** — use a file-system tool to find the source and target record files under the real SyberMem record directories (`.sybermem/changes/`, `.sybermem/decisions/`, `.sybermem/requirements/`, `.sybermem/bugs/`, `.sybermem/norms/`). Match the requested record IDs against the actual filenames (`YYYY-MM-DD-NNN-title.md`). If either does not exist, stop and report which one is missing.
 4. **Read the source record** — load its frontmatter.
 5. **Apply the relation behavior**
-   - For `implements`/`fixes`/`related`, append `<target-id>` to the matching frontmatter list field. If the field does not exist, create it as a list. If `<target-id>` is already present, skip (no duplicate).
+   - For `implements`/`fixes`/`related`/`crystallized-from`, append `<target-id>` to the matching frontmatter list field (`crystallized_from` for `crystallized-from`). If the field does not exist, create it as a list. If `<target-id>` is already present, skip (no duplicate). `crystallized-from` is used on a `norm` record to point at the decision/requirement it was crystallized from.
    - For `superseded-by`, write `superseded_by: <target-id>` in the source frontmatter. If the field already exists with the same value, skip. If it exists with a different value, warn and ask before overwriting.
 6. **Apply the archive side-effect for `superseded-by`** — move the source conclusion from `## Key Conclusions` to `## Archived Conclusions`, appending `[superseded by <target-id>]`. If it is already archived with the same suffix, skip.
 7. **Write the source-side updates only** — save the source file and any required source-side conclusion move in `.sybermem/INDEX.md`. Do NOT modify the target record.
