@@ -932,9 +932,9 @@ async function flushRecallOutcome($, root, activity, sessionID, timestamp = new 
 }
 
 // packages/opencode-plugin/src/habit_intent.ts
-var NO_CAPTURE = { captured: false, habitType: "" };
-var HABIT_INTENT_HINT_RE = /\b(always|habit|preference|prefer|remember)\b/i;
-var CJK_HABIT_INTENT_HINTS = ["\u4EE5\u540E", "\u504F\u597D", "\u4E60\u60EF", "\u8BB0\u4F4F"];
+var NO_CAPTURE = { captured: false, habitType: "", suggestedScope: "" };
+var HABIT_INTENT_HINT_RE = /\b(always|habit|preference|prefer|remember|usually|default|convention)\b/i;
+var CJK_HABIT_INTENT_HINTS = ["\u4EE5\u540E", "\u504F\u597D", "\u4E60\u60EF", "\u8BB0\u4F4F", "\u603B\u662F", "\u6BCF\u6B21", "\u9ED8\u8BA4", "\u4E00\u5F8B", "\u8BB0\u5F97", "\u5C3D\u91CF", "\u89C4\u8303", "\u7EA6\u5B9A"];
 function looksLikeHabitIntent(text) {
   return HABIT_INTENT_HINT_RE.test(text) || CJK_HABIT_INTENT_HINTS.some((hint) => text.includes(hint));
 }
@@ -949,7 +949,12 @@ async function captureHabitIntentWithCli($, root, text) {
       return NO_CAPTURE;
     const candidate = Reflect.get(parsed, "candidate");
     const habitType = typeof candidate === "object" && candidate !== null ? Reflect.get(candidate, "habit_type") : "";
-    return { captured: true, habitType: typeof habitType === "string" ? habitType : "" };
+    const suggestedScope = typeof candidate === "object" && candidate !== null ? Reflect.get(candidate, "suggested_scope") : "";
+    return {
+      captured: true,
+      habitType: typeof habitType === "string" ? habitType : "",
+      suggestedScope: typeof suggestedScope === "string" ? suggestedScope : ""
+    };
   } catch {
     return NO_CAPTURE;
   }
@@ -1115,6 +1120,15 @@ function habitToastMessage(summary) {
   const n = summary.habitCount;
   return `\uD83E\uDDE0 SyberMem \u5DF2\u5E94\u7528\u4F60\u7684 ${n} \u6761\u4E60\u60EF (applied ${n} user habit reminder${n === 1 ? "" : "s"})`;
 }
+function habitCandidateToast(habitIntent) {
+  if (habitIntent.captured && habitIntent.suggestedScope === "project") {
+    return "\uD83D\uDCA1 SyberMem \u53D1\u73B0\u4E00\u6761\u50CF\u662F\u672C\u9879\u76EE\u7684\u7EA6\u5B9A \u2014 \u53EF\u7528 /sybermem-record \u8BB0\u4E3A\u51B3\u7B56/\u9700\u6C42\uFF0C\u6216 /sybermem-habit \u786E\u8BA4";
+  }
+  if (habitIntent.captured && habitIntent.suggestedScope === "user") {
+    return "\uD83D\uDCA1 SyberMem \u53D1\u73B0\u4E00\u6761\u53EF\u590D\u7528\u7684\u4E2A\u4EBA\u4E60\u60EF \u2014 \u9700\u8981\u7684\u8BDD\u7528 /sybermem-habit \u4E00\u6B65\u786E\u8BA4";
+  }
+  return "\uD83D\uDCA1 SyberMem \u53D1\u73B0\u4E00\u6761\u53EF\u590D\u7528\u7684\u504F\u597D/\u89C4\u8303 \u2014 \u9700\u8981\u7684\u8BDD\u7528 /sybermem-habit \u4E00\u6B65\u786E\u8BA4\uFF08\u4F1A\u95EE\u4F60\u8BB0\u6210\u4E60\u60EF\u8FD8\u662F\u9879\u76EE\u7EA6\u5B9A\uFF09";
+}
 async function handleSessionCreated(args, root, sessionID) {
   const versionNudge = updateNudgeMessage(root);
   if (versionNudge)
@@ -1243,7 +1257,7 @@ var SyberMemPlugin = async ({ $, directory, client }) => {
       stashPromptPackets(sessionID, packets);
       const summary = classifyPackets(packets);
       if (habitIntent.captured || summary.habitCandidate) {
-        throttledToast(args.client, "habit-candidate", "\uD83D\uDCA1 SyberMem \u53D1\u73B0\u4E00\u6761\u53EF\u590D\u7528\u7684\u504F\u597D/\u89C4\u8303 \u2014 \u9700\u8981\u7684\u8BDD\u7528 /sybermem-habit \u4E00\u6B65\u786E\u8BA4");
+        throttledToast(args.client, "habit-candidate", habitCandidateToast(habitIntent));
       }
     },
     "experimental.chat.system.transform": async ({ sessionID }, output) => {

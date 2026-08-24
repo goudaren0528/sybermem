@@ -65,6 +65,20 @@ function habitToastMessage(summary: InjectionSummary): string | null {
   return `🧠 SyberMem 已应用你的 ${n} 条习惯 (applied ${n} user habit reminder${n === 1 ? "" : "s"})`
 }
 
+// Scope-aware "save this preference" hint. When Core suggests where the preference
+// belongs (cross-project user habit vs a project decision/requirement record), the
+// toast routes the user to the right home; otherwise it stays neutral and defers the
+// user-vs-project question to the /sybermem-habit confirm step.
+function habitCandidateToast(habitIntent: import("./habit_intent").HabitIntentResult): string {
+  if (habitIntent.captured && habitIntent.suggestedScope === "project") {
+    return "💡 SyberMem 发现一条像是本项目的约定 — 可用 /sybermem-record 记为决策/需求，或 /sybermem-habit 确认"
+  }
+  if (habitIntent.captured && habitIntent.suggestedScope === "user") {
+    return "💡 SyberMem 发现一条可复用的个人习惯 — 需要的话用 /sybermem-habit 一步确认"
+  }
+  return "💡 SyberMem 发现一条可复用的偏好/规范 — 需要的话用 /sybermem-habit 一步确认（会问你记成习惯还是项目约定）"
+}
+
 async function handleSessionCreated(args: PluginArgs, root: string, sessionID: string): Promise<void> {
   // Version nudge fires independently of conclusions: an outdated project should
   // be flagged even before it has any recorded memory. Fail-open and throttled.
@@ -200,7 +214,7 @@ export const SyberMemPlugin: Plugin = async ({ $, directory, client }: PluginArg
       // heuristic, so the user knows a habit candidate is ready to confirm.
       const summary = classifyPackets(packets)
       if (habitIntent.captured || summary.habitCandidate) {
-        throttledToast(args.client, "habit-candidate", "💡 SyberMem 发现一条可复用的偏好/规范 — 需要的话用 /sybermem-habit 一步确认")
+        throttledToast(args.client, "habit-candidate", habitCandidateToast(habitIntent))
       }
     },
     "experimental.chat.system.transform": async ({ sessionID }: { readonly sessionID?: string }, output: SystemTransformOutput) => {

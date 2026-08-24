@@ -40,7 +40,7 @@ Before running SyberMem CLI commands, resolve a command variable first. On Windo
 
 Types: `workflow`, `style`, `tooling`, `communication`, `review`, `avoidance`.
 
-Use `--injection-policy prompt_ok_when_supported` only when the user explicitly wants prompt-time reminders on supported hosts such as Claude Code, OpenCode, or Codex. Default `compaction_ok` is safer and works for manual/compaction carry-forward.
+Injection policy controls WHERE a user-confirmed habit may surface, not whether it may be remembered (confirmation-first still gates creation). The default is now `prompt_ok_when_supported`, so a confirmed habit is perceptible at prompt time (🧠) on supported hosts such as Claude Code, OpenCode, or Codex — bounded by the conservative selection gate (active, high-confidence, directly relevant, `not_applies_to`-excluded, at most 3). Pass `--injection-policy compaction_ok` when the user wants a habit carried forward only at compaction, or `--injection-policy manual_only` to keep it out of automatic injection entirely.
 
 ## Workflow
 
@@ -55,10 +55,14 @@ Use `--injection-policy prompt_ok_when_supported` only when the user explicitly 
 
 The passive capture is candidate-only and never creates a habit on its own. To turn a pending candidate into a real habit in one confirmed step:
 
-1. Read it: `$SyberMemCli habit intent-status --format json`. The candidate JSON carries a suggested `habit_type` but no statement.
-2. Propose ONE normalized statement to the user based on the recent conversation, plus the suggested type. Ask them to confirm (confirmation-first still applies — the passive candidate is a hint, not authorization).
-3. On confirmation, add it: `$SyberMemCli habit add --type <type> --applies-to <tag> "<normalized statement>"`.
-4. Clear the candidate so it does not linger: `$SyberMemCli habit intent-clear`.
+1. Read it: `$SyberMemCli habit intent-status --format json`. The candidate JSON carries a suggested `habit_type`, a suggested `suggested_scope` (`user` / `project` / `ambiguous`), and no statement.
+2. Route by `suggested_scope` (it is a suggestion; the user always decides):
+   - `user` → a cross-project personal habit. Propose ONE normalized statement + type and confirm, then add it as a user habit (below).
+   - `project` → a project-specific convention. Do NOT add a user habit; suggest recording it via `/sybermem-record` as a `decision` or `requirement` (that is its real home), then clear the candidate.
+   - `ambiguous` → ask ONE question: "记成跨项目的个人习惯，还是本项目的约定（走 /sybermem-record）？" Route by the answer.
+3. Propose ONE normalized statement to the user based on the recent conversation, plus the suggested type. Ask them to confirm (confirmation-first still applies — the passive candidate is a hint, not authorization).
+4. On confirmation of a user habit, add it: `$SyberMemCli habit add --type <type> --applies-to <tag> "<normalized statement>"`.
+5. Clear the candidate so it does not linger: `$SyberMemCli habit intent-clear`.
 
 If the user declines, just clear the candidate with `habit intent-clear` and do not add anything.
 
@@ -101,12 +105,12 @@ Run:
 $SyberMemCli habit add --type workflow --applies-to planning --applies-to implementation "Prefer plans before code changes"
 ```
 
-User: "之后每次都提醒我这个偏好。"
+User: "这个偏好只在压缩时带上就行，别每轮都提醒。"
 
-Run:
+Run (opt into the more conservative compaction-only policy; prompt-time is the default):
 
 ```bash
-$SyberMemCli habit add --type workflow --applies-to planning --applies-to implementation --injection-policy prompt_ok_when_supported "Prefer plans before code changes"
+$SyberMemCli habit add --type workflow --applies-to planning --applies-to implementation --injection-policy compaction_ok "Prefer plans before code changes"
 ```
 
 User: "这像不像一个要记住的习惯？"
@@ -125,7 +129,7 @@ $SyberMemCli habit remind --context "planning implementation preference" --forma
 | Saving a habit after observing repeated behavior | Ask for confirmation first. |
 | Storing the user's raw prompt as the habit | Store a normalized statement. |
 | Claiming unsupported platform reminders | State the actual boundary: Claude Code, OpenCode, and Codex support prompt-time habit reminders on their supported prompt seams; Codex also supports bounded startup context, prompt recall, record-intent capture, Stop record nudges, and compact re-seed markers, but not hidden auto-resume or direct compaction prompt injection. Gemini/Cursor/Kimi do not have runtime reminder wiring. |
-| Adding prompt-time policy by default | Use `prompt_ok_when_supported` only on explicit request. |
+| Forcing a habit to compaction-only without reason | Prompt-time (`prompt_ok_when_supported`) is the default so confirmed habits stay perceptible; only downgrade to `compaction_ok`/`manual_only` when the user asks for quieter delivery. |
 
 ## Completion
 
