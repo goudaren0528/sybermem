@@ -26,16 +26,23 @@ lifecycle-hook and prompt-time recall behavior:
   `UserPromptSubmit` hook uses, and they also append User Habit Memory reminder
   markdown in the same transform. Recall is gated by the same high-signal
   threshold (record-id / relation, or score >= 12), so weak keyword matches stay
-  silent and every injected recall hint carries a visible marker. Habit reminders
-  stay conservative and fail open: only active, high-confidence, directly relevant,
-  prompt-ok-when-supported habits are included, with bounded output.
+   silent and every injected recall hint carries a visible marker. Habit reminders
+   stay conservative and fail open: only active, high-confidence, directly relevant,
+   prompt-ok-when-supported habits are included, with bounded output. Habits added
+   via `/sybermem-habit` are prompt-ok-when-supported by DEFAULT, so a confirmed
+   habit is perceptible at prompt time without extra flags; relevance uses CJK-aware
+   tokenization plus a weighted floor (an `applies_to` tag match is a strong boost,
+   otherwise a habit needs two distinct statement/type overlaps) so Chinese contexts
+   match while unrelated habits stay silent.
 - To make in-session injection perceptible (not just the `session.created` toast),
-  `experimental.chat.system.transform` shows a throttled `⭐ SyberMem: injected N
-  recall hint(s) [ + habit reminder(s)] into this prompt` toast at the moment
-  context actually reaches the model. `chat.message` shows a `💡 Detected a
-  reusable preference — save it with /sybermem-habit` toast when a prompt looks
-  like a preference but no stored habit matched (the CLI's `habit_preference_candidate`
-  outcome), turning an otherwise silently-dropped signal into a discoverable action.
+  `experimental.chat.system.transform` shows SEPARATE throttled toasts at the moment
+  context actually reaches the model: a `⭐` recall toast for injected recall hints and
+  a distinct `🧠` toast for applied user habits, so an applied habit is as perceptible
+  as recall instead of being merged into one notice. `chat.message` shows a scope-aware
+  `💡` toast when a prompt looks like a reusable preference — routing to `/sybermem-habit`
+  for a cross-project habit, to `/sybermem-record` for a project-specific convention, or
+  deferring the user-vs-project question to the confirm step when ambiguous — turning an
+  otherwise silently-dropped signal into a discoverable action.
   Both toasts are cooldown-throttled (~30s per type) and fail open, so they never
   block or spam the prompt flow.
 - `session.idle` classifies changed files into a record nudge, a digest nudge, or
