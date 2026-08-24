@@ -130,7 +130,7 @@ def parse_project_yaml_full(root: Path) -> dict[str, object]:
 def iter_record_files(root: Path) -> list[Path]:
     syb = root / ".sybermem"
     files: list[Path] = []
-    for sub in ["changes", "decisions", "requirements", "bugs", "digests", "theme-digests"]:
+    for sub in ["changes", "decisions", "requirements", "bugs", "norms", "digests", "theme-digests"]:
         d = syb / sub
         if d.is_dir():
             files.extend(sorted(d.glob("*.md")))
@@ -159,7 +159,10 @@ def related_files_by_record(root: Path, record_ids: list[str] | None = None) -> 
 
 
 def _frontmatter_lines(text: str) -> list[str]:
-    lines = text.splitlines()
+    # Tolerate a UTF-8 BOM: an editor (or PowerShell Set-Content) may prepend \ufeff,
+    # which would otherwise make the first line "\ufeff---" and silently drop all
+    # frontmatter parsing (record type/scope/etc. would come back empty).
+    lines = text.lstrip("\ufeff").splitlines()
     if not lines or lines[0] != "---":
         return []
     for index in range(1, len(lines)):
@@ -197,6 +200,7 @@ def parse_record_file(path: Path, project_id: str, slug: str) -> dict[str, str]:
     source_kind = ""
     authority = ""
     lifecycle = ""
+    scope = ""
     explicit_topics = False
     frontmatter = _frontmatter_lines(text)
     index = 0
@@ -263,6 +267,8 @@ def parse_record_file(path: Path, project_id: str, slug: str) -> dict[str, str]:
             authority = unwrap_scalar(line.split(":", 1)[1])
         elif line.startswith("lifecycle:"):
             lifecycle = unwrap_scalar(line.split(":", 1)[1])
+        elif line.startswith("scope:"):
+            scope = unwrap_scalar(line.split(":", 1)[1])
         index += 1
     # Extract #topic tags from the full text (e.g. "#architecture #foundation")
     if not explicit_topics:
@@ -293,4 +299,5 @@ def parse_record_file(path: Path, project_id: str, slug: str) -> dict[str, str]:
         "source_kind": source_kind,
         "authority": authority,
         "lifecycle": lifecycle,
+        "scope": scope,
     }

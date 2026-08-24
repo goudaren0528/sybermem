@@ -12,6 +12,7 @@ SECTION_BY_TYPE: Final[Mapping[str, str]] = {
     "decision": "Technical Decisions",
     "requirement": "Requirements / Discussions",
     "bug": "Bug Fix Records",
+    "norm": "Project Norms",
 }
 TOPIC_PATTERN: Final[re.Pattern[str]] = re.compile(r"^[\w][\w-]*$")
 
@@ -65,6 +66,7 @@ def generated_sections(root: Path, records: tuple[Record, ...]) -> Mapping[str, 
         "Technical Decisions": _render_standard_table(root, records, "decision"),
         "Requirements / Discussions": _render_requirements_table(root, records),
         "Bug Fix Records": _render_bugs_table(root, records),
+        "Project Norms": _render_standard_table(root, records, "norm"),
         "Topic Index": _render_topic_index(records),
     }
 
