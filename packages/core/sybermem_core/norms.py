@@ -30,10 +30,18 @@ class Norm(TypedDict):
     path: str
 
 
+_MAX_STATEMENT_CHARS: Final = 300
+
+
 def _statement(row: dict) -> str:
     # Prefer key_conclusion (the norm template maps the imperative statement there);
-    # fall back to the title so a norm is never rendered empty.
-    return (row.get("key_conclusion") or row.get("title") or "").strip()
+    # fall back to the title so a norm is never rendered empty. Bounded so an oversized
+    # frontmatter value can never inject unbounded authoritative text into a prompt.
+    raw = (row.get("key_conclusion") or row.get("title") or "").strip()
+    normalized = " ".join(raw.split())
+    if len(normalized) <= _MAX_STATEMENT_CHARS:
+        return normalized
+    return normalized[: _MAX_STATEMENT_CHARS - 3].rstrip() + "..."
 
 
 def _to_norm(row: dict, lifecycle: str) -> Norm:
@@ -90,11 +98,13 @@ def constitution(root: Path, *, limit: int = CONSTITUTION_MAX) -> list[Norm]:
     """Return the bounded, always-on set of active GLOBAL norms (the project constitution).
 
     Deterministically ordered by record_id so the same session always sees the same set;
-    capped at `limit` so it stays a scarce, high-signal layer rather than noise.
+    capped at min(limit, CONSTITUTION_MAX) so a caller can never widen past the hard cap
+    (the constitution must stay a scarce, high-signal layer).
     """
+    effective = max(0, min(limit, CONSTITUTION_MAX))
     globals_only = [n for n in active_norms(root) if _is_global(n["scope"])]
     globals_only.sort(key=lambda n: n["record_id"])
-    return globals_only[:limit]
+    return globals_only[:effective]
 
 
 class NormCoverage(TypedDict):
@@ -119,48 +129,80 @@ def norm_coverage(root: Path) -> NormCoverage:
     }
 
 
+# Generic tokens that carry no relevance signal on their own — mostly CJK imperative /
+# filler bigrams and common English words. A norm must NOT surface just because a prompt
+# shares these. Mirrors the habit subsystem's stopword hardening.
+_STOP_TERMS: Final = frozenset({
+    "must", "should", "always", "never", "avoid", "use", "the", "and", "for", "with",
+    "必须", "禁止", "不得", "不能", "一律", "总是", "应当", "务必", "严禁", "避免",
+    "使用", "项目", "处理", "进行", "需要", "可以", "一个", "这个", "我们", "以及",
+})
+
+
 def _terms(value: str) -> set[str]:
-    terms = {t.lower() for t in re.findall(r"[\w-]+", value) if t.strip()}
-    terms = {t for t in terms if not _CJK_RE.search(t)}
-    grams: set[str] = set()
+    terms: set[str] = set()
+    for term in re.findall(r"[\w-]+", value):
+        if not term.strip():
+            continue
+        if _CJK_RE.search(term):
+            # Mixed run like "auth认证": keep ASCII sub-runs (so English scope/statement
+            # tokens still match) and drop the CJK blob (grams are emitted below).
+            for ascii_run in re.findall(r"[0-9a-zA-Z_-]+", term):
+                terms.add(ascii_run.lower())
+        else:
+            terms.add(term.lower())
     for run in re.findall(r"[\u3400-\u4dbf\u4e00-\u9fff]+", value):
-        for i, ch in enumerate(run):
+        for i in range(len(run)):
             if i + 1 < len(run):
-                grams.add(run[i : i + 2])
-    return terms | grams
+                terms.add(run[i : i + 2])  # CJK bigram
+    return terms
+
+
+def _strong_terms(value: str) -> set[str]:
+    # Terms strong enough to establish relevance: multi-character, not a stopword. A single
+    # CJK char or a common filler word is too weak to surface an unrelated norm.
+    return {t for t in _terms(value) if len(t) >= 2 and t not in _STOP_TERMS}
 
 
 def _scope_matches_context(scope: str, context_terms: set[str]) -> bool:
     # A scope like "topic:auth" / "path:packages/core/**" / "tool:pnpm" matches when its
-    # payload tokens intersect the context terms. Global scopes are handled by the
-    # constitution lane, not here.
+    # payload tokens intersect the context terms (exact token), OR a scope token appears as
+    # a substring of a context token (so "auth" matches "authentication"). Global scopes
+    # are handled by the constitution lane, not here.
     if _is_global(scope):
         return False
     scope_terms = _terms(scope.replace(":", " ").replace("/", " ").replace("*", " "))
     scope_terms -= {"topic", "path", "tool", "toolchain"}
-    return bool(scope_terms & context_terms)
+    scope_terms = {t for t in scope_terms if len(t) >= 2}
+    if scope_terms & context_terms:
+        return True
+    # Substring alias: a short scope token contained in a longer context token.
+    return any(len(s) >= 3 and any(s in c for c in context_terms) for s in scope_terms)
 
 
 def scoped_norms(root: Path, context: str, *, limit: int = CONSTITUTION_MAX) -> list[Norm]:
     """Return active NON-global norms relevant to the current context.
 
-    Relevance: a scope-tag match (strong), or >=SCOPED_RELEVANCE_MIN distinct statement/
-    topic term overlaps with the context. Keeps norms context-scoped without touching the
-    ordinary recall high-signal gate.
+    Relevance: a scope-tag match (strong), or >=SCOPED_RELEVANCE_MIN distinct STRONG
+    statement overlaps (multi-char, non-stopword) with the context. Keeps norms context-
+    scoped without touching the ordinary recall high-signal gate, and — like the habit
+    subsystem — a single common token or CJK filler bigram is never enough to surface an
+    unrelated norm.
     """
     context_terms = _terms(context)
     if not context_terms:
         return []
+    context_strong = {t for t in context_terms if len(t) >= 2 and t not in _STOP_TERMS}
     scored: list[tuple[int, Norm]] = []
     for norm in active_norms(root):
         if _is_global(norm["scope"]):
             continue
         scope_match = _scope_matches_context(norm["scope"], context_terms)
-        overlap = len(_terms(norm["statement"]).intersection(context_terms))
+        strong_overlap = len(_strong_terms(norm["statement"]).intersection(context_strong))
         if scope_match:
-            scored.append((100 + overlap, norm))
-        elif overlap >= SCOPED_RELEVANCE_MIN:
-            scored.append((overlap, norm))
+            scored.append((100 + strong_overlap, norm))
+        elif strong_overlap >= SCOPED_RELEVANCE_MIN:
+            scored.append((strong_overlap, norm))
     scored.sort(key=lambda pair: (-pair[0], pair[1]["record_id"]))
     return [norm for _, norm in scored[:limit]]
 
