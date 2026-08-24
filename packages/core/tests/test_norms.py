@@ -89,6 +89,24 @@ def test_scoped_norms_match_by_statement_overlap_when_no_scope_tag(tmp_path: Pat
     assert scoped_norms(root, "update the readme title") == []
 
 
+def test_norm_coverage_reports_split_and_constitution_budget(tmp_path: Path) -> None:
+    from sybermem_core.norms import norm_coverage
+
+    root = tmp_path / "p"
+    root.mkdir()
+    write_project(root)
+    write_norm(root, "g1.md", "norm-001", "global", "Rule 1")
+    write_norm(root, "g2.md", "norm-002", "global", "Rule 2")
+    write_norm(root, "s1.md", "norm-003", "topic:auth", "Auth rule")
+
+    cov = norm_coverage(root)
+    assert cov["active"] == 3
+    assert cov["global_"] == 2
+    assert cov["scoped"] == 1
+    assert cov["constitution_used"] == 2
+    assert cov["constitution_max"] == CONSTITUTION_MAX
+
+
 def test_active_norms_excludes_superseded_and_archived(tmp_path: Path) -> None:
     root = tmp_path / "p"
     root.mkdir()

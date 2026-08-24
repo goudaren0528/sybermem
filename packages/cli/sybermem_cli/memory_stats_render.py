@@ -50,6 +50,23 @@ def _print_digest_coverage(payload: dict) -> None:
         print(f"Digest coverage: {covered}/{total} records covered, {uncovered} uncovered (latest digest {latest}, {age}d ago)")
     else:
         print(f"Digest coverage: no digest yet, {uncovered}/{total} records uncovered")
+    _print_norm_coverage(payload)
+
+
+def _print_norm_coverage(payload: dict) -> None:
+    coverage = payload.get("norm_coverage")
+    if not coverage:
+        return
+    active = coverage.get("active", 0)
+    if active == 0:
+        print("Project norms: none")
+        return
+    used = coverage.get("constitution_used", 0)
+    cap = coverage.get("constitution_max", 0)
+    print(
+        f"Project norms: {active} active ({coverage.get('global_', 0)} global, "
+        f"{coverage.get('scoped', 0)} scoped); constitution {used}/{cap}"
+    )
 
 
 def _print_recall_health(payload: dict) -> None:

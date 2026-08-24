@@ -8,6 +8,7 @@ from typing import Final
 
 from .identity import now_iso
 from .digest_governance import digest_backlog
+from .norms import norm_coverage
 from .records import iter_record_files, parse_project_yaml, parse_record_file
 
 
@@ -54,6 +55,8 @@ def project_memory_stats(root: Path) -> dict:
         # Snapshot (not windowed): how much undigested work has accumulated. Makes the
         # compression layer's health as visible as recall health.
         "digest_coverage": digest_backlog(root),
+        # Snapshot: active norm count, global/scoped split, and constitution budget usage.
+        "norm_coverage": norm_coverage(root),
     }
 
 

@@ -97,6 +97,28 @@ def constitution(root: Path, *, limit: int = CONSTITUTION_MAX) -> list[Norm]:
     return globals_only[:limit]
 
 
+class NormCoverage(TypedDict):
+    active: int
+    global_: int
+    scoped: int
+    constitution_used: int
+    constitution_max: int
+
+
+def norm_coverage(root: Path) -> NormCoverage:
+    """Snapshot of norm health for memory-stats: active count, global vs scoped split,
+    and how much of the bounded constitution budget is used."""
+    active = active_norms(root)
+    globals_ = [n for n in active if _is_global(n["scope"])]
+    return {
+        "active": len(active),
+        "global_": len(globals_),
+        "scoped": len(active) - len(globals_),
+        "constitution_used": min(len(globals_), CONSTITUTION_MAX),
+        "constitution_max": CONSTITUTION_MAX,
+    }
+
+
 def _terms(value: str) -> set[str]:
     terms = {t.lower() for t in re.findall(r"[\w-]+", value) if t.strip()}
     terms = {t for t in terms if not _CJK_RE.search(t)}
