@@ -251,3 +251,54 @@ def nominate_norm_candidates(root: Path, *, min_occurrences: int = NOMINATION_MI
         })
     nominations.sort(key=lambda n: (-n["occurrences"], n["sample"]))
     return nominations
+
+
+# Same-scope conflict detection (P2 governance): two ACTIVE norms in the same scope with
+# high statement overlap are a likely contradiction/duplication that should be resolved
+# (supersede one, or reword scopes). This is advisory — it never edits or deactivates a
+# norm; it just surfaces the pair for the user to resolve.
+CONFLICT_OVERLAP_MIN: Final = 0.5
+
+
+class NormConflict(TypedDict):
+    scope: str
+    norms: list[str]  # conflicting active norm ids in the same scope
+    reason: str
+
+
+def _scope_key(scope: str) -> str:
+    return ",".join(sorted(t.strip().lower() for t in scope.split(",") if t.strip()))
+
+
+def norm_conflicts(root: Path) -> list[NormConflict]:
+    """Return pairs/groups of active norms in the same scope with high statement overlap."""
+    active = active_norms(root)
+    by_scope: dict[str, list[Norm]] = {}
+    for norm in active:
+        by_scope.setdefault(_scope_key(norm["scope"]), []).append(norm)
+    conflicts: list[NormConflict] = []
+    for scope_key, group in by_scope.items():
+        if len(group) < 2:
+            continue
+        # Cluster within the scope by statement token overlap.
+        clustered: list[dict] = []
+        for norm in group:
+            terms = _terms(norm["statement"])
+            placed = False
+            for cluster in clustered:
+                if terms and len(cluster["terms"] & terms) / max(len(terms), 1) >= CONFLICT_OVERLAP_MIN:
+                    cluster["ids"].append(norm["record_id"])
+                    cluster["terms"] |= terms
+                    placed = True
+                    break
+            if not placed:
+                clustered.append({"ids": [norm["record_id"]], "terms": set(terms)})
+        for cluster in clustered:
+            if len(cluster["ids"]) >= 2:
+                conflicts.append({
+                    "scope": scope_key or "unscoped",
+                    "norms": sorted(cluster["ids"]),
+                    "reason": "Multiple active norms in the same scope with overlapping statements — supersede one or narrow their scopes.",
+                })
+    conflicts.sort(key=lambda c: (c["scope"], c["norms"]))
+    return conflicts

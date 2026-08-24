@@ -5,7 +5,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "core"))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from sybermem_cli.main import cmd_norms_list, cmd_norms_nominate
+from sybermem_cli.main import cmd_norms_doctor, cmd_norms_list, cmd_norms_nominate
 
 
 def write_project(root: Path) -> None:
@@ -115,3 +115,31 @@ def test_cli_norms_nominate_none(tmp_path: Path, monkeypatch, capsys) -> None:
 
     assert exit_code == 0
     assert "No norm nominations." in capsys.readouterr().out
+
+
+def test_cli_norms_doctor_reports_conflicts_and_exits_1(tmp_path: Path, monkeypatch, capsys) -> None:
+    root = tmp_path / "p"
+    root.mkdir()
+    write_project(root)
+    write_norm(root, "a.md", "norm-001", "topic:auth", "Sessions must expire after inactivity")
+    write_norm(root, "b.md", "norm-002", "topic:auth", "Sessions must expire after 30 minutes inactivity")
+    monkeypatch.chdir(root)
+
+    exit_code = cmd_norms_doctor(Namespace(format="text"))
+
+    assert exit_code == 1
+    out = capsys.readouterr().out
+    assert "conflict" in out
+    assert "norm-001" in out and "norm-002" in out
+
+
+def test_cli_norms_doctor_clean_exits_0(tmp_path: Path, monkeypatch, capsys) -> None:
+    root = tmp_path / "p"
+    root.mkdir()
+    write_project(root)
+    monkeypatch.chdir(root)
+
+    exit_code = cmd_norms_doctor(Namespace(format="text"))
+
+    assert exit_code == 0
+    assert "No norm conflicts." in capsys.readouterr().out

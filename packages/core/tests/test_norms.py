@@ -157,6 +157,34 @@ def test_nominate_skips_constraint_already_covered_by_active_norm(tmp_path: Path
     assert nominate_norm_candidates(root) == []
 
 
+def test_norm_conflicts_flags_same_scope_overlap(tmp_path: Path) -> None:
+    from sybermem_core.norms import norm_conflicts
+
+    root = tmp_path / "p"
+    root.mkdir()
+    write_project(root)
+    write_norm(root, "a.md", "norm-001", "topic:auth", "Sessions must expire after inactivity")
+    write_norm(root, "b.md", "norm-002", "topic:auth", "Sessions must expire after 30 minutes inactivity")
+    write_norm(root, "c.md", "norm-003", "topic:payment", "Webhooks must be idempotent")  # different scope
+
+    conflicts = norm_conflicts(root)
+    assert len(conflicts) == 1
+    assert set(conflicts[0]["norms"]) == {"norm-001", "norm-002"}
+    assert conflicts[0]["scope"] == "topic:auth"
+
+
+def test_norm_conflicts_none_when_scopes_differ_or_no_overlap(tmp_path: Path) -> None:
+    from sybermem_core.norms import norm_conflicts
+
+    root = tmp_path / "p"
+    root.mkdir()
+    write_project(root)
+    write_norm(root, "a.md", "norm-001", "topic:auth", "Sessions expire after inactivity")
+    write_norm(root, "b.md", "norm-002", "topic:payment", "Webhooks must be idempotent")
+
+    assert norm_conflicts(root) == []
+
+
 def test_active_norms_excludes_superseded_and_archived(tmp_path: Path) -> None:
     root = tmp_path / "p"
     root.mkdir()
