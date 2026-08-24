@@ -27,7 +27,7 @@ class ContinuityMetadata(TypedDict):
     summary: str
 
 
-RECORD_ID_RE = re.compile(rf"(?:change|decision|requirement|bug|digest)-{RECORD_ID_SUFFIX}")
+RECORD_ID_RE = re.compile(rf"(?:change|decision|requirement|bug|norm|digest)-{RECORD_ID_SUFFIX}")
 
 
 def is_auto_trail(title: str, content: str) -> bool:

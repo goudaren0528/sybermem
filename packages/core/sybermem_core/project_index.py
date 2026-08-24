@@ -15,6 +15,7 @@ DERIVED_SECTIONS: Final[tuple[str, ...]] = (
     "Technical Decisions",
     "Requirements / Discussions",
     "Bug Fix Records",
+    "Project Norms",
     "Topic Index",
 )
 CANONICAL_RECORD_DIRECTORIES: Final[Mapping[str, str]] = {
@@ -22,9 +23,10 @@ CANONICAL_RECORD_DIRECTORIES: Final[Mapping[str, str]] = {
     "decision": "decisions",
     "requirement": "requirements",
     "bug": "bugs",
+    "norm": "norms",
 }
-RECORD_TYPES: Final[frozenset[str]] = frozenset(("change", "decision", "requirement", "bug"))
-RECORD_ID_PATTERN: Final[re.Pattern[str]] = re.compile(rf"^(change|decision|requirement|bug)-{RECORD_ID_SUFFIX}$")
+RECORD_TYPES: Final[frozenset[str]] = frozenset(("change", "decision", "requirement", "bug", "norm"))
+RECORD_ID_PATTERN: Final[re.Pattern[str]] = re.compile(rf"^(change|decision|requirement|bug|norm)-{RECORD_ID_SUFFIX}$")
 HEADING_PATTERN: Final[re.Pattern[str]] = re.compile(r"^## (.+)$")
 CONCLUSION_PATTERN: Final[re.Pattern[str]] = re.compile(r"^- \[([^\]]+)]\s*((?:#[\w-]+\s*)*)—\s*(.*?)\s*\(([^)]*)\)\s*$")
 TABLE_ROW_PATTERN: Final[re.Pattern[str]] = re.compile(r"^\|\s*(.*?)\s*\|$")

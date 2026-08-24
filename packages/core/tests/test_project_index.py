@@ -139,7 +139,8 @@ def test_build_project_index_preserves_required_anchor_comments(tmp_path: Path) 
 
     # Then: the health-check anchor comments remain present in generated sections
     assert "<!-- add new conclusions here -->" in index
-    assert index.count("<!-- add new records here -->") == 4
+    # 5 record tables now: changes, decisions, requirements, bugs, norms
+    assert index.count("<!-- add new records here -->") == 5
 
 
 def test_build_project_index_renders_canonical_requirement_and_bug_metadata_on_first_build(tmp_path: Path) -> None:

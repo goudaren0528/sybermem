@@ -78,6 +78,46 @@ def test_parse_record_file_prefers_explicit_frontmatter_record_id_and_topics(tmp
     assert record["key_conclusion"] == "Explicit canonical metadata wins over filename fallback."
 
 
+def test_parse_record_file_reads_norm_type_and_scope(tmp_path: Path) -> None:
+    # Given: a norm record with scope frontmatter
+    record_path = tmp_path / "2026-08-24-norm-abc.md"
+    record_path.write_text(
+        "\n".join([
+            "---", "type: norm", "record_id: norm-abcdef1234567890abcdef1234567890",
+            "date: 2026-08-24", "title: Use pnpm", "authority: authoritative",
+            "status: active", "scope: global", "key_conclusion: Use pnpm in this repo",
+            "---", "", "## Norm Statement", "Use pnpm.",
+        ]) + "\n",
+        encoding="utf-8",
+    )
+
+    record = parse_record_file(record_path, "project-1", "demo")
+    assert record["type"] == "norm"
+    assert record["scope"] == "global"
+    assert record["authority"] == "authoritative"
+    assert record["key_conclusion"] == "Use pnpm in this repo"
+
+
+def test_parse_record_file_tolerates_utf8_bom(tmp_path: Path) -> None:
+    # Given: a record whose file begins with a UTF-8 BOM (e.g. written by some editors)
+    record_path = tmp_path / "2026-08-24-norm-bom.md"
+    record_path.write_text(
+        "\ufeff" + "\n".join([
+            "---", "type: norm", "record_id: norm-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "date: 2026-08-24", "title: BOM norm", "scope: global",
+            "key_conclusion: BOM must not break frontmatter parsing",
+            "---", "", "## Norm Statement", "x",
+        ]) + "\n",
+        encoding="utf-8",
+    )
+
+    record = parse_record_file(record_path, "", "")
+    # Without BOM tolerance these would all be empty
+    assert record["type"] == "norm"
+    assert record["scope"] == "global"
+    assert record["key_conclusion"] == "BOM must not break frontmatter parsing"
+
+
 def test_parse_record_file_preserves_legacy_filename_record_id_and_optional_metadata(tmp_path: Path) -> None:
     # Given: a legacy record without canonical frontmatter extensions
     record_path = tmp_path / "2026-08-07-007-legacy-record.md"

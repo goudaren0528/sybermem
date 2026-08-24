@@ -49,7 +49,7 @@ _ROW_CACHE: dict[str, tuple[float, list[SearchRow]]] = {}
 
 def _records_fingerprint(root: Path) -> float:
     latest = 0.0
-    for subdir in ("changes", "decisions", "requirements", "bugs", "digests", "theme-digests"):
+    for subdir in ("changes", "decisions", "requirements", "bugs", "norms", "digests", "theme-digests"):
         record_dir = root / ".sybermem" / subdir
         if not record_dir.is_dir():
             continue

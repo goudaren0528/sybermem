@@ -20,6 +20,7 @@ from sybermem_core.status import project_memory_stats, project_status
 from sybermem_core.resume import build_resume_checkpoint
 from sybermem_core.next_step_router import classify_record_intent, recommend_next_step
 from sybermem_core.digest_governance import build_digest_governance_report, latest_digest_summary
+from sybermem_core.norms import constitution, scoped_norms
 from sybermem_core.portfolio import build_portfolio
 from sybermem_core.team import init_team_repo
 from sybermem_core.publish_bootstrap import bootstrap_publish_status
@@ -219,6 +220,32 @@ def cmd_digest_latest(args: argparse.Namespace) -> int:
         print(f"[{summary['record_id']}] {summary['title']} ({summary['date']})")
         for line in summary["conclusions"]:
             print(line)
+    return 0
+
+
+def cmd_norms_list(args: argparse.Namespace) -> int:
+    root = resolve_project_root()
+    if root is None:
+        print("No SyberMem project root found.", file=sys.stderr)
+        return 1
+    if args.scope == "global":
+        norms = constitution(root)
+    elif args.scope == "scoped":
+        norms = scoped_norms(root, args.context)
+    else:
+        # "all": the constitution plus, when a context is given, the relevant scoped norms.
+        norms = constitution(root)
+        if args.context:
+            seen = {n["record_id"] for n in norms}
+            norms = norms + [n for n in scoped_norms(root, args.context) if n["record_id"] not in seen]
+    if args.format == "json":
+        print(dump_json({"norms": norms}))
+    else:
+        if not norms:
+            print("No matching norms.")
+            return 0
+        for norm in norms:
+            print(f"[{norm['record_id']}] ({norm['scope'] or 'unscoped'}) {norm['statement']}")
     return 0
 
 
@@ -696,6 +723,14 @@ def main() -> int:
     digest_latest_cmd = digest_sub.add_parser("latest")
     digest_latest_cmd.add_argument("--format", choices=["text", "json"], default="text")
     digest_latest_cmd.set_defaults(func=cmd_digest_latest)
+
+    norms = sub.add_parser("norms")
+    norms_sub = norms.add_subparsers(dest="norms_command", required=True)
+    norms_list = norms_sub.add_parser("list")
+    norms_list.add_argument("--scope", choices=["all", "global", "scoped"], default="all")
+    norms_list.add_argument("--context", default="")
+    norms_list.add_argument("--format", choices=["text", "json"], default="text")
+    norms_list.set_defaults(func=cmd_norms_list)
 
     record = sub.add_parser("record")
     record_sub = record.add_subparsers(dest="record_command", required=True)
