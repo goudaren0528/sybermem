@@ -1,7 +1,25 @@
 import type { Shell } from "./runtime"
-import { digestStatusText, sybermemText } from "./runtime"
+import { digestLatestText, digestStatusText, sybermemText } from "./runtime"
 import { detectStaleSignal, parseIndex, parsePhaseIndex, parseProjectIdentity } from "./project_state"
 import type { SystemTransformOutput } from "./prompt_context"
+
+// Pull the latest phase digest's Core Conclusions into a bounded startup section. The
+// digest flow archives source-record conclusions out of INDEX Key Conclusions, so
+// without this the startup context loses exactly what the digest compressed. Fail-open.
+async function latestDigestSection($: Shell, root: string): Promise<string> {
+  try {
+    const parsed: unknown = JSON.parse(await digestLatestText($, root))
+    if (typeof parsed !== "object" || parsed === null) return ""
+    const conclusions = Reflect.get(parsed, "conclusions")
+    if (!Array.isArray(conclusions) || conclusions.length === 0) return ""
+    const title = typeof Reflect.get(parsed, "title") === "string" ? Reflect.get(parsed, "title") : ""
+    const lines = conclusions.filter((c): c is string => typeof c === "string").slice(0, 5)
+    if (lines.length === 0) return ""
+    return `\n### Latest Digest${title ? `: ${title}` : ""}\n${lines.join("\n")}\n`
+  } catch {
+    return ""
+  }
+}
 
 // One-shot pending flag per session. A plugin instance lives for the session, so
 // a module-level set is session-scoped; we only need to guarantee startup context
@@ -53,6 +71,7 @@ export async function buildStartupContext($: Shell, root: string): Promise<strin
     context += `\n### Phase Index\nStatus: ${phaseInfo.status}. ${phaseInfo.confirmedCount} confirmed phases.\n`
     if (phaseInfo.activePhase) context += `Active phase: ${phaseInfo.activePhase}.\n`
   }
+  context += await latestDigestSection($, root)
   if (stale.stale) context += `\n⭐ Heads-up: phase index trails HEAD by ${stale.commitsAhead} commits — conclusions may lag your latest work. Consider /sybermem-phase-analyze.\n`
   try {
     const staleDigestCount = numberField(JSON.parse(await digestStatusText($, root)), "stale")

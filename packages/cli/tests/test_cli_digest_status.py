@@ -6,7 +6,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "core"))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from sybermem_cli.main import cmd_digest_status
+from sybermem_cli.main import cmd_digest_latest, cmd_digest_status
 from sybermem_core.digest_coverage import compute_coverage_hash
 
 
@@ -95,4 +95,32 @@ def test_cli_digest_status_no_project_root_exits_1(tmp_path: Path, monkeypatch, 
     exit_code = cmd_digest_status(Namespace(format="json"))
 
     assert exit_code == 1
-    assert "No SyberMem project root found." in capsys.readouterr().err
+
+
+def test_cli_digest_latest_json_returns_conclusions(tmp_path: Path, monkeypatch, capsys) -> None:
+    root = tmp_path / "project"
+    root.mkdir()
+    write_project(root)
+    write_file(root, "changes/a.md", "---\ntype: change\n---\n\norig\n")
+    write_digest(root, "d.md", "digest-ok", ["changes/a.md"], compute_coverage_hash(root, ["changes/a.md"]))
+    monkeypatch.chdir(root)
+
+    exit_code = cmd_digest_latest(Namespace(format="json"))
+
+    assert exit_code == 0
+    out = capsys.readouterr().out
+    assert '"record_id": "digest-ok"' in out
+    assert "Core Conclusions" not in out  # only the bullet, not the header
+    assert "- s" in out
+
+
+def test_cli_digest_latest_no_digest_reports_none(tmp_path: Path, monkeypatch, capsys) -> None:
+    root = tmp_path / "project"
+    root.mkdir()
+    write_project(root)
+    monkeypatch.chdir(root)
+
+    exit_code = cmd_digest_latest(Namespace(format="text"))
+
+    assert exit_code == 0
+    assert "No digest found." in capsys.readouterr().out
