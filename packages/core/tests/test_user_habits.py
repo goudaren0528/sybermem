@@ -449,6 +449,35 @@ def test_prompt_reminder_untagged_habit_requires_two_generic_overlaps(tmp_path: 
     assert habit.habit_id in double
 
 
+def test_prompt_reminder_matches_ascii_tag_in_mixed_ascii_cjk_context(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Given: a habit tagged with an ASCII tag that also has enough statement signal
+    monkeypatch.setenv("SYBERMEM_HOME", str(tmp_path))
+    habit = add_habit(
+        statement="Prefer typescript strict mode",
+        habit_type=HabitType.STYLE,
+        applies_to=("typescript",),
+    )
+
+    # When: the prompt mixes ASCII and CJK in one run ("typescript严格模式")
+    markdown = render_habit_reminder_markdown(context="启用typescript严格模式")
+
+    # Then: the ASCII sub-token is preserved so the applies_to tag still matches
+    assert habit.habit_id in markdown
+
+
+def test_prompt_reminder_ignores_common_cjk_character_overlap(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Given: an untagged Chinese habit that shares only common function chars with an
+    # unrelated prompt (我/的), the classic anti-spam failure mode
+    monkeypatch.setenv("SYBERMEM_HOME", str(tmp_path))
+    habit = add_habit(statement="我的回复保持简洁", habit_type=HabitType.COMMUNICATION)
+
+    # When: an unrelated Chinese prompt shares only 我/我的/的
+    markdown = render_habit_reminder_markdown(context="我的项目需要部署")
+
+    # Then: single/common-character overlap must NOT inject the unrelated habit
+    assert habit.habit_id not in markdown
+
+
 def test_prompt_reminder_not_applies_to_stays_hard_exclusion(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     # Given: a prompt-eligible habit excluded from quick-fix contexts
     monkeypatch.setenv("SYBERMEM_HOME", str(tmp_path))
