@@ -2,7 +2,8 @@ import type { Plugin } from "@opencode-ai/plugin"
 import { appendAutoTrailJournal, classifyFollowup, countCommitsSinceLastRecord, detectHighLevelAreas, getChangedFiles, overlapsRecentAutoTrails, THEME_WINDOW_SIZE, trailFiles } from "./followup"
 import { buildCompactionContext } from "./compaction"
 import { detectStaleSignal, parseIndex } from "./project_state"
-import { memoryStatsText, resolveRoot } from "./runtime"
+import { digestStatusText, memoryStatsText, resolveRoot } from "./runtime"
+import { digestBacklogToast, parseDigestBacklog } from "./digest_backlog_signal"
 import { loadNudgeState, saveNudgeState } from "./state"
 import { appendRecallDebug } from "./recall_debug"
 import { captureRecordIntentWithCli } from "./record_intent"
@@ -109,6 +110,21 @@ async function maybeToastRecallHealth(args: PluginArgs, root: string): Promise<v
   }
 }
 
+// Proactive "you have undigested work" heads-up. Reads the same digest-governance JSON
+// the compaction/startup stale-digest check uses (single source of truth in core), so
+// there is no duplicated coverage logic here. Fires only above the backlog threshold,
+// throttled, and fail-open so it never blocks idle handling.
+async function maybeToastDigestBacklog(args: PluginArgs, root: string): Promise<void> {
+  try {
+    const backlog = parseDigestBacklog(await digestStatusText(args.$, root))
+    if (!backlog) return
+    const message = digestBacklogToast(backlog)
+    if (message) throttledToast(args.client, "digest-backlog", message)
+  } catch {
+    // Advisory only: digest backlog must never block or reject the idle handler.
+  }
+}
+
 // At idle, turn this session's accumulated recall injections + edits into one
 // bounded recall-outcome journal entry, then reset the session accumulator.
 // Fail-open: relevance evidence is advisory and must never block idle handling.
@@ -185,6 +201,7 @@ export const SyberMemPlugin: Plugin = async ({ $, directory, client }: PluginArg
         try { await handleSessionIdle(args, root, sessionID) } catch { /* nudge is advisory */ }
         await flushSessionRelevance(args, root, sessionID)
         await maybeToastRecallHealth(args, root)
+        await maybeToastDigestBacklog(args, root)
       }
     },
     "tool.execute.after": async (input: unknown, output: unknown) => {
