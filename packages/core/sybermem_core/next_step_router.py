@@ -92,6 +92,7 @@ def recommend_next_step(root: Path) -> dict[str, str]:
     # phase-stale signal `resume` already passes in; otherwise the two entrypoints
     # could disagree on a stale phase index.
     phase_state = compute_phase_state(root)
+    backlog = digest_backlog(root)
 
     first_pass = recommend_next_step_read_only(
         root,
@@ -100,6 +101,8 @@ def recommend_next_step(root: Path) -> dict[str, str]:
         phase_digest=phase_digest,
         theme_digest=theme_digest,
         phase_state=phase_state,
+        backlog_uncovered=backlog["uncovered"],
+        backlog_total=backlog["total_records"],
     )
     if first_pass["action"] == "/sybermem-phase-analyze":
         return first_pass
@@ -112,6 +115,8 @@ def recommend_next_step(root: Path) -> dict[str, str]:
         theme_digest=theme_digest,
         phase_state=phase_state,
         commit_gap=_count_commits_since_last_record(root),
+        backlog_uncovered=backlog["uncovered"],
+        backlog_total=backlog["total_records"],
     )
 
 
@@ -126,12 +131,16 @@ def recommend_next_step_read_only(
     phase_state: str | None = None,
     record_candidate: RecordCandidate | None = None,
     backlog_uncovered: int | None = None,
+    backlog_total: int | None = None,
 ) -> dict[str, str]:
     status = status or project_status(root)
     readiness = readiness or publication_readiness(root)
     phase_digest = latest_phase_digest(root) if phase_digest is None else phase_digest
     theme_digest = latest_theme_digest(root) if theme_digest is None else theme_digest
-    backlog_uncovered = digest_backlog(root)["uncovered"] if backlog_uncovered is None else backlog_uncovered
+    if backlog_uncovered is None or backlog_total is None:
+        _bl = digest_backlog(root)
+        backlog_uncovered = _bl["uncovered"] if backlog_uncovered is None else backlog_uncovered
+        backlog_total = _bl["total_records"] if backlog_total is None else backlog_total
     team = read_team_from_project_yaml(root)
 
     # 0) If phase-index is missing or not yet analyzed, recommend phase-analyze first
@@ -168,10 +177,14 @@ def recommend_next_step_read_only(
             "reason": f"There are {commit_gap} commits since the last record. Consider creating a durable record for this round of work."
         }
 
-    if readiness["enough_material"] and not phase_digest:
+    # First digest: recommend once enough records exist to be worth compressing. This
+    # uses a digest-specific threshold on total records rather than the publish-oriented
+    # 'enough_material' gate — "can be published" and "should be compressed" are different
+    # questions, and coupling them made the digest nudge fire on as little as one decision.
+    if not phase_digest and backlog_total >= DIGEST_BACKLOG_THRESHOLD:
         return {
             "action": "/sybermem-digest",
-            "reason": "The current project has enough material for a phase digest, but no digest exists yet."
+            "reason": f"The project has {backlog_total} records and no digest yet. Consider a phase digest to compress the accumulated work."
         }
 
     # Re-recommend a digest on an ALREADY-digested project once enough new records have
