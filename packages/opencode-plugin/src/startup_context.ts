@@ -1,7 +1,18 @@
 import type { Shell } from "./runtime"
-import { digestLatestText, digestStatusText, sybermemText } from "./runtime"
+import { digestLatestText, digestStatusText, normsListText, sybermemText } from "./runtime"
 import { detectStaleSignal, parseIndex, parsePhaseIndex, parseProjectIdentity } from "./project_state"
+import { constitutionSection, parseNorms } from "./norm_signal"
 import type { SystemTransformOutput } from "./prompt_context"
+
+// The project constitution: active GLOBAL norms, injected once per session at startup so
+// binding rules govern work regardless of prompt relevance. Bounded by the CLI cap. Fail-open.
+async function constitutionBlock($: Shell, root: string): Promise<string> {
+  try {
+    return constitutionSection(parseNorms(await normsListText($, root, "global", "")))
+  } catch {
+    return ""
+  }
+}
 
 // Pull the latest phase digest's Core Conclusions into a bounded startup section. The
 // digest flow archives source-record conclusions out of INDEX Key Conclusions, so
@@ -64,12 +75,17 @@ export async function buildStartupContext($: Shell, root: string): Promise<strin
   // they were all archived into a digest), the digest's own conclusions may be the ONLY
   // useful startup context — so we must not bail before checking for it.
   const digestSection = await latestDigestSection($, root)
-  if (conclusions.length === 0 && !digestSection) return null
+  // The project constitution (binding global norms) is highest-priority governing context
+  // and, like digests, may be the only useful startup content when INDEX conclusions are empty.
+  const constitution = await constitutionBlock($, root)
+  if (conclusions.length === 0 && !digestSection && !constitution) return null
   const phaseInfo = parsePhaseIndex(root)
   const identity = parseProjectIdentity(root)
   const stale = await detectStaleSignal($, root)
   let context = "## SyberMem Startup Context\n\n"
   if (identity.exists && identity.slug) context += `Project: ${identity.slug} (${identity.projectId ?? "no id"}).\n\n`
+  // Norms first: they govern the work, so they lead the startup context.
+  context += constitution
   if (conclusions.length > 0) {
     context += "### Key Conclusions\n"
     for (const c of conclusions) context += `${c}\n`

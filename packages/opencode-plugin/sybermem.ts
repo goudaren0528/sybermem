@@ -218,6 +218,10 @@ async function digestLatestText($, root) {
   const sybermem = resolveSybermemCommand();
   return $`${sybermem} digest latest --format json`.cwd(root).nothrow().text();
 }
+async function normsListText($, root, scope, context) {
+  const sybermem = resolveSybermemCommand();
+  return $`${sybermem} norms list --scope ${scope} --context ${context} --format json`.cwd(root).nothrow().text();
+}
 async function memoryStatsText($, root) {
   const sybermem = resolveSybermemCommand();
   return $`${sybermem} project memory-stats --format json`.cwd(root).nothrow().text();
@@ -704,7 +708,55 @@ ${output.system[0]}`;
   return classifyPackets(packets);
 }
 
+// packages/opencode-plugin/src/norm_signal.ts
+function parseNorms(json) {
+  const trimmed = json.trim();
+  if (!trimmed)
+    return [];
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (typeof parsed !== "object" || parsed === null)
+      return [];
+    const norms = Reflect.get(parsed, "norms");
+    if (!Array.isArray(norms))
+      return [];
+    const out = [];
+    for (const raw of norms) {
+      if (typeof raw !== "object" || raw === null)
+        continue;
+      const recordId = Reflect.get(raw, "record_id");
+      const statement = Reflect.get(raw, "statement");
+      const scope = Reflect.get(raw, "scope");
+      if (typeof recordId === "string" && typeof statement === "string" && statement) {
+        out.push({ recordId, statement, scope: typeof scope === "string" ? scope : "" });
+      }
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+function constitutionSection(norms) {
+  if (norms.length === 0)
+    return "";
+  const lines = [`
+### Project Norms (binding)`];
+  for (const norm of norms)
+    lines.push(`- [${norm.recordId}] ${norm.statement}`);
+  lines.push("These are binding project norms \u2014 follow them unless the user explicitly overrides.");
+  return lines.join(`
+`) + `
+`;
+}
+
 // packages/opencode-plugin/src/startup_context.ts
+async function constitutionBlock($, root) {
+  try {
+    return constitutionSection(parseNorms(await normsListText($, root, "global", "")));
+  } catch {
+    return "";
+  }
+}
 async function latestDigestSection2($, root) {
   try {
     const parsed = JSON.parse(await digestLatestText($, root));
@@ -760,7 +812,8 @@ async function buildStartupContext($, root) {
   const parsed = parseIndex(root);
   const conclusions = parsed?.conclusions ?? [];
   const digestSection = await latestDigestSection2($, root);
-  if (conclusions.length === 0 && !digestSection)
+  const constitution = await constitutionBlock($, root);
+  if (conclusions.length === 0 && !digestSection && !constitution)
     return null;
   const phaseInfo = parsePhaseIndex(root);
   const identity = parseProjectIdentity(root);
@@ -772,6 +825,7 @@ async function buildStartupContext($, root) {
     context += `Project: ${identity.slug} (${identity.projectId ?? "no id"}).
 
 `;
+  context += constitution;
   if (conclusions.length > 0) {
     context += `### Key Conclusions
 `;
