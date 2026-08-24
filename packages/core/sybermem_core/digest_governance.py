@@ -202,12 +202,28 @@ class DigestBacklog(TypedDict):
     has_digest: bool
 
 
+def _normalize_source_path(rel: str) -> str:
+    """Canonicalize a source path for backlog comparison.
+
+    Digest source_records are usually generated as clean posix relative paths, but a
+    legacy or hand-authored digest may use backslashes or a './' prefix. Normalize both
+    sides of the coverage comparison so a Windows-style 'changes\\foo.md' or './changes/
+    foo.md' still matches the canonical 'changes/foo.md' instead of silently counting the
+    record as uncovered. This only affects backlog matching, NOT the coverage-hash
+    contract (which hashes the declared paths verbatim).
+    """
+    normalized = rel.strip().replace("\\", "/")
+    while normalized.startswith("./"):
+        normalized = normalized[2:]
+    return normalized.lstrip("/")
+
+
 def _record_relpath(root: Path, path: Path) -> str:
     """Return a digest source_records-style path (e.g. 'changes/foo.md') for a record."""
     try:
-        return path.relative_to(root / ".sybermem").as_posix()
+        return _normalize_source_path(path.relative_to(root / ".sybermem").as_posix())
     except ValueError:
-        return path.name
+        return _normalize_source_path(path.name)
 
 
 def _days_between(iso_from: str, iso_to: str) -> int:
@@ -290,26 +306,30 @@ def digest_backlog(root: Path, *, today: str | None = None) -> DigestBacklog:
     """
     covered: set[str] = set()
     latest_digest_date = ""
-    non_digest_paths: list[tuple[str, str]] = []  # (relpath, created_at)
+    has_digest = False
+    non_digest_paths: list[str] = []  # .sybermem-relative posix paths
     for path in iter_record_files(root):
         row = parse_record_file(path, "", "")
         if _is_digest_path(path):
+            has_digest = True  # existence is independent of a valid date frontmatter
             source_records, _ = parse_digest_coverage(row["content"])
             for rel in source_records:
-                covered.add(rel)
+                covered.add(_normalize_source_path(rel))
             created = row.get("created_at", "")
             if created and created > latest_digest_date:
                 latest_digest_date = created
             continue
-        non_digest_paths.append((_record_relpath(root, path), row.get("created_at", "")))
+        non_digest_paths.append(_record_relpath(root, path))
 
-    uncovered = sum(1 for rel, _ in non_digest_paths if rel not in covered)
+    uncovered = sum(1 for rel in non_digest_paths if rel not in covered)
     resolved_today = today or date_cls.today().isoformat()
     days_since = _days_between(latest_digest_date, resolved_today) if latest_digest_date else 0
     return {
         "uncovered": uncovered,
         "total_records": len(non_digest_paths),
         "latest_digest_date": latest_digest_date,
+        # Existence is decoupled from the date: a digest with an empty/malformed date
+        # frontmatter still counts as "has a digest" (days_since just stays 0).
         "days_since_latest_digest": days_since,
-        "has_digest": bool(latest_digest_date),
+        "has_digest": has_digest,
     }

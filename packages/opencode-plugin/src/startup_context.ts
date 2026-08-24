@@ -59,19 +59,26 @@ function stringField(value: unknown, key: string): string {
 // here would duplicate them in the identical system transform.
 export async function buildStartupContext($: Shell, root: string): Promise<string | null> {
   const parsed = parseIndex(root)
-  if (!parsed || parsed.conclusions.length === 0) return null
+  const conclusions = parsed?.conclusions ?? []
+  // Fetch the latest digest section up front: when INDEX has no key conclusions (e.g.
+  // they were all archived into a digest), the digest's own conclusions may be the ONLY
+  // useful startup context — so we must not bail before checking for it.
+  const digestSection = await latestDigestSection($, root)
+  if (conclusions.length === 0 && !digestSection) return null
   const phaseInfo = parsePhaseIndex(root)
   const identity = parseProjectIdentity(root)
   const stale = await detectStaleSignal($, root)
   let context = "## SyberMem Startup Context\n\n"
   if (identity.exists && identity.slug) context += `Project: ${identity.slug} (${identity.projectId ?? "no id"}).\n\n`
-  context += "### Key Conclusions\n"
-  for (const c of parsed.conclusions) context += `${c}\n`
+  if (conclusions.length > 0) {
+    context += "### Key Conclusions\n"
+    for (const c of conclusions) context += `${c}\n`
+  }
   if (phaseInfo.exists) {
     context += `\n### Phase Index\nStatus: ${phaseInfo.status}. ${phaseInfo.confirmedCount} confirmed phases.\n`
     if (phaseInfo.activePhase) context += `Active phase: ${phaseInfo.activePhase}.\n`
   }
-  context += await latestDigestSection($, root)
+  context += digestSection
   if (stale.stale) context += `\n⭐ Heads-up: phase index trails HEAD by ${stale.commitsAhead} commits — conclusions may lag your latest work. Consider /sybermem-phase-analyze.\n`
   try {
     const staleDigestCount = numberField(JSON.parse(await digestStatusText($, root)), "stale")
