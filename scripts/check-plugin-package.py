@@ -112,6 +112,7 @@ OPENCODE_PLUGIN_SOURCE_MODULES: Final = [
     Path("packages/opencode-plugin/src/recall_outcome.ts"),
     Path("packages/opencode-plugin/src/habit_intent.ts"),
     Path("packages/opencode-plugin/src/digest_backlog_signal.ts"),
+    Path("packages/opencode-plugin/src/norm_signal.ts"),
 ]
 CLI_USING_SKILLS: Final = [
     Path("packages/claude-skills/using-sybermem/SKILL.md"),
