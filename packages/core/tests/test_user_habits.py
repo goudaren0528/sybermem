@@ -465,6 +465,18 @@ def test_prompt_reminder_matches_ascii_tag_in_mixed_ascii_cjk_context(tmp_path: 
     assert habit.habit_id in markdown
 
 
+def test_prompt_reminder_injects_untagged_chinese_habit_on_two_strong_overlaps(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Given: a legitimate untagged Chinese habit
+    monkeypatch.setenv("SYBERMEM_HOME", str(tmp_path))
+    habit = add_habit(statement="回复保持简洁明了", habit_type=HabitType.COMMUNICATION)
+
+    # When: a relevant Chinese prompt shares two strong bigrams (回复 + 简洁)
+    markdown = render_habit_reminder_markdown(context="帮我把回复写得简洁一点")
+
+    # Then: two distinct strong overlaps clear the floor (floor and min-strong agree)
+    assert habit.habit_id in markdown
+
+
 def test_prompt_reminder_ignores_common_cjk_character_overlap(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     # Given: an untagged Chinese habit that shares only common function chars with an
     # unrelated prompt (我/的), the classic anti-spam failure mode

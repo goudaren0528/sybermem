@@ -465,7 +465,11 @@ def _score_habit(habit: Habit, terms: set[str]) -> int:
 # applies_to tag OR cleared the floor via >=2 distinct STRONG overlaps. This fixes
 # "never injects for Chinese" without letting an unrelated/untagged habit inject on
 # every Chinese prompt via shared function characters.
-_PROMPT_RELEVANCE_FLOOR: Final = 3
+#
+# Floor is 2 so that exactly two STRONG overlaps (e.g. bigrams 回复+简洁) qualify a
+# legitimate untagged habit — consistent with _MIN_STRONG_OVERLAPS. An applies_to tag
+# match adds +3 and always clears the floor on its own.
+_PROMPT_RELEVANCE_FLOOR: Final = 2
 _APPLIES_TO_BOOST: Final = 3
 _MAX_GENERIC_OVERLAP: Final = 3
 _MIN_STRONG_OVERLAPS: Final = 2
