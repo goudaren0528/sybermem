@@ -345,7 +345,9 @@ function stringField(value, key) {
 }
 async function buildCompactionContext($, root) {
   const parsed = parseIndex(root);
-  if (!parsed || parsed.conclusions.length === 0)
+  const conclusions = parsed?.conclusions ?? [];
+  const digestSection = await latestDigestSection($, root);
+  if (conclusions.length === 0 && !digestSection)
     return null;
   const phaseInfo = parsePhaseIndex(root);
   const identity = parseProjectIdentity(root);
@@ -366,12 +368,14 @@ async function buildCompactionContext($, root) {
     context += `Project: ${identity.slug} (${identity.projectId ?? "no id"}).
 
 `;
-  context += `### Key Conclusions
+  if (conclusions.length > 0) {
+    context += `### Key Conclusions
 `;
-  for (const c of parsed.conclusions)
-    context += `${c}
+    for (const c of conclusions)
+      context += `${c}
 `;
-  context += await latestDigestSection($, root);
+  }
+  context += digestSection;
   if (stale.stale)
     context += `
 \u2B50 Heads-up: phase index trails HEAD by ${stale.commitsAhead} commits \u2014 the conclusions above may lag your latest work. Consider /sybermem-phase-analyze before relying on phase context.
@@ -397,11 +401,12 @@ Status: ${phaseInfo.status}. ${phaseInfo.confirmedCount} confirmed phases.
 ### Stale Signal
 Phase-index last git boundary: ${stale.boundary}, current HEAD: ${stale.head} (${stale.commitsAhead} commits ahead).
 `;
-  if (Object.keys(parsed.topicIndex).length > 0) {
+  const topicIndex = parsed?.topicIndex ?? {};
+  if (Object.keys(topicIndex).length > 0) {
     context += `
 ### Topic Index
 `;
-    for (const [topic, records] of Object.entries(parsed.topicIndex))
+    for (const [topic, records] of Object.entries(topicIndex))
       context += `- ${topic}: ${records.join(", ")}
 `;
   }
@@ -753,7 +758,9 @@ function stringField2(value, key) {
 }
 async function buildStartupContext($, root) {
   const parsed = parseIndex(root);
-  if (!parsed || parsed.conclusions.length === 0)
+  const conclusions = parsed?.conclusions ?? [];
+  const digestSection = await latestDigestSection2($, root);
+  if (conclusions.length === 0 && !digestSection)
     return null;
   const phaseInfo = parsePhaseIndex(root);
   const identity = parseProjectIdentity(root);
@@ -765,11 +772,13 @@ async function buildStartupContext($, root) {
     context += `Project: ${identity.slug} (${identity.projectId ?? "no id"}).
 
 `;
-  context += `### Key Conclusions
+  if (conclusions.length > 0) {
+    context += `### Key Conclusions
 `;
-  for (const c of parsed.conclusions)
-    context += `${c}
+    for (const c of conclusions)
+      context += `${c}
 `;
+  }
   if (phaseInfo.exists) {
     context += `
 ### Phase Index
@@ -779,7 +788,7 @@ Status: ${phaseInfo.status}. ${phaseInfo.confirmedCount} confirmed phases.
       context += `Active phase: ${phaseInfo.activePhase}.
 `;
   }
-  context += await latestDigestSection2($, root);
+  context += digestSection;
   if (stale.stale)
     context += `
 \u2B50 Heads-up: phase index trails HEAD by ${stale.commitsAhead} commits \u2014 conclusions may lag your latest work. Consider /sybermem-phase-analyze.

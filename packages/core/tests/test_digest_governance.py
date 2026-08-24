@@ -236,6 +236,55 @@ def test_latest_digest_summary_returns_title_and_conclusions(tmp_path: Path) -> 
     assert summary["conclusions"] == ["- first", "- second"]
 
 
+def test_digest_backlog_normalizes_source_path_forms(tmp_path: Path) -> None:
+    # Given: a digest declaring sources with backslash and ./ prefix (legacy/hand-authored)
+    from sybermem_core.digest_governance import digest_backlog
+
+    root = tmp_path / "project"
+    root.mkdir()
+    write_project(root)
+    _write_record(root, "changes/a.md", "2026-08-01")
+    _write_record(root, "changes/b.md", "2026-08-02")
+    # Digest with non-canonical path forms that still point at the same files
+    write_file(
+        root,
+        "digests/2026-08-05-001-d.md",
+        "---\ntype: digest\ndate: 2026-08-05\nrecord_id: digest-001\ntitle: d\n"
+        "source_records:\n  - changes\\a.md\n  - ./changes/b.md\n---\n\n## Core Conclusions\n- x\n",
+    )
+
+    # When
+    backlog = digest_backlog(root, today="2026-08-10")
+
+    # Then: both records are recognized as covered despite the path-form differences
+    assert backlog["uncovered"] == 0
+    assert backlog["total_records"] == 2
+
+
+def test_digest_backlog_has_digest_true_even_with_empty_date(tmp_path: Path) -> None:
+    # Given: a real digest file whose date frontmatter is missing
+    from sybermem_core.digest_governance import digest_backlog
+
+    root = tmp_path / "project"
+    root.mkdir()
+    write_project(root)
+    _write_record(root, "changes/a.md", "2026-08-01")
+    write_file(
+        root,
+        "digests/no-date-d.md",
+        "---\ntype: digest\nrecord_id: digest-001\ntitle: d\nsource_records:\n  - changes/a.md\n---\n\n## Core Conclusions\n- x\n",
+    )
+
+    # When
+    backlog = digest_backlog(root, today="2026-08-10")
+
+    # Then: existence is decoupled from the date — has_digest is True, days_since 0
+    assert backlog["has_digest"] is True
+    assert backlog["latest_digest_date"] == ""
+    assert backlog["days_since_latest_digest"] == 0
+    assert backlog["uncovered"] == 0
+
+
 def test_latest_digest_summary_none_when_no_digest(tmp_path: Path) -> None:
     from sybermem_core.digest_governance import latest_digest_summary
 

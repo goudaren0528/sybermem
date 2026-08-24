@@ -35,7 +35,11 @@ function stringField(value: unknown, key: string): string {
 
 export async function buildCompactionContext($: Shell, root: string): Promise<string | null> {
   const parsed = parseIndex(root)
-  if (!parsed || parsed.conclusions.length === 0) return null
+  const conclusions = parsed?.conclusions ?? []
+  // Digest conclusions may be the only remaining useful carry-forward when INDEX key
+  // conclusions were archived into a digest, so fetch the digest section before bailing.
+  const digestSection = await latestDigestSection($, root)
+  if (conclusions.length === 0 && !digestSection) return null
   const phaseInfo = parsePhaseIndex(root)
   const identity = parseProjectIdentity(root)
   const stale = await detectStaleSignal($, root)
@@ -48,9 +52,11 @@ export async function buildCompactionContext($: Shell, root: string): Promise<st
   }
   if (!context) context = "## SyberMem Project Memory\n\n"
   if (identity.exists && identity.slug) context += `Project: ${identity.slug} (${identity.projectId ?? "no id"}).\n\n`
-  context += "### Key Conclusions\n"
-  for (const c of parsed.conclusions) context += `${c}\n`
-  context += await latestDigestSection($, root)
+  if (conclusions.length > 0) {
+    context += "### Key Conclusions\n"
+    for (const c of conclusions) context += `${c}\n`
+  }
+  context += digestSection
   if (stale.stale) context += `\n⭐ Heads-up: phase index trails HEAD by ${stale.commitsAhead} commits — the conclusions above may lag your latest work. Consider /sybermem-phase-analyze before relying on phase context.\n`
   try {
     const staleDigestCount = numberField(JSON.parse(await digestStatusText($, root)), "stale")
@@ -63,9 +69,10 @@ export async function buildCompactionContext($: Shell, root: string): Promise<st
     if (phaseInfo.activePhase) context += `Active phase: ${phaseInfo.activePhase}.\n`
   }
   if (stale.stale) context += `\n### Stale Signal\nPhase-index last git boundary: ${stale.boundary}, current HEAD: ${stale.head} (${stale.commitsAhead} commits ahead).\n`
-  if (Object.keys(parsed.topicIndex).length > 0) {
+  const topicIndex = parsed?.topicIndex ?? {}
+  if (Object.keys(topicIndex).length > 0) {
     context += "\n### Topic Index\n"
-    for (const [topic, records] of Object.entries(parsed.topicIndex)) context += `- ${topic}: ${records.join(", ")}\n`
+    for (const [topic, records] of Object.entries(topicIndex)) context += `- ${topic}: ${records.join(", ")}\n`
   }
   try {
     const rec: unknown = JSON.parse(await sybermemText($, root, ["next-step", "--format", "json"]))
