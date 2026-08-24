@@ -189,6 +189,51 @@ def test_backlog_rerecommends_digest_on_already_digested_project(tmp_path: Path)
     assert "not covered by any digest" in step["reason"]
 
 
+def test_first_digest_uses_record_count_not_publish_readiness(tmp_path: Path) -> None:
+    # Given: a project with no digest and enough total records to be worth compressing
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    write_project(project_root)
+
+    # When: no phase digest and backlog_total >= threshold (even if publish readiness is False)
+    step = recommend_next_step_read_only(
+        project_root,
+        readiness={"enough_material": False},
+        phase_digest=None,
+        theme_digest=None,
+        commit_gap=0,
+        phase_state="current",
+        backlog_uncovered=6,
+        backlog_total=6,
+    )
+
+    # Then: recommends the first digest based on record accumulation, not publish readiness
+    assert step["action"] == "/sybermem-digest"
+    assert "no digest yet" in step["reason"]
+
+
+def test_first_digest_not_recommended_below_record_threshold(tmp_path: Path) -> None:
+    # Given: a project with no digest but only a couple of records
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    write_project(project_root)
+
+    # When: total records below the digest threshold, even with publish readiness True
+    step = recommend_next_step_read_only(
+        project_root,
+        readiness={"enough_material": True},
+        phase_digest=None,
+        theme_digest=None,
+        commit_gap=0,
+        phase_state="current",
+        backlog_uncovered=2,
+        backlog_total=2,
+    )
+
+    # Then: no premature digest recommendation (decoupled from publish's low threshold)
+    assert step["action"] != "/sybermem-digest"
+
+
 def test_backlog_below_threshold_does_not_rerecommend_digest(tmp_path: Path) -> None:
     # Given: an already-digested project with only a small uncovered backlog
     project_root = tmp_path / "project"
