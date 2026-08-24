@@ -66,6 +66,14 @@ function habitToastMessage(summary: InjectionSummary): string | null {
   return `🧠 SyberMem 已应用你的 ${n} 条习惯 (applied ${n} user habit reminder${n === 1 ? "" : "s"})`
 }
 
+// Applied scoped-norm toast: a binding project norm relevant to this prompt's area was
+// injected. Distinct marker so a governing norm is as perceptible as recall/habit.
+function normToastMessage(summary: InjectionSummary): string | null {
+  if (summary.normCount === 0) return null
+  const n = summary.normCount
+  return `📏 SyberMem 已应用 ${n} 条相关项目规范 (applied ${n} project norm${n === 1 ? "" : "s"})`
+}
+
 // Scope-aware "save this preference" hint. When Core suggests where the preference
 // belongs (cross-project user habit vs a project decision/requirement record), the
 // toast routes the user to the right home; otherwise it stays neutral and defers the
@@ -259,6 +267,8 @@ export const SyberMemPlugin: Plugin = async ({ $, directory, client }: PluginArg
         if (recallMessage) throttledToast(args.client, "recall-injected", recallMessage)
         const habitMessage = habitToastMessage(summary)
         if (habitMessage) throttledToast(args.client, "habit-injected", habitMessage)
+        const normMessage = normToastMessage(summary)
+        if (normMessage) throttledToast(args.client, "norm-injected", normMessage)
       }
       // Arm the opt-in reply marker for this turn (no-op unless SYBERMEM_REPLY_MARKER
       // is set and material was actually injected).
