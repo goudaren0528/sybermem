@@ -200,7 +200,7 @@ def register_habit_commands(sub) -> None:
     add.add_argument("--type", required=True, choices=["workflow", "style", "tooling", "communication", "review", "avoidance"])
     add.add_argument("--applies-to", action="append", default=[])
     add.add_argument("--not-applies-to", action="append", default=[])
-    add.add_argument("--injection-policy", choices=["manual_only", "compaction_ok", "prompt_ok_when_supported"], default="compaction_ok")
+    add.add_argument("--injection-policy", choices=["manual_only", "compaction_ok", "prompt_ok_when_supported"], default="prompt_ok_when_supported")
     add.add_argument("--format", choices=["text", "json"], default="text")
     add.set_defaults(func=cmd_habit_add)
 

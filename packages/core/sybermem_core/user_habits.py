@@ -35,16 +35,67 @@ MAX_INJECTED_HABITS: Final = 3
 MAX_LOG_EVENTS: Final = 200
 MAX_STATEMENT_CHARS: Final = 300
 HABIT_INTENT_TERMS: Final = {
+    # ASCII single-word triggers (matched as tokens via _terms()).
     "always",
     "habit",
     "preference",
     "prefer",
     "remember",
+    "usually",
+    "default",
+    "convention",
+    # CJK triggers (matched as substrings via the fallback in _looks_like_habit_intent,
+    # since CJK has no whitespace token boundaries). Kept multi-char so they stay
+    # specific and do not fire on incidental single characters.
     "以后",
     "偏好",
     "习惯",
     "记住",
+    "总是",
+    "每次",
+    "默认",
+    "一律",
+    "记得",
+    "尽量",
+    "规范",
+    "约定",
 }
+# Signals that a preference is PROJECT-specific (belongs in a decision/requirement
+# record via /sybermem-record) rather than a cross-project USER habit. Deliberately
+# conservative: only fire on phrasing that clearly scopes to "this repo / this project".
+PROJECT_SCOPE_HINTS: Final = (
+    "this project",
+    "this repo",
+    "this repository",
+    "this codebase",
+    "in this repo",
+    "本项目",
+    "这个项目",
+    "本仓库",
+    "这个仓库",
+    "该项目",
+    "该仓库",
+    "这个代码库",
+)
+# Signals that a preference is a cross-project USER habit (communication/tooling/style
+# that follows the person everywhere), so it belongs in user-habit memory.
+USER_SCOPE_HINTS: Final = (
+    "always",
+    "usually",
+    "in general",
+    "everywhere",
+    "cross-project",
+    "my",
+    "i prefer",
+    "i like",
+    "我",
+    "我的",
+    "跨项目",
+    "一律",
+    "总是",
+    "习惯",
+    "偏好",
+)
 # Map an intent phrase to a habit_type so the captured candidate is pre-classified.
 HABIT_TYPE_HINTS: Final = (
     ("review", ("review", "pr", "评审", "审查", "代码审查")),
@@ -75,9 +126,15 @@ def add_habit(
     habit_type: HabitType | str,
     applies_to: tuple[str, ...] = (),
     not_applies_to: tuple[str, ...] = (),
-    injection_policy: InjectionPolicy | str = InjectionPolicy.COMPACTION_OK,
+    injection_policy: InjectionPolicy | str = InjectionPolicy.PROMPT_OK_WHEN_SUPPORTED,
     source_ref: str | None = None,
 ) -> Habit:
+    # Default to PROMPT_OK_WHEN_SUPPORTED so a user-confirmed habit is perceptible
+    # at prompt time on supported hosts (OpenCode/Claude/Codex) by default, not only
+    # during compaction. Confirmation-first still holds: add_habit is reached only
+    # AFTER the user confirmed the habit, so this controls WHERE a confirmed habit
+    # surfaces, never WHETHER it may be remembered. Existing serialized habits keep
+    # their stored policy; only newly created habits adopt the new default.
     habit = Habit(
         habit_id=f"habit-{uuid4().hex}",
         scope="user",
@@ -202,12 +259,14 @@ def _select_remindable(context: str, higher_authority_text: str) -> list[Habit]:
             continue
         if habit.review_after and habit.review_after < date.today().isoformat():
             continue
+        # not_applies_to stays a HARD exclusion; higher_authority already handled above.
         if habit.not_applies_to and context_terms.intersection(habit.not_applies_to):
             continue
-        if habit.applies_to and not context_terms.intersection(habit.applies_to):
-            continue
-        score = _score_habit(habit, context_terms)
-        if score > 0:
+        # applies_to is no longer a hard filter (it killed all Chinese contexts); it is
+        # now a strong boost inside the weighted relevance floor, so a directly relevant
+        # habit surfaces while an unrelated/untagged one still stays silent.
+        score = _prompt_relevance(habit, context_terms)
+        if score >= _PROMPT_RELEVANCE_FLOOR:
             candidates.append(HabitSearchResult(habit=habit, score=score))
     ranked = sorted(candidates, key=lambda result: (-result.score, result.habit.last_confirmed_at, result.habit.habit_id))
     return [result.habit for result in ranked[:MAX_INJECTED_HABITS]]
@@ -357,13 +416,58 @@ def _string_tuple(values: list[str]) -> tuple[str, ...]:
     return tuple(_single_line(value).lower() for value in values)
 
 
+# CJK unified ideographs (plus common extension-A). Chinese has no whitespace word
+# boundaries, so re.findall(r"[\w-]+") collapses a whole run into ONE token that can
+# only match another identical run. We additionally emit per-character and adjacent
+# bigram tokens so a Chinese prompt can intersect Chinese habit statements/tags the
+# way English word tokens already do.
+_CJK_RE: Final = re.compile(r"[\u3400-\u4dbf\u4e00-\u9fff]")
+
+
+def _cjk_grams(value: str) -> set[str]:
+    grams: set[str] = set()
+    for run in re.findall(r"[\u3400-\u4dbf\u4e00-\u9fff]+", value):
+        for idx, ch in enumerate(run):
+            grams.add(ch)
+            if idx + 1 < len(run):
+                grams.add(run[idx : idx + 2])
+    return grams
+
+
 def _terms(value: str) -> set[str]:
-    return {term.lower() for term in re.findall(r"[\w-]+", value) if term.strip()}
+    terms = {term.lower() for term in re.findall(r"[\w-]+", value) if term.strip()}
+    # Drop the whitespace-free CJK blob tokens (they only match identical blobs) and
+    # replace them with character + bigram tokens that actually intersect.
+    terms = {term for term in terms if not _CJK_RE.search(term)}
+    return terms | _cjk_grams(value)
 
 
 def _score_habit(habit: Habit, terms: set[str]) -> int:
     haystack = _terms(" ".join((habit.statement, habit.habit_type.value, *habit.applies_to)))
     return len(haystack.intersection(terms))
+
+
+# Prompt-time relevance floor. Unlike the recall path (score floor 12 on a different
+# scale), habit statements are short, so we use a small weighted score: an explicit
+# applies_to match is a strong signal (+3), and each distinct statement/type token
+# overlap adds +1 (capped). A habit qualifies only when it either matched an applies_to
+# tag OR cleared the floor via >=2 distinct generic overlaps — this fixes "never injects
+# for Chinese" without letting an unrelated/untagged habit inject on every prompt.
+_PROMPT_RELEVANCE_FLOOR: Final = 3
+_APPLIES_TO_BOOST: Final = 3
+_MAX_GENERIC_OVERLAP: Final = 3
+
+
+def _prompt_relevance(habit: Habit, context_terms: set[str]) -> int:
+    applies_match = bool(habit.applies_to and context_terms.intersection(habit.applies_to))
+    generic = _terms(" ".join((habit.statement, habit.habit_type.value)))
+    generic_overlap = len(generic.intersection(context_terms))
+    score = (_APPLIES_TO_BOOST if applies_match else 0) + min(generic_overlap, _MAX_GENERIC_OVERLAP)
+    # Untagged/non-tag-matching habits must clear the floor on generic overlap alone,
+    # and a single incidental token is never enough (require >=2 distinct overlaps).
+    if not applies_match and generic_overlap < 2:
+        return 0
+    return score
 
 
 def _now() -> str:
@@ -387,6 +491,37 @@ def _classify_habit_type(text: str) -> str:
     return "workflow"
 
 
+def _hint_hit(text: str, hints: tuple[str, ...]) -> bool:
+    terms = _terms(text)
+    lowered = text.lower()
+    for hint in hints:
+        if hint in terms or (not hint.isascii() and hint in text) or (" " in hint and hint in lowered):
+            return True
+    return False
+
+
+def _classify_scope(text: str) -> str:
+    """Suggest where a candidate preference belongs: user habit vs project record.
+
+    Returns "user", "project", or "ambiguous". This is only a suggestion surfaced
+    to the user at confirmation time — the user always decides. When both or neither
+    signal is present we return "ambiguous" so the confirm step asks one question
+    instead of guessing wrong.
+    """
+    project = _hint_hit(text, PROJECT_SCOPE_HINTS)
+    user = _hint_hit(text, USER_SCOPE_HINTS)
+    # An explicit "this repo / this project" phrase is a strong scope marker and wins
+    # over a bare durability word like "always"/"总是" (which only signals the
+    # preference is standing, not WHERE it belongs). A first-person marker ("my"/"我")
+    # is the one user signal strong enough to keep it ambiguous against a project hint.
+    if project:
+        first_person = _hint_hit(text, ("my", "i prefer", "i like", "我", "我的"))
+        return "ambiguous" if first_person else "project"
+    if user:
+        return "user"
+    return "ambiguous"
+
+
 def classify_habit_intent(text: str) -> dict | None:
     """Return a candidate-only habit-intent classification, or None.
 
@@ -404,6 +539,10 @@ def classify_habit_intent(text: str) -> dict | None:
         "candidate_only": True,
         "action": "/sybermem-habit",
         "habit_type": _classify_habit_type(text),
+        # Suggested routing for the confirm step: "user" (cross-project habit),
+        # "project" (belongs in a /sybermem-record decision/requirement), or
+        # "ambiguous" (ask the user). Never auto-routes; suggestion only.
+        "suggested_scope": _classify_scope(text),
         "reason": "prompt looks like a reusable user preference",
         "created_at": _now(),
     }

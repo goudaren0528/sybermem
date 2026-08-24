@@ -61,7 +61,9 @@ def test_add_habit_persists_explicit_active_high_confidence_habit(tmp_path: Path
     assert habit.source_kind == "explicit_user"
     assert habit.confidence is Confidence.HIGH
     assert habit.status is HabitStatus.ACTIVE
-    assert habit.injection_policy is InjectionPolicy.COMPACTION_OK
+    # New default: a user-confirmed habit is prompt-time eligible on supported hosts,
+    # so it is perceptible at prompt time (🧠), not only during compaction.
+    assert habit.injection_policy is InjectionPolicy.PROMPT_OK_WHEN_SUPPORTED
 
     stored = list_habits()
     assert stored == [habit]
@@ -339,7 +341,12 @@ def test_render_habit_reminder_markdown_uses_prompt_policy_and_bounds_output(tmp
             applies_to=("planning",),
             injection_policy=InjectionPolicy.PROMPT_OK_WHEN_SUPPORTED,
         )
-    compaction_only = add_habit(statement="Prefer compaction-only planning", habit_type=HabitType.WORKFLOW, applies_to=("planning",))
+    compaction_only = add_habit(
+        statement="Prefer compaction-only planning",
+        habit_type=HabitType.WORKFLOW,
+        applies_to=("planning",),
+        injection_policy=InjectionPolicy.COMPACTION_OK,
+    )
 
     # When: a prompt-time reminder is rendered
     markdown = render_habit_reminder_markdown(context="planning")
@@ -400,6 +407,63 @@ def test_habit_reminder_respects_higher_authority_text(tmp_path: Path, monkeypat
     assert render_habit_reminder_markdown(context="planning", higher_authority_text="No planning reminders") == ""
 
 
+def test_prompt_reminder_matches_chinese_context_via_cjk_tokenization(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Given: a Chinese habit with a Chinese applies_to tag, prompt-eligible by default
+    monkeypatch.setenv("SYBERMEM_HOME", str(tmp_path))
+    habit = add_habit(
+        statement="回复统一使用中文",
+        habit_type=HabitType.COMMUNICATION,
+        applies_to=("沟通",),
+    )
+
+    # When: a Chinese prompt about replying arrives (no whitespace word boundaries)
+    markdown = render_habit_reminder_markdown(context="请以后回复我用中文")
+
+    # Then: CJK char/bigram tokenization lets the Chinese context match the habit
+    assert habit.habit_id in markdown
+
+
+def test_prompt_reminder_stays_silent_for_unrelated_context(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Given: a prompt-eligible planning habit
+    monkeypatch.setenv("SYBERMEM_HOME", str(tmp_path))
+    add_habit(statement="Prefer plans before implementation", habit_type=HabitType.WORKFLOW, applies_to=("planning",))
+
+    # When: an unrelated prompt with no planning relevance
+    markdown = render_habit_reminder_markdown(context="deploy the docker image to staging")
+
+    # Then: the relevance floor keeps an irrelevant habit silent (no per-turn spam)
+    assert "habit-" not in markdown
+
+
+def test_prompt_reminder_untagged_habit_requires_two_generic_overlaps(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Given: an untagged prompt-eligible habit (no applies_to)
+    monkeypatch.setenv("SYBERMEM_HOME", str(tmp_path))
+    habit = add_habit(statement="Prefer concise review comments", habit_type=HabitType.REVIEW)
+
+    # When: a single incidental token overlaps ("review" only) vs two distinct overlaps
+    single = render_habit_reminder_markdown(context="review")
+    double = render_habit_reminder_markdown(context="write concise review comments please")
+
+    # Then: one incidental overlap is not enough; two distinct overlaps clear the floor
+    assert habit.habit_id not in single
+    assert habit.habit_id in double
+
+
+def test_prompt_reminder_not_applies_to_stays_hard_exclusion(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Given: a prompt-eligible habit excluded from quick-fix contexts
+    monkeypatch.setenv("SYBERMEM_HOME", str(tmp_path))
+    habit = add_habit(
+        statement="Prefer detailed planning",
+        habit_type=HabitType.WORKFLOW,
+        applies_to=("planning",),
+        not_applies_to=("quick-fix",),
+    )
+
+    # When / Then: a context that hits not_applies_to is excluded even if it also matches applies_to
+    assert habit.habit_id not in render_habit_reminder_markdown(context="planning quick-fix")
+    assert habit.habit_id in render_habit_reminder_markdown(context="planning")
+
+
 def test_classify_habit_intent_matches_preference_language_and_types(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     # Given / When / Then: durable-preference language is classified as a candidate
     monkeypatch.setenv("SYBERMEM_HOME", str(tmp_path))
@@ -434,6 +498,25 @@ def test_classify_habit_type_only_applies_after_intent_gate(tmp_path: Path, monk
     assert tooling is not None and tooling["habit_type"] == "tooling"
     communication = classify_habit_intent("记住我的语言偏好")
     assert communication is not None and communication["habit_type"] == "communication"
+
+
+def test_classify_habit_intent_suggests_scope(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Given / When / Then: cross-project preference language suggests a user habit
+    monkeypatch.setenv("SYBERMEM_HOME", str(tmp_path))
+    user_scope = classify_habit_intent("我一律用中文回复")
+    assert user_scope is not None and user_scope["suggested_scope"] == "user"
+
+    # Project-scoped phrasing suggests a project record instead of a user habit
+    project_scope = classify_habit_intent("以后这个项目的 PR 都要小而聚焦")
+    assert project_scope is not None and project_scope["suggested_scope"] == "project"
+
+    # Mixed / unclear phrasing stays ambiguous so the confirm step asks
+    ambiguous = classify_habit_intent("以后先出方案再写代码")
+    assert ambiguous is not None and ambiguous["suggested_scope"] == "ambiguous"
+
+    # English project scope is recognized too
+    english_project = classify_habit_intent("always keep this repo's commits small")
+    assert english_project is not None and english_project["suggested_scope"] == "project"
 
 
 def test_capture_habit_intent_writes_candidate_without_creating_a_habit(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
