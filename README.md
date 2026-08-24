@@ -65,16 +65,31 @@ implements: [requirement-002]
 
 ### Project memory
 
-- 结构化 records：`change` / `decision` / `requirement` / `bug`
+- 结构化 records：`change` / `decision` / `requirement` / `bug` / `norm`
 - UUID-backed `record_id`，并兼容旧 numeric record ID
 - 从 canonical records 派生的 `.sybermem/INDEX.md`
 - phase digest 与 theme digest，用于阶段和主题级压缩
-- record 关系：`implements` / `fixes` / `related` / `superseded_by`
+- record 关系：`implements` / `fixes` / `related` / `superseded_by` / `crystallized_from`
 - 只读续接：`/sybermem-resume` 与 `sybermem resume`
-- 记忆统计：`sybermem project memory-stats` 默认打印最近 7 天 / 30 天的终端表格（含召回精准度列），`--format json` 输出结构化统计供 `/sybermem-summary` 使用
+- 记忆统计：`sybermem project memory-stats` 默认打印最近 7 天 / 30 天的终端表格（含召回精准度列、digest 覆盖、norm 覆盖），`--format json` 输出结构化统计供 `/sybermem-summary` 使用
 - 召回相关性反馈：OpenCode 通过 `file.edited` / `todo.updated` / `tool.execute.after` 累积每轮编辑焦点、任务完成与测试/构建信号，`session.idle` 据此把召回注入过的记录与实际编辑的文件（按记录的 `related_files`）比对，写入有界 `.sybermem/.recall-outcomes.jsonl`，得出频率之外的 `low_relevance`（精准度）判定；record 提醒也据此带上语义化触发原因
 - 项目内检索：`/sybermem-search` 与 `sybermem search`
 - 下一步建议：`/using-sybermem` 与 `sybermem next-step`
+
+### Digest 沉淀与反哺
+
+- phase / theme digest 用 coverage hash 做机械陈旧检测：`sybermem digest status` 给出 current/stale/unknown 判定
+- digest 积压信号：`sybermem digest status --format json` 带 `backlog`（未被任何 digest 覆盖的 record 数 + 距上次 digest 天数）。已经做过一次 digest 后仍持续记录的项目，会在 OpenCode `session.idle`、Claude/Codex `SessionStart` 得到"N 条记录尚未进入任何 digest"的 `⭐` 提醒；`next-step` 首次 digest 推荐改用 digest 专属的记录数阈值（而非发布阈值）
+- digest 结果真正反哺：digest 进入搜索/召回语料（带 `related_digest` 连续性关联和 stale 冲突标注）；`sybermem digest latest` 返回最新 phase digest 的 Core Conclusions，OpenCode 在 startup / compaction 里把它注入上下文——digest 内容对模型可见，而不仅仅是"去读"指针
+
+### Project Norms（项目规范 / 约束）
+
+- 一等 `norm` record 类型，存于 `.sybermem/norms/`，区别于个人 habit（用户级）和普通 decision
+- 字段：`scope`（`global` / `topic:x` / `path:x` / `tool:x`）、祈使 `statement`、`authority: authoritative`，复用已有 lifecycle + supersede 机制
+- 双通道反哺：**宪法**（active 全局 norm，最多 5 条，每会话开场恒注入，与 prompt 相关性无关）+ **域内召回**（非全局 norm 按 scope tag 或 ≥2 个强语句重叠命中，不降低召回门槛）
+- 识别（都 confirmation-first，绝不自动固化）：显式——`/sybermem-record` 收尾把绑定规则固化为 `norm`（带 `crystallized_from` 溯源）；涌现——`sybermem norms nominate` 确定性地检测跨 ≥3 条 decision/requirement 反复出现、且未被现有 norm 覆盖的约束，在 `/sybermem-digest` / `/sybermem-theme-digest` 收尾提名
+- 反哺覆盖三宿主：OpenCode（startup 宪法 + 每-prompt 域内召回 + `📏` toast + compaction 复用宪法）、Claude Code（`SessionStart` 宪法 + `UserPromptSubmit` 域内）、Codex（`SessionStart` 宪法 + `UserPromptSubmit` 域内）
+- 治理：`sybermem norms doctor` 检测同 scope 内重叠的多条 active norm（疑似矛盾/重复，CI 可据非零退出码拦截，仅提示不改写）；`sybermem norms list --scope global|scoped|all --context <text> --format json` 是所有宿主共用的单一事实源
 
 ### Workspace / Hub
 
@@ -101,11 +116,12 @@ implements: [requirement-002]
 - 查看与治理：`sybermem habit list`、`search`、`pause`、`delete`
 - 可见提醒：`sybermem habit remind --context planning --format markdown` 与 `/sybermem-habit`
 - 手动/compaction 注入：`sybermem habit inject --context planning --format markdown`
+- 默认 prompt-time 可感知：`habit add` 默认 `injection_policy=prompt_ok_when_supported`，确认过的习惯在支持的宿主上开箱即可在逐 prompt 注入（弹 `🧠`），无需额外参数；相关性用 CJK 感知的加权匹配（命中 `applies_to` tag 为强信号，否则需 ≥2 个多字符语句重叠），中文上下文可命中，无关习惯保持静默
 - 被动候选捕获（仅候选，永不自动写入）：OpenCode `chat.message` 检测到"以后都…/我习惯…"这类可复用偏好时，调用 `sybermem habit intent --prompt <text>` 把候选写入用户级 `~/.sybermem/.habit-intent.json`（绝不创建 active habit，绝不持久化密钥/注入文本）；`/sybermem-habit` 读取 `habit intent-status` 后经用户确认一键转为 habit，再 `habit intent-clear` 清除
-- 独立醒目的注入提示：OpenCode 里 recall 与 habit 各弹独立 toast——recall 用 `⭐`，应用的用户习惯用单独的 `🧠`（不再混在一条里），捕获到候选偏好时弹 `💡`
+- 独立醒目的注入提示：OpenCode 里 recall / habit / 项目规范各弹独立 toast——recall 用 `⭐`，应用的用户习惯用 `🧠`，应用的项目规范用 `📏`；捕获到候选时弹 scope 感知的 `💡`（个人习惯引导到 `/sybermem-habit`，项目约定引导到 `/sybermem-record`，模糊时追问）
 - 感知层：`sybermem habit awareness` 及 OpenCode 首轮 startup context 展示 active 习惯数量、类型分布与是否有待确认候选（只报数量，不暴露 habit 内容，也不与逐 prompt 提醒重复）
 - 保守门槛：只注入 active、高置信、未被排除、与上下文直接相关的习惯，最多 3 条
-- 默认不进入项目 `.sybermem/` records，也不发布到 Team memory
+- 默认不进入项目 `.sybermem/` records，也不发布到 Team memory；个人偏好 → habit，绑定的项目规则 → 固化为 `norm`（见 Project Norms）
 
 ## CLI 与 Skill 的边界
 
@@ -113,7 +129,7 @@ SyberMem 有两类执行路径，可靠性不同：
 
 | 路径 | 代表能力 | 说明 |
 |---|---|---|
-| CLI / Core | `sybermem resume`、`search`、`next-step`、`portfolio`、`index build`、`project index build/check`、`project memory-stats`、`record id`、`habit add/list/search/pause/delete/remind/inject`、`team init/summary`、`publish status`、`project uninstall` | 程序执行，可脚本化，适合确定性查询和发布流程 |
+| CLI / Core | `sybermem resume`、`search`、`next-step`、`portfolio`、`index build`、`project index build/check`、`project memory-stats`、`record id`、`habit add/list/search/pause/delete/remind/inject`、`digest status/latest`、`norms list/nominate/doctor`、`team init/summary`、`publish status`、`project uninstall` | 程序执行，可脚本化，适合确定性查询和发布流程 |
 | Skill 编排 | `/sybermem-record`、`/sybermem-habit`、`/sybermem-link`、`/sybermem-digest`、`/sybermem-theme-digest`、`/sybermem-phase-analyze` | 由 AI 按 skill 指令编辑 `.sybermem/` Markdown 或调用用户级 habit CLI，适合需要判断和整理的工作 |
 
 `sybermem record id --type <change|decision|requirement|bug>` 只生成 canonical record ID；完整 record 创建仍通过 `/sybermem-record` 完成。
@@ -187,10 +203,11 @@ claude --plugin-dir .
 ### 项目 owner
 
 - `/sybermem-resume`：获取只读续接视图
-- `/sybermem-record`：记录一轮有价值的工作
+- `/sybermem-record`：记录一轮有价值的工作；收尾时可把绑定的项目规则固化为 `norm`
 - `/sybermem-search`：查找历史 records
 - `/sybermem-habit`：记录、查看、暂停、删除用户级习惯，或触发可见提醒
 - `/sybermem-summary`：查看当前项目状态
+- `sybermem norms list/nominate/doctor`：查看项目规范宪法、提名重复约束、检测同 scope 冲突
 - `/sybermem-digest`：沉淀稳定阶段结论
 - `/sybermem-theme-digest`：沉淀跨阶段主题结论
 - `/sybermem-team-publish`：preview、review 后发布到 Team memory
