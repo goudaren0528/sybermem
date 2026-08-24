@@ -102,12 +102,20 @@ If you catch yourself doing any of these, STOP:
 ## Optional closing step: surface a fixable norm
 
 A digest is a natural moment to notice conventions worth fixing down. After the
-digest is written, scan the compressed source records for a **recurring** norm or
-standing requirement (a rule that shows up across multiple records). If one stands
-out, offer (once, batched) to capture it — never auto-write:
+digest is written, check for **recurring binding constraints** that should be
+crystallized into project norms.
+
+First, ask the CLI for emergent nominations (deterministic recurrence detection over
+decision/requirement records): `sybermem norms nominate --format json`. Each nomination
+carries `occurrences`, `evidence` (source record ids), and a representative `sample`.
+Also do your own semantic look-back for constraints the token detector may have missed.
+
+If a recurring binding rule stands out, offer (once, batched) to capture it — never auto-write:
 
 - Personal / cross-project preference → offer a **user habit** (`/sybermem-habit`).
-- Project-specific convention/norm → note it likely belongs in a **`decision` or `requirement` record**.
+- Recurring binding project rule → offer to **crystallize a `norm`** via `/sybermem-record`
+  (see that skill's "Crystallizing a project norm"), citing the nomination `evidence`.
+- Ordinary non-binding convention → an ordinary `decision`/`requirement` record is enough.
 
 Rules: only when it recurs and you are confident; one batched offer, one-step to accept;
 decline or silence → drop it. Confirmation-first (L1). Skip entirely when nothing recurs.

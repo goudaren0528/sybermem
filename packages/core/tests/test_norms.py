@@ -107,6 +107,56 @@ def test_norm_coverage_reports_split_and_constitution_budget(tmp_path: Path) -> 
     assert cov["constitution_max"] == CONSTITUTION_MAX
 
 
+def _write_decision(root: Path, name: str, record_id: str, body: str) -> None:
+    (root / ".sybermem" / "decisions").mkdir(parents=True, exist_ok=True)
+    text = "\n".join(["---", "type: decision", f"record_id: {record_id}", "date: 2026-08-20", f"title: {record_id}", "---", "", body]) + "\n"
+    (root / ".sybermem" / "decisions" / name).write_text(text, encoding="utf-8")
+
+
+def test_nominate_norm_candidates_finds_recurring_constraint(tmp_path: Path) -> None:
+    from sybermem_core.norms import nominate_norm_candidates
+
+    root = tmp_path / "p"
+    root.mkdir()
+    write_project(root)
+    # Same constraint expressed in 3 distinct decision records
+    _write_decision(root, "d1.md", "decision-001", "All new HTTP handlers must validate input at the boundary.")
+    _write_decision(root, "d2.md", "decision-002", "New HTTP handlers must validate input at the boundary before use.")
+    _write_decision(root, "d3.md", "decision-003", "Every HTTP handler must validate its input at the boundary.")
+
+    noms = nominate_norm_candidates(root)
+    assert len(noms) == 1
+    assert noms[0]["occurrences"] == 3
+    assert set(noms[0]["evidence"]) == {"decision-001", "decision-002", "decision-003"}
+
+
+def test_nominate_below_threshold_yields_nothing(tmp_path: Path) -> None:
+    from sybermem_core.norms import nominate_norm_candidates
+
+    root = tmp_path / "p"
+    root.mkdir()
+    write_project(root)
+    _write_decision(root, "d1.md", "decision-001", "Handlers must validate input at the boundary.")
+    _write_decision(root, "d2.md", "decision-002", "Handlers must validate input at the boundary.")
+
+    assert nominate_norm_candidates(root) == []
+
+
+def test_nominate_skips_constraint_already_covered_by_active_norm(tmp_path: Path) -> None:
+    from sybermem_core.norms import nominate_norm_candidates
+
+    root = tmp_path / "p"
+    root.mkdir()
+    write_project(root)
+    write_norm(root, "n.md", "norm-001", "global", "HTTP handlers must validate input at the boundary")
+    _write_decision(root, "d1.md", "decision-001", "Handlers must validate input at the boundary.")
+    _write_decision(root, "d2.md", "decision-002", "Handlers must validate input at the boundary always.")
+    _write_decision(root, "d3.md", "decision-003", "Every handler must validate input at the boundary.")
+
+    # Already covered by the active norm -> not re-nominated
+    assert nominate_norm_candidates(root) == []
+
+
 def test_active_norms_excludes_superseded_and_archived(tmp_path: Path) -> None:
     root = tmp_path / "p"
     root.mkdir()

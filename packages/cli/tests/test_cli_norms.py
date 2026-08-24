@@ -5,7 +5,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "core"))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from sybermem_cli.main import cmd_norms_list
+from sybermem_cli.main import cmd_norms_list, cmd_norms_nominate
 
 
 def write_project(root: Path) -> None:
@@ -80,3 +80,38 @@ def test_cli_norms_list_none(tmp_path: Path, monkeypatch, capsys) -> None:
 
     assert exit_code == 0
     assert "No matching norms." in capsys.readouterr().out
+
+
+def _write_decision(root: Path, name: str, record_id: str, body: str) -> None:
+    (root / ".sybermem" / "decisions").mkdir(parents=True, exist_ok=True)
+    text = "\n".join(["---", "type: decision", f"record_id: {record_id}", "date: 2026-08-20", f"title: {record_id}", "---", "", body]) + "\n"
+    (root / ".sybermem" / "decisions" / name).write_text(text, encoding="utf-8")
+
+
+def test_cli_norms_nominate_json(tmp_path: Path, monkeypatch, capsys) -> None:
+    root = tmp_path / "p"
+    root.mkdir()
+    write_project(root)
+    _write_decision(root, "d1.md", "decision-001", "All HTTP handlers must validate input at the boundary.")
+    _write_decision(root, "d2.md", "decision-002", "HTTP handlers must validate input at the boundary first.")
+    _write_decision(root, "d3.md", "decision-003", "Every HTTP handler must validate input at the boundary.")
+    monkeypatch.chdir(root)
+
+    exit_code = cmd_norms_nominate(Namespace(format="json"))
+
+    assert exit_code == 0
+    out = capsys.readouterr().out
+    assert '"occurrences": 3' in out
+    assert "decision-001" in out
+
+
+def test_cli_norms_nominate_none(tmp_path: Path, monkeypatch, capsys) -> None:
+    root = tmp_path / "p"
+    root.mkdir()
+    write_project(root)
+    monkeypatch.chdir(root)
+
+    exit_code = cmd_norms_nominate(Namespace(format="text"))
+
+    assert exit_code == 0
+    assert "No norm nominations." in capsys.readouterr().out
