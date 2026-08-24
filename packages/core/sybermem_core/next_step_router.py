@@ -11,7 +11,13 @@ from .records import iter_record_files, parse_project_yaml, parse_record_file
 from .retrieval import classify_authority, classify_source_kind
 from .status import project_status, publication_readiness
 from .publish import latest_phase_digest, latest_theme_digest
+from .digest_governance import digest_backlog
 from .record_intent import RecordCandidate, classify_record_intent, route_record_candidate
+
+# Uncovered-record threshold that re-recommends a digest on an ALREADY-digested project.
+# Coarser than the record-gap nudge (3) because a digest compresses a whole batch; 5
+# uncovered records is a meaningful accumulation worth compressing.
+DIGEST_BACKLOG_THRESHOLD = 5
 
 
 def _phase_boundary_date(text: str) -> str:
@@ -119,11 +125,13 @@ def recommend_next_step_read_only(
     commit_gap: int | None = None,
     phase_state: str | None = None,
     record_candidate: RecordCandidate | None = None,
+    backlog_uncovered: int | None = None,
 ) -> dict[str, str]:
     status = status or project_status(root)
     readiness = readiness or publication_readiness(root)
     phase_digest = latest_phase_digest(root) if phase_digest is None else phase_digest
     theme_digest = latest_theme_digest(root) if theme_digest is None else theme_digest
+    backlog_uncovered = digest_backlog(root)["uncovered"] if backlog_uncovered is None else backlog_uncovered
     team = read_team_from_project_yaml(root)
 
     # 0) If phase-index is missing or not yet analyzed, recommend phase-analyze first
@@ -164,6 +172,16 @@ def recommend_next_step_read_only(
         return {
             "action": "/sybermem-digest",
             "reason": "The current project has enough material for a phase digest, but no digest exists yet."
+        }
+
+    # Re-recommend a digest on an ALREADY-digested project once enough new records have
+    # accumulated that no digest covers them. This closes the gap where the "no digest
+    # yet" gate above never fires again after the first digest, so a long-running project
+    # could pile up dozens of uncovered records with no proactive compression signal.
+    if phase_digest and backlog_uncovered >= DIGEST_BACKLOG_THRESHOLD:
+        return {
+            "action": "/sybermem-digest",
+            "reason": f"{backlog_uncovered} records are not covered by any digest yet. Consider a new phase digest to compress the accumulated work."
         }
 
     if team.get("team_path"):
