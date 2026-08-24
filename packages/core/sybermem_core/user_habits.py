@@ -435,10 +435,19 @@ def _cjk_grams(value: str) -> set[str]:
 
 
 def _terms(value: str) -> set[str]:
-    terms = {term.lower() for term in re.findall(r"[\w-]+", value) if term.strip()}
-    # Drop the whitespace-free CJK blob tokens (they only match identical blobs) and
-    # replace them with character + bigram tokens that actually intersect.
-    terms = {term for term in terms if not _CJK_RE.search(term)}
+    terms: set[str] = set()
+    for term in re.findall(r"[\w-]+", value):
+        if not term.strip():
+            continue
+        if _CJK_RE.search(term):
+            # A mixed run like "abc中文" tokenizes as one blob that only matches an
+            # identical blob. Split it: keep the ASCII/latin sub-runs as real tokens
+            # (so English applies_to tags still match) and drop the CJK blob itself
+            # (CJK chars/bigrams are emitted separately by _cjk_grams below).
+            for ascii_run in re.findall(r"[0-9a-zA-Z_-]+", term):
+                terms.add(ascii_run.lower())
+        else:
+            terms.add(term.lower())
     return terms | _cjk_grams(value)
 
 
@@ -449,23 +458,33 @@ def _score_habit(habit: Habit, terms: set[str]) -> int:
 
 # Prompt-time relevance floor. Unlike the recall path (score floor 12 on a different
 # scale), habit statements are short, so we use a small weighted score: an explicit
-# applies_to match is a strong signal (+3), and each distinct statement/type token
-# overlap adds +1 (capped). A habit qualifies only when it either matched an applies_to
-# tag OR cleared the floor via >=2 distinct generic overlaps — this fixes "never injects
-# for Chinese" without letting an unrelated/untagged habit inject on every prompt.
+# applies_to match is a strong signal (+3), and distinct STRONG statement/type overlaps
+# add +1 each (capped). A "strong" overlap is a multi-character token (a CJK bigram or
+# an ASCII word), NOT a single CJK character — common function characters like 我/的 must
+# not qualify an unrelated habit. A habit qualifies only when it either matched an
+# applies_to tag OR cleared the floor via >=2 distinct STRONG overlaps. This fixes
+# "never injects for Chinese" without letting an unrelated/untagged habit inject on
+# every Chinese prompt via shared function characters.
 _PROMPT_RELEVANCE_FLOOR: Final = 3
 _APPLIES_TO_BOOST: Final = 3
 _MAX_GENERIC_OVERLAP: Final = 3
+_MIN_STRONG_OVERLAPS: Final = 2
+
+
+def _is_strong_token(token: str) -> bool:
+    # Multi-character tokens carry real signal; a single character (esp. a common CJK
+    # function char) is too weak to establish relevance on its own.
+    return len(token) >= 2
 
 
 def _prompt_relevance(habit: Habit, context_terms: set[str]) -> int:
     applies_match = bool(habit.applies_to and context_terms.intersection(habit.applies_to))
     generic = _terms(" ".join((habit.statement, habit.habit_type.value)))
-    generic_overlap = len(generic.intersection(context_terms))
-    score = (_APPLIES_TO_BOOST if applies_match else 0) + min(generic_overlap, _MAX_GENERIC_OVERLAP)
-    # Untagged/non-tag-matching habits must clear the floor on generic overlap alone,
-    # and a single incidental token is never enough (require >=2 distinct overlaps).
-    if not applies_match and generic_overlap < 2:
+    strong_overlap = sum(1 for token in generic.intersection(context_terms) if _is_strong_token(token))
+    score = (_APPLIES_TO_BOOST if applies_match else 0) + min(strong_overlap, _MAX_GENERIC_OVERLAP)
+    # Untagged/non-tag-matching habits must clear the floor on STRONG overlap alone;
+    # a single strong token (or only weak single-char overlaps) is never enough.
+    if not applies_match and strong_overlap < _MIN_STRONG_OVERLAPS:
         return 0
     return score
 
