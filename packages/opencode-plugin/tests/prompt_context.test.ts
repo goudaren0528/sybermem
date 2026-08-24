@@ -42,7 +42,7 @@ describe("prompt context helpers", () => {
     const injected = injectStashedPromptPackets("session-empty", { system: ["base"] })
 
     // Then
-    expect(injected).toEqual({ injected: false, recallCount: 0, habitCount: 0, habitCandidate: false })
+    expect(injected).toEqual({ injected: false, recallCount: 0, habitCount: 0, habitCandidate: false, normCount: 0 })
   })
 
   it("classifies recall and habit packets with counts", () => {
@@ -72,6 +72,20 @@ describe("prompt context helpers", () => {
     // Then
     expect(summary.habitCount).toBe(0)
     expect(summary.habitCandidate).toBe(true)
+    expect(summary.injected).toBe(true)
+  })
+
+  it("counts scoped project-norm packets", () => {
+    // Given
+    const packets = [
+      "## Relevant Project Norms\n- [norm-001] (topic:auth) Sessions expire in 30m\n- [norm-002] (path:api) Validate at boundary",
+    ]
+
+    // When
+    const summary = classifyPackets(packets)
+
+    // Then
+    expect(summary.normCount).toBe(2)
     expect(summary.injected).toBe(true)
   })
 })

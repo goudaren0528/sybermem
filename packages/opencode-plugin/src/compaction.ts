@@ -1,5 +1,16 @@
-import { digestLatestText, digestStatusText, sybermemText, type Shell } from "./runtime"
+import { digestLatestText, digestStatusText, normsListText, sybermemText, type Shell } from "./runtime"
 import { detectStaleSignal, parseIndex, parsePhaseIndex, parseProjectIdentity } from "./project_state"
+import { constitutionSection, parseNorms } from "./norm_signal"
+
+// Carry the project constitution (binding global norms) through compaction so binding
+// rules survive context compression. Fail-open.
+async function constitutionBlock($: Shell, root: string): Promise<string> {
+  try {
+    return constitutionSection(parseNorms(await normsListText($, root, "global", "")))
+  } catch {
+    return ""
+  }
+}
 
 // Latest phase digest Core Conclusions for compaction carry-forward. Same rationale as
 // startup: the digest flow archives source conclusions out of INDEX, so surface the
@@ -39,7 +50,8 @@ export async function buildCompactionContext($: Shell, root: string): Promise<st
   // Digest conclusions may be the only remaining useful carry-forward when INDEX key
   // conclusions were archived into a digest, so fetch the digest section before bailing.
   const digestSection = await latestDigestSection($, root)
-  if (conclusions.length === 0 && !digestSection) return null
+  const constitution = await constitutionBlock($, root)
+  if (conclusions.length === 0 && !digestSection && !constitution) return null
   const phaseInfo = parsePhaseIndex(root)
   const identity = parseProjectIdentity(root)
   const stale = await detectStaleSignal($, root)
@@ -52,6 +64,7 @@ export async function buildCompactionContext($: Shell, root: string): Promise<st
   }
   if (!context) context = "## SyberMem Project Memory\n\n"
   if (identity.exists && identity.slug) context += `Project: ${identity.slug} (${identity.projectId ?? "no id"}).\n\n`
+  context += constitution
   if (conclusions.length > 0) {
     context += "### Key Conclusions\n"
     for (const c of conclusions) context += `${c}\n`

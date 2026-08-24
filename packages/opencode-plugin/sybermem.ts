@@ -313,7 +313,66 @@ async function detectStaleSignal($, root) {
   }
 }
 
+// packages/opencode-plugin/src/norm_signal.ts
+function parseNorms(json) {
+  const trimmed = json.trim();
+  if (!trimmed)
+    return [];
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (typeof parsed !== "object" || parsed === null)
+      return [];
+    const norms = Reflect.get(parsed, "norms");
+    if (!Array.isArray(norms))
+      return [];
+    const out = [];
+    for (const raw of norms) {
+      if (typeof raw !== "object" || raw === null)
+        continue;
+      const recordId = Reflect.get(raw, "record_id");
+      const statement = Reflect.get(raw, "statement");
+      const scope = Reflect.get(raw, "scope");
+      if (typeof recordId === "string" && typeof statement === "string" && statement) {
+        out.push({ recordId, statement, scope: typeof scope === "string" ? scope : "" });
+      }
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+function constitutionSection(norms) {
+  if (norms.length === 0)
+    return "";
+  const lines = [`
+### Project Norms (binding)`];
+  for (const norm of norms)
+    lines.push(`- [${norm.recordId}] ${norm.statement}`);
+  lines.push("These are binding project norms \u2014 follow them unless the user explicitly overrides.");
+  return lines.join(`
+`) + `
+`;
+}
+function scopedNormSection(norms) {
+  if (norms.length === 0)
+    return "";
+  const lines = [`
+### Relevant Project Norms`];
+  for (const norm of norms)
+    lines.push(`- [${norm.recordId}] (${norm.scope || "scoped"}) ${norm.statement}`);
+  return lines.join(`
+`) + `
+`;
+}
+
 // packages/opencode-plugin/src/compaction.ts
+async function constitutionBlock($, root) {
+  try {
+    return constitutionSection(parseNorms(await normsListText($, root, "global", "")));
+  } catch {
+    return "";
+  }
+}
 async function latestDigestSection($, root) {
   try {
     const parsed = JSON.parse(await digestLatestText($, root));
@@ -351,7 +410,8 @@ async function buildCompactionContext($, root) {
   const parsed = parseIndex(root);
   const conclusions = parsed?.conclusions ?? [];
   const digestSection = await latestDigestSection($, root);
-  if (conclusions.length === 0 && !digestSection)
+  const constitution = await constitutionBlock($, root);
+  if (conclusions.length === 0 && !digestSection && !constitution)
     return null;
   const phaseInfo = parsePhaseIndex(root);
   const identity = parseProjectIdentity(root);
@@ -372,6 +432,7 @@ async function buildCompactionContext($, root) {
     context += `Project: ${identity.slug} (${identity.projectId ?? "no id"}).
 
 `;
+  context += constitution;
   if (conclusions.length > 0) {
     context += `### Key Conclusions
 `;
@@ -658,6 +719,12 @@ async function collectPromptPackets($, root, text) {
     const raw = await sybermemText($, root, ["context", "habit", "--context", text, "--delivery", "prompt-time", "--format", "markdown"]);
     appendPromptPacket(packets, raw, "## User Habit Reminder");
   } catch {}
+  try {
+    const section = scopedNormSection(parseNorms(await normsListText($, root, "scoped", text)));
+    if (section.trim())
+      packets.push(`## Relevant Project Norms
+${section.trim().replace(/^### Relevant Project Norms\n?/, "")}`);
+  } catch {}
   return packets;
 }
 function stashPromptPackets(sessionID, packets) {
@@ -666,13 +733,14 @@ function stashPromptPackets(sessionID, packets) {
   else
     RECALL_STASH.delete(sessionID);
 }
-var NO_INJECTION = { injected: false, recallCount: 0, habitCount: 0, habitCandidate: false };
+var NO_INJECTION = { injected: false, recallCount: 0, habitCount: 0, habitCandidate: false, normCount: 0 };
 function classifyPackets(packets) {
   if (packets.length === 0)
     return NO_INJECTION;
   let recallCount = 0;
   let habitCount = 0;
   let habitCandidate = false;
+  let normCount = 0;
   for (const packet of packets) {
     const trimmed = packet.trim();
     if (trimmed.startsWith("## SyberMem Recall Hints")) {
@@ -683,9 +751,12 @@ function classifyPackets(packets) {
       habitCount += habitLines.length;
       if (habitLines.length === 0)
         habitCandidate = true;
+    } else if (trimmed.startsWith("## Relevant Project Norms")) {
+      normCount += trimmed.split(`
+`).filter((line) => line.startsWith("- [norm-")).length;
     }
   }
-  return { injected: recallCount > 0 || habitCount > 0 || habitCandidate, recallCount, habitCount, habitCandidate };
+  return { injected: recallCount > 0 || habitCount > 0 || habitCandidate || normCount > 0, recallCount, habitCount, habitCandidate, normCount };
 }
 function countBullets(packet) {
   return packet.split(`
@@ -708,49 +779,8 @@ ${output.system[0]}`;
   return classifyPackets(packets);
 }
 
-// packages/opencode-plugin/src/norm_signal.ts
-function parseNorms(json) {
-  const trimmed = json.trim();
-  if (!trimmed)
-    return [];
-  try {
-    const parsed = JSON.parse(trimmed);
-    if (typeof parsed !== "object" || parsed === null)
-      return [];
-    const norms = Reflect.get(parsed, "norms");
-    if (!Array.isArray(norms))
-      return [];
-    const out = [];
-    for (const raw of norms) {
-      if (typeof raw !== "object" || raw === null)
-        continue;
-      const recordId = Reflect.get(raw, "record_id");
-      const statement = Reflect.get(raw, "statement");
-      const scope = Reflect.get(raw, "scope");
-      if (typeof recordId === "string" && typeof statement === "string" && statement) {
-        out.push({ recordId, statement, scope: typeof scope === "string" ? scope : "" });
-      }
-    }
-    return out;
-  } catch {
-    return [];
-  }
-}
-function constitutionSection(norms) {
-  if (norms.length === 0)
-    return "";
-  const lines = [`
-### Project Norms (binding)`];
-  for (const norm of norms)
-    lines.push(`- [${norm.recordId}] ${norm.statement}`);
-  lines.push("These are binding project norms \u2014 follow them unless the user explicitly overrides.");
-  return lines.join(`
-`) + `
-`;
-}
-
 // packages/opencode-plugin/src/startup_context.ts
-async function constitutionBlock($, root) {
+async function constitutionBlock2($, root) {
   try {
     return constitutionSection(parseNorms(await normsListText($, root, "global", "")));
   } catch {
@@ -812,7 +842,7 @@ async function buildStartupContext($, root) {
   const parsed = parseIndex(root);
   const conclusions = parsed?.conclusions ?? [];
   const digestSection = await latestDigestSection2($, root);
-  const constitution = await constitutionBlock($, root);
+  const constitution = await constitutionBlock2($, root);
   if (conclusions.length === 0 && !digestSection && !constitution)
     return null;
   const phaseInfo = parsePhaseIndex(root);
@@ -1265,6 +1295,12 @@ function habitToastMessage(summary) {
   const n = summary.habitCount;
   return `\uD83E\uDDE0 SyberMem \u5DF2\u5E94\u7528\u4F60\u7684 ${n} \u6761\u4E60\u60EF (applied ${n} user habit reminder${n === 1 ? "" : "s"})`;
 }
+function normToastMessage(summary) {
+  if (summary.normCount === 0)
+    return null;
+  const n = summary.normCount;
+  return `\uD83D\uDCCF SyberMem \u5DF2\u5E94\u7528 ${n} \u6761\u76F8\u5173\u9879\u76EE\u89C4\u8303 (applied ${n} project norm${n === 1 ? "" : "s"})`;
+}
 function habitCandidateToast(habitIntent) {
   if (habitIntent.captured && habitIntent.suggestedScope === "project") {
     return "\uD83D\uDCA1 SyberMem \u53D1\u73B0\u4E00\u6761\u50CF\u662F\u672C\u9879\u76EE\u7684\u7EA6\u5B9A \u2014 \u53EF\u7528 /sybermem-record \u8BB0\u4E3A\u51B3\u7B56/\u9700\u6C42\uFF0C\u6216 /sybermem-habit \u786E\u8BA4";
@@ -1434,6 +1470,9 @@ var SyberMemPlugin = async ({ $, directory, client }) => {
         const habitMessage = habitToastMessage(summary);
         if (habitMessage)
           throttledToast(args.client, "habit-injected", habitMessage);
+        const normMessage = normToastMessage(summary);
+        if (normMessage)
+          throttledToast(args.client, "norm-injected", normMessage);
       }
       armReplyMarker(sessionID ?? "", summary.recallCount, summary.habitCount);
     },
