@@ -20,7 +20,7 @@ from sybermem_core.status import project_memory_stats, project_status
 from sybermem_core.resume import build_resume_checkpoint
 from sybermem_core.next_step_router import classify_record_intent, recommend_next_step
 from sybermem_core.digest_governance import build_digest_governance_report, latest_digest_summary
-from sybermem_core.norms import constitution, nominate_norm_candidates, scoped_norms
+from sybermem_core.norms import constitution, nominate_norm_candidates, norm_conflicts, scoped_norms
 from sybermem_core.portfolio import build_portfolio
 from sybermem_core.team import init_team_repo
 from sybermem_core.publish_bootstrap import bootstrap_publish_status
@@ -265,6 +265,25 @@ def cmd_norms_nominate(args: argparse.Namespace) -> int:
             print(f"({nom['occurrences']}x) {nom['sample']}")
             print(f"    evidence: {', '.join(nom['evidence'])}")
     return 0
+
+
+def cmd_norms_doctor(args: argparse.Namespace) -> int:
+    root = resolve_project_root()
+    if root is None:
+        print("No SyberMem project root found.", file=sys.stderr)
+        return 1
+    conflicts = norm_conflicts(root)
+    if args.format == "json":
+        print(dump_json({"conflicts": conflicts}))
+    else:
+        if not conflicts:
+            print("No norm conflicts.")
+            return 0
+        for c in conflicts:
+            print(f"[{c['scope']}] conflict: {', '.join(c['norms'])}")
+            print(f"    {c['reason']}")
+    # Non-zero exit when conflicts exist so scripts/CI can gate on norm governance health.
+    return 1 if conflicts else 0
 
 
 def cmd_project_status(args: argparse.Namespace) -> int:
@@ -753,6 +772,10 @@ def main() -> int:
     norms_nominate = norms_sub.add_parser("nominate")
     norms_nominate.add_argument("--format", choices=["text", "json"], default="text")
     norms_nominate.set_defaults(func=cmd_norms_nominate)
+
+    norms_doctor = norms_sub.add_parser("doctor")
+    norms_doctor.add_argument("--format", choices=["text", "json"], default="text")
+    norms_doctor.set_defaults(func=cmd_norms_doctor)
 
     record = sub.add_parser("record")
     record_sub = record.add_subparsers(dest="record_command", required=True)
