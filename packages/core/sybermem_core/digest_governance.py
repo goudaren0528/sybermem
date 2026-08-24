@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date as date_cls
 from pathlib import Path
 from typing import Literal, TypeAlias, TypedDict
 
@@ -44,6 +45,7 @@ class DigestGovernanceReport(TypedDict):
     stale: int
     unknown: int
     digests: list[DigestHealth]
+    backlog: "DigestBacklog"
 
 
 def _is_digest_path(path: Path) -> bool:
@@ -163,6 +165,7 @@ def build_digest_governance_report(root: Path) -> DigestGovernanceReport:
         "stale": verdict_counts["stale"],
         "unknown": verdict_counts["unknown"],
         "digests": healths,
+        "backlog": digest_backlog(root),
     }
 
 
@@ -189,3 +192,68 @@ def stale_digest_count(root: Path) -> int:
         if compute_coverage_hash(root, source_records) != stored_hash:
             stale += 1
     return stale
+
+
+class DigestBacklog(TypedDict):
+    uncovered: int  # non-digest records not covered by any digest's source_records
+    total_records: int  # total non-digest records considered
+    latest_digest_date: str  # ISO date of the most recent digest, or "" if none
+    days_since_latest_digest: int  # days between latest digest and today, 0 when no digest
+    has_digest: bool
+
+
+def _record_relpath(root: Path, path: Path) -> str:
+    """Return a digest source_records-style path (e.g. 'changes/foo.md') for a record."""
+    try:
+        return path.relative_to(root / ".sybermem").as_posix()
+    except ValueError:
+        return path.name
+
+
+def _days_between(iso_from: str, iso_to: str) -> int:
+    try:
+        d_from = date_cls.fromisoformat(iso_from[:10])
+        d_to = date_cls.fromisoformat(iso_to[:10])
+    except ValueError:
+        return 0
+    return max((d_to - d_from).days, 0)
+
+
+def digest_backlog(root: Path, *, today: str | None = None) -> DigestBacklog:
+    """Measure how much undigested work has accumulated (the "should I digest?" signal).
+
+    Complements coverage-hash staleness ("is an EXISTING digest still accurate?") with
+    the missing signal: how many non-digest records exist that no digest covers, plus how
+    long since the most recent digest. This is the deterministic basis for a proactive
+    "N records not yet in any digest" nudge — including on projects that already made one
+    digest and then kept accumulating (the case the next-step 'no digest yet' gate misses).
+
+    Coverage is by digest source_records paths (the same relative paths the coverage-hash
+    machinery uses), so a record counts as covered iff its .sybermem-relative path appears
+    in some digest's declared source_records.
+    """
+    covered: set[str] = set()
+    latest_digest_date = ""
+    non_digest_paths: list[tuple[str, str]] = []  # (relpath, created_at)
+    for path in iter_record_files(root):
+        row = parse_record_file(path, "", "")
+        if _is_digest_path(path):
+            source_records, _ = parse_digest_coverage(row["content"])
+            for rel in source_records:
+                covered.add(rel)
+            created = row.get("created_at", "")
+            if created and created > latest_digest_date:
+                latest_digest_date = created
+            continue
+        non_digest_paths.append((_record_relpath(root, path), row.get("created_at", "")))
+
+    uncovered = sum(1 for rel, _ in non_digest_paths if rel not in covered)
+    resolved_today = today or date_cls.today().isoformat()
+    days_since = _days_between(latest_digest_date, resolved_today) if latest_digest_date else 0
+    return {
+        "uncovered": uncovered,
+        "total_records": len(non_digest_paths),
+        "latest_digest_date": latest_digest_date,
+        "days_since_latest_digest": days_since,
+        "has_digest": bool(latest_digest_date),
+    }

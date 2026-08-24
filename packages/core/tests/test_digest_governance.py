@@ -135,5 +135,89 @@ def test_empty_project_has_zero_digests(tmp_path: Path) -> None:
     root.mkdir()
     write_project(root)
     report = build_digest_governance_report(root)
-    assert report == {"total": 0, "current": 0, "stale": 0, "unknown": 0, "digests": []}
+    assert report == {
+        "total": 0,
+        "current": 0,
+        "stale": 0,
+        "unknown": 0,
+        "digests": [],
+        "backlog": {
+            "uncovered": 0,
+            "total_records": 0,
+            "latest_digest_date": "",
+            "days_since_latest_digest": 0,
+            "has_digest": False,
+        },
+    }
     assert stale_digest_count(root) == 0
+
+
+def _write_record(root: Path, rel: str, date: str) -> None:
+    write_file(root, rel, f"---\ntype: change\ndate: {date}\n---\n\nbody\n")
+
+
+def test_digest_backlog_counts_uncovered_records(tmp_path: Path) -> None:
+    # Given: 3 change records, a digest covering only one of them
+    from sybermem_core.digest_governance import digest_backlog
+
+    root = tmp_path / "project"
+    root.mkdir()
+    write_project(root)
+    _write_record(root, "changes/a.md", "2026-08-01")
+    _write_record(root, "changes/b.md", "2026-08-02")
+    _write_record(root, "changes/c.md", "2026-08-03")
+    write_digest(root, "d1.md", "digest-001", ["changes/a.md"], compute_coverage_hash(root, ["changes/a.md"]))
+
+    # When
+    backlog = digest_backlog(root, today="2026-08-20")
+
+    # Then: two records (b, c) are not covered by any digest
+    assert backlog["uncovered"] == 2
+    assert backlog["total_records"] == 3
+    assert backlog["has_digest"] is True
+    assert backlog["latest_digest_date"] == "2026-08-05"
+    assert backlog["days_since_latest_digest"] == 15
+
+
+def test_digest_backlog_all_covered_is_zero(tmp_path: Path) -> None:
+    from sybermem_core.digest_governance import digest_backlog
+
+    root = tmp_path / "project"
+    root.mkdir()
+    write_project(root)
+    _write_record(root, "changes/a.md", "2026-08-01")
+    _write_record(root, "decisions/x.md", "2026-08-02")
+    write_digest(root, "d1.md", "digest-001", ["changes/a.md", "decisions/x.md"], compute_coverage_hash(root, ["changes/a.md", "decisions/x.md"]))
+
+    backlog = digest_backlog(root, today="2026-08-10")
+    assert backlog["uncovered"] == 0
+    assert backlog["total_records"] == 2
+
+
+def test_digest_backlog_no_digest_reports_all_uncovered(tmp_path: Path) -> None:
+    from sybermem_core.digest_governance import digest_backlog
+
+    root = tmp_path / "project"
+    root.mkdir()
+    write_project(root)
+    _write_record(root, "changes/a.md", "2026-08-01")
+    _write_record(root, "changes/b.md", "2026-08-02")
+
+    backlog = digest_backlog(root, today="2026-08-10")
+    # No digest exists: every record is uncovered, no date, and days_since stays 0
+    assert backlog["uncovered"] == 2
+    assert backlog["has_digest"] is False
+    assert backlog["latest_digest_date"] == ""
+    assert backlog["days_since_latest_digest"] == 0
+
+
+def test_digest_backlog_report_included(tmp_path: Path) -> None:
+    root = tmp_path / "project"
+    root.mkdir()
+    write_project(root)
+    _write_record(root, "changes/a.md", "2026-08-01")
+    _write_record(root, "changes/b.md", "2026-08-02")
+    write_digest(root, "d1.md", "digest-001", ["changes/a.md"], compute_coverage_hash(root, ["changes/a.md"]))
+    report = build_digest_governance_report(root)
+    assert report["backlog"]["uncovered"] == 1
+    assert report["backlog"]["total_records"] == 2
