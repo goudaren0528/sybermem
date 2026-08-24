@@ -115,6 +115,17 @@ If you catch yourself doing any of these, STOP:
 | "Those phase digests probably cover everything" | Verify. Use raw records to fill actual gaps. |
 | "This is basically the same as /sybermem-digest" | No. Phase digest summarizes one phase; theme digest summarizes one topic across phases. |
 
+## Optional closing step: surface a fixable norm
+
+A theme digest spans phases, so it is the strongest place to notice a constraint that
+recurs ACROSS phases and should be crystallized into a binding project norm. After the
+theme digest is written, run `sybermem norms nominate --format json` (deterministic
+recurrence detection over decision/requirement records) and do your own cross-phase
+semantic look-back. If a recurring binding rule stands out, offer (once, batched,
+confirmation-first, never auto-write) to crystallize a `norm` via `/sybermem-record`
+(see "Crystallizing a project norm"), citing the nomination `evidence`. Ordinary
+non-binding conventions stay as `decision`/`requirement` records. Skip when nothing recurs.
+
 ## Terminal State
 
 This skill is complete when:
