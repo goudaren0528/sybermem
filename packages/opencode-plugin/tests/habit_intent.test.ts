@@ -26,6 +26,20 @@ describe("habit intent capture", () => {
     // Then
     expect(result.captured).toBe(true)
     expect(result.habitType).toBe("communication")
+    // No suggested_scope in this canned payload → empty, not undefined
+    expect(result.suggestedScope).toBe("")
+  })
+
+  it("propagates the suggested_scope from the Core candidate", async () => {
+    // Given: Core suggests this is a project-scoped convention
+    const { shell } = stubShell(JSON.stringify({ captured: true, candidate: { habit_type: "workflow", suggested_scope: "project" } }))
+
+    // When
+    const result = await captureHabitIntentWithCli(shell, "/root", "以后这个项目的 PR 都要小")
+
+    // Then: the plugin carries the routing suggestion for a scope-aware toast
+    expect(result.captured).toBe(true)
+    expect(result.suggestedScope).toBe("project")
   })
 
   it("routes through the habit intent CLI with an argparse-safe --prompt= form", async () => {
@@ -54,9 +68,24 @@ describe("habit intent capture", () => {
   it("prefilter recognizes ASCII and CJK preference language only", () => {
     expect(looksLikeHabitIntent("always prefer plans")).toBe(true)
     expect(looksLikeHabitIntent("remember this")).toBe(true)
-    expect(looksLikeHabitIntent("以后都用中文回复我")).toBe(true)
+    expect(looksLikeHabitIntent("以后都用中文回复")).toBe(true)
     expect(looksLikeHabitIntent("fix the crash in the parser")).toBe(false)
     expect(looksLikeHabitIntent("")).toBe(false)
+  })
+
+  it("prefilter recognizes the expanded ASCII and CJK trigger vocabulary", () => {
+    // Expanded ASCII triggers
+    expect(looksLikeHabitIntent("usually I want tests first")).toBe(true)
+    expect(looksLikeHabitIntent("make this the default going forward")).toBe(true)
+    expect(looksLikeHabitIntent("follow this convention")).toBe(true)
+    // Expanded CJK triggers that previously slipped through the prefilter
+    expect(looksLikeHabitIntent("总是先出方案")).toBe(true)
+    expect(looksLikeHabitIntent("每次都跑测试")).toBe(true)
+    expect(looksLikeHabitIntent("默认用中文")).toBe(true)
+    expect(looksLikeHabitIntent("尽量保持 PR 小而聚焦")).toBe(true)
+    expect(looksLikeHabitIntent("这个仓库的约定")).toBe(true)
+    // Still silent for ordinary work talk
+    expect(looksLikeHabitIntent("重启一下服务")).toBe(false)
   })
 
   it("fails open on empty text and on malformed CLI output", async () => {
