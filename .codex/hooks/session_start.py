@@ -127,12 +127,48 @@ def _digest_backlog_line() -> str:
         return ""
 
 
+def _constitution_block() -> str:
+    """Return the binding-global-norms constitution block, or '' when none/unavailable.
+
+    Reuses `sybermem norms list --scope global --format json` (single source of truth) so
+    Codex sessions are governed by binding norms from startup. Fail-open, timeout-bounded.
+    """
+    command = _sybermem_command()
+    if command is None:
+        return ""
+    try:
+        result = subprocess.run(
+            [*command, "norms", "list", "--scope", "global", "--format", "json"],
+            env={**os.environ, "PYTHONIOENCODING": "utf-8"},
+            text=True, encoding="utf-8", errors="replace",
+            capture_output=True, check=False, timeout=SYBERMEM_TIMEOUT_SECONDS,
+        )
+        if result.returncode != 0 or not result.stdout.strip():
+            return ""
+        norms = json.loads(result.stdout).get("norms")
+        if not isinstance(norms, list) or not norms:
+            return ""
+        lines = ["Project Norms (binding — follow unless the user explicitly overrides):"]
+        for norm in norms:
+            if not isinstance(norm, dict):
+                continue
+            statement = str(norm.get("statement", "")).strip()
+            record_id = str(norm.get("record_id", "")).strip()
+            if statement:
+                lines.append(f"- [{record_id}] {statement}")
+        return "\n".join(lines) if len(lines) > 1 else ""
+    except Exception:
+        return ""
+
+
 def _hook_output(markdown: str) -> HookOutput | None:
     markdown = markdown.strip()
     if not markdown.startswith(SESSION_HEADING):
         return None
     backlog_line = _digest_backlog_line()
-    context = f"{markdown}\n{backlog_line}\n" if backlog_line else f"{markdown}\n"
+    constitution = _constitution_block()
+    extras = "\n".join(part for part in (constitution, backlog_line) if part)
+    context = f"{markdown}\n{extras}\n" if extras else f"{markdown}\n"
     return {
         "hookSpecificOutput": {
             "hookEventName": HOOK_EVENT_NAME,
