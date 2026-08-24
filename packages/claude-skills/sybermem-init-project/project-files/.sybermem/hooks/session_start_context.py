@@ -254,26 +254,39 @@ def latest_record_date(root: Path) -> str:
     return latest
 
 
+DIGEST_BACKLOG_THRESHOLD = 5
+
+
 def detect_stale_digests(root: Path) -> dict:
-    """Count mechanically-stale digests via the CLI, for a proactive governance heads-up.
+    """Read digest governance status via the CLI, for proactive heads-ups.
 
     Shells to `sybermem digest status --format json` (the single source of truth in
     sybermem_core.digest_governance) rather than reimplementing coverage-hash logic in
-    the hook. Fail-open to no signal when the CLI is unavailable or errors, so session
-    start never breaks. This only surfaces a heads-up — it never regenerates a digest.
+    the hook. Returns both the mechanically-stale count AND the backlog snapshot
+    (uncovered records + age), so one CLI call feeds both the stale and the "haven't
+    digested in a while" heads-ups. Fail-open to no signal when the CLI is unavailable or
+    errors, so session start never breaks. This only surfaces heads-ups — it never
+    regenerates a digest.
     """
+    empty = {"stale": 0, "uncovered": 0, "days_since_latest_digest": 0, "has_digest": False}
     try:
         result = subprocess.run(
             ["sybermem", "digest", "status", "--format", "json"],
             cwd=root, capture_output=True, text=True, encoding="utf-8", check=False,
         )
         if result.returncode not in (0, 1) or not result.stdout.strip():
-            return {"stale": 0}
+            return empty
         import json as _json
         payload = _json.loads(result.stdout)
-        return {"stale": int(payload.get("stale", 0) or 0)}
+        backlog = payload.get("backlog") or {}
+        return {
+            "stale": int(payload.get("stale", 0) or 0),
+            "uncovered": int(backlog.get("uncovered", 0) or 0),
+            "days_since_latest_digest": int(backlog.get("days_since_latest_digest", 0) or 0),
+            "has_digest": bool(backlog.get("has_digest", False)),
+        }
     except Exception:
-        return {"stale": 0}
+        return empty
 
 
 def detect_record_gap(root: Path) -> dict:
@@ -369,12 +382,25 @@ def build_context(root: Path) -> str:
     # load-bearing signal exists — one or more phase/theme digests are mechanically stale
     # because their source records changed. This never regenerates a digest; it points
     # the user at /sybermem-digest so drifted summaries stop reading as authoritative.
-    stale_digests = detect_stale_digests(root)
-    if stale_digests["stale"] > 0:
+    digest_status = detect_stale_digests(root)
+    if digest_status["stale"] > 0:
         lines.append(
-            f"⭐ Digest heads-up: {stale_digests['stale']} digest(s) are stale — their source "
+            f"⭐ Digest heads-up: {digest_status['stale']} digest(s) are stale — their source "
             "records changed since the summary was written. Run /sybermem-digest to regenerate, "
             "or `sybermem digest status` to see which sources drifted."
+        )
+    # Backlog heads-up: enough undigested work has accumulated to be worth compressing.
+    # Complements the stale check (which only fires for EXISTING drifted digests) so a
+    # long-running project that keeps recording but never digests still gets a signal.
+    if digest_status["uncovered"] >= DIGEST_BACKLOG_THRESHOLD:
+        age_note = (
+            f" (last digest {digest_status['days_since_latest_digest']}d ago)"
+            if digest_status["has_digest"] and digest_status["days_since_latest_digest"] > 0
+            else ""
+        )
+        lines.append(
+            f"⭐ Digest heads-up: {digest_status['uncovered']} records are not covered by any digest yet"
+            f"{age_note}. Consider /sybermem-digest to compress the accumulated work."
         )
 
     if conclusions:
