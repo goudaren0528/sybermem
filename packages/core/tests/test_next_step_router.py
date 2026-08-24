@@ -165,3 +165,46 @@ def test_next_step_and_resume_agree_on_stale_phase(tmp_path: Path) -> None:
 
     # Then: the two entrypoints no longer disagree (regression guard)
     assert router_action == resume_action == "/sybermem-phase-analyze"
+
+
+def test_backlog_rerecommends_digest_on_already_digested_project(tmp_path: Path) -> None:
+    # Given: a healthy, already-digested project that has since accumulated uncovered records
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    write_project(project_root)
+
+    # When: a phase digest already exists but backlog is at/above the threshold
+    step = recommend_next_step_read_only(
+        project_root,
+        readiness={"enough_material": True},
+        phase_digest="digests/2026-08-01-001-first.md",
+        theme_digest=None,
+        commit_gap=0,
+        phase_state="current",
+        backlog_uncovered=5,
+    )
+
+    # Then: it re-recommends a digest (the old 'no digest yet' gate would have stayed silent)
+    assert step["action"] == "/sybermem-digest"
+    assert "not covered by any digest" in step["reason"]
+
+
+def test_backlog_below_threshold_does_not_rerecommend_digest(tmp_path: Path) -> None:
+    # Given: an already-digested project with only a small uncovered backlog
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    write_project(project_root)
+
+    # When: backlog is below the threshold
+    step = recommend_next_step_read_only(
+        project_root,
+        readiness={"enough_material": True},
+        phase_digest="digests/2026-08-01-001-first.md",
+        theme_digest=None,
+        commit_gap=0,
+        phase_state="current",
+        backlog_uncovered=4,
+    )
+
+    # Then: no digest re-recommendation (falls through to the healthy summary)
+    assert step["action"] != "/sybermem-digest"
