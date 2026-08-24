@@ -157,12 +157,50 @@ def _capture_record_intent(prompt: str) -> None:
     (root / RECORD_INTENT_PATH).write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
+def _scoped_norms_section(prompt: str) -> str:
+    """Render a '## Relevant Project Norms' section for scoped norms matching this prompt.
+
+    Global norms are delivered by SessionStart (the constitution); this surfaces only
+    scoped norms via 'norms list --scope scoped --context <prompt>' (JSON). Fail-open.
+    """
+    command = _sybermem_command()
+    if command is None:
+        return ""
+    try:
+        result = subprocess.run(
+            [*command, "norms", "list", "--scope", "scoped", "--context", prompt, "--format", "json"],
+            env={**os.environ, "PYTHONIOENCODING": "utf-8"},
+            text=True, encoding="utf-8", errors="replace",
+            capture_output=True, check=False, timeout=SYBERMEM_TIMEOUT_SECONDS,
+        )
+        if result.returncode != 0 or not result.stdout.strip():
+            return ""
+        norms = json.loads(result.stdout).get("norms")
+        if not isinstance(norms, list) or not norms:
+            return ""
+        lines = ["## Relevant Project Norms"]
+        for norm in norms:
+            if not isinstance(norm, dict):
+                continue
+            statement = str(norm.get("statement", "")).strip()
+            record_id = str(norm.get("record_id", "")).strip()
+            scope = str(norm.get("scope", "")).strip() or "scoped"
+            if statement:
+                lines.append(f"- [{record_id}] ({scope}) {statement}")
+        return "\n".join(lines) if len(lines) > 1 else ""
+    except Exception:
+        return ""
+
+
 def _context_sections(prompt: str) -> list[str]:
     sections: list[str] = []
     for kind, heading in (("recall", RECALL_HEADING), ("habit", REMINDER_HEADING)):
         markdown = _context_markdown(prompt, kind).strip()
         if markdown.startswith(heading):
             sections.append(markdown)
+    norms = _scoped_norms_section(prompt)
+    if norms:
+        sections.append(norms)
     return sections
 
 
