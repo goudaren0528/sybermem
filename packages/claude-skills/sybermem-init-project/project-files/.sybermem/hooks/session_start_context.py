@@ -289,6 +289,28 @@ def detect_stale_digests(root: Path) -> dict:
         return empty
 
 
+def detect_constitution(root: Path) -> list[dict]:
+    """Return active GLOBAL norms (the project constitution) via the CLI.
+
+    Shells to `sybermem norms list --scope global --format json` (single source of truth
+    in sybermem_core.norms) so binding global norms govern the session from startup.
+    Fail-open to [] when the CLI is unavailable or errors.
+    """
+    try:
+        result = subprocess.run(
+            ["sybermem", "norms", "list", "--scope", "global", "--format", "json"],
+            cwd=root, capture_output=True, text=True, encoding="utf-8", check=False,
+        )
+        if result.returncode != 0 or not result.stdout.strip():
+            return []
+        import json as _json
+        payload = _json.loads(result.stdout)
+        norms = payload.get("norms")
+        return [n for n in norms if isinstance(n, dict)] if isinstance(norms, list) else []
+    except Exception:
+        return []
+
+
 def detect_record_gap(root: Path) -> dict:
     """Count git commits since the most recent record, to nudge timely recording.
 
@@ -348,6 +370,17 @@ def build_context(root: Path) -> str:
         lines.append(f"Project: {project_info['slug']} ({project_info.get('project_id', 'no id')}).")
 
     lines.append(f"Loaded {len(conclusions)} key conclusions from SyberMem.")
+
+    # Project constitution: binding global norms, injected at session start so they govern
+    # the work regardless of prompt relevance. Highest priority, so surfaced right away.
+    constitution = detect_constitution(root)
+    if constitution:
+        lines.append("Project Norms (binding — follow unless the user explicitly overrides):")
+        for norm in constitution:
+            statement = str(norm.get("statement", "")).strip()
+            record_id = str(norm.get("record_id", "")).strip()
+            if statement:
+                lines.append(f"- [{record_id}] {statement}")
 
     if topics:
         topic_names = ", ".join(sorted(topics.keys()))

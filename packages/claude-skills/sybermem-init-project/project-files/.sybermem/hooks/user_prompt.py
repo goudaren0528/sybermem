@@ -107,6 +107,26 @@ def _run_habit_reminder(prompt: str) -> str:
         return ""
 
 
+def _run_scoped_norms(root: Path, prompt: str) -> str:
+    """Return a bounded packet of binding project norms relevant to this prompt's area.
+
+    Global norms are delivered by SessionStart (the constitution); here we surface only
+    scoped norms whose scope tag / statement matches the prompt. Fail open to "".
+    """
+    try:
+        from sybermem_core.norms import scoped_norms
+
+        norms = scoped_norms(root, prompt)
+        if not norms:
+            return ""
+        lines = ["## Relevant Project Norms"]
+        for norm in norms:
+            lines.append(f"- [{norm['record_id']}] ({norm['scope'] or 'scoped'}) {norm['statement']}")
+        return "\n".join(lines)
+    except Exception:  # noqa: BROAD_EXCEPT_OK - hook boundary must fail open.
+        return ""
+
+
 def _write_additional_context(parts: list[str]) -> None:
     packet = "\n\n".join(part.strip() for part in parts if part.strip())
     if not packet:
@@ -140,7 +160,7 @@ def main() -> int:
             return 0
 
         _run_intent_capture(root, prompt)
-        _write_additional_context([_run_recall(root, prompt), _run_habit_reminder(prompt)])
+        _write_additional_context([_run_recall(root, prompt), _run_habit_reminder(prompt), _run_scoped_norms(root, prompt)])
         return 0
     except Exception:  # noqa: BROAD_EXCEPT_OK - fail open, never block a prompt.
         return 0
