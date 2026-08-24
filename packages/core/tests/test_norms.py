@@ -89,6 +89,64 @@ def test_scoped_norms_match_by_statement_overlap_when_no_scope_tag(tmp_path: Pat
     assert scoped_norms(root, "update the readme title") == []
 
 
+def test_scoped_norms_ignore_common_cjk_overlap(tmp_path: Path) -> None:
+    # Given: an untagged-ish norm and a prompt that shares only common CJK filler
+    root = tmp_path / "p"
+    root.mkdir()
+    write_project(root)
+    write_norm(root, "n.md", "norm-001", "topic:transaction", "必须使用事务处理")
+
+    # A prompt about logging shares 必须/使用 (stopwords) but not the real subject
+    got = scoped_norms(root, "必须记录日志信息")
+    assert got == []
+
+
+def test_scoped_norms_match_mixed_ascii_cjk_scope(tmp_path: Path) -> None:
+    # Given: an auth-scoped norm
+    root = tmp_path / "p"
+    root.mkdir()
+    write_project(root)
+    write_norm(root, "n.md", "norm-001", "topic:auth", "Sessions expire after inactivity")
+
+    # A prompt with a mixed ASCII-CJK token "auth认证" must still match the auth scope
+    got = scoped_norms(root, "修复 auth认证 登录流程")
+    assert [n["record_id"] for n in got] == ["norm-001"]
+
+
+def test_scoped_norms_scope_substring_alias(tmp_path: Path) -> None:
+    # Given: a topic:auth norm and a prompt using the longer word "authentication"
+    root = tmp_path / "p"
+    root.mkdir()
+    write_project(root)
+    write_norm(root, "n.md", "norm-001", "topic:auth", "Rotate tokens regularly")
+
+    got = scoped_norms(root, "improve the authentication token flow")
+    assert [n["record_id"] for n in got] == ["norm-001"]
+
+
+def test_constitution_statement_is_length_bounded(tmp_path: Path) -> None:
+    root = tmp_path / "p"
+    root.mkdir()
+    write_project(root)
+    write_norm(root, "n.md", "norm-001", "global", "x" * 2000)
+
+    con = constitution(root)
+    assert len(con) == 1
+    assert len(con[0]["statement"]) <= 300
+
+
+def test_constitution_limit_cannot_exceed_hard_cap(tmp_path: Path) -> None:
+    root = tmp_path / "p"
+    root.mkdir()
+    write_project(root)
+    for i in range(CONSTITUTION_MAX + 4):
+        write_norm(root, f"g{i}.md", f"norm-{i:03d}", "global", f"Rule {i}")
+
+    # A caller cannot widen past the hard cap
+    assert len(constitution(root, limit=100)) == CONSTITUTION_MAX
+    assert len(constitution(root, limit=-1)) == 0
+
+
 def test_norm_coverage_reports_split_and_constitution_budget(tmp_path: Path) -> None:
     from sybermem_core.norms import norm_coverage
 

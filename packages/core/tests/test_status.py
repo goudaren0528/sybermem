@@ -188,6 +188,7 @@ def test_project_memory_stats_counts_records_by_type_and_window(tmp_path: Path, 
         "decision": 1,
         "requirement": 1,
         "bug": 1,
+        "norm": 0,
         "digest": 1,
         "theme-digest": 1,
     }
@@ -196,6 +197,27 @@ def test_project_memory_stats_counts_records_by_type_and_window(tmp_path: Path, 
     assert stats["windows"]["30d"]["records"]["total"] == 5
     assert stats["windows"]["30d"]["records"]["by_type"]["requirement"] == 0
     assert stats["windows"]["30d"]["records"]["by_type"]["change"] == 1
+
+
+def test_project_memory_stats_counts_norm_records_in_totals(tmp_path: Path, monkeypatch) -> None:
+    # Given: a project with a change and a norm record
+    project_root = tmp_path / "project"
+    sybermem = project_root / ".sybermem"
+    sybermem.mkdir(parents=True)
+    (sybermem / "project.yaml").write_text("project_id: project-1\nslug: demo\n", encoding="utf-8")
+    monkeypatch.setattr(memory_stats_module, "now_iso", lambda: "2026-08-24T12:00:00+08:00")
+    (sybermem / "changes").mkdir()
+    (sybermem / "changes" / "2026-08-20-c.md").write_text("---\ntype: change\ndate: 2026-08-20\n---\n\nx\n", encoding="utf-8")
+    (sybermem / "norms").mkdir()
+    (sybermem / "norms" / "2026-08-21-n.md").write_text("---\ntype: norm\ndate: 2026-08-21\nscope: global\n---\n\nx\n", encoding="utf-8")
+
+    # When
+    stats = project_memory_stats(project_root)
+
+    # Then: total and by_type agree — norm is a counted bucket (no phantom total)
+    assert stats["totals"]["records"]["total"] == 2
+    assert stats["totals"]["records"]["by_type"]["norm"] == 1
+    assert stats["totals"]["records"]["by_type"]["change"] == 1
 
 
 def test_project_memory_stats_exposes_digest_coverage(tmp_path: Path, monkeypatch) -> None:

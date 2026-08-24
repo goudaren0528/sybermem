@@ -12,7 +12,7 @@ from .norms import norm_coverage
 from .records import iter_record_files, parse_project_yaml, parse_record_file
 
 
-RECORD_TYPES: Final = ("change", "decision", "requirement", "bug", "digest", "theme-digest")
+RECORD_TYPES: Final = ("change", "decision", "requirement", "bug", "norm", "digest", "theme-digest")
 WINDOWS: Final = {"7d": 7, "30d": 30}
 # Recent recall injection rate below this is treated as low-signal: prompts are
 # arriving but the high-signal gate rarely finds anything worth injecting.

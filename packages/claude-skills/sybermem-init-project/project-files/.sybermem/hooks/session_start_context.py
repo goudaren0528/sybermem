@@ -353,6 +353,16 @@ def build_context(root: Path) -> str:
     version_line = _version_nudge_line(root)
     if not index_path.is_file():
         base = "SyberMem startup context:\nNo .sybermem/INDEX.md found. Run /sybermem-init-project to initialize."
+        # Norms live under .sybermem/norms/ independent of INDEX.md, so the binding
+        # constitution must still govern a norm-only / partially-initialized project.
+        constitution = detect_constitution(root)
+        if constitution:
+            base += "\nProject Norms (binding — follow unless the user explicitly overrides):"
+            for norm in constitution:
+                statement = str(norm.get("statement", "")).strip()
+                record_id = str(norm.get("record_id", "")).strip()
+                if statement:
+                    base += f"\n- [{record_id}] {statement}"
         return f"{base}\n{version_line}" if version_line else base
 
     index_text = index_path.read_text(encoding="utf-8")

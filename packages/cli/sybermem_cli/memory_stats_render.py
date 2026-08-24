@@ -22,7 +22,7 @@ def render_project_memory_stats_text(payload: dict) -> None:
                 str(payload["windows"]["7d"]["records"]["by_type"].get(record_type, 0)),
                 str(payload["windows"]["30d"]["records"]["by_type"].get(record_type, 0)),
             ]
-            for record_type in ["change", "decision", "requirement", "bug", "digest", "theme-digest"]
+            for record_type in ["change", "decision", "requirement", "bug", "norm", "digest", "theme-digest"]
         ],
     )
     if payload["totals"]["recall"].get("status") == "no_log":
