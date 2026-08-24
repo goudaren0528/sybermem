@@ -198,6 +198,54 @@ def test_project_memory_stats_counts_records_by_type_and_window(tmp_path: Path, 
     assert stats["windows"]["30d"]["records"]["by_type"]["change"] == 1
 
 
+def test_project_memory_stats_exposes_digest_coverage(tmp_path: Path, monkeypatch) -> None:
+    # Given: a project with change records and one digest covering only some of them
+    project_root = tmp_path / "project"
+    sybermem = project_root / ".sybermem"
+    sybermem.mkdir(parents=True)
+    (sybermem / "project.yaml").write_text("project_id: project-1\nslug: demo\n", encoding="utf-8")
+    monkeypatch.setattr(memory_stats_module, "now_iso", lambda: "2026-08-14T12:00:00+08:00")
+
+    from sybermem_core.digest_coverage import compute_coverage_hash
+
+    changes = sybermem / "changes"
+    changes.mkdir()
+    for name, dt in (("a", "2026-08-01"), ("b", "2026-08-02"), ("c", "2026-08-03")):
+        (changes / f"{dt}-{name}.md").write_text(f"---\ntype: change\ndate: {dt}\n---\n\nbody\n", encoding="utf-8")
+    digests = sybermem / "digests"
+    digests.mkdir()
+    cov = compute_coverage_hash(project_root, ["changes/2026-08-01-a.md"])
+    (digests / "2026-08-05-001-d.md").write_text(
+        "\n".join(
+            [
+                "---",
+                "type: digest",
+                "date: 2026-08-05",
+                "record_id: digest-001",
+                "title: d",
+                "source_records:",
+                "  - changes/2026-08-01-a.md",
+                f"coverage_hash: {cov}",
+                "---",
+                "",
+                "## Core Conclusions\n- x",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    # When
+    stats = project_memory_stats(project_root)
+
+    # Then: digest coverage is surfaced as a snapshot alongside recall health
+    coverage = stats["digest_coverage"]
+    assert coverage["uncovered"] == 2
+    assert coverage["total_records"] == 3
+    assert coverage["has_digest"] is True
+    assert coverage["latest_digest_date"] == "2026-08-05"
+
+
 def test_project_memory_stats_summarizes_recall_debug_windows(tmp_path: Path, monkeypatch) -> None:
     # Given: recall debug entries with injects, abstains, match classes, and malformed lines
     project_root = tmp_path / "project"

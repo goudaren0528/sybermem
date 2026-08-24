@@ -29,9 +29,27 @@ def render_project_memory_stats_text(payload: dict) -> None:
         print("")
         print("Recall debug log: unavailable (.sybermem/.recall-debug.jsonl not found)")
         _print_recall_health(payload)
+        _print_digest_coverage(payload)
         return
     _print_recall_detail_tables(payload)
     _print_recall_health(payload)
+    _print_digest_coverage(payload)
+
+
+def _print_digest_coverage(payload: dict) -> None:
+    coverage = payload.get("digest_coverage")
+    if not coverage:
+        return
+    print("")
+    uncovered = coverage.get("uncovered", 0)
+    total = coverage.get("total_records", 0)
+    covered = max(total - uncovered, 0)
+    if coverage.get("has_digest"):
+        age = coverage.get("days_since_latest_digest", 0)
+        latest = coverage.get("latest_digest_date", "")
+        print(f"Digest coverage: {covered}/{total} records covered, {uncovered} uncovered (latest digest {latest}, {age}d ago)")
+    else:
+        print(f"Digest coverage: no digest yet, {uncovered}/{total} records uncovered")
 
 
 def _print_recall_health(payload: dict) -> None:
