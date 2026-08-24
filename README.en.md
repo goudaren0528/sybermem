@@ -65,16 +65,31 @@ implements: [requirement-002]
 
 ### Project Memory
 
-- structured records: `change` / `decision` / `requirement` / `bug`
+- structured records: `change` / `decision` / `requirement` / `bug` / `norm`
 - UUID-backed `record_id` values, with legacy numeric record IDs still readable
 - derived `.sybermem/INDEX.md` from canonical records
 - phase digests and theme digests for phase/topic compression
-- record relations: `implements` / `fixes` / `related` / `superseded_by`
+- record relations: `implements` / `fixes` / `related` / `superseded_by` / `crystallized_from`
 - read-only resume: `/sybermem-resume` and `sybermem resume`
-- memory stats: `sybermem project memory-stats` prints 7d/30d terminal tables by default (including a recall precision column), and `--format json` emits structured stats for `/sybermem-summary`
+- memory stats: `sybermem project memory-stats` prints 7d/30d terminal tables by default (including recall precision, digest coverage, and norm coverage), and `--format json` emits structured stats for `/sybermem-summary`
 - recall relevance feedback: OpenCode accumulates per-session edit focus, todo-batch completion, and test/build signals via `file.edited` / `todo.updated` / `tool.execute.after`, then at `session.idle` matches injected records against edited files (through each record's `related_files`) into a bounded `.sybermem/.recall-outcomes.jsonl`, producing a precision-based `low_relevance` verdict distinct from frequency; record nudges also carry a semantic trigger reason
 - project search: `/sybermem-search` and `sybermem search`
 - next-step guidance: `/using-sybermem` and `sybermem next-step`
+
+### Digest Compression and Feedback
+
+- phase/theme digests use a coverage hash for mechanical staleness detection: `sybermem digest status` reports current/stale/unknown verdicts
+- digest backlog signal: `sybermem digest status --format json` carries a `backlog` object (records not covered by any digest + days since the last digest). A project that keeps recording but never digests gets a proactive "N records not yet in any digest" `⭐` heads-up at OpenCode `session.idle` and Claude/Codex `SessionStart`; the first-digest next-step recommendation now uses a digest-specific record threshold rather than the publish threshold
+- digest results actually feed back: digests are in the search/recall corpus (with `related_digest` continuity links and stale conflict notes); `sybermem digest latest` returns the newest phase digest's Core Conclusions, which OpenCode injects into startup/compaction context — digest content is model-visible, not just a "go read it" pointer
+
+### Project Norms (binding rules)
+
+- first-class `norm` record type under `.sybermem/norms/`, distinct from user habits (user-level) and ordinary decisions
+- fields: `scope` (`global` / `topic:x` / `path:x` / `tool:x`), an imperative `statement`, `authority: authoritative`, reusing the existing lifecycle + supersede machinery
+- two feedback lanes: the always-on **constitution** (active global norms, max 5, injected once per session regardless of prompt relevance) plus **scoped recall** (non-global norms matched by scope tag or >=2 strong statement overlaps, without lowering the recall gate)
+- identification (both confirmation-first, never auto-promote): explicit — the `/sybermem-record` closing step crystallizes a binding rule into a `norm` (with `crystallized_from` provenance); emergent — `sybermem norms nominate` deterministically detects constraints recurring across >=3 decision/requirement records and not covered by an active norm, surfaced at `/sybermem-digest` / `/sybermem-theme-digest`
+- feedback reaches all three hosts: OpenCode (startup constitution + per-prompt scoped recall + `📏` toast + compaction constitution reuse), Claude Code (`SessionStart` constitution + `UserPromptSubmit` scoped), Codex (`SessionStart` constitution + `UserPromptSubmit` scoped)
+- governance: `sybermem norms doctor` flags 2+ active norms in the same scope with overlapping statements (likely contradiction/duplication; non-zero exit for CI gating; advisory only, never edits); `sybermem norms list --scope global|scoped|all --context <text> --format json` is the single source of truth every host consumes
 
 ### Workspace / Hub
 
@@ -101,11 +116,12 @@ implements: [requirement-002]
 - review and governance: `sybermem habit list`, `search`, `pause`, and `delete`
 - visible reminders: `sybermem habit remind --context planning --format markdown` and `/sybermem-habit`
 - manual/compaction injection: `sybermem habit inject --context planning --format markdown`
+- prompt-time perceptible by default: `habit add` now defaults `injection_policy=prompt_ok_when_supported`, so a confirmed habit is injected at prompt time (`🧠`) on supported hosts without extra flags; relevance uses CJK-aware weighted matching (an `applies_to` tag match is a strong boost, otherwise >=2 distinct multi-char statement overlaps), so Chinese contexts match while unrelated habits stay silent
 - passive candidate capture (candidate-only, never auto-written): when OpenCode `chat.message` detects reusable-preference language ("always…", "I prefer…"), it calls `sybermem habit intent --prompt <text>` to write a candidate to the user-level `~/.sybermem/.habit-intent.json` (never an active habit, never persists secrets/injection text); `/sybermem-habit` reads `habit intent-status` and, after user confirmation, turns it into a habit in one step, then runs `habit intent-clear`
-- distinct injection toasts: recall and habit each get their own OpenCode toast — `⭐` for recall and a separate `🧠` for an applied user habit (no longer merged), plus `💡` when a candidate preference is captured
+- distinct injection toasts: recall, habit, and project norm each get their own OpenCode toast — `⭐` for recall, `🧠` for an applied user habit, `📏` for an applied project norm — plus a scope-aware `💡` when a candidate is captured (routes a personal habit to `/sybermem-habit`, a project convention to `/sybermem-record`, or asks when ambiguous)
 - awareness surface: `sybermem habit awareness` and the OpenCode first-turn startup context report the active-habit count, type distribution, and whether a candidate is pending (counts only, never statements, never duplicating prompt-time reminders)
 - conservative gates: only active, high-confidence, directly relevant, non-excluded habits are injected, with a maximum of three
-- habits are not stored in project `.sybermem/` records and are not published to Team memory by default
+- habits are not stored in project `.sybermem/` records and are not published to Team memory by default; a personal preference → habit, a binding project rule → crystallize a `norm` (see Project Norms)
 
 ## CLI vs Skill Boundaries
 
@@ -113,7 +129,7 @@ SyberMem has two execution paths with different reliability properties:
 
 | Path | Representative capabilities | Notes |
 |---|---|---|
-| CLI / Core | `sybermem resume`, `search`, `next-step`, `portfolio`, `index build`, `project index build/check`, `project memory-stats`, `record id`, `habit add/list/search/pause/delete/remind/inject`, `team init/summary`, `publish status`, `project uninstall` | Programmatic and scriptable; best for deterministic queries and publication flows |
+| CLI / Core | `sybermem resume`, `search`, `next-step`, `portfolio`, `index build`, `project index build/check`, `project memory-stats`, `record id`, `habit add/list/search/pause/delete/remind/inject`, `digest status/latest`, `norms list/nominate/doctor`, `team init/summary`, `publish status`, `project uninstall` | Programmatic and scriptable; best for deterministic queries and publication flows |
 | Skill orchestration | `/sybermem-record`, `/sybermem-habit`, `/sybermem-link`, `/sybermem-digest`, `/sybermem-theme-digest`, `/sybermem-phase-analyze` | AI edits `.sybermem/` Markdown or invokes user-level habit CLI according to skill instructions; best for work that requires judgment and synthesis |
 
 `sybermem record id --type <change|decision|requirement|bug>` only mints a canonical record ID. Full record creation still happens through `/sybermem-record`.
@@ -187,10 +203,11 @@ If a project already has custom `.claude/settings.json` content, SyberMem patche
 ### Project Owner
 
 - `/sybermem-resume`: get a bounded read-only resume view
-- `/sybermem-record`: record a meaningful round of work
+- `/sybermem-record`: record a meaningful round of work; at closeout, crystallize a binding project rule into a `norm`
 - `/sybermem-search`: search historical records
 - `/sybermem-habit`: add, review, pause, delete, or remind user-level habits
 - `/sybermem-summary`: inspect current project state
+- `sybermem norms list/nominate/doctor`: view the project-norm constitution, nominate recurring constraints, detect same-scope conflicts
 - `/sybermem-digest`: capture a stable phase conclusion
 - `/sybermem-theme-digest`: capture a cross-phase topic conclusion
 - `/sybermem-team-publish`: preview, review, then publish into Team memory
