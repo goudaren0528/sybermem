@@ -406,6 +406,40 @@ ${habitMarkdown}
   return context.length > 3000 ? `${context.substring(0, 2997)}...` : context;
 }
 
+// packages/opencode-plugin/src/digest_backlog_signal.ts
+function parseDigestBacklog(json) {
+  const trimmed = json.trim();
+  if (!trimmed)
+    return null;
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (typeof parsed !== "object" || parsed === null)
+      return null;
+    const backlog = Reflect.get(parsed, "backlog");
+    if (typeof backlog !== "object" || backlog === null)
+      return null;
+    const uncovered = Reflect.get(backlog, "uncovered");
+    if (typeof uncovered !== "number")
+      return null;
+    const days = Reflect.get(backlog, "days_since_latest_digest");
+    const hasDigest = Reflect.get(backlog, "has_digest");
+    return {
+      uncovered,
+      daysSinceLatestDigest: typeof days === "number" ? days : 0,
+      hasDigest: hasDigest === true
+    };
+  } catch {
+    return null;
+  }
+}
+var DIGEST_BACKLOG_THRESHOLD = 5;
+function digestBacklogToast(backlog) {
+  if (backlog.uncovered < DIGEST_BACKLOG_THRESHOLD)
+    return null;
+  const ageNote = backlog.hasDigest && backlog.daysSinceLatestDigest > 0 ? `\uFF08\u8DDD\u4E0A\u6B21 digest ${backlog.daysSinceLatestDigest} \u5929\uFF09` : "";
+  return `\u2B50 SyberMem: ${backlog.uncovered} \u6761\u8BB0\u5F55\u5C1A\u672A\u8FDB\u5165\u4EFB\u4F55 digest${ageNote} \u2014 \u8003\u8651 /sybermem-digest \u538B\u7F29\u8FD9\u6279\u5DE5\u4F5C`;
+}
+
 // packages/opencode-plugin/src/state.ts
 import { existsSync as existsSync4, readFileSync as readFileSync3, statSync, writeFileSync as writeFileSync2 } from "fs";
 import { join as join4 } from "path";
@@ -1155,6 +1189,16 @@ async function maybeToastRecallHealth(args, root) {
       throttledToast(args.client, "recall-health", message);
   } catch {}
 }
+async function maybeToastDigestBacklog(args, root) {
+  try {
+    const backlog = parseDigestBacklog(await digestStatusText(args.$, root));
+    if (!backlog)
+      return;
+    const message = digestBacklogToast(backlog);
+    if (message)
+      throttledToast(args.client, "digest-backlog", message);
+  } catch {}
+}
 async function flushSessionRelevance(args, root, sessionID) {
   if (!sessionID)
     return;
@@ -1231,6 +1275,7 @@ var SyberMemPlugin = async ({ $, directory, client }) => {
         } catch {}
         await flushSessionRelevance(args, root, sessionID);
         await maybeToastRecallHealth(args, root);
+        await maybeToastDigestBacklog(args, root);
       }
     },
     "tool.execute.after": async (input, output) => {
