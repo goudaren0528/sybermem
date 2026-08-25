@@ -10,6 +10,8 @@ $ArchivePrefix = "sybermem-$Branch"
 $LauncherDir = Join-Path $env:USERPROFILE ".claude\sybermem"
 $LauncherPath = Join-Path $LauncherDir "launch_record_change_on_stop.py"
 $SessionLauncherPath = Join-Path $LauncherDir "launch_session_start_context.py"
+$ManifestPath = Join-Path $LauncherDir "managed-install.json"
+$RemoverPath = Join-Path $LauncherDir "safe-managed-remove.py"
 $CliDir = Join-Path $LauncherDir "cli"
 $CliVenv = Join-Path $CliDir "venv"
 $CliWrapper = Join-Path $CliDir "sybermem.cmd"
@@ -49,7 +51,9 @@ try {
     $CodexHookSource = Join-Path $TmpDir "$ArchivePrefix\.codex\hooks\user_prompt.py"
     $CodexSessionHookSource = Join-Path $TmpDir "$ArchivePrefix\.codex\hooks\session_start.py"
     $CodexStopHookSource = Join-Path $TmpDir "$ArchivePrefix\.codex\hooks\stop.py"
-    $CodexPostCompactHookSource = Join-Path $TmpDir "$ArchivePrefix\.codex\hooks\post_compact.py"
+$CodexPostCompactHookSource = Join-Path $TmpDir "$ArchivePrefix\.codex\hooks\post_compact.py"
+$ManifestSource = Join-Path $TmpDir "$ArchivePrefix\scripts\managed-install.json"
+$RemoverSource = Join-Path $TmpDir "$ArchivePrefix\scripts\safe-managed-remove.py"
 
     if (-not (Test-Path $SkillsSrc)) {
         throw "Skills not found in archive"
@@ -57,31 +61,13 @@ try {
 
     function Remove-ManagedDirectory {
         param([string]$Root, [string]$Target)
-        if (-not (Test-Path -LiteralPath $Target)) { return }
-        $rootItem = Get-Item -LiteralPath $Root -Force
-        if (($rootItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw "Refusing linked managed root: $Root" }
-        $rootFull = [IO.Path]::GetFullPath($Root).TrimEnd('\', '/')
-        $parentFull = [IO.Path]::GetFullPath((Split-Path -Parent $Target)).TrimEnd('\', '/')
-        if (-not [StringComparer]::OrdinalIgnoreCase.Equals($rootFull, $parentFull)) {
-            throw "Refusing to remove path outside managed root: $Target"
-        }
-        $item = Get-Item -LiteralPath $Target -Force
-        if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
-            Remove-Item -LiteralPath $Target -Force -Confirm:$false
-            return
-        }
-        Remove-Item -LiteralPath $Target -Recurse -Force -Confirm:$false
+        & python $RemoverSource child --root $Root --name (Split-Path -Leaf $Target)
+        if ($LASTEXITCODE -ne 0) { throw "Managed removal failed: $Target" }
     }
 
     foreach ($target in $Targets) {
         if (-not (Test-Path $target.Path)) {
             New-Item -ItemType Directory -Path $target.Path -Force | Out-Null
-        }
-        foreach ($legacySkill in @("init-project", "record", "summary")) {
-            $legacyPath = Join-Path $target.Path $legacySkill
-            if (Test-Path $legacyPath) {
-                Remove-ManagedDirectory -Root $target.Path -Target $legacyPath
-            }
         }
         foreach ($retiredSkill in @("sybermem-phase-confirm", "sybermem-team-publish", "sybermem-team-summary")) {
             $retiredPath = Join-Path $target.Path $retiredSkill
@@ -195,7 +181,9 @@ try {
     # Global launchers: only needed by the Claude Code lifecycle hooks.
     if (Test-Path (Join-Path $env:USERPROFILE ".claude")) {
         if (-not (Test-Path $LauncherDir)) {
-            New-Item -ItemType Directory -Path $LauncherDir -Force | Out-Null
+    New-Item -ItemType Directory -Path $LauncherDir -Force | Out-Null
+    Copy-Item -Path $ManifestSource -Destination $ManifestPath -Force
+    Copy-Item -Path $RemoverSource -Destination $RemoverPath -Force
         }
         Copy-Item -Path $LauncherSource -Destination $LauncherPath -Force
         Write-Host "  [Claude Code] installed stop hook launcher: $LauncherPath"
