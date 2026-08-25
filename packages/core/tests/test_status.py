@@ -56,6 +56,23 @@ def test_project_status_returns_empty_snapshot_when_project_is_uninitialized(tmp
     assert status["open_requirements"] == []
 
 
+def test_project_status_publication_team_is_empty_without_team_association(tmp_path: Path) -> None:
+    # Given: an ordinary project with NO team: block in project.yaml
+    project_root = tmp_path / "p"
+    sybermem = project_root / ".sybermem"
+    sybermem.mkdir(parents=True)
+    (sybermem / "project.yaml").write_text("project_id: project-1\nslug: demo\n", encoding="utf-8")
+
+    # When
+    status = project_status(project_root)
+
+    # Then: the publication contract is preserved (shape stays) but team metadata is empty,
+    # so ordinary status stays valid without Team. (Team mode is deprecated; decision-f780ec.)
+    assert "publication" in status
+    assert status["publication"]["team"] == {}
+    assert "preview" in status["publication"]
+
+
 def test_project_status_treats_fixed_bug_as_closed_but_statusless_as_open(tmp_path: Path) -> None:
     # Given: a project with one bug marked `fixed`, one marked `resolved`, and one with no status
     project_root = tmp_path / "project"
