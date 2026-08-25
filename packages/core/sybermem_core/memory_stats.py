@@ -240,6 +240,7 @@ def _empty_memory_usage(status: str) -> dict:
         "turns": 0,
         "items": 0,
         "chars": 0,
+        "digest_items": 0,
         "avg_chars_per_turn": None,
         "p95_chars_per_turn": None,
         "lanes": {lane: {"items": 0, "chars": 0} for lane in ("recall", "habit", "norm", "startup")},
@@ -253,6 +254,7 @@ def _non_negative_int(value) -> int:
 def _recall_counts(entries: list[dict], malformed_lines: int, status: str) -> dict:
     events = len(entries)
     injected = sum(1 for entry in entries if entry.get("event") == "inject")
+    digest_injected = sum(1 for entry in entries if entry.get("event") == "inject" and entry.get("has_digest") is True)
     abstained = sum(1 for entry in entries if entry.get("event") == "abstain")
     match_classes: Counter[str] = Counter()
     matched_records: Counter[str] = Counter()
@@ -267,6 +269,7 @@ def _recall_counts(entries: list[dict], malformed_lines: int, status: str) -> di
         "status": status,
         "events": events,
         "injected": injected,
+        "digest_injected": digest_injected,
         "abstained": abstained,
         "recall_rate": injected / events if events else None,
         "match_classes": dict(sorted(match_classes.items())),
