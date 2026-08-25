@@ -44,6 +44,23 @@ def test_project_status_has_no_publication_field_after_team_removal(tmp_path: Pa
     assert status["open_bugs"] == []
 
 
+def test_project_memory_stats_preserves_unavailable_memory_usage_status(tmp_path: Path) -> None:
+    # Given: a managed project with a usage journal too large for advisory stats
+    project_root = tmp_path / "p"
+    sybermem = project_root / ".sybermem"
+    sybermem.mkdir(parents=True)
+    (sybermem / "project.yaml").write_text("project_id: project-1\nslug: demo\n", encoding="utf-8")
+    (sybermem / ".memory-usage.jsonl").write_text("x" * 1_000_001, encoding="utf-8")
+
+    # When
+    stats = memory_stats_module.project_memory_stats(project_root)
+
+    # Then
+    assert stats["totals"]["memory_usage"]["status"] == "unavailable"
+    assert stats["windows"]["7d"]["memory_usage"]["status"] == "unavailable"
+    assert stats["windows"]["30d"]["memory_usage"]["status"] == "unavailable"
+
+
 def test_project_status_ignores_legacy_team_block(tmp_path: Path) -> None:
     # Given: a project whose project.yaml still carries a legacy nested `team:` block
     # (from before Team mode was removed; decision-f780ec)
