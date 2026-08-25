@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 import runpy
 from pathlib import Path
+import subprocess
+import sys
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -50,6 +52,43 @@ def test_python_install_common_writes_codex_hook_commands(tmp_path) -> None:
     assert "sybermem_session_start.py" in data["hooks"]["SessionStart"][0]["command"]
     assert "sybermem_stop.py" in data["hooks"]["Stop"][0]["command"]
     assert "sybermem_post_compact.py" in data["hooks"]["PostCompact"][0]["command"]
+
+
+def test_python_install_runtime_reuses_existing_venv(monkeypatch, tmp_path) -> None:
+    # Given: a Windows-style existing CLI venv already has its Python and pip launchers.
+    install_common = runpy.run_path(str(ROOT / "scripts" / "_install_common.py"))
+    install_runtime = install_common["_install_runtime"]
+    commands: list[list[str]] = []
+
+    root = tmp_path / "checkout"
+    scripts = root / "scripts"
+    scripts.mkdir(parents=True)
+    for name in ("managed-install.json", "safe-managed-remove.py", "global-stop-hook-launcher.py", "global-session-start-launcher.py"):
+        (scripts / name).write_text(name, encoding="utf-8")
+    (root / "VERSION").write_text("test", encoding="utf-8")
+    (root / "packages" / "core").mkdir(parents=True)
+    (root / "packages" / "cli").mkdir(parents=True)
+
+    home = tmp_path / "home"
+    venv_scripts = home / ".claude" / "sybermem" / "cli" / "venv" / "Scripts"
+    venv_scripts.mkdir(parents=True)
+    (venv_scripts / "python").write_text("python", encoding="utf-8")
+    (venv_scripts / "pip").write_text("pip", encoding="utf-8")
+
+    def fake_run(command: list[str], *, check: bool) -> subprocess.CompletedProcess[str]:
+        commands.append(command)
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr(install_common["os"], "name", "nt")
+    monkeypatch.setattr(install_common["subprocess"], "run", fake_run)
+
+    # When: runtime install refreshes packages into the existing venv.
+    install_runtime(root, home)
+
+    # Then: it does not recreate the venv and still runs pip refresh commands.
+    assert [sys.executable, "-m", "venv", str(home / ".claude" / "sybermem" / "cli" / "venv")] not in commands
+    assert any(command[1:5] == ["-m", "pip", "install", "--upgrade"] for command in commands)
+    assert any("--force-reinstall" in command for command in commands)
 
 
 def test_package_integrity_checks_all_runtime_refresh_scripts() -> None:
