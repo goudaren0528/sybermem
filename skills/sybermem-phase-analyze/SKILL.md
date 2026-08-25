@@ -11,6 +11,8 @@ Analyze the project's `.sybermem/` record history and deterministically persist 
 
 **Phase grouping is an agent judgement.** Read the full record history and produce a **semantic** grouping — coherent phase titles plus the records each phase covers — then persist it deterministically with the CLI so it can never be silently lost to a hand-written Markdown step. Mechanical month+topic grouping is only a **fallback** when the agent cannot produce a semantic grouping. Resolve record ids to files by each record's frontmatter `record_id:`, never by filename (filenames may truncate the UUID). Downstream `/sybermem-digest` uses `sybermem project coverage-hash` to derive the deterministic `coverage_hash` for each phase's source records.
 
+**Re-derive the grouping from record CONTENT every run — never inherit the existing phase-index as if it were a trusted semantic grouping.** A refresh is NOT an increment-only pass: do not merely slot new records into whatever phases already exist. The existing `phase-index.md` may itself be a stale mechanical-fallback result (its tell: titles shaped like `<month> <topic> cluster`, one big catch-all phase plus many single-record phases). Treat the prior index only as a coverage checklist (which record ids exist), never as authoritative phase boundaries. You MUST read each record's frontmatter (`title`, `topics`, `implements`/`fixes` relations) and re-decide the semantic boundaries from that content. Grouping purely from a `record_id` list — without reading what each record is about — is a mechanical bucket in disguise and is forbidden on the CLI-first path. A phase holding a single record (digest phases aside) is a fragmentation signal: try to merge it into the adjacent subsystem/theme phase before confirming, and only keep it standalone if no coherent neighbour exists.
+
 ## CLI Resolution
 
 This skill uses the SyberMem CLI when available. Resolve it in this order:
@@ -32,6 +34,9 @@ Implementation note for PowerShell examples: store the chosen executable in `$Sy
 
 1. Resolve the SyberMem CLI using the CLI Resolution rules above.
 2. **Read the full `.sybermem/` record history** and build a semantic grouping: coherent phase titles, each with its covered records, as JSON `{ "phases": [ { "title": "...", "covered_records": ["change-001", ...] } ] }`. Cover **every** record in exactly one phase. Resolve record ids to file paths via each record's frontmatter `record_id:`, never by filename.
+   - **Read each record's CONTENT, not just its id.** For every record open its frontmatter and read `title`, `topics`, and any `implements`/`fixes`/`related` relations. Group by what the records are actually about (subsystem / theme / feature line), not by a `record_id` string or by the month prefix. Building the JSON from an id list alone — or by copying the existing `phase-index.md` structure — is the mechanical fallback wearing a semantic costume, and is not allowed here.
+   - **Do not inherit the prior phase boundaries.** Use the existing index only to confirm which record ids exist (a coverage checklist). Re-derive titles and groupings from content each run; expect a good result to be a small number of internally coherent phases, not one catch-all phase plus a long tail of single-record phases.
+   - **No fragmented phases.** Before writing the JSON, scan for any phase covering a single record (digest-only phases excepted). Merge each such record into the nearest coherent subsystem/theme phase. Keep it standalone only when there is genuinely no coherent neighbour, and be prepared to justify why.
 3. Write the grouping to a temp JSON file and run `sybermem project phase analyze --from-json <file> --format json`. Core validates every covered record exists and is covered by exactly one phase, then atomically writes confirmed phases + coverage map + `status: analyzed` to `.sybermem/analysis/phase-index.md`.
 4. If the CLI exits successfully and emits valid JSON, summarize the returned phases and STOP — do not hand-edit the phase index.
 5. **Mechanical fallback:** only if you cannot produce a semantic grouping, run `sybermem project phase analyze --format json` (no `--from-json`) to get deterministic month+topic bucketing, and STOP.
@@ -109,8 +114,8 @@ After proposing candidates, automatically confirm all of them as phases. There i
 
 Confirmed phase IDs use the stable `phase-<NNN>` format. `source_candidate_id` should point back to the candidate that was confirmed when that lineage is known.
 
-- keep existing confirmed phases unchanged unless the user explicitly revisits them
-- avoid silently removing coverage mappings
+- prefer keeping stable existing confirmed phases, BUT re-group when the existing phases are fragmented (single-record `<month> <topic> cluster` phases) or were produced by mechanical fallback — coherence of the semantic grouping takes precedence over structural stability
+- avoid silently removing coverage mappings (records must never lose coverage), but reassigning a record from a fragmented phase into a coherent merged phase is expected, not "silent removal"
 - add new unassigned records to the coverage map when no phase match is clear
 
 7. **Update analysis progress** — write back: last analysis time, last analyzed record boundary, optional git boundary, whether unprocessed new records remain, enough current-state metadata for future summary to identify the most recently active confirmed phase
@@ -138,6 +143,9 @@ If you catch yourself doing any of these, STOP:
 - Silently removing existing confirmed phases or coverage mappings
 - Declaring analysis complete without writing back analysis progress metadata
 - Confirming phases with empty `covered_records` lists when records actually exist
+- Treating the existing `phase-index.md` as a trusted semantic grouping and only slotting new records into it (increment-only refresh) instead of re-deriving groupings from record content
+- Building the grouping from a `record_id` list without reading each record's `title`/`topics`/relations
+- Confirming a run whose result is one large catch-all phase plus multiple single-record `<month> <topic> cluster` phases — that is the mechanical-fallback fingerprint, not a semantic grouping; go merge the single-record phases into coherent subsystem/theme phases
 
 **All of these mean: go back to the relevant step and re-verify.**
 
