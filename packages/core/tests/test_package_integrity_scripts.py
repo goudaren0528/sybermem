@@ -158,8 +158,6 @@ def test_package_integrity_checks_cli_using_skills_with_fixed_launcher_guidance(
         Path("packages/claude-skills/sybermem-record/SKILL.md"),
         Path("packages/claude-skills/sybermem-search/SKILL.md"),
         Path("packages/claude-skills/sybermem-habit/SKILL.md"),
-        Path("packages/claude-skills/sybermem-team-publish/SKILL.md"),
-        Path("packages/claude-skills/sybermem-team-summary/SKILL.md"),
         Path("packages/claude-skills/sybermem-init-project/SKILL.md"),
         Path("packages/claude-skills/sybermem-update/SKILL.md"),
         Path("packages/claude-skills/sybermem-summary/SKILL.md"),
@@ -211,16 +209,21 @@ def test_package_integrity_requires_distribution_scripts_clean_retired_skills() 
     checker = runpy.run_path(str(CHECK_SCRIPT))
 
     # When / Then: the checker defines the retired-skill cleanup contract and wires it into main
-    assert checker["RETIRED_SKILL_NAMES"] == ["sybermem-phase-confirm"]
+    assert checker["RETIRED_SKILL_NAMES"] == [
+        "sybermem-phase-confirm",
+        "sybermem-team-publish",
+        "sybermem-team-summary",
+    ]
     assert callable(checker["check_retired_skill_cleanup"])
     script_text = CHECK_SCRIPT.read_text(encoding="utf-8")
     assert "check_retired_skill_cleanup(root)" in script_text
 
     # And every distribution script (install/install-remote/update/uninstall, sh+ps1)
-    # references the retired skill so it gets cleaned from old installs.
+    # references every retired skill so it gets cleaned from old installs.
     for relative_path in checker["DISTRIBUTION_SCRIPTS"]:
         text = (ROOT / relative_path).read_text(encoding="utf-8")
-        assert "sybermem-phase-confirm" in text, f"{relative_path.as_posix()} must clean retired skill sybermem-phase-confirm"
+        for retired in checker["RETIRED_SKILL_NAMES"]:
+            assert retired in text, f"{relative_path.as_posix()} must clean retired skill {retired}"
 
 
 def test_cli_using_skills_include_fixed_launcher_contract_fragments() -> None:

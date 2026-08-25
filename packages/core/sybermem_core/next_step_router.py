@@ -1,12 +1,9 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
 from pathlib import Path
-import json
 import re
 import subprocess
 
-from .project import read_team_from_project_yaml
 from .records import iter_record_files, parse_project_yaml, parse_record_file
 from .retrieval import classify_authority, classify_source_kind
 from .status import project_status, publication_readiness
@@ -43,8 +40,8 @@ def compute_phase_state(root: Path) -> str:
 
     Shared source of truth for phase freshness so the CLI `next-step` path and
     `resume` agree. Previously only `resume` computed this and passed it in, so a
-    bare `sybermem next-step` could recommend a later-stage action (e.g. team
-    publish) while `resume` correctly steered to phase-analyze on a stale index.
+    bare `sybermem next-step` could recommend a later-stage action while `resume`
+    correctly steered to phase-analyze on a stale index.
     """
     phase_index = root / ".sybermem" / "analysis" / "phase-index.md"
     if not phase_index.is_file():
@@ -141,7 +138,6 @@ def recommend_next_step_read_only(
         _bl = digest_backlog(root)
         backlog_uncovered = _bl["uncovered"] if backlog_uncovered is None else backlog_uncovered
         backlog_total = _bl["total_records"] if backlog_total is None else backlog_total
-    team = read_team_from_project_yaml(root)
 
     # 0) If phase-index is missing or not yet analyzed, recommend phase-analyze first
     if phase_state == "stale":
@@ -165,7 +161,7 @@ def recommend_next_step_read_only(
             "reason": "No phase index exists. Run phase analysis to build the structural foundation."
         }
 
-    # 1) record > digest > team-publish
+    # 1) record > digest
     if record_candidate is not None:
         routed_candidate = route_record_candidate(record_candidate)
         return routed_candidate
@@ -196,31 +192,6 @@ def recommend_next_step_read_only(
             "action": "/sybermem-digest",
             "reason": f"{backlog_uncovered} records are not covered by any digest yet. Consider a new phase digest to compress the accumulated work."
         }
-
-    # DEPRECATED Team-publish recommendation (Team mode is being removed; decision-f780ec).
-    # Fires ONLY for projects that already have a Team association, so new projects never
-    # see it. Removed entirely in the breaking release.
-    if team.get("team_path"):
-        team_root = Path(team["team_path"])
-        meta_path = team_root / "projects" / status["slug"] / "meta.json"
-        if meta_path.is_file():
-            meta = json.loads(meta_path.read_text(encoding="utf-8"))
-            published_at = meta.get("published_at", "")
-            if published_at:
-                try:
-                    published_dt = datetime.fromisoformat(published_at)
-                    if datetime.fromisoformat(status["as_of"]) - published_dt > timedelta(days=2):
-                        return {
-                            "action": "/sybermem-team-publish",
-                            "reason": "This project has a Team association but has not been published to Team memory recently."
-                        }
-                except Exception:
-                    pass
-        else:
-            return {
-                "action": "/sybermem-team-publish",
-                "reason": "This project is linked to Team memory but has not been published there yet."
-            }
 
     return {
         "action": "/sybermem-summary",

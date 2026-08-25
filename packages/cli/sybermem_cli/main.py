@@ -22,16 +22,12 @@ from sybermem_core.next_step_router import classify_record_intent, recommend_nex
 from sybermem_core.digest_governance import build_digest_governance_report, latest_digest_summary
 from sybermem_core.norms import constitution, nominate_norm_candidates, norm_conflicts, scoped_norms
 from sybermem_core.portfolio import build_portfolio
-from sybermem_core.team import init_team_repo
-from sybermem_core.publish_bootstrap import bootstrap_publish_status
-from sybermem_core.team_summary import build_team_management_summary
 from sybermem_core.uninstall import deactivate_project_sybermem
 from sybermem_core.version import get_installed_version
 from sybermem_core.doctor import version_report
 from sybermem_cli.habits import register_habit_commands
 from sybermem_cli.context import register_context_commands
 from sybermem_cli.memory_stats_render import render_project_memory_stats_text
-from sybermem_cli.publish_render import render_publish_status_text
 from sybermem_cli.search_render import render_search_text
 
 
@@ -363,41 +359,6 @@ def cmd_portfolio(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_team_init(args: argparse.Namespace) -> int:
-    try:
-        payload = init_team_repo(Path(args.path), args.team_id, args.name, args.remote)
-    except Exception as exc:
-        print(str(exc), file=sys.stderr)
-        return 1
-
-    if args.format == "json":
-        print(dump_json(payload))
-    else:
-        print("Initialized team repo:")
-        print(f"- team_id: {payload['team_id']}")
-        print(f"- name: {payload['name']}")
-        print(f"- path: {payload['path']}")
-        print(f"- remote: {payload['remote']}")
-    return 0
-
-
-def cmd_publish_status(args: argparse.Namespace) -> int:
-    try:
-        tp = Path(args.team_path) if args.team_path else None
-        payload = bootstrap_publish_status(tp, preview=args.preview, preview_source_hash=args.preview_source_hash)
-    except Exception as exc:
-        print(str(exc), file=sys.stderr)
-        return 1
-
-    if args.format == "json":
-        print(dump_json(payload))
-        if payload.get("status") in {"stale_preview", "blocked"}:
-            return 1
-    else:
-        return render_publish_status_text(payload)
-    return 0
-
-
 def cmd_project_memory_stats(args: argparse.Namespace) -> int:
     root = resolve_project_root()
     if root is None:
@@ -426,27 +387,6 @@ def cmd_record_intent(args: argparse.Namespace) -> int:
         print(dump_json(bounded))
     else:
         print(bounded["classification"])
-    return 0
-
-
-def cmd_team_summary(args: argparse.Namespace) -> int:
-    try:
-        result = build_team_management_summary(Path(args.team_path))
-    except Exception as exc:
-        print(str(exc), file=sys.stderr)
-        return 1
-
-    payload = result["payload"]
-    if args.format == "json":
-        print(dump_json(payload))
-    else:
-        print("Generated Team management summary:")
-        print(f"- team: {result['team_id']}")
-        print(f"- markdown: {result['summary_markdown']}")
-        print(f"- json: {result['summary_json']}")
-        print(f"- baseline state: {result['summary_state']}")
-        if payload.get("deep_review_candidates"):
-            print("- suggested deeper review: inspect the projects listed under Worth Deeper Review")
     return 0
 
 
@@ -796,30 +736,6 @@ def main() -> int:
     record_intent.add_argument("--prompt", required=True)
     record_intent.add_argument("--format", choices=["text", "json"], default="text")
     record_intent.set_defaults(func=cmd_record_intent)
-
-    team = sub.add_parser("team")
-    team_sub = team.add_subparsers(dest="team_command", required=True)
-    team_init = team_sub.add_parser("init")
-    team_init.add_argument("--path", required=True)
-    team_init.add_argument("--team-id", required=True)
-    team_init.add_argument("--name", required=True)
-    team_init.add_argument("--remote", required=True)
-    team_init.add_argument("--format", choices=["text", "json"], default="text")
-    team_init.set_defaults(func=cmd_team_init)
-
-    team_summary = team_sub.add_parser("summary")
-    team_summary.add_argument("--team-path", required=True)
-    team_summary.add_argument("--format", choices=["text", "json"], default="text")
-    team_summary.set_defaults(func=cmd_team_summary)
-
-    publish = sub.add_parser("publish")
-    publish_sub = publish.add_subparsers(dest="publish_command", required=True)
-    publish_status_cmd = publish_sub.add_parser("status")
-    publish_status_cmd.add_argument("--team-path", default=None)
-    publish_status_cmd.add_argument("--preview", action="store_true")
-    publish_status_cmd.add_argument("--preview-source-hash", default=None)
-    publish_status_cmd.add_argument("--format", choices=["text", "json"], default="text")
-    publish_status_cmd.set_defaults(func=cmd_publish_status)
 
     version_cmd = sub.add_parser("version")
     version_cmd.add_argument("--format", choices=["text", "json"], default="text")
