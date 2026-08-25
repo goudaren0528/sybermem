@@ -8,6 +8,7 @@ export interface MemoryUsageEntry {
   readonly session_id: string
   readonly total_items: number
   readonly total_chars: number
+  readonly digest_items: number
   readonly recall_items: number
   readonly recall_chars: number
   readonly habit_items: number
@@ -84,6 +85,7 @@ export function buildMemoryUsageEntry(input: MemoryUsageInput, options: MemoryUs
   const habitChars = packetChars(input.packets, "## User Habit Reminder")
   const normChars = packetChars(input.packets, "## Relevant Project Norms")
   const injectedIds = uniqueStructuredIds(input.packets, startup)
+  const digestItems = injectedIds.filter((id) => id.startsWith("digest-")).length
   return {
     schema_version: 1,
     timestamp: options.timestamp ?? new Date().toISOString(),
@@ -91,6 +93,7 @@ export function buildMemoryUsageEntry(input: MemoryUsageInput, options: MemoryUs
     session_id: boundText(input.sessionID, MAX_SESSION_ID_CHARS),
     total_items: summary.recallCount + summary.habitCount + summary.normCount + startupItems,
     total_chars: recallChars + habitChars + normChars + startup.length,
+    digest_items: digestItems,
     recall_items: summary.recallCount,
     recall_chars: recallChars,
     habit_items: summary.habitCount,

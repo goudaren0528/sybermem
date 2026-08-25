@@ -37,6 +37,7 @@ describe("memory usage journal", () => {
       session_id: "session-usage",
       total_items: 4,
       total_chars: 219,
+      digest_items: 0,
       recall_items: 1,
       recall_chars: 51,
       habit_items: 1,
@@ -62,8 +63,26 @@ describe("memory usage journal", () => {
     // Then: the journal entry remains a zero-cost abstention measurement
     expect(entry.total_items).toBe(0)
     expect(entry.total_chars).toBe(0)
+    expect(entry.digest_items).toBe(0)
     expect(entry.startup_present).toBe(false)
     expect(entry.injected_ids).toEqual([])
+  })
+
+  it("records digest item counts from structured injected ids only", () => {
+    // Given
+    const entry = buildMemoryUsageEntry(
+      {
+        sessionID: "session-digest-usage",
+        packets: ["## SyberMem Recall Hints\n- [digest-phase-a] compressed seam\n- [change-a] raw seam"],
+        startup: "## SyberMem Startup Context\n- [digest-startup] previous phase",
+      },
+      { timestamp: "2026-08-25T12:00:00.000Z" },
+    )
+
+    // Then
+    expect(entry.digest_items).toBe(2)
+    expect(entry.injected_ids).toEqual(["digest-phase-a", "change-a", "digest-startup"])
+    expect(JSON.stringify(entry)).not.toContain("compressed seam")
   })
 
   it("appends metadata for model-visible memory", () => {
@@ -81,6 +100,7 @@ describe("memory usage journal", () => {
       // Then: the persisted line has measurements and IDs, never packet content
       const line = readFileSync(join(root, ".sybermem", ".memory-usage.jsonl"), "utf-8").trim()
       expect(line).toContain('"schema_version":1')
+      expect(line).toContain('"digest_items":0')
       expect(line).toContain('"injected_ids":["change-a"]')
       expect(line).not.toContain("private content")
     } finally {
