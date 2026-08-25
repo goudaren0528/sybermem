@@ -29,6 +29,7 @@ def _turn(timestamp: str, chars: int, items: int = 1, **lanes: int) -> dict:
         "session_id": "session-1",
         "total_items": items,
         "total_chars": chars,
+        "digest_items": lanes.get("digest_items", 0),
         "recall_items": lanes.get("recall_items", 0),
         "recall_chars": lanes.get("recall_chars", 0),
         "habit_items": lanes.get("habit_items", 0),
@@ -69,6 +70,40 @@ def test_memory_usage_journal_skips_malformed_unknown_and_outcome_rows(tmp_path:
     assert status == "available"
     assert len(turns) == 1
     assert len(outcomes) == 1
+    assert turns[0].digest_items == 0
+
+
+def test_memory_usage_defaults_missing_digest_field_to_zero_for_older_logs(tmp_path: Path) -> None:
+    # Given: an older memory usage row without digest_items
+    _write_journal(
+        tmp_path,
+        [
+            {
+                "schema_version": 1,
+                "timestamp": "2026-08-14T09:00:00+08:00",
+                "host": "opencode",
+                "session_id": "session-1",
+                "total_items": 1,
+                "total_chars": 10,
+                "recall_items": 1,
+                "recall_chars": 4,
+                "habit_items": 0,
+                "habit_chars": 0,
+                "norm_items": 0,
+                "norm_chars": 0,
+                "startup_items": 0,
+                "startup_chars": 0,
+            }
+        ],
+    )
+
+    # When
+    turns, _, status = read_memory_usage_journal(tmp_path)
+
+    # Then
+    assert status == "available"
+    assert len(turns) == 1
+    assert turns[0].digest_items == 0
 
 
 def test_memory_usage_aggregates_lanes_and_p95_without_outcome_double_counting(tmp_path: Path) -> None:
@@ -77,7 +112,7 @@ def test_memory_usage_aggregates_lanes_and_p95_without_outcome_double_counting(t
         tmp_path,
         [
             _turn("2026-08-14T09:00:00+08:00", 10, recall_items=1, recall_chars=4),
-            _turn("2026-08-13T09:00:00+08:00", 20, habit_items=1, habit_chars=7),
+            _turn("2026-08-13T09:00:00+08:00", 20, habit_items=1, habit_chars=7, digest_items=1),
             _turn("2026-08-12T09:00:00+08:00", 30, norm_items=1, norm_chars=9, startup_items=1, startup_chars=5),
             {"schema_version": 1, "host": "opencode", "event": "session_outcome", "timestamp": "2026-08-14T09:01:00+08:00", "memory_turns": 99, "memory_chars": 999},
         ],
@@ -91,6 +126,7 @@ def test_memory_usage_aggregates_lanes_and_p95_without_outcome_double_counting(t
     assert result["turns"] == 3
     assert result["items"] == 3
     assert result["chars"] == 60
+    assert result["digest_items"] == 1
     assert result["avg_chars_per_turn"] == 20
     assert result["p95_chars_per_turn"] == 30
     assert result["lanes"] == {
@@ -112,6 +148,7 @@ def test_memory_usage_is_explicitly_unavailable_when_journal_is_missing(tmp_path
         "turns": 0,
         "items": 0,
         "chars": 0,
+        "digest_items": 0,
         "avg_chars_per_turn": None,
         "p95_chars_per_turn": None,
         "lanes": {

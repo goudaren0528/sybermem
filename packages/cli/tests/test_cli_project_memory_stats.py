@@ -18,22 +18,22 @@ def _memory_stats_payload(project_root: Path) -> dict:
         "as_of": "2026-08-14T12:00:00+08:00",
         "totals": {
             "records": {"total": 4, "by_type": {"change": 2, "decision": 1, "requirement": 0, "bug": 1, "digest": 0, "theme-digest": 0}},
-            "recall": {"status": "available", "events": 5, "injected": 3, "abstained": 2, "recall_rate": 0.6, "malformed_lines": 0},
+            "recall": {"status": "available", "events": 5, "injected": 3, "digest_injected": 1, "abstained": 2, "recall_rate": 0.6, "malformed_lines": 0},
             "relevance": {"sessions": 2, "injected": 3, "measurable": 2, "unmeasurable": 1, "hit": 1, "precision": 0.5, "evidence_available": True},
-            "memory_usage": {"status": "available", "turns": 3, "items": 4, "chars": 80, "avg_chars_per_turn": 26.6666666667, "p95_chars_per_turn": 40, "lanes": {"recall": {"items": 1, "chars": 20}, "habit": {"items": 1, "chars": 15}, "norm": {"items": 1, "chars": 25}, "startup": {"items": 1, "chars": 20}}},
+            "memory_usage": {"status": "available", "turns": 3, "items": 4, "chars": 80, "digest_items": 1, "avg_chars_per_turn": 26.6666666667, "p95_chars_per_turn": 40, "lanes": {"recall": {"items": 1, "chars": 20}, "habit": {"items": 1, "chars": 15}, "norm": {"items": 1, "chars": 25}, "startup": {"items": 1, "chars": 20}}},
         },
         "windows": {
             "7d": {
                 "records": {"total": 2, "by_type": {"change": 1, "decision": 1, "requirement": 0, "bug": 0, "digest": 0, "theme-digest": 0}},
-                "recall": {"status": "available", "events": 2, "injected": 1, "abstained": 1, "recall_rate": 0.5, "match_classes": {"topic": 1}, "top_matched_records": [{"record_id": "change-a", "count": 2}], "abstain_reasons": {"no-high-signal-recall": 1}, "malformed_lines": 0},
+                "recall": {"status": "available", "events": 2, "injected": 1, "digest_injected": 1, "abstained": 1, "recall_rate": 0.5, "match_classes": {"topic": 1}, "top_matched_records": [{"record_id": "change-a", "count": 2}], "abstain_reasons": {"no-high-signal-recall": 1}, "malformed_lines": 0},
                 "relevance": {"sessions": 1, "injected": 1, "measurable": 1, "unmeasurable": 0, "hit": 1, "precision": 1.0, "evidence_available": True},
-                "memory_usage": {"status": "available", "turns": 2, "items": 2, "chars": 30, "avg_chars_per_turn": 15, "p95_chars_per_turn": 20, "lanes": {"recall": {"items": 1, "chars": 20}, "habit": {"items": 1, "chars": 10}, "norm": {"items": 0, "chars": 0}, "startup": {"items": 0, "chars": 0}}},
+                "memory_usage": {"status": "available", "turns": 2, "items": 2, "chars": 30, "digest_items": 1, "avg_chars_per_turn": 15, "p95_chars_per_turn": 20, "lanes": {"recall": {"items": 1, "chars": 20}, "habit": {"items": 1, "chars": 10}, "norm": {"items": 0, "chars": 0}, "startup": {"items": 0, "chars": 0}}},
             },
             "30d": {
                 "records": {"total": 4, "by_type": {"change": 2, "decision": 1, "requirement": 0, "bug": 1, "digest": 0, "theme-digest": 0}},
-                "recall": {"status": "available", "events": 5, "injected": 3, "abstained": 2, "recall_rate": 0.6, "match_classes": {"topic": 2, "record-id": 1}, "top_matched_records": [{"record_id": "change-a", "count": 3}], "abstain_reasons": {"no-high-signal-recall": 2}, "malformed_lines": 0},
+                "recall": {"status": "available", "events": 5, "injected": 3, "digest_injected": 1, "abstained": 2, "recall_rate": 0.6, "match_classes": {"topic": 2, "record-id": 1}, "top_matched_records": [{"record_id": "change-a", "count": 3}], "abstain_reasons": {"no-high-signal-recall": 2}, "malformed_lines": 0},
                 "relevance": {"sessions": 2, "injected": 3, "measurable": 2, "unmeasurable": 1, "hit": 1, "precision": 0.5, "evidence_available": True},
-                "memory_usage": {"status": "available", "turns": 3, "items": 4, "chars": 80, "avg_chars_per_turn": 26.6666666667, "p95_chars_per_turn": 40, "lanes": {"recall": {"items": 1, "chars": 20}, "habit": {"items": 1, "chars": 15}, "norm": {"items": 1, "chars": 25}, "startup": {"items": 1, "chars": 20}}},
+                "memory_usage": {"status": "available", "turns": 3, "items": 4, "chars": 80, "digest_items": 1, "avg_chars_per_turn": 26.6666666667, "p95_chars_per_turn": 40, "lanes": {"recall": {"items": 1, "chars": 20}, "habit": {"items": 1, "chars": 15}, "norm": {"items": 1, "chars": 25}, "startup": {"items": 1, "chars": 20}}},
             },
         },
         "recall_health": {"status": "healthy", "recall_rate": 0.5, "precision": 0.5, "hint": "Recent recall injection rate is healthy."},

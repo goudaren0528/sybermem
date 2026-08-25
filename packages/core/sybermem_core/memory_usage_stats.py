@@ -22,6 +22,7 @@ class MemoryUsageStats(TypedDict):
     turns: int
     items: int
     chars: int
+    digest_items: int
     avg_chars_per_turn: float | None
     p95_chars_per_turn: int | None
     lanes: dict[str, LaneStats]
@@ -32,6 +33,7 @@ class UsageTurn:
     timestamp: date
     items: int
     chars: int
+    digest_items: int
     lanes: dict[str, LaneStats]
 
 
@@ -126,6 +128,7 @@ def _aggregate(turns: list[UsageTurn], status: str) -> MemoryUsageStats:
         "turns": len(turns),
         "items": sum(turn.items for turn in turns),
         "chars": chars,
+        "digest_items": sum(turn.digest_items for turn in turns),
         "avg_chars_per_turn": chars / len(turns) if turns else None,
         "p95_chars_per_turn": nearest_rank_p95([turn.chars for turn in turns]),
         "lanes": lanes,
@@ -138,6 +141,7 @@ def _empty_stats(status: str) -> MemoryUsageStats:
         "turns": 0,
         "items": 0,
         "chars": 0,
+        "digest_items": 0,
         "avg_chars_per_turn": None,
         "p95_chars_per_turn": None,
         "lanes": {lane: {"items": 0, "chars": 0} for lane in LANES},
@@ -157,13 +161,14 @@ def _parse_turn(row: dict[str, object]) -> UsageTurn | None:
         return None
     timestamp = _parse_date(row.get("timestamp"))
     numeric = {key: _non_negative_int(row.get(key)) for key in ("total_items", "total_chars")}
+    digest_items = _non_negative_int(row.get("digest_items")) or 0
     if timestamp is None or numeric["total_items"] is None or numeric["total_chars"] is None:
         return None
     lanes = {
         lane: {"items": _non_negative_int(row.get(f"{lane}_items")) or 0, "chars": _non_negative_int(row.get(f"{lane}_chars")) or 0}
         for lane in LANES
     }
-    return UsageTurn(timestamp, numeric["total_items"], numeric["total_chars"], lanes)
+    return UsageTurn(timestamp, numeric["total_items"], numeric["total_chars"], digest_items, lanes)
 
 
 def _parse_outcome(row: dict[str, object]) -> UsageOutcome | None:
