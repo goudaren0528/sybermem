@@ -4,7 +4,7 @@ import { buildCompactionContext } from "./compaction"
 import { detectStaleSignal, parseIndex } from "./project_state"
 import { digestStatusText, memoryStatsText, resolveRoot } from "./runtime"
 import { digestBacklogToast, parseDigestBacklog } from "./digest_backlog_signal"
-import { loadNudgeState, saveNudgeState } from "./state"
+import { compactJsonlJournal, loadNudgeState, saveNudgeState } from "./state"
 import { appendRecallDebug } from "./recall_debug"
 import { captureRecordIntentWithCli } from "./record_intent"
 import { classifyPackets, collectPromptPackets, extractPromptText, injectStashedPromptPackets, RECALL_STASH, stashPromptPackets, type ChatMessageOutput, type SystemTransformOutput } from "./prompt_context"
@@ -83,6 +83,9 @@ async function flushSessionRelevance(args: PluginArgs, root: string, sessionID: 
   try {
     const activity = getSessionActivity(sessionID)
     await flushRecallOutcome(args.$, root, activity, sessionID)
+    compactJsonlJournal(root, ".memory-usage.jsonl", 200)
+    compactJsonlJournal(root, ".recall-outcomes.jsonl", 200)
+    compactJsonlJournal(root, ".recall-debug.jsonl", 200)
   } catch {
     // Relevance measurement is best-effort; swallow all errors.
   } finally {

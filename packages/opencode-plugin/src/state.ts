@@ -1,5 +1,5 @@
-import { existsSync, readFileSync, statSync, writeFileSync } from "fs"
-import { join } from "path"
+import { appendFileSync, existsSync, lstatSync, readFileSync, realpathSync, statSync, writeFileSync } from "fs"
+import { join, relative } from "path"
 
 export interface NudgeState {
   readonly lastFingerprint?: string
@@ -45,6 +45,31 @@ function parseNumberMap(raw: Record<string, unknown>): Readonly<Record<string, n
 const NUDGE_STATE_FILE = ".nudge-state.json"
 const LEGACY_NUDGE_STATE_FILE = ".opencode-nudge-state.json"
 const MAX_EXISTING_JSONL_BYTES = 1_000_000
+const MAX_JSONL_ENTRY_BYTES = 16_384
+
+function isInside(parent: string, child: string): boolean {
+  const rel = relative(parent, child)
+  return rel === "" || (!rel.startsWith("..") && !rel.includes(":"))
+}
+
+function safeJsonlPath(root: string, fileName: string): string | null {
+  if (fileName.includes("/") || fileName.includes("\\") || !fileName.endsWith(".jsonl")) return null
+  const memoryDir = join(root, ".sybermem")
+  const p = join(memoryDir, fileName)
+  try {
+    const dirStat = lstatSync(memoryDir)
+    if (!dirStat.isDirectory() || dirStat.isSymbolicLink()) return null
+    const realDir = realpathSync(memoryDir)
+    if (existsSync(p)) {
+      const fileStat = lstatSync(p)
+      if (!fileStat.isFile() || fileStat.isSymbolicLink()) return null
+      if (!isInside(realDir, realpathSync(p))) return null
+    }
+    return p
+  } catch {
+    return null
+  }
+}
 
 export function loadNudgeState(root: string): NudgeState {
   const p = join(root, ".sybermem", NUDGE_STATE_FILE)
@@ -73,10 +98,22 @@ export function saveNudgeState(root: string, state: NudgeState): void {
 }
 
 export function boundedJsonlAppend(root: string, fileName: string, entry: object, limit: number): void {
-  const p = join(root, ".sybermem", fileName)
   try {
-    const existing = existsSync(p) && statSync(p).size <= MAX_EXISTING_JSONL_BYTES ? readFileSync(p, "utf-8").split("\n").filter((line) => line.trim()) : []
-    existing.push(JSON.stringify(entry))
+    const p = safeJsonlPath(root, fileName)
+    if (!p) return
+    const line = JSON.stringify(entry)
+    if (Buffer.byteLength(line, "utf-8") > MAX_JSONL_ENTRY_BYTES) return
+    appendFileSync(p, `${line}\n`, "utf-8")
+  } catch {
+    // fail open
+  }
+}
+
+export function compactJsonlJournal(root: string, fileName: string, limit: number): void {
+  try {
+    const p = safeJsonlPath(root, fileName)
+    if (!p || limit <= 0 || statSync(p).size > MAX_EXISTING_JSONL_BYTES) return
+    const existing = readFileSync(p, "utf-8").split("\n").filter((line) => line.trim())
     writeFileSync(p, existing.slice(-limit).join("\n") + "\n", "utf-8")
   } catch {
     // fail open
