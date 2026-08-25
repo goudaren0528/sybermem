@@ -73,7 +73,7 @@ For each phase, run Steps 4–10 independently. This is the normal batch path �
    - Resolve the `source_records` project-relative paths for the phase: run `sybermem project coverage-hash --phase-id phase-NNN --format json`, which resolves the phase's covered record ids to real file paths (via frontmatter `record_id:`, never filename) and returns `{"source_records": [...], "coverage_hash": "..."}`. Use the returned `coverage_hash`.
    - If your `source_records` differ from the phase's covered set (e.g. explicit sources), pass them directly: `sybermem project coverage-hash --source-records "changes/x.md,bugs/y.md" --format json`.
    - If the CLI is unavailable, fall back to core semantics: for each project-relative path in `source_records`, sorted ascending, take the file's current bytes' SHA-256 hex (literal `<missing>` if absent), build `"{rel_path}:{sha256}"` lines, join with `\n`, and SHA-256 the UTF-8 bytes — but **prefer the CLI** so the value always matches `sybermem_core.digest_coverage.compute_coverage_hash`.
-8. **Write the digest file** — path: `.sybermem/digests/{YYYY-MM-DD}-{NNN}-{title}.md`. Use `.sybermem/templates/digest-template.md`. Fill `coverage_hash` with the value from Step 7a (never leave the `{{coverage_hash}}` placeholder).
+8. **Write the digest file** — path: `.sybermem/digests/{YYYY-MM-DD}-{NNN}-{title}.md`. Use `.sybermem/templates/digest-template.md`. Fill `coverage_hash` with the value from Step 7a (never leave the `{{coverage_hash}}` placeholder). Write `## Core Conclusions` as concise, standalone, source-aware durable facts. They are the compressed hot-path signal and may be injected into model-visible startup or compaction context, so each conclusion should still make sense when read alone.
 9. **Update INDEX.md** — insert row above `<!-- add new digest records here -->` in `## Phase Digests` table: `| NNN | YYYY-MM-DD | Title | <status> | X records | [link](digests/file.md) |`
 10. **Preserve Key Conclusions signal quality** — do not add to `## Key Conclusions` by default. Only add if the digest introduces a truly global project conclusion.
 11. **Archive source record conclusions** — after writing the digest, move the Key Conclusions of the source records to `## Archived Conclusions` in INDEX.md. Append `[compressed in digest-NNN]` to each archived line. This keeps Key Conclusions focused on current undigested work. Only move conclusions whose record ID is in the `source_records` list; leave other conclusions untouched.
@@ -95,6 +95,7 @@ If you catch yourself doing any of these, STOP:
 - Generating a second digest for the exact same source set
 - Skipping the overlap warning when source records partially overlap with an existing digest
 - Writing a digest that reads like a current-state summary instead of a durable conclusion
+- Writing `## Core Conclusions` as vague notes, open questions, or claims not grounded in the listed `source_records`
 - Leaving the `{{coverage_hash}}` placeholder unfilled, inventing a hash, or computing it over anything other than the exact `source_records` set (this silently defeats stale-digest detection)
 
 **All of these mean: go back to Step 2 and re-verify source coverage and phase status.**
