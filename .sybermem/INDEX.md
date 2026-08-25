@@ -22,6 +22,7 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 - [change-7f75f17f01cc4d249ca8468e7bbfec7d] #habit #opencode #ux — Habits were invisible because add_habit defaulted to compaction_ok while the prompt-time selector required prompt_ok_when_supported, and _terms\(\) never tokenized CJK so applies_to killed every Chinese context; fixed by defaulting to prompt-ok, CJK-aware weighted relevance, and a suggested_scope routing hint (2026-08-24)
 - [change-7fd560c9a8414c8b9cde8ac842fbad0e] #memory #observability #opencode #quality #security — Review Work required the memory-usage journal to be secure, bounded, append-only on the prompt hot path, and semantically limited to real memory turns before the observability rollout could be considered handoff-ready. (2026-08-25)
 - [change-878c029967b944cca3fc634c7148cf27] #codex #distribution #versioning — Codex additionalContext now carries explicit SyberMem markers and the distribution version is bumped to 0.1.1 so users can refresh project-local files after global updates. (2026-08-25)
+- [change-9a18342f07a64925bad69cbff5b47f89] #digest #recall #observability — Delivered current digest conclusion injection and digest usage observability across Codex, Claude templates, OpenCode, Core, and docs so stable phase conclusions become model-visible and measurable without adding new memory infrastructure. (2026-08-25)
 - [change-bcac35f53e004164adb47471d7cf094d] #norm #opencode #ux — Delivered norm P1 — per-prompt scoped-norm recall + compaction constitution reuse \(OpenCode\), memory-stats norm coverage, and digest-time emergent nomination of recurring constraints \(confirmation-first\) — so norms reach relevant work and recurring rules get proactively surfaced for crystallization (2026-08-24)
 - [change-c2be7cced7eb4250b288606869f1e726] #uninstall #distribution #safety — Added explicit project/global uninstall routing because users need safe natural-language scope selection while preserving project memory histories. (2026-08-25)
 - [change-e3777a9e3b784c43b6af93be99707348] #opencode #installer #windows — Added a Python-based SyberMem install/update path so Windows OpenCode users can refresh globally without spawning powershell.exe. (2026-08-25)
@@ -74,6 +75,7 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 | change-7f75f17f01cc4d249ca8468e7bbfec7d | 2026-08-24 | Make user habits perceptible at prompt time \(default prompt-ok, CJK match, scope routing\) | done | [link](changes/2026-08-24-change-7f75f17f01cc4d249ca8468e7bbfec7d-habit-prompt-time-perceptibility.md) |
 | change-7fd560c9a8414c8b9cde8ac842fbad0e | 2026-08-25 | Review fixes for OpenCode memory observability | done | [link](changes/2026-08-25-change-7fd560c9a8414c8b9cde8ac842fbad0e-memory-observability-review-fixes.md) |
 | change-878c029967b944cca3fc634c7148cf27 | 2026-08-25 | Codex context markers and 0.1.1 version rollout | active | [link](changes/2026-08-25-change-878c029967b944cca3fc634c7148cf27-codex-context-marker-version-bump.md) |
+| change-9a18342f07a64925bad69cbff5b47f89 | 2026-08-25 | Digest injection and observability rollout | done | [link](changes/2026-08-25-change-9a18342f07a64925bad69cbff5b47f89-digest-injection-and-observability.md) |
 | change-bcac35f53e004164adb47471d7cf094d | 2026-08-24 | Norm subsystem P1 — scoped recall, compaction constitution, memory-stats visibility, emergent nomination | done | [link](changes/2026-08-24-change-bcac35f53e004164adb47471d7cf094d-norm-p1-scoped-recall-nomination.md) |
 | change-c2be7cced7eb4250b288606869f1e726 | 2026-08-25 | Scoped uninstall CLI and natural-language uninstall skill | active | [link](changes/2026-08-25-change-c2be7cced7eb4250b288606869f1e726-scoped-uninstall.md) |
 | change-e3777a9e3b784c43b6af93be99707348 | 2026-08-25 | OpenCode Python update path for Windows PowerShell spawn failures | active | [link](changes/2026-08-25-change-e3777a9e3b784c43b6af93be99707348-opencode-python-update-path.md) |
@@ -120,18 +122,19 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 <!-- Auto-maintained: maps topic tags to record IDs for fast lookup -->
 - architecture: change-2011a3f2b21e40dbb926187ebae50cf8, change-3d8c9c844d5747c3b15e84838a2d4fe8, decision-c24f122fbe5d46ee8095022e6b8c53c8, decision-f780ec7166e14fc2ab1ac595c0edda03, norm-e86ae226dbbf4e28af3de8c1db92f552, requirement-75f7b0e98b7043eeac310fa2a36ba36d
 - codex: change-878c029967b944cca3fc634c7148cf27
-- digest: change-33b663865936415c9ae9a34e28f6ea6c, change-76481099f07c4f1f9de150a0281fb58f, change-f8bd388c7bac4ee584c68edc97951e18
+- digest: change-33b663865936415c9ae9a34e28f6ea6c, change-76481099f07c4f1f9de150a0281fb58f, change-9a18342f07a64925bad69cbff5b47f89, change-f8bd388c7bac4ee584c68edc97951e18
 - distribution: change-0c35875b8fde4feb93837ce354533b9b, change-13b0a327e1544f3e8e5ac5d3992c5c97, change-2b4df42e0ff942718e9afef5897ecc4c, change-2b9c79a39ea64b178c9902894cbd49fd, change-657dd8880ab24e889e1f3b2b1521ee3a, change-878c029967b944cca3fc634c7148cf27, change-c2be7cced7eb4250b288606869f1e726, decision-f780ec7166e14fc2ab1ac595c0edda03
 - documentation: change-f8bd388c7bac4ee584c68edc97951e18
 - habit: change-7f75f17f01cc4d249ca8468e7bbfec7d
 - installer: bug-17a87caf3b014254bdc0d284ad010540, change-e3777a9e3b784c43b6af93be99707348
 - memory: change-0638a1012020456193d3b469506151af, change-7fd560c9a8414c8b9cde8ac842fbad0e, decision-c24f122fbe5d46ee8095022e6b8c53c8, requirement-ffb8b8130ecd4d33b8a08cfbb9479b59
 - norm: change-2011a3f2b21e40dbb926187ebae50cf8, change-3d8c9c844d5747c3b15e84838a2d4fe8, change-bcac35f53e004164adb47471d7cf094d, change-f8bd388c7bac4ee584c68edc97951e18, requirement-75f7b0e98b7043eeac310fa2a36ba36d
-- observability: change-0638a1012020456193d3b469506151af, change-7fd560c9a8414c8b9cde8ac842fbad0e, requirement-ffb8b8130ecd4d33b8a08cfbb9479b59
+- observability: change-0638a1012020456193d3b469506151af, change-7fd560c9a8414c8b9cde8ac842fbad0e, change-9a18342f07a64925bad69cbff5b47f89, requirement-ffb8b8130ecd4d33b8a08cfbb9479b59
 - opencode: bug-17a87caf3b014254bdc0d284ad010540, change-0638a1012020456193d3b469506151af, change-2011a3f2b21e40dbb926187ebae50cf8, change-33b663865936415c9ae9a34e28f6ea6c, change-76481099f07c4f1f9de150a0281fb58f, change-7f75f17f01cc4d249ca8468e7bbfec7d, change-7fd560c9a8414c8b9cde8ac842fbad0e, change-bcac35f53e004164adb47471d7cf094d, change-e3777a9e3b784c43b6af93be99707348, requirement-75f7b0e98b7043eeac310fa2a36ba36d, requirement-ffb8b8130ecd4d33b8a08cfbb9479b59
 - process: norm-e86ae226dbbf4e28af3de8c1db92f552
 - qa: change-13b0a327e1544f3e8e5ac5d3992c5c97, change-2b4df42e0ff942718e9afef5897ecc4c
 - quality: bug-146ffbf8c1d9415d9708e8f18b003971, change-7fd560c9a8414c8b9cde8ac842fbad0e
+- recall: change-9a18342f07a64925bad69cbff5b47f89
 - refactor: change-0c35875b8fde4feb93837ce354533b9b, change-2b9c79a39ea64b178c9902894cbd49fd, change-657dd8880ab24e889e1f3b2b1521ee3a
 - retrieval: bug-146ffbf8c1d9415d9708e8f18b003971, decision-c24f122fbe5d46ee8095022e6b8c53c8
 - safety: change-c2be7cced7eb4250b288606869f1e726
