@@ -98,16 +98,7 @@ implements: [requirement-002]
 - workspace search 支持项目、类型和状态过滤
 - index 缺失、schema 过期或 stale 时给出恢复提示
 - portfolio 视图：`sybermem portfolio`
-
-### Team memory
-
-- Team repo 初始化：`sybermem team init`
-- 发布前只读 preview：`sybermem publish status --preview`
-- 使用 preview hash 发布，避免基于过期预览写入
-- Team overview 自动更新
-- Team management summary：`sybermem team summary`
-- phase / theme digest 历史同步到 Team repo
-- 对应 skill：`/sybermem-team-publish`、`/sybermem-team-summary`
+- 跨项目组合视图：`sybermem portfolio` 基于 Hub registry 只读汇总各已注册项目的阶段、未决 bug/需求、digest 覆盖与最近记录日期（不需要单独的 Team 仓库或发布流程）
 
 ### User Habit Memory
 
@@ -121,7 +112,7 @@ implements: [requirement-002]
 - 独立醒目的注入提示：OpenCode 里 recall / habit / 项目规范各弹独立 toast——recall 用 `⭐`，应用的用户习惯用 `🧠`，应用的项目规范用 `📏`；捕获到候选时弹 scope 感知的 `💡`（个人习惯引导到 `/sybermem-habit`，项目约定引导到 `/sybermem-record`，模糊时追问）
 - 感知层：`sybermem habit awareness` 及 OpenCode 首轮 startup context 展示 active 习惯数量、类型分布与是否有待确认候选（只报数量，不暴露 habit 内容，也不与逐 prompt 提醒重复）
 - 保守门槛：只注入 active、高置信、未被排除、与上下文直接相关的习惯，最多 3 条
-- 默认不进入项目 `.sybermem/` records，也不发布到 Team memory；个人偏好 → habit，绑定的项目规则 → 固化为 `norm`（见 Project Norms）
+- 默认不进入项目 `.sybermem/` records；个人偏好 → habit，绑定的项目规则 → 固化为 `norm`（见 Project Norms）
 
 ## CLI 与 Skill 的边界
 
@@ -129,7 +120,7 @@ SyberMem 有两类执行路径，可靠性不同：
 
 | 路径 | 代表能力 | 说明 |
 |---|---|---|
-| CLI / Core | `sybermem resume`、`search`、`next-step`、`portfolio`、`index build`、`project index build/check`、`project memory-stats`、`record id`、`habit add/list/search/pause/delete/remind/inject`、`digest status/latest`、`norms list/nominate/doctor`、`team init/summary`、`publish status`、`project uninstall` | 程序执行，可脚本化，适合确定性查询和发布流程 |
+| CLI / Core | `sybermem resume`、`search`、`next-step`、`portfolio`、`index build`、`project index build/check`、`project memory-stats`、`record id`、`habit add/list/search/pause/delete/remind/inject`、`digest status/latest`、`norms list/nominate/doctor`、`project uninstall` | 程序执行，可脚本化，适合确定性查询 |
 | Skill 编排 | `/sybermem-record`、`/sybermem-habit`、`/sybermem-link`、`/sybermem-digest`、`/sybermem-theme-digest`、`/sybermem-phase-analyze` | 由 AI 按 skill 指令编辑 `.sybermem/` Markdown 或调用用户级 habit CLI，适合需要判断和整理的工作 |
 
 `sybermem record id --type <change|decision|requirement|bug>` 只生成 canonical record ID；完整 record 创建仍通过 `/sybermem-record` 完成。
@@ -210,12 +201,10 @@ claude --plugin-dir .
 - `sybermem norms list/nominate/doctor`：查看项目规范宪法、提名重复约束、检测同 scope 冲突
 - `/sybermem-digest`：沉淀稳定阶段结论
 - `/sybermem-theme-digest`：沉淀跨阶段主题结论
-- `/sybermem-team-publish`：preview、review 后发布到 Team memory
 
-### 管理者 / 管理 agent
+### 跨项目视图
 
-- `/sybermem-team-summary`：生成 Team 管理摘要
-- 阅读 Team repo 中的 `dashboards/current-overview.md` 和 `latest-management-summary.md`
+- `sybermem portfolio`：只读汇总各已注册项目（阶段、未决 bug/需求、digest 覆盖、最近记录日期）
 
 ### 不确定下一步时
 
@@ -234,17 +223,11 @@ claude --plugin-dir .
 - 项目内检索默认基于已解析 Markdown records 的词法匹配和打分；需要跨项目搜索时使用 workspace index。
 - 可选的 `SYBERMEM_SEMANTIC_RECALL=1` 会启用本地 char n-gram 召回补充，用于显式检索，不会自动注入每轮提示。
 
-## Team workflow
+## 跨项目协作
 
-推荐路径：
+团队协作直接通过 Git 共享每个仓库的 `.sybermem/`：任何人 clone/pull 后即获得完整的项目工程记忆，agent hooks/plugin 在本地开发时自动应用。需要跨多个仓库的只读组合视图时，用 `sybermem portfolio`（基于 Hub registry，无需单独的 Team 仓库或发布流程）。
 
-1. 在项目内持续 record / digest
-2. 用 `/sybermem-team-publish` 或 `sybermem publish status --preview --format json` 生成只读 preview
-3. review source revision、source hash、freshness、conflicts 和 review-required 状态
-4. 使用 preview hash 发布
-5. Team overview 自动更新
-6. 用 `/sybermem-team-summary` 或 `sybermem team summary` 生成管理摘要
-7. 需要细节时下钻到完整 digest 历史
+> 注：早期版本的独立 "Team memory" 发布子系统（`sybermem team`/`publish`、`/sybermem-team-*`）已移除——对"单团队共享单仓库 + Git"的工作流它是冗余的（见 CHANGELOG）。现有的外部 Team 仓库和 `.sybermem/` 历史不受影响。
 
 ## 仓库结构
 
@@ -253,7 +236,7 @@ claude --plugin-dir .
 hooks/                               # Claude Code hook 声明与 delegator
 skills/                              # Plugin-facing skills tree
 packages/claude-skills/              # Skills 分发源
-packages/core/                       # Core memory / Team publication logic
+packages/core/                       # Core memory / norm & digest governance logic
 packages/cli/                        # sybermem CLI
 packages/opencode-plugin/            # OpenCode plugin
 .codex-plugin/                       # Codex marketplace/entry metadata
