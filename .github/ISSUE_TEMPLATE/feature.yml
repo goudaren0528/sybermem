@@ -24,7 +24,6 @@ body:
       options:
         - Project (records / resume / search / digest)
         - Hub (registry / portfolio / workspace search)
-        - Team (publish / summary)
         - CLI
         - Hooks
         - Distribution / install
