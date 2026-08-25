@@ -8,7 +8,7 @@ from . import next_step_router
 from .digest_sources import latest_phase_digest, latest_theme_digest
 from .records import iter_record_files, parse_project_yaml, parse_record_file
 from .retrieval import classify_authority, classify_source_kind, derive_summary
-from .status import project_status, publication_readiness
+from .status import project_status
 
 ResumeMode = Literal["fast", "standard", "deep"]
 
@@ -52,11 +52,8 @@ def build_resume_checkpoint(project_root: Path, mode: ResumeMode = "fast") -> di
 
     status = project_status(root)
     signals = _resume_signals(root, status)
-    readiness = publication_readiness(root)
     next_action = next_step_router.recommend_next_step_read_only(
         root,
-        status=status,
-        readiness=readiness,
         phase_digest=signals.phase_digest_path,
         theme_digest=signals.theme_digest_path,
         phase_state=signals.phase_state,

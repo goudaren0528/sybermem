@@ -44,7 +44,6 @@ def test_record_candidate_wins_before_digest(tmp_path: Path) -> None:
     # When: the shared read-only router chooses one next action
     step = recommend_next_step_read_only(
         project_root,
-        readiness={"enough_material": True},
         phase_digest=None,
         theme_digest=None,
         commit_gap=5,
@@ -162,7 +161,6 @@ def test_backlog_rerecommends_digest_on_already_digested_project(tmp_path: Path)
     # When: a phase digest already exists but backlog is at/above the threshold
     step = recommend_next_step_read_only(
         project_root,
-        readiness={"enough_material": True},
         phase_digest="digests/2026-08-01-001-first.md",
         theme_digest=None,
         commit_gap=0,
@@ -175,16 +173,15 @@ def test_backlog_rerecommends_digest_on_already_digested_project(tmp_path: Path)
     assert "not covered by any digest" in step["reason"]
 
 
-def test_first_digest_uses_record_count_not_publish_readiness(tmp_path: Path) -> None:
+def test_first_digest_uses_digest_record_threshold(tmp_path: Path) -> None:
     # Given: a project with no digest and enough total records to be worth compressing
     project_root = tmp_path / "project"
     project_root.mkdir()
     write_project(project_root)
 
-    # When: no phase digest and backlog_total >= threshold (even if publish readiness is False)
+    # When: no phase digest and backlog_total >= the digest-specific threshold
     step = recommend_next_step_read_only(
         project_root,
-        readiness={"enough_material": False},
         phase_digest=None,
         theme_digest=None,
         commit_gap=0,
@@ -193,21 +190,20 @@ def test_first_digest_uses_record_count_not_publish_readiness(tmp_path: Path) ->
         backlog_total=6,
     )
 
-    # Then: recommends the first digest based on record accumulation, not publish readiness
+    # Then: recommends the first digest based on record accumulation
     assert step["action"] == "/sybermem-digest"
     assert "no digest yet" in step["reason"]
 
 
-def test_first_digest_not_recommended_below_record_threshold(tmp_path: Path) -> None:
+def test_first_digest_not_recommended_below_digest_threshold(tmp_path: Path) -> None:
     # Given: a project with no digest but only a couple of records
     project_root = tmp_path / "project"
     project_root.mkdir()
     write_project(project_root)
 
-    # When: total records below the digest threshold, even with publish readiness True
+    # When: total records are below the digest threshold
     step = recommend_next_step_read_only(
         project_root,
-        readiness={"enough_material": True},
         phase_digest=None,
         theme_digest=None,
         commit_gap=0,
@@ -229,7 +225,6 @@ def test_backlog_below_threshold_does_not_rerecommend_digest(tmp_path: Path) -> 
     # When: backlog is below the threshold
     step = recommend_next_step_read_only(
         project_root,
-        readiness={"enough_material": True},
         phase_digest="digests/2026-08-01-001-first.md",
         theme_digest=None,
         commit_gap=0,

@@ -6,7 +6,6 @@ import subprocess
 
 from .records import iter_record_files, parse_project_yaml, parse_record_file
 from .retrieval import classify_authority, classify_source_kind
-from .status import project_status, publication_readiness
 from .digest_sources import latest_phase_digest, latest_theme_digest
 from .digest_governance import digest_backlog
 from .record_intent import RecordCandidate, classify_record_intent, route_record_candidate
@@ -81,8 +80,6 @@ def _count_commits_since_last_record(root: Path) -> int:
 
 
 def recommend_next_step(root: Path) -> dict[str, str]:
-    status = project_status(root)
-    readiness = publication_readiness(root)
     phase_digest = latest_phase_digest(root)
     theme_digest = latest_theme_digest(root)
     # Compute phase freshness here so the CLI `next-step` path uses the same
@@ -93,8 +90,6 @@ def recommend_next_step(root: Path) -> dict[str, str]:
 
     first_pass = recommend_next_step_read_only(
         root,
-        status=status,
-        readiness=readiness,
         phase_digest=phase_digest,
         theme_digest=theme_digest,
         phase_state=phase_state,
@@ -106,8 +101,6 @@ def recommend_next_step(root: Path) -> dict[str, str]:
 
     return recommend_next_step_read_only(
         root,
-        status=status,
-        readiness=readiness,
         phase_digest=phase_digest,
         theme_digest=theme_digest,
         phase_state=phase_state,
@@ -120,8 +113,6 @@ def recommend_next_step(root: Path) -> dict[str, str]:
 def recommend_next_step_read_only(
     root: Path,
     *,
-    status: dict | None = None,
-    readiness: dict | None = None,
     phase_digest: str | None = None,
     theme_digest: str | None = None,
     commit_gap: int | None = None,
@@ -130,8 +121,6 @@ def recommend_next_step_read_only(
     backlog_uncovered: int | None = None,
     backlog_total: int | None = None,
 ) -> dict[str, str]:
-    status = status or project_status(root)
-    readiness = readiness or publication_readiness(root)
     phase_digest = latest_phase_digest(root) if phase_digest is None else phase_digest
     theme_digest = latest_theme_digest(root) if theme_digest is None else theme_digest
     if backlog_uncovered is None or backlog_total is None:
