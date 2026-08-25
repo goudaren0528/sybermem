@@ -8,7 +8,9 @@ import {
   recordInjectedRecords,
   recordToolExecution,
   resetSessionActivity,
+  recordMemoryUsage,
 } from "../src/session_activity"
+import type { MemoryUsageEntry } from "../src/memory_usage"
 
 describe("session activity", () => {
   it("accumulates edit frequency per tracked file and normalizes separators", () => {
@@ -93,6 +95,51 @@ describe("session activity", () => {
 
       // Then
       expect(getSessionActivity(id).lastToolSignal).toBe("tests_passed")
+    } finally {
+      resetSessionActivity(id)
+    }
+  })
+
+  it("accumulates model-visible memory measurements from the Phase 1 usage entry", () => {
+    // Given: two actual model-visible usage entries from separate transforms
+    const id = `s-${crypto.randomUUID()}`
+    const first: MemoryUsageEntry = {
+      schema_version: 1,
+      timestamp: "2026-08-25T12:00:00.000Z",
+      host: "opencode",
+      session_id: id,
+      total_items: 4,
+      total_chars: 200,
+      recall_items: 2,
+      recall_chars: 100,
+      habit_items: 1,
+      habit_chars: 30,
+      norm_items: 1,
+      norm_chars: 40,
+      startup_items: 0,
+      startup_chars: 0,
+      injected_ids: ["change-a"],
+      startup_present: false,
+    }
+    const second: MemoryUsageEntry = { ...first, total_items: 2, total_chars: 80, recall_items: 1, recall_chars: 50, habit_items: 0, habit_chars: 0, norm_items: 0, norm_chars: 0, startup_items: 1, startup_chars: 30, startup_present: true }
+    try {
+      // When
+      recordMemoryUsage(id, first)
+      recordMemoryUsage(id, second)
+
+      // Then: counters are summed without re-parsing rendered prompt text
+      const activity = getSessionActivity(id)
+      expect(activity.memoryTurns).toBe(2)
+      expect(activity.memoryItems).toBe(6)
+      expect(activity.memoryChars).toBe(280)
+      expect(activity.recallItems).toBe(3)
+      expect(activity.recallChars).toBe(150)
+      expect(activity.habitItems).toBe(1)
+      expect(activity.habitChars).toBe(30)
+      expect(activity.normItems).toBe(1)
+      expect(activity.normChars).toBe(40)
+      expect(activity.startupItems).toBe(1)
+      expect(activity.startupChars).toBe(30)
     } finally {
       resetSessionActivity(id)
     }
