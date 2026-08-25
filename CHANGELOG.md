@@ -20,6 +20,7 @@
 - Candidate-only User Habit Memory intent capture: OpenCode `chat.message` classifies reusable-preference prompts and calls `sybermem habit intent --prompt`, writing a candidate to the user-level `~/.sybermem/.habit-intent.json`. It never creates an active habit and never persists secrets/injection text; `/sybermem-habit` confirms a pending candidate into a habit in one step and then clears it. New CLI: `sybermem habit intent`, `intent-status`, `intent-clear`, `awareness`.
 - Distinct habit injection visibility on OpenCode: applied user habits now get their own `🧠` toast, separate from the recall `⭐` toast, and a captured candidate raises a `💡` toast.
 - User-habit awareness surface: `sybermem habit awareness` and the OpenCode first-turn startup context report active-habit counts, type distribution, and a pending-candidate flag (counts only, never habit statements, no duplication of prompt-time reminders).
+- Scoped uninstall: `sybermem uninstall --scope project|global` and `/sybermem-uninstall` separate project-level deactivation from global removal, ask when natural-language scope is unclear, and preserve project `.sybermem/` histories.
 
 ### Removed (breaking)
 - The standalone **Team memory** publication subsystem has been removed. Removed CLI: `sybermem team init`, `sybermem team summary`, `sybermem publish status`. Removed skills: `/sybermem-team-publish`, `/sybermem-team-summary`. Removed core modules: `team`, `team_summary`, `publish`, `publish_bootstrap`, `publish_render`, `publish_sources`.
@@ -34,3 +35,4 @@
 - Codex plugin metadata and platform docs now describe user-skill support plus bounded managed hooks; hidden auto-resume and broad runtime automation remain unsupported.
 - Public install docs now describe OpenCode and Codex prompt-time support accurately: OpenCode supports project recall plus habit reminders through its chat transform hooks, while Codex supports startup context through `SessionStart` and prompt recall/habit reminders through `UserPromptSubmit` `additionalContext`.
 - OpenCode plugin source is split under `packages/opencode-plugin/src/` and bundled back to `packages/opencode-plugin/sybermem.ts` for installer compatibility.
+- Managed uninstall manifest now separates active `skills` from `retired_skills`, while the remover still cleans both so old users shed retired Team skills on update/uninstall.
