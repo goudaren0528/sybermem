@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Literal, TypedDict
 
 from . import next_step_router
-from .publish import latest_phase_digest, latest_theme_digest
+from .digest_sources import latest_phase_digest, latest_theme_digest
 from .records import iter_record_files, parse_project_yaml, parse_record_file
 from .retrieval import classify_authority, classify_source_kind, derive_summary
 from .status import project_status, publication_readiness

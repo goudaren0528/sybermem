@@ -10,7 +10,7 @@ from .project import read_team_from_project_yaml
 from .records import iter_record_files, parse_project_yaml, parse_record_file
 from .retrieval import classify_authority, classify_source_kind
 from .status import project_status, publication_readiness
-from .publish import latest_phase_digest, latest_theme_digest
+from .digest_sources import latest_phase_digest, latest_theme_digest
 from .digest_governance import digest_backlog
 from .record_intent import RecordCandidate, classify_record_intent, route_record_candidate
 

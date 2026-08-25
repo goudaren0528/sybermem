@@ -6,7 +6,8 @@ from pathlib import Path
 
 from .project import resolve_project_root, read_team_from_project_yaml, write_team_to_project_yaml
 from .publish_render import parse_published_status, read_team_yaml, render_current_status, render_project_card, render_team_overview
-from .publish_sources import latest_phase_digest, latest_theme_digest, sync_markdown_history
+from .digest_sources import latest_phase_digest, latest_theme_digest
+from .publish_sources import sync_markdown_history
 from .records import parse_project_yaml
 from .status import build_publication_preview, project_status, publication_readiness, team_publication_metadata
 
