@@ -60,9 +60,9 @@ Goal: add an OpenCode-first observability loop for actual memory injection usage
 
 ### 6. Final Verification and Review Work
 
-- [ ] Run all relevant OpenCode plugin, Core, and CLI tests.
-- [ ] Run diagnostics on every changed source file and verify build/type-check success where applicable.
-- [ ] Manually exercise one injected turn and one abstained turn; inspect the usage log, session outcome, user summary, and `project memory-stats` output.
+- [x] Run all relevant OpenCode plugin, Core, and CLI tests.
+- [x] Run diagnostics on every changed source file and verify build/type-check success where applicable.
+- [x] Manually exercise one injected turn and one abstained turn; inspect the usage log, session outcome, user summary, and `project memory-stats` output.
 - [ ] Run Review Work after engineering is complete.
 - [ ] Resolve every blocking Review Work finding and rerun affected verification.
 - [ ] Confirm the final worktree contains no unintended changes and all engineering phases were committed atomically.
