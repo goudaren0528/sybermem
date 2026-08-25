@@ -7,7 +7,7 @@ import { digestBacklogToast, parseDigestBacklog } from "./digest_backlog_signal"
 import { loadNudgeState, saveNudgeState } from "./state"
 import { appendRecallDebug } from "./recall_debug"
 import { captureRecordIntentWithCli } from "./record_intent"
-import { classifyPackets, collectPromptPackets, extractPromptText, injectStashedPromptPackets, RECALL_STASH, stashPromptPackets, type ChatMessageOutput, type InjectionSummary, type SystemTransformOutput } from "./prompt_context"
+import { classifyPackets, collectPromptPackets, extractPromptText, injectStashedPromptPackets, RECALL_STASH, stashPromptPackets, type ChatMessageOutput, type SystemTransformOutput } from "./prompt_context"
 import { buildStartupContext, consumePendingStartup, markPendingStartup, prependStartupContext } from "./startup_context"
 import { lowSignalRecallToast, parseRecallHealth } from "./recall_health_signal"
 import { extractEditedFile, getSessionActivity, recordEditedFile, recordInjectedRecords, recordMemoryUsage, recordToolExecution, recordTodoUpdate, resetSessionActivity } from "./session_activity"
@@ -16,31 +16,10 @@ import { captureHabitIntentWithCli } from "./habit_intent"
 import { updateNudgeMessage } from "./version_signal"
 import { applyReplyMarker, armReplyMarker } from "./reply_marker"
 import { appendMemoryUsage } from "./memory_usage"
+import { buildPromptInjectionToastSummary, habitCandidateToast, promptInjectionToastMessage, throttledToast, type ToastClient } from "./injection_toast"
 
-interface ToastClient { readonly tui: { readonly showToast: (input: { readonly body: { readonly message: string; readonly variant: "info" } }) => Promise<void> } }
 interface PluginArgs { readonly $: import("./runtime").Shell; readonly directory: string; readonly client: ToastClient }
 interface EventInput { readonly event: { readonly type: string; readonly properties?: { readonly info?: { readonly id?: string } } } }
-
-async function showToast(client: ToastClient, message: string): Promise<void> {
-  try {
-    await client.tui.showToast({ body: { message, variant: "info" } })
-  } catch {
-    // Fail open: toasts are optional UX, never block the prompt flow.
-  }
-}
-
-// In-memory throttle keyed by message type so we never toast-spam the TUI. The
-// plugin process lives for the session; a fresh process resets the counter.
-const LAST_TOAST = new Map<string, number>()
-const TOAST_COOLDOWN_MS = 30_000
-
-function throttledToast(client: ToastClient, key: string, message: string): void {
-  const now = Date.now()
-  const last = LAST_TOAST.get(key) ?? 0
-  if (now - last < TOAST_COOLDOWN_MS) return
-  LAST_TOAST.set(key, now)
-  void showToast(client, message)
-}
 
 function readSessionID(source: unknown): string {
   if (typeof source !== "object" || source === null) return ""
@@ -49,44 +28,6 @@ function readSessionID(source: unknown): string {
     if (typeof value === "string" && value) return value
   }
   return ""
-}
-
-function recallToastMessage(summary: InjectionSummary): string | null {
-  if (summary.recallCount === 0) return null
-  const n = summary.recallCount
-  return `⭐ SyberMem 记忆已加入本轮回答参考：${n} 条相关记录 (recall)`
-}
-
-// Habit injection gets its own distinct, brain-marked toast so an applied user
-// habit is as perceptible as recall — not buried inside a combined recall notice.
-function habitToastMessage(summary: InjectionSummary): string | null {
-  if (summary.habitCount === 0) return null
-  const n = summary.habitCount
-  // Keep the English "applied ... user habit reminder(s)" phrasing so the toast
-  // stays a DISTINCT applied-habit signal (also asserted by the package guard).
-  return `🧠 SyberMem 已应用你的 ${n} 条习惯 (applied ${n} user habit reminder${n === 1 ? "" : "s"})`
-}
-
-// Applied scoped-norm toast: a binding project norm relevant to this prompt's area was
-// injected. Distinct marker so a governing norm is as perceptible as recall/habit.
-function normToastMessage(summary: InjectionSummary): string | null {
-  if (summary.normCount === 0) return null
-  const n = summary.normCount
-  return `📏 SyberMem 已应用 ${n} 条相关项目规范 (applied ${n} project norm${n === 1 ? "" : "s"})`
-}
-
-// Scope-aware "save this preference" hint. When Core suggests where the preference
-// belongs (cross-project user habit vs a project decision/requirement record), the
-// toast routes the user to the right home; otherwise it stays neutral and defers the
-// user-vs-project question to the /sybermem-habit confirm step.
-function habitCandidateToast(habitIntent: import("./habit_intent").HabitIntentResult): string {
-  if (habitIntent.captured && habitIntent.suggestedScope === "project") {
-    return "💡 SyberMem 发现一条像是本项目的约定 — 可用 /sybermem-record 记为决策/需求，或 /sybermem-habit 确认"
-  }
-  if (habitIntent.captured && habitIntent.suggestedScope === "user") {
-    return "💡 SyberMem 发现一条可复用的个人习惯 — 需要的话用 /sybermem-habit 一步确认"
-  }
-  return "💡 SyberMem 发现一条可复用的偏好/规范 — 需要的话用 /sybermem-habit 一步确认（会问你记成习惯还是项目约定）"
 }
 
 async function handleSessionCreated(args: PluginArgs, root: string, sessionID: string): Promise<void> {
@@ -262,18 +203,9 @@ export const SyberMemPlugin: Plugin = async ({ $, directory, client }: PluginArg
       }
       const usageEntry = appendMemoryUsage(root, { sessionID: sessionID ?? "", packets, startup })
       if (sessionID) recordMemoryUsage(sessionID, usageEntry)
-      // Toast at injection time (not capture time) so the user only sees a
-      // notice when context actually reached the model. Recall and habit get
-      // SEPARATE, distinctly-marked toasts so an applied user habit is as
-      // perceptible as recall, instead of being merged into one notice. The
-      // habit-candidate case stays on chat.message's own "save this" toast.
-      if (!summary.habitCandidate) {
-        const recallMessage = recallToastMessage(summary)
-        if (recallMessage) throttledToast(args.client, "recall-injected", recallMessage)
-        const habitMessage = habitToastMessage(summary)
-        if (habitMessage) throttledToast(args.client, "habit-injected", habitMessage)
-        const normMessage = normToastMessage(summary)
-        if (normMessage) throttledToast(args.client, "norm-injected", normMessage)
+      const promptInjectionToast = buildPromptInjectionToastSummary(summary, usageEntry)
+      if (promptInjectionToast) {
+        throttledToast(args.client, "prompt-memory-injected", promptInjectionToastMessage(promptInjectionToast))
       }
       // Arm the opt-in reply marker for this turn (no-op unless SYBERMEM_REPLY_MARKER
       // is set and material was actually injected).
