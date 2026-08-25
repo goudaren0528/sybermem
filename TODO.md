@@ -56,15 +56,25 @@ Goal: add an OpenCode-first observability loop for actual memory injection usage
 - [x] Document `.memory-usage.jsonl`, privacy boundaries, fail-open behavior, and the meaning of Edit Alignment in README/CLI docs.
 - [x] Create a SyberMem change record linked with `implements: [requirement-ffb8b8130ecd4d33b8a08cfbb9479b59]`.
 - [x] Build and check the derived SyberMem INDEX.
-- [ ] Commit: `docs(memory): document injection observability`.
+- [x] Commit: `docs(memory): document injection observability`.
 
-### 6. Final Verification and Review Work
+### 6. Review Work Blocker Fixes
+
+- [x] Move usage journal retention compaction out of the OpenCode system-transform hot path; append metadata rows only during the transform and compact at idle.
+- [x] Reject symlinked `.sybermem` journal destinations and oversized JSONL entries fail-open.
+- [x] Bound `session_id`, packet scan volume, and injected ID cardinality; extract IDs only from structured memory item lines.
+- [x] Write memory `session_outcome` rows only for sessions that had actual model-visible memory turns.
+- [x] Treat unreadable, non-UTF-8, or oversized Core usage journals as `unavailable` rather than crashing `project memory-stats`.
+- [x] Update public docs that still described separate recall/habit/norm success toasts.
+- [x] Record the Review Work blocker resolution as project engineering memory.
+
+### 7. Final Verification and Review Work
 
 - [x] Run all relevant OpenCode plugin, Core, and CLI tests.
 - [x] Run diagnostics on every changed source file and verify build/type-check success where applicable.
 - [x] Manually exercise one injected turn and one abstained turn; inspect the usage log, session outcome, user summary, and `project memory-stats` output.
 - [ ] Run Review Work after engineering is complete.
-- [ ] Resolve every blocking Review Work finding and rerun affected verification.
+- [x] Resolve every blocking Review Work finding and rerun affected verification.
 - [ ] Confirm the final worktree contains no unintended changes and all engineering phases were committed atomically.
 
 ### Deferred
