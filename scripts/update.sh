@@ -23,6 +23,10 @@ LAUNCHER_PATH="$LAUNCHER_DIR/launch_record_change_on_stop.py"
 LAUNCHER_SOURCE="$ADR_PATH/scripts/global-stop-hook-launcher.py"
 SESSION_LAUNCHER_SOURCE="$ADR_PATH/scripts/global-session-start-launcher.py"
 SESSION_LAUNCHER_PATH="$LAUNCHER_DIR/launch_session_start_context.py"
+MANIFEST_SOURCE="$ADR_PATH/scripts/managed-install.json"
+MANIFEST_PATH="$LAUNCHER_DIR/managed-install.json"
+REMOVER_SOURCE="$ADR_PATH/scripts/safe-managed-remove.py"
+REMOVER_PATH="$LAUNCHER_DIR/safe-managed-remove.py"
 CLI_DIR="$HOME/.claude/sybermem/cli"
 CLI_VENV="$CLI_DIR/venv"
 CLI_WRAPPER="$CLI_DIR/sybermem"
@@ -33,21 +37,14 @@ LEGACY_LOCAL_SKILLS="$ADR_PATH/.claude/skills"
 echo "=== SyberMem 更新 ==="
 
 safe_remove_managed_dir() {
-    local root="$1" target="$2"
-    [ -e "$target" ] || [ -L "$target" ] || return 0
-    [ ! -L "$root" ] || { echo "Refusing linked managed root: $root" >&2; return 1; }
-    local root_real parent_real
-    root_real="$(cd "$root" && pwd -P)" || return 1
-    parent_real="$(cd "$(dirname "$target")" && pwd -P)" || return 1
-    [ "$parent_real" = "$root_real" ] || { echo "Refusing to remove path outside managed root: $target" >&2; return 1; }
-    if [ -L "$target" ]; then rm -f -- "$target"; else rm -rf -- "$target"; fi
+    python "$REMOVER_SOURCE" child --root "$1" --name "$(basename "$2")"
 }
 
 sync_skills() {
     local target="$1"
     local label="$2"
     mkdir -p "$target"
-    for retired in init-project record summary sybermem-phase-confirm sybermem-team-publish sybermem-team-summary; do
+    for retired in sybermem-phase-confirm sybermem-team-publish sybermem-team-summary; do
         safe_remove_managed_dir "$target" "$target/$retired"
     done
     for skill in sybermem-init-project sybermem-record sybermem-summary sybermem-resume sybermem-digest sybermem-phase-analyze using-sybermem sybermem-update sybermem-search sybermem-link sybermem-theme-digest sybermem-habit; do
@@ -156,6 +153,8 @@ PY
 install_codex_user_prompt_hook
 
 mkdir -p "$LAUNCHER_DIR"
+cp "$MANIFEST_SOURCE" "$MANIFEST_PATH"
+cp "$REMOVER_SOURCE" "$REMOVER_PATH"
 cp "$LAUNCHER_SOURCE" "$LAUNCHER_PATH"
 chmod +x "$LAUNCHER_PATH"
 echo "  [Global] 已安装 stop hook launcher: $LAUNCHER_PATH"
