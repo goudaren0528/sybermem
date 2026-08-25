@@ -113,7 +113,7 @@ implements: [requirement-002]
 - 手动/compaction 注入：`sybermem habit inject --context planning --format markdown`
 - 默认 prompt-time 可感知：`habit add` 默认 `injection_policy=prompt_ok_when_supported`，确认过的习惯在支持的宿主上开箱即可在逐 prompt 注入（弹 `🧠`），无需额外参数；相关性用 CJK 感知的加权匹配（命中 `applies_to` tag 为强信号，否则需 ≥2 个多字符语句重叠），中文上下文可命中，无关习惯保持静默
 - 被动候选捕获（仅候选，永不自动写入）：OpenCode `chat.message` 检测到"以后都…/我习惯…"这类可复用偏好时，调用 `sybermem habit intent --prompt <text>` 把候选写入用户级 `~/.sybermem/.habit-intent.json`（绝不创建 active habit，绝不持久化密钥/注入文本）；`/sybermem-habit` 读取 `habit intent-status` 后经用户确认一键转为 habit，再 `habit intent-clear` 清除
-- 独立醒目的注入提示：OpenCode 里 recall / habit / 项目规范各弹独立 toast——recall 用 `⭐`，应用的用户习惯用 `🧠`，应用的项目规范用 `📏`；捕获到候选时弹 scope 感知的 `💡`（个人习惯引导到 `/sybermem-habit`，项目约定引导到 `/sybermem-record`，模糊时追问）
+- 注入可见性：OpenCode 在同一轮 prompt 真正注入 recall / habit / 项目规范后，只弹一条有界 post-injection summary（汇总 total items、total chars 和 lane counts）；捕获到候选时仍弹独立 scope 感知的 `💡`（个人习惯引导到 `/sybermem-habit`，项目约定引导到 `/sybermem-record`，模糊时追问），startup context 继续使用独立的一次性提示
 - 感知层：`sybermem habit awareness` 及 OpenCode 首轮 startup context 展示 active 习惯数量、类型分布与是否有待确认候选（只报数量，不暴露 habit 内容，也不与逐 prompt 提醒重复）
 - 保守门槛：只注入 active、高置信、未被排除、与上下文直接相关的习惯，最多 3 条
 - 默认不进入项目 `.sybermem/` records；个人偏好 → habit，绑定的项目规则 → 固化为 `norm`（见 Project Norms）
