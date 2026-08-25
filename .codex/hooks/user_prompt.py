@@ -11,8 +11,10 @@ from datetime import datetime, timezone
 
 
 HOOK_EVENT_NAME: Final = "UserPromptSubmit"
+CODEX_CONTEXT_HEADING: Final = "## SyberMem Codex Context"
 RECALL_HEADING: Final = "## SyberMem Recall Hints"
 REMINDER_HEADING: Final = "## User Habit Reminder"
+NORMS_HEADING: Final = "## Relevant Project Norms"
 SYBERMEM_TIMEOUT_SECONDS: Final = 5
 RECORD_INTENT_PATH: Final = ".sybermem/.record-intent.json"
 
@@ -204,10 +206,22 @@ def _context_sections(prompt: str) -> list[str]:
     return sections
 
 
+def _summary_marker(sections: list[str]) -> str:
+    lines = [CODEX_CONTEXT_HEADING, "", "SyberMem injected context for this Codex turn:"]
+    for section in sections:
+        if section.startswith(RECALL_HEADING):
+            lines.append("- [recall] Project recall")
+        elif section.startswith(REMINDER_HEADING):
+            lines.append("- [habit] User habit reminder")
+        elif section.startswith(NORMS_HEADING):
+            lines.append("- [norms] Relevant project norms")
+    return "\n".join(lines)
+
+
 def _hook_output(sections: list[str]) -> HookOutput | None:
     if not sections:
         return None
-    additional_context = "\n\n".join(sections) + "\n"
+    additional_context = "\n\n".join([_summary_marker(sections), *sections]) + "\n"
     return {
         "hookSpecificOutput": {
             "hookEventName": HOOK_EVENT_NAME,
