@@ -59,22 +59,30 @@ Choose the update path in this order:
 1. **Local clone available**
    - If the current working directory is the SyberMem repo and contains the install/update scripts, use the local update script.
    - Bash shell: `./scripts/update.sh`
+   - Windows OpenCode or `cmd.exe`: `python scripts/update.py`
    - PowerShell shell: `./scripts/update.ps1`
 
 2. **Any other project**
    - Use the remote install script to refresh the globally installed skills.
    - Bash shell: `curl -sSL https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/install-remote.sh | bash`
+   - Windows OpenCode or `cmd.exe`: `python -c "import urllib.request; exec(urllib.request.urlopen('https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/install-remote.py').read())"`
    - PowerShell shell: `irm https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/install-remote.ps1 | iex`
+
+On Windows OpenCode, prefer the Python commands above. They do not spawn
+`powershell.exe`; the remote script downloads and extracts the repository with
+Python's standard library before running the shared installer. Existing
+PowerShell and shell paths remain supported.
 
 The remote install path is also the update path for globally installed skills.
 
 ### Step 2: Run CLI-first project refresh in the current project
 
-After the global refresh completes, resolve a SyberMem CLI command and run project refresh. Before running SyberMem CLI commands, resolve a command variable first. On Windows PowerShell, prefer `$env:USERPROFILE\.claude\sybermem\cli\sybermem.cmd` and store the chosen command in `$SyberMemCli`; on Unix, prefer `$HOME/.claude/sybermem/cli/sybermem` and store the chosen command in `"$SYBERMEM_CLI"`. If the fixed launcher is unavailable, fall back to bare `sybermem`. Do not modify persistent PATH automatically. Command examples below use `$SyberMemCli` / `"$SYBERMEM_CLI"`.
+After the global refresh completes, resolve a SyberMem CLI command and run project refresh. Before running SyberMem CLI commands, resolve a command variable first. On Windows `cmd.exe` or OpenCode, prefer `%USERPROFILE%\.claude\sybermem\cli\sybermem.cmd`; in Windows PowerShell prefer `$env:USERPROFILE\.claude\sybermem\cli\sybermem.cmd` and store the chosen command in `$SyberMemCli`; on Unix, prefer `$HOME/.claude/sybermem/cli/sybermem` and store the chosen command in `"$SYBERMEM_CLI"`. If the fixed launcher is unavailable, fall back to bare `sybermem`. Do not modify persistent PATH automatically. Command examples below use `$SyberMemCli` / `"$SYBERMEM_CLI"`.
 
 1. Prefer bare `sybermem`.
 2. If bare `sybermem` is unavailable, try the fixed launcher:
    - Windows PowerShell: `$env:USERPROFILE\.claude\sybermem\cli\sybermem.cmd`
+   - Windows `cmd.exe`: `%USERPROFILE%\.claude\sybermem\cli\sybermem.cmd`
    - macOS / Linux: `$HOME/.claude/sybermem/cli/sybermem`
 3. Run:
 
@@ -84,6 +92,10 @@ $SYBERMEM_CLI project refresh --format json
 
 ```powershell
 & $SyberMemCli project refresh --format json
+```
+
+```cmd
+"%USERPROFILE%\.claude\sybermem\cli\sybermem.cmd" project refresh --format json
 ```
 
 The command is the primary project-local update path. It is responsible for:
