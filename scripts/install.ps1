@@ -34,6 +34,24 @@ $Targets = @(
 
 Write-Host "=== SyberMem Install ==="
 
+function Remove-ManagedDirectory {
+    param([string]$Root, [string]$Target)
+    if (-not (Test-Path -LiteralPath $Target)) { return }
+    $rootItem = Get-Item -LiteralPath $Root -Force
+    if (($rootItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw "Refusing linked managed root: $Root" }
+    $rootFull = [IO.Path]::GetFullPath($Root).TrimEnd('\', '/')
+    $parentFull = [IO.Path]::GetFullPath((Split-Path -Parent $Target)).TrimEnd('\', '/')
+    if (-not [StringComparer]::OrdinalIgnoreCase.Equals($rootFull, $parentFull)) {
+        throw "Refusing to remove path outside managed root: $Target"
+    }
+    $item = Get-Item -LiteralPath $Target -Force
+    if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+        Remove-Item -LiteralPath $Target -Force -Confirm:$false
+        return
+    }
+    Remove-Item -LiteralPath $Target -Recurse -Force -Confirm:$false
+}
+
 foreach ($target in $Targets) {
     if (-not (Test-Path $target.Path)) {
         New-Item -ItemType Directory -Path $target.Path -Force | Out-Null
@@ -41,13 +59,13 @@ foreach ($target in $Targets) {
     foreach ($legacySkill in @("init-project", "record", "summary")) {
         $legacyPath = Join-Path $target.Path $legacySkill
         if (Test-Path $legacyPath) {
-            Remove-Item -Path $legacyPath -Recurse -Force -Confirm:$false
+            Remove-ManagedDirectory -Root $target.Path -Target $legacyPath
         }
     }
     foreach ($retiredSkill in @("sybermem-phase-confirm", "sybermem-team-publish", "sybermem-team-summary")) {
         $retiredPath = Join-Path $target.Path $retiredSkill
         if (Test-Path $retiredPath) {
-            Remove-Item -Path $retiredPath -Recurse -Force -Confirm:$false
+            Remove-ManagedDirectory -Root $target.Path -Target $retiredPath
         }
     }
     foreach ($skill in @("sybermem-init-project", "sybermem-record", "sybermem-summary", "sybermem-resume", "sybermem-digest", "sybermem-phase-analyze", "using-sybermem", "sybermem-update", "sybermem-search", "sybermem-link", "sybermem-theme-digest", "sybermem-habit")) {
@@ -55,7 +73,7 @@ foreach ($target in $Targets) {
         $dst = Join-Path $target.Path $skill
         if (Test-Path $src) {
             if (Test-Path $dst) {
-                Remove-Item -Path $dst -Recurse -Force -Confirm:$false
+                Remove-ManagedDirectory -Root $target.Path -Target $dst
             }
             Copy-Item -Path $src -Destination $dst -Recurse -Force
             Write-Host "  [$($target.Label)] installed: /$skill"
