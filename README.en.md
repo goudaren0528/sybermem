@@ -98,16 +98,7 @@ implements: [requirement-002]
 - workspace search with project, type, and status filters
 - recovery guidance for missing, incompatible, or stale indexes
 - portfolio view: `sybermem portfolio`
-
-### Team Memory
-
-- Team repo initialization: `sybermem team init`
-- read-only publish preview: `sybermem publish status --preview`
-- publish with a reviewed preview hash to avoid stale writes
-- automatic Team overview rebuilds
-- Team management summary: `sybermem team summary`
-- phase/theme digest history sync into the Team repo
-- matching skills: `/sybermem-team-publish`, `/sybermem-team-summary`
+- cross-project view: `sybermem portfolio` aggregates each registered project (phase, open bugs/requirements, digest coverage, latest record date) read-only from the Hub registry — no separate Team repo or publish pipeline
 
 ### User Habit Memory
 
@@ -121,7 +112,7 @@ implements: [requirement-002]
 - distinct injection toasts: recall, habit, and project norm each get their own OpenCode toast — `⭐` for recall, `🧠` for an applied user habit, `📏` for an applied project norm — plus a scope-aware `💡` when a candidate is captured (routes a personal habit to `/sybermem-habit`, a project convention to `/sybermem-record`, or asks when ambiguous)
 - awareness surface: `sybermem habit awareness` and the OpenCode first-turn startup context report the active-habit count, type distribution, and whether a candidate is pending (counts only, never statements, never duplicating prompt-time reminders)
 - conservative gates: only active, high-confidence, directly relevant, non-excluded habits are injected, with a maximum of three
-- habits are not stored in project `.sybermem/` records and are not published to Team memory by default; a personal preference → habit, a binding project rule → crystallize a `norm` (see Project Norms)
+- habits are not stored in project `.sybermem/` records; a personal preference → habit, a binding project rule → crystallize a `norm` (see Project Norms)
 
 ## CLI vs Skill Boundaries
 
@@ -129,7 +120,7 @@ SyberMem has two execution paths with different reliability properties:
 
 | Path | Representative capabilities | Notes |
 |---|---|---|
-| CLI / Core | `sybermem resume`, `search`, `next-step`, `portfolio`, `index build`, `project index build/check`, `project memory-stats`, `record id`, `habit add/list/search/pause/delete/remind/inject`, `digest status/latest`, `norms list/nominate/doctor`, `team init/summary`, `publish status`, `project uninstall` | Programmatic and scriptable; best for deterministic queries and publication flows |
+| CLI / Core | `sybermem resume`, `search`, `next-step`, `portfolio`, `index build`, `project index build/check`, `project memory-stats`, `record id`, `habit add/list/search/pause/delete/remind/inject`, `digest status/latest`, `norms list/nominate/doctor`, `project uninstall` | Programmatic and scriptable; best for deterministic queries |
 | Skill orchestration | `/sybermem-record`, `/sybermem-habit`, `/sybermem-link`, `/sybermem-digest`, `/sybermem-theme-digest`, `/sybermem-phase-analyze` | AI edits `.sybermem/` Markdown or invokes user-level habit CLI according to skill instructions; best for work that requires judgment and synthesis |
 
 `sybermem record id --type <change|decision|requirement|bug>` only mints a canonical record ID. Full record creation still happens through `/sybermem-record`.
@@ -210,12 +201,10 @@ If a project already has custom `.claude/settings.json` content, SyberMem patche
 - `sybermem norms list/nominate/doctor`: view the project-norm constitution, nominate recurring constraints, detect same-scope conflicts
 - `/sybermem-digest`: capture a stable phase conclusion
 - `/sybermem-theme-digest`: capture a cross-phase topic conclusion
-- `/sybermem-team-publish`: preview, review, then publish into Team memory
 
-### Manager / Management Agent
+### Cross-Project View
 
-- `/sybermem-team-summary`: generate the Team management summary
-- read `dashboards/current-overview.md` and `latest-management-summary.md` in the Team repo
+- `sybermem portfolio`: read-only aggregate of each registered project (phase, open bugs/requirements, digest coverage, latest record date)
 
 ### When Unsure What To Do Next
 
@@ -234,17 +223,11 @@ If a project already has custom `.claude/settings.json` content, SyberMem patche
 - Project search defaults to lexical matching and scoring over parsed Markdown records; use the workspace index for cross-project search.
 - Optional `SYBERMEM_SEMANTIC_RECALL=1` enables a local char n-gram recall supplement for explicit search. It does not automatically inject recall into every prompt.
 
-## Team Workflow
+## Cross-Project Collaboration
 
-Recommended path:
+Teams collaborate by sharing each repo's `.sybermem/` directly through Git: anyone who clones/pulls gets the full project engineering memory locally, and the agent hooks/plugins apply it during their own development. For a read-only view across multiple repos, use `sybermem portfolio` (Hub-registry based — no separate Team repo or publish pipeline).
 
-1. Keep recording and digesting inside each project.
-2. Generate a read-only preview with `/sybermem-team-publish` or `sybermem publish status --preview --format json`.
-3. Review source revision, source hash, freshness, conflicts, and review-required state.
-4. Publish with the reviewed preview hash.
-5. Let Team overview rebuild automatically.
-6. Generate a management summary with `/sybermem-team-summary` or `sybermem team summary`.
-7. Drill into full digest history when details are needed.
+> Note: the earlier standalone "Team memory" publication subsystem (`sybermem team`/`publish`, `/sybermem-team-*`) has been removed — it was redundant for a single team sharing one repo via Git (see CHANGELOG). Existing external Team repositories and `.sybermem/` history are unaffected.
 
 ## Repository Structure
 
@@ -253,7 +236,7 @@ Recommended path:
 hooks/                               # Claude Code hook declarations and delegators
 skills/                              # Plugin-facing skills tree
 packages/claude-skills/              # Skill source for distribution
-packages/core/                       # Core memory / Team publication logic
+packages/core/                       # Core memory / norm & digest governance logic
 packages/cli/                        # sybermem CLI
 packages/opencode-plugin/            # OpenCode plugin
 .codex-plugin/                       # Codex marketplace/entry metadata

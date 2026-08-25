@@ -21,6 +21,13 @@
 - Distinct habit injection visibility on OpenCode: applied user habits now get their own `🧠` toast, separate from the recall `⭐` toast, and a captured candidate raises a `💡` toast.
 - User-habit awareness surface: `sybermem habit awareness` and the OpenCode first-turn startup context report active-habit counts, type distribution, and a pending-candidate flag (counts only, never habit statements, no duplication of prompt-time reminders).
 
+### Removed (breaking)
+- The standalone **Team memory** publication subsystem has been removed. Removed CLI: `sybermem team init`, `sybermem team summary`, `sybermem publish status`. Removed skills: `/sybermem-team-publish`, `/sybermem-team-summary`. Removed core modules: `team`, `team_summary`, `publish`, `publish_bootstrap`, `publish_render`, `publish_sources`.
+  - **Breaking API change:** `sybermem project status` (`project_status()`) no longer returns a `publication` object.
+  - **Rationale:** for a single team sharing one repo's `.sybermem/` via Git, Team mode targeted a multi-repo manager persona that does not exist; its only unique value (a cross-repo management projection) is now served by the read-only `sybermem portfolio` (Hub-registry based, no separate Team repo, no publish pipeline, no preview hash).
+  - **Data safety:** your `.sybermem/` history and any external Team Git repositories are never deleted or modified. Existing `team:` blocks in `.sybermem/project.yaml` are inert and ignored. Upgrading (global install/update + `/sybermem-update`) cleans the retired Team skills from installs via the retired-skill cleanup contract.
+  - **Migration:** collaborate via Git-shared `.sybermem/` as before; use `sybermem portfolio` for a cross-project view. External Team repositories remain readable and user-owned but receive no further SyberMem updates.
+
 ### Changed
 - `using-sybermem` now includes a `<SUBAGENT-STOP>` guard
 - SessionStart bootstrap context now includes a short SyberMem skill catalog
