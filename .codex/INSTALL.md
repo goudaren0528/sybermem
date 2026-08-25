@@ -58,14 +58,18 @@ persistent PATH automatically.
 
 The Codex hooks are merged under `SessionStart`, `UserPromptSubmit`, `Stop`, and
 `PostCompact`. `SessionStart` and `UserPromptSubmit` return bounded context
-through `hookSpecificOutput.additionalContext`. The prompt hook combines
-high-signal project recall and User Habit Memory reminders when either one
-qualifies, and it writes bounded `.sybermem/.record-intent.json` classifier
-metadata for explicit record requests without persisting the raw prompt. `Stop`
-emits at most one bounded `/sybermem-record` continuation nudge per changed-file
-fingerprint and returns nothing when `stop_hook_active` is true. `PostCompact`
-writes only `.sybermem/.codex-compact-marker.json`; it does not inject direct
-compaction context.
+through `hookSpecificOutput.additionalContext`. When context is injected, the
+managed hooks lead with an ASCII SyberMem marker (`## SyberMem Codex Startup` or
+`## SyberMem Codex Context`) so Codex transcripts can distinguish SyberMem
+startup context, recall, habits, and scoped norms without relying on desktop
+notifications. The prompt hook combines high-signal project recall and User Habit
+Memory reminders when either one qualifies, and it writes bounded
+`.sybermem/.record-intent.json` classifier metadata for explicit record requests
+without persisting the raw prompt. `Stop` emits at most one bounded
+`/sybermem-record` continuation nudge per changed-file fingerprint and returns
+nothing when `stop_hook_active` is true. `PostCompact` writes only
+`.sybermem/.codex-compact-marker.json`; it does not inject direct compaction
+context.
 
 ## Project setup
 
@@ -158,7 +162,8 @@ Test-Path "$env:USERPROFILE\.codex\hooks.json"
 The installed `hooks.json` should contain `SessionStart`, `UserPromptSubmit`,
 `Stop`, and `PostCompact` entries that point to the SyberMem hooks. Only
 `SessionStart` and `UserPromptSubmit` write bounded context through
-`hookSpecificOutput.additionalContext`; `Stop` can return a bounded continuation
+`hookSpecificOutput.additionalContext`; injected context starts with a SyberMem
+Codex marker and stays model-visible. `Stop` can return a bounded continuation
 nudge, and `PostCompact` is side-effect-only.
 
 ## Repository verification
@@ -214,12 +219,16 @@ The Codex `SessionStart` hook injects bounded startup context from `sybermem
 context session --format markdown`. The Codex `UserPromptSubmit` hook injects
 high-signal project recall from `sybermem context recall --query ...` and bounded
 User Habit Memory reminders from `sybermem context habit --delivery prompt-time`.
-It also captures explicit record intent into `.sybermem/.record-intent.json`
-using bounded classifier metadata. The Codex `Stop` hook can return one bounded
-`/sybermem-record` continuation nudge and uses both Codex `stop_hook_active` and
-a local fingerprint to avoid loops. The Codex `PostCompact` hook writes a marker
-so the next compact-source `SessionStart` can re-seed ordinary session context;
-it does not inject direct compaction prompt context. All hook paths fail open.
+When either hook injects context, it prefixes the `additionalContext` payload with
+a short SyberMem Codex marker. This is Codex's supported visibility path; SyberMem
+does not install Windows desktop toasts or claim an OpenCode-style TUI toast API
+for Codex. It also captures explicit record intent into
+`.sybermem/.record-intent.json` using bounded classifier metadata. The Codex
+`Stop` hook can return one bounded `/sybermem-record` continuation nudge and uses
+both Codex `stop_hook_active` and a local fingerprint to avoid loops. The Codex
+`PostCompact` hook writes a marker so the next compact-source `SessionStart` can
+re-seed ordinary session context; it does not inject direct compaction prompt
+context. All hook paths fail open.
 
 Manual commands stay documented and supported:
 
@@ -244,6 +253,7 @@ In particular, SyberMem does **not** install or claim:
 - direct compaction prompt injection
 - plugin-copy lifecycle behavior
 - a repository `.agents/skills` mirror
+- OpenCode-style TUI toasts or default Windows desktop toast notifications
 
 Codex users can still invoke project memory intentionally through the installed
 user skills and the `sybermem` CLI when they want more context than the bounded
