@@ -10,13 +10,14 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[3]
 POWERSHELL = shutil.which("powershell") or shutil.which("powershell.exe")
-RETIRED = ("sybermem-team-publish", "sybermem-team-summary")
+ACTIVE = ("sybermem-record", "sybermem-uninstall")
+RETIRED = ("sybermem-phase-confirm", "sybermem-team-publish", "sybermem-team-summary")
 CODEX_HOOKS = ("sybermem_user_prompt.py", "sybermem_session_start.py", "sybermem_stop.py", "sybermem_post_compact.py")
 
 
 def _seed_home(home: Path) -> Path:
     for root in (home / ".claude" / "skills", home / ".config" / "opencode" / "skills", home / ".agents" / "skills"):
-        for name in RETIRED:
+        for name in (*ACTIVE, *RETIRED):
             path = root / name
             path.mkdir(parents=True, exist_ok=True)
             (path / "SKILL.md").write_text("retired\n", encoding="utf-8")
@@ -27,6 +28,12 @@ def _seed_home(home: Path) -> Path:
         (runtime / name).write_text("managed\n", encoding="utf-8")
     shutil.copy2(ROOT / "scripts" / "managed-install.json", runtime / "managed-install.json")
     shutil.copy2(ROOT / "scripts" / "safe-managed-remove.py", runtime / "safe-managed-remove.py")
+    local_link = home / ".local" / "bin" / "sybermem"
+    local_link.parent.mkdir(parents=True)
+    try:
+        local_link.symlink_to(runtime / "cli" / "sybermem")
+    except OSError:
+        local_link.write_text("not-a-link\n", encoding="utf-8")
     codex = home / ".codex" / "hooks"
     codex.mkdir(parents=True)
     for name in CODEX_HOOKS:
@@ -58,7 +65,7 @@ def test_uninstall_ps1_preserves_unknown_files_and_cleans_all_skill_roots(tmp_pa
     assert sentinel.read_text(encoding="utf-8") == "preserve me\n"
     assert not (tmp_path / ".claude" / "sybermem" / "cli").exists()
     for root in (tmp_path / ".claude" / "skills", tmp_path / ".config" / "opencode" / "skills", tmp_path / ".agents" / "skills"):
-        for name in RETIRED:
+        for name in (*ACTIVE, *RETIRED):
             assert not (root / name).exists()
     assert not (tmp_path / ".config" / "opencode" / "plugins" / "sybermem.ts").exists()
     for name in CODEX_HOOKS:
