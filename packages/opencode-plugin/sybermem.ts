@@ -961,7 +961,23 @@ var RECORD_ID_RE2 = /\b(?:change|decision|requirement|bug|digest)-[a-z0-9-]+\b/g
 var SKIP_PREFIXES2 = [".git/", ".sybermem/", "ADR/", ".claude/", ".opencode/", "node_modules/"];
 var SESSIONS = new Map;
 function freshActivity() {
-  return { editedFiles: new Map, todoCompletedBatches: 0, lastToolSignal: null, injectedRecords: new Set };
+  return {
+    editedFiles: new Map,
+    todoCompletedBatches: 0,
+    lastToolSignal: null,
+    injectedRecords: new Set,
+    memoryTurns: 0,
+    memoryItems: 0,
+    memoryChars: 0,
+    recallItems: 0,
+    recallChars: 0,
+    habitItems: 0,
+    habitChars: 0,
+    normItems: 0,
+    normChars: 0,
+    startupItems: 0,
+    startupChars: 0
+  };
 }
 function getSessionActivity(sessionID) {
   let activity = SESSIONS.get(sessionID);
@@ -1046,9 +1062,26 @@ function recordInjectedRecords(sessionID, packets) {
   for (const match of recallPacket.matchAll(RECORD_ID_RE2))
     activity.injectedRecords.add(match[0].toLowerCase());
 }
+function recordMemoryUsage(sessionID, entry) {
+  if (entry.total_items === 0)
+    return;
+  const activity = getSessionActivity(sessionID);
+  activity.memoryTurns += 1;
+  activity.memoryItems += entry.total_items;
+  activity.memoryChars += entry.total_chars;
+  activity.recallItems += entry.recall_items;
+  activity.recallChars += entry.recall_chars;
+  activity.habitItems += entry.habit_items;
+  activity.habitChars += entry.habit_chars;
+  activity.normItems += entry.norm_items;
+  activity.normChars += entry.norm_chars;
+  activity.startupItems += entry.startup_items;
+  activity.startupChars += entry.startup_chars;
+}
 
 // packages/opencode-plugin/src/recall_outcome.ts
-var EMPTY_OUTCOME = { injected: 0, hit: 0, precision: null, hitRecords: [], missRecords: [] };
+var EMPTY_OUTCOME = { recallEvidenceAvailable: true, injected: 0, measurable: 0, unmeasurable: 0, hit: 0, precision: null, hitRecords: [], missRecords: [] };
+var UNAVAILABLE_OUTCOME = { recallEvidenceAvailable: false, injected: 0, measurable: 0, unmeasurable: 0, hit: 0, precision: null, hitRecords: [], missRecords: [] };
 function normalize(path) {
   return path.trim().replace(/\\/g, "/");
 }
@@ -1056,11 +1089,14 @@ function computeRecallOutcome(injected, relatedFilesByRecord, editedFiles) {
   const edited = new Set([...editedFiles].map(normalize));
   const hitRecords = [];
   const missRecords = [];
+  let unmeasurable = 0;
   for (const rawId of injected) {
     const id = rawId.toLowerCase();
     const related = (relatedFilesByRecord[id] ?? relatedFilesByRecord[rawId] ?? []).map(normalize);
-    if (related.length === 0)
+    if (related.length === 0) {
+      unmeasurable += 1;
       continue;
+    }
     if (related.some((file) => edited.has(file)))
       hitRecords.push(id);
     else
@@ -1068,9 +1104,12 @@ function computeRecallOutcome(injected, relatedFilesByRecord, editedFiles) {
   }
   const injectedCount = hitRecords.length + missRecords.length;
   if (injectedCount === 0)
-    return EMPTY_OUTCOME;
+    return { ...EMPTY_OUTCOME, unmeasurable };
   return {
+    recallEvidenceAvailable: true,
     injected: injectedCount,
+    measurable: injectedCount,
+    unmeasurable,
     hit: hitRecords.length,
     precision: hitRecords.length / injectedCount,
     hitRecords,
@@ -1097,21 +1136,52 @@ function parseRecordFilesJson(raw) {
 }
 async function flushRecallOutcome($, root, activity, sessionID, timestamp = new Date().toISOString()) {
   const injected = [...activity.injectedRecords];
-  if (injected.length === 0 || activity.editedFiles.size === 0)
+  if (injected.length === 0 && activity.memoryTurns === 0 && activity.editedFiles.size === 0 && activity.todoCompletedBatches === 0 && activity.lastToolSignal === null)
     return EMPTY_OUTCOME;
   let mapping = {};
-  try {
-    mapping = parseRecordFilesJson(await recordFilesText($, root, injected.join(",")));
-  } catch {
-    return EMPTY_OUTCOME;
+  let recallEvidenceAvailable = true;
+  if (injected.length > 0) {
+    try {
+      mapping = parseRecordFilesJson(await recordFilesText($, root, injected.join(",")));
+    } catch {
+      recallEvidenceAvailable = false;
+    }
   }
-  const outcome = computeRecallOutcome(injected, mapping, new Set(activity.editedFiles.keys()));
-  if (outcome.injected === 0)
-    return EMPTY_OUTCOME;
+  const outcome = recallEvidenceAvailable ? computeRecallOutcome(injected, mapping, new Set(activity.editedFiles.keys())) : UNAVAILABLE_OUTCOME;
+  boundedJsonlAppend(root, ".memory-usage.jsonl", {
+    schema_version: 1,
+    host: "opencode",
+    event: "session_outcome",
+    timestamp,
+    session_id: sessionID,
+    memory_turns: activity.memoryTurns,
+    memory_items: activity.memoryItems,
+    memory_chars: activity.memoryChars,
+    recall_items: activity.recallItems,
+    recall_chars: activity.recallChars,
+    habit_items: activity.habitItems,
+    habit_chars: activity.habitChars,
+    norm_items: activity.normItems,
+    norm_chars: activity.normChars,
+    startup_items: activity.startupItems,
+    startup_chars: activity.startupChars,
+    edited_files: activity.editedFiles.size,
+    todo_completed_batches: activity.todoCompletedBatches,
+    tool_signal: activity.lastToolSignal,
+    recall_evidence_available: outcome.recallEvidenceAvailable,
+    recall_measurable: outcome.measurable,
+    recall_unmeasurable: outcome.unmeasurable,
+    recall_hit: outcome.hit,
+    recall_precision: outcome.precision
+  }, 200);
+  if (!outcome.recallEvidenceAvailable || outcome.injected === 0)
+    return outcome;
   boundedJsonlAppend(root, ".recall-outcomes.jsonl", {
     timestamp,
     session: sessionID,
     injected: outcome.injected,
+    measurable: outcome.measurable,
+    unmeasurable: outcome.unmeasurable,
     hit: outcome.hit,
     precision: outcome.precision,
     hit_records: outcome.hitRecords,
@@ -1316,9 +1386,9 @@ function buildMemoryUsageEntry(input, options = {}) {
 }
 function appendMemoryUsage(root, input, options = {}) {
   const entry = buildMemoryUsageEntry(input, options);
-  if (entry.total_items === 0)
-    return;
-  boundedJsonlAppend(root, ".memory-usage.jsonl", entry, 200);
+  if (entry.total_items > 0)
+    boundedJsonlAppend(root, ".memory-usage.jsonl", entry, 200);
+  return entry;
 }
 
 // packages/opencode-plugin/src/plugin.ts
@@ -1529,7 +1599,9 @@ var SyberMemPlugin = async ({ $, directory, client }) => {
           throttledToast(args.client, "startup-context", "\u2B50 SyberMem: injected project startup context into this session");
         }
       }
-      appendMemoryUsage(root, { sessionID: sessionID ?? "", packets, startup });
+      const usageEntry = appendMemoryUsage(root, { sessionID: sessionID ?? "", packets, startup });
+      if (sessionID)
+        recordMemoryUsage(sessionID, usageEntry);
       if (!summary.habitCandidate) {
         const recallMessage = recallToastMessage(summary);
         if (recallMessage)
