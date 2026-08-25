@@ -579,30 +579,11 @@ def main() -> int:
 
     actions = generate_actions(files) if overall == "needs_update" else []
 
-    # Team association check
-    team_info = {"has_team_link": False, "team_path": "", "team_path_accessible": False}
-    yaml_path = root / ".sybermem" / "project.yaml"
-    if yaml_path.is_file():
-        in_team = False
-        for line in yaml_path.read_text(encoding="utf-8").splitlines():
-            if line.rstrip() == "team:":
-                in_team = True
-                continue
-            if in_team and line.startswith("  team_path:"):
-                tp = line.split(":", 1)[1].strip()
-                if tp:
-                    team_info["has_team_link"] = True
-                    team_info["team_path"] = tp
-                    team_info["team_path_accessible"] = Path(tp).is_dir()
-            if in_team and not line.startswith(" "):
-                in_team = False
-
     report = {
         "root": str(root),
         "overall": overall,
         "files": files,
         "capabilities": capabilities,
-        "team": team_info,
         "actions_needed": actions,
     }
 
