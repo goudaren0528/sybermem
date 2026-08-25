@@ -17,8 +17,10 @@ DISTRIBUTION_SCRIPTS: Final = [
     Path("scripts/install.ps1"),
     Path("scripts/install-remote.sh"),
     Path("scripts/install-remote.ps1"),
+    Path("scripts/install-remote.py"),
     Path("scripts/update.sh"),
     Path("scripts/update.ps1"),
+    Path("scripts/update.py"),
     Path("scripts/uninstall.sh"),
     Path("scripts/uninstall.ps1"),
 ]
@@ -32,46 +34,57 @@ VISIBLE_SKILL_SCRIPTS: Final = [
     Path("scripts/install.ps1"),
     Path("scripts/install-remote.sh"),
     Path("scripts/install-remote.ps1"),
+    Path("scripts/install-remote.py"),
     Path("scripts/update.sh"),
     Path("scripts/update.ps1"),
+    Path("scripts/update.py"),
 ]
 OPENCODE_PLUGIN_UPDATE_SCRIPTS: Final = [
     Path("scripts/install.sh"),
     Path("scripts/install.ps1"),
     Path("scripts/install-remote.sh"),
     Path("scripts/install-remote.ps1"),
+    Path("scripts/install-remote.py"),
     Path("scripts/update.sh"),
     Path("scripts/update.ps1"),
+    Path("scripts/update.py"),
 ]
 CODEX_SKILL_SCRIPTS: Final = [
     Path("scripts/install.sh"),
     Path("scripts/install.ps1"),
     Path("scripts/install-remote.sh"),
     Path("scripts/install-remote.ps1"),
+    Path("scripts/install-remote.py"),
     Path("scripts/update.sh"),
     Path("scripts/update.ps1"),
+    Path("scripts/update.py"),
 ]
 CODEX_HOOK_INSTALL_SCRIPTS: Final = [
     Path("scripts/install.sh"),
     Path("scripts/install.ps1"),
     Path("scripts/install-remote.sh"),
     Path("scripts/install-remote.ps1"),
+    Path("scripts/install-remote.py"),
     Path("scripts/update.sh"),
     Path("scripts/update.ps1"),
+    Path("scripts/update.py"),
 ]
 RUNTIME_REFRESH_SCRIPTS: Final = [
     Path("scripts/install.sh"),
     Path("scripts/install.ps1"),
     Path("scripts/install-remote.sh"),
     Path("scripts/install-remote.ps1"),
+    Path("scripts/install-remote.py"),
     Path("scripts/update.sh"),
     Path("scripts/update.ps1"),
+    Path("scripts/update.py"),
 ]
 MANAGED_REMOVAL_SCRIPTS: Final = [
     Path("scripts/install.sh"), Path("scripts/install.ps1"),
     Path("scripts/install-remote.sh"), Path("scripts/install-remote.ps1"),
     Path("scripts/update.sh"), Path("scripts/update.ps1"),
     Path("scripts/uninstall.sh"), Path("scripts/uninstall.ps1"),
+    Path("scripts/install-remote.py"), Path("scripts/update.py"),
 ]
 NO_CACHE_ROOTS: Final = [
     Path("packages/claude-skills"),
@@ -245,6 +258,13 @@ def relative_files(root: Path) -> list[Path]:
     return sorted(path.relative_to(root) for path in root.rglob("*") if path.is_file())
 
 
+def distribution_script_text(root: Path, script: Path) -> str:
+    text = (root / script).read_text(encoding="utf-8")
+    if script.suffix == ".py":
+        text += (root / "scripts" / "_install_common.py").read_text(encoding="utf-8")
+    return text
+
+
 def check_skill_tree_parity(root: Path) -> list[str]:
     source_root = root / "packages" / "claude-skills"
     plugin_root = root / "skills"
@@ -282,7 +302,7 @@ def check_distribution_script_coverage(root: Path, names: list[str]) -> None:
         script_path = root / script
         if not script_path.is_file():
             fail(f"Missing distribution script: {script.as_posix()}")
-        script_text = script_path.read_text(encoding="utf-8")
+        script_text = distribution_script_text(root, script)
         if script.name.startswith("uninstall"):
             if "managed-install.json" not in script_text:
                 fail(f"{script.as_posix()} must consume managed-install.json")
@@ -292,10 +312,16 @@ def check_distribution_script_coverage(root: Path, names: list[str]) -> None:
             fail(f"{script.as_posix()} is missing skill inventory entries: {', '.join(missing)}")
 
     for script in VISIBLE_SKILL_SCRIPTS:
-        script_text = (root / script).read_text(encoding="utf-8")
-        missing = [name for name in names if f"/{name}" not in script_text]
+        script_text = distribution_script_text(root, script)
+        missing = [name for name in names if name not in script_text]
         if missing:
             fail(f"{script.as_posix()} is missing user-facing skill output: {', '.join(missing)}")
+        if script.suffix == ".py" and "updated: /{name}" not in script_text:
+            fail(f"{script.as_posix()} is missing user-facing dynamic skill output")
+        if script.suffix != ".py":
+            missing_visible = [name for name in names if f"/{name}" not in script_text]
+            if missing_visible:
+                fail(f"{script.as_posix()} is missing user-facing skill output: {', '.join(missing_visible)}")
 
 
 def check_retired_skill_cleanup(root: Path) -> None:
@@ -318,7 +344,7 @@ def check_retired_skill_cleanup(root: Path) -> None:
         fail(f"scripts/managed-install.json retired_skills includes active skills: {', '.join(active_overlap)}")
     for script in DISTRIBUTION_SCRIPTS:
         script_path = root / script
-        script_text = script_path.read_text(encoding="utf-8")
+        script_text = distribution_script_text(root, script)
         if script.name.startswith("uninstall"):
             if "managed-install.json" not in script_text:
                 fail(f"{script.as_posix()} must consume the managed install manifest")
@@ -330,10 +356,12 @@ def check_retired_skill_cleanup(root: Path) -> None:
 
 def check_opencode_plugin_update_wiring(root: Path) -> None:
     for script in OPENCODE_PLUGIN_UPDATE_SCRIPTS:
-        script_text = (root / script).read_text(encoding="utf-8")
+        script_text = distribution_script_text(root, script)
         required_fragments = [
-            "packages/opencode-plugin/sybermem.ts" if script.suffix == ".sh" else "packages\\opencode-plugin\\sybermem.ts",
-            ".config/opencode/plugins" if script.suffix == ".sh" else ".config\\opencode\\plugins",
+            "packages/opencode-plugin/sybermem.ts" if script.suffix == ".sh" else "packages\\opencode-plugin\\sybermem.ts" if script.suffix == ".ps1" else "opencode-plugin",
+            ".config/opencode/plugins" if script.suffix == ".sh" else ".config\\opencode\\plugins" if script.suffix == ".ps1" else ".config",
+            "opencode",
+            "plugins",
             "sybermem.ts",
         ]
         missing = [fragment for fragment in required_fragments if fragment not in script_text]
@@ -343,9 +371,10 @@ def check_opencode_plugin_update_wiring(root: Path) -> None:
 
 def check_codex_skill_install_wiring(root: Path) -> None:
     for script in CODEX_SKILL_SCRIPTS:
-        script_text = (root / script).read_text(encoding="utf-8")
+        script_text = distribution_script_text(root, script)
         required_fragments = [
-            ".agents/skills" if script.suffix == ".sh" else ".agents\\skills",
+            ".agents/skills" if script.suffix == ".sh" else ".agents\\skills" if script.suffix == ".ps1" else ".agents",
+            "skills",
             "Codex",
         ]
         missing = [fragment for fragment in required_fragments if fragment not in script_text]
@@ -433,7 +462,7 @@ def check_codex_user_prompt_hook_install_wiring(root: Path) -> None:
         fail(f".codex/hooks/user_prompt.py contains unsupported Codex automation behavior: {', '.join(found_source)}")
 
     for script in CODEX_HOOK_INSTALL_SCRIPTS:
-        script_text = (root / script).read_text(encoding="utf-8")
+        script_text = distribution_script_text(root, script)
         if script.suffix == ".sh":
             required_fragments = [
                 ".codex/hooks/user_prompt.py",
@@ -465,7 +494,7 @@ def check_codex_user_prompt_hook_install_wiring(root: Path) -> None:
                 "background automation",
                 "auto-resume",
             ]
-        else:
+        elif script.suffix == ".ps1":
             required_fragments = [
                 ".codex\\hooks\\user_prompt.py",
                 ".codex\\hooks\\session_start.py",
@@ -496,6 +525,17 @@ def check_codex_user_prompt_hook_install_wiring(root: Path) -> None:
                 "background automation",
                 "auto-resume",
             ]
+        else:
+            required_fragments = [
+                ".codex", "hooks", "user_prompt.py", "session_start.py", "stop.py", "post_compact.py",
+                "sybermem_user_prompt.py", "sybermem_session_start.py", "sybermem_stop.py", "sybermem_post_compact.py",
+                "hooks.json", '"UserPromptSubmit"', '"SessionStart"', '"Stop"', '"PostCompact"', '"type": "command"',
+                "additionalContextLimit", "SyberMem prompt context adds bounded Codex recall and habit reminders when relevant.",
+                "SyberMem session context adds bounded Codex startup context when available.",
+                "SyberMem Stop nudge adds bounded record reminders without looping.",
+                "SyberMem PostCompact marks compact re-seed for the next SessionStart.",
+            ]
+            forbidden_fragments = [".codex/config.toml", '"agent"', '"startup"', '"session"', "background automation", "auto-resume"]
         missing = [fragment for fragment in required_fragments if fragment not in script_text]
         if missing:
             fail(f"{script.as_posix()} is missing Codex UserPromptSubmit hook install wiring: {', '.join(missing)}")
@@ -506,10 +546,11 @@ def check_codex_user_prompt_hook_install_wiring(root: Path) -> None:
 
 def check_runtime_refresh_wiring(root: Path) -> None:
     for script in RUNTIME_REFRESH_SCRIPTS:
-        script_text = (root / script).read_text(encoding="utf-8")
+        script_text = distribution_script_text(root, script)
         required_fragments = [
-            "packages/core" if script.suffix == ".sh" else "packages\\core",
-            "packages/cli" if script.suffix == ".sh" else "packages\\cli",
+            "packages/core" if script.suffix == ".sh" else "packages\\core" if script.suffix == ".ps1" else "packages",
+            "packages/cli" if script.suffix == ".sh" else "packages\\cli" if script.suffix == ".ps1" else "core",
+            "cli" if script.suffix == ".py" else "packages",
             "--upgrade",
             "--force-reinstall",
         ]
@@ -528,7 +569,7 @@ def check_managed_removal_wiring(root: Path) -> None:
     if missing_manifest:
         fail(f"scripts/managed-install.json is missing active skills: {', '.join(missing_manifest)}")
     for script in MANAGED_REMOVAL_SCRIPTS:
-        text = (root / script).read_text(encoding="utf-8")
+        text = distribution_script_text(root, script)
         missing = [name for name in ("managed-install.json", "safe-managed-remove.py") if name not in text]
         if missing:
             fail(f"{script.as_posix()} is missing managed removal wiring: {', '.join(missing)}")

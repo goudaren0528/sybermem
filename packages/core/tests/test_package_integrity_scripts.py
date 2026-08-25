@@ -1,11 +1,55 @@
 from __future__ import annotations
 
+import json
 import runpy
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[3]
 CHECK_SCRIPT = ROOT / "scripts" / "check-plugin-package.py"
+
+
+def distribution_script_text(relative_path: Path) -> str:
+    text = (ROOT / relative_path).read_text(encoding="utf-8")
+    if relative_path.suffix == ".py":
+        text += (ROOT / "scripts" / "_install_common.py").read_text(encoding="utf-8")
+    return text
+
+
+def test_python_install_common_writes_codex_hook_commands(tmp_path) -> None:
+    # Given: an existing Codex hooks.json carries an unrelated hook that must be preserved.
+    install_common = runpy.run_path(str(ROOT / "scripts" / "_install_common.py"))
+    install_codex_hooks = install_common["_install_codex_hooks"]
+
+    source_dir = tmp_path / "checkout" / ".codex" / "hooks"
+    source_dir.mkdir(parents=True)
+    for name in ("user_prompt.py", "session_start.py", "stop.py", "post_compact.py"):
+        (source_dir / name).write_text("print('hook')\n", encoding="utf-8")
+    home = tmp_path / "home"
+    hooks_json = home / ".codex" / "hooks.json"
+    hooks_json.parent.mkdir(parents=True)
+    hooks_json.write_text(
+        json.dumps({"hooks": {"UserPromptSubmit": [{"type": "command", "command": "python other.py"}]}}),
+        encoding="utf-8",
+    )
+
+    # When: the Python installer wires Codex hooks.
+    install_codex_hooks(tmp_path / "checkout", home)
+
+    # Then: managed commands point at installed sybermem_*.py files and the unrelated hook remains.
+    data = json.loads(hooks_json.read_text(encoding="utf-8"))
+    prompt_handlers = data["hooks"]["UserPromptSubmit"]
+    assert {path.name for path in (home / ".codex" / "hooks").iterdir()} == {
+        "sybermem_user_prompt.py",
+        "sybermem_session_start.py",
+        "sybermem_stop.py",
+        "sybermem_post_compact.py",
+    }
+    assert prompt_handlers[0]["command"] == "python other.py"
+    assert "sybermem_user_prompt.py" in prompt_handlers[1]["command"]
+    assert "sybermem_session_start.py" in data["hooks"]["SessionStart"][0]["command"]
+    assert "sybermem_stop.py" in data["hooks"]["Stop"][0]["command"]
+    assert "sybermem_post_compact.py" in data["hooks"]["PostCompact"][0]["command"]
 
 
 def test_package_integrity_checks_all_runtime_refresh_scripts() -> None:
@@ -18,14 +62,16 @@ def test_package_integrity_checks_all_runtime_refresh_scripts() -> None:
         Path("scripts/install.ps1"),
         Path("scripts/install-remote.sh"),
         Path("scripts/install-remote.ps1"),
+        Path("scripts/install-remote.py"),
         Path("scripts/update.sh"),
         Path("scripts/update.ps1"),
+        Path("scripts/update.py"),
     ]
 
 
 def test_package_integrity_checks_managed_removal_wiring() -> None:
     checker = runpy.run_path(str(CHECK_SCRIPT))
-    assert len(checker["MANAGED_REMOVAL_SCRIPTS"]) == 8
+    assert len(checker["MANAGED_REMOVAL_SCRIPTS"]) == 10
     assert callable(checker["check_managed_removal_wiring"])
     assert "check_managed_removal_wiring(root)" in CHECK_SCRIPT.read_text(encoding="utf-8")
 
@@ -40,8 +86,10 @@ def test_package_integrity_checks_codex_runtime_distribution() -> None:
         Path("scripts/install.ps1"),
         Path("scripts/install-remote.sh"),
         Path("scripts/install-remote.ps1"),
+        Path("scripts/install-remote.py"),
         Path("scripts/update.sh"),
         Path("scripts/update.ps1"),
+        Path("scripts/update.py"),
     ]
     assert checker["CODEX_HOOK_INSTALL_SCRIPTS"] == checker["CODEX_SKILL_SCRIPTS"]
     assert Path(".codex/INSTALL.md") in checker["PUBLIC_DOCS"]
@@ -72,9 +120,13 @@ def test_codex_installers_include_user_skill_targets() -> None:
 
     # When / Then: every install/update script names the Codex target path and label
     for relative_path in checker["CODEX_SKILL_SCRIPTS"]:
-        text = (ROOT / relative_path).read_text(encoding="utf-8")
-        target_fragment = ".agents/skills" if relative_path.suffix == ".sh" else ".agents\\skills"
-        assert target_fragment in text
+        text = distribution_script_text(relative_path)
+        if relative_path.suffix == ".py":
+            assert ".agents" in text
+            assert "skills" in text
+        else:
+            target_fragment = ".agents/skills" if relative_path.suffix == ".sh" else ".agents\\skills"
+            assert target_fragment in text
         assert "Codex" in text
 
 
@@ -229,7 +281,7 @@ def test_package_integrity_requires_distribution_scripts_clean_retired_skills() 
     # And every distribution script (install/install-remote/update/uninstall, sh+ps1)
     # references every retired skill so it gets cleaned from old installs.
     for relative_path in checker["DISTRIBUTION_SCRIPTS"]:
-        text = (ROOT / relative_path).read_text(encoding="utf-8")
+        text = distribution_script_text(relative_path)
         if relative_path.name.startswith("uninstall"):
             assert "managed-install.json" in text
             continue
@@ -250,9 +302,12 @@ def test_package_integrity_guards_uninstall_scope_skill_distribution() -> None:
     # When / Then: it is tracked by launcher guidance and every distribution script exposes it
     assert Path("packages/claude-skills/sybermem-uninstall/SKILL.md") in checker["CLI_USING_SKILLS"]
     for relative_path in checker["VISIBLE_SKILL_SCRIPTS"]:
-        text = (ROOT / relative_path).read_text(encoding="utf-8")
+        text = distribution_script_text(relative_path)
         assert "sybermem-uninstall" in text
-        assert "/sybermem-uninstall" in text
+        if relative_path.suffix == ".py":
+            assert "updated: /{name}" in text
+        else:
+            assert "/sybermem-uninstall" in text
 
     cli_main = (ROOT / "packages" / "cli" / "sybermem_cli" / "main.py").read_text(encoding="utf-8")
     assert 'sub.add_parser("uninstall")' in cli_main
@@ -485,8 +540,10 @@ def test_package_integrity_exposes_opencode_cli_resolution_check() -> None:
         Path("scripts/install.ps1"),
         Path("scripts/install-remote.sh"),
         Path("scripts/install-remote.ps1"),
+        Path("scripts/install-remote.py"),
         Path("scripts/update.sh"),
         Path("scripts/update.ps1"),
+        Path("scripts/update.py"),
     ]
 
 
