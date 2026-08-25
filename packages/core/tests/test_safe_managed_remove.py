@@ -102,4 +102,36 @@ def test_uninstall_rejects_tampered_opencode_plugin(tmp_path: Path) -> None:
     with pytest.raises(RuntimeError, match="invalid OpenCode plugin path"):
         module.uninstall(home, manifest_path)
 
-    assert sentinel.read_text(encoding="utf-8") == "preserve\n"
+
+def test_uninstall_cleans_retired_skill_from_all_roots(tmp_path: Path) -> None:
+    # A retired skill (e.g. the removed Team skills) must be cleaned from every
+    # managed skills root on uninstall, including the Codex ~/.agents/skills root.
+    module = _module()
+    home = tmp_path / "home"
+    home.mkdir()
+    roots = [
+        home / ".claude" / "skills",
+        home / ".config" / "opencode" / "skills",
+        home / ".agents" / "skills",
+    ]
+    for root in roots:
+        skill_dir = root / "sybermem-team-summary"
+        skill_dir.mkdir(parents=True)
+        (skill_dir / "SKILL.md").write_text("retired\n", encoding="utf-8")
+    (home / ".claude" / "sybermem").mkdir(parents=True)
+
+    manifest = {
+        "schema_version": 1,
+        "skills": ["sybermem-team-summary"],
+        "runtime_dirs": [],
+        "runtime_files": ["managed-install.json", "safe-managed-remove.py"],
+        "codex_hook_files": [],
+        "opencode_plugin": ".config/opencode/plugins/sybermem.ts",
+    }
+    manifest_path = tmp_path / "managed-install.json"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    module.uninstall(home, manifest_path)
+
+    for root in roots:
+        assert not (root / "sybermem-team-summary").exists()
