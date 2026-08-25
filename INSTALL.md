@@ -58,6 +58,15 @@ curl -sSL https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/i
 irm https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/install-remote.ps1 | iex
 ```
 
+##### Windows OpenCode / cmd.exe (PowerShell-free)
+
+```cmd
+python -c "import urllib.request; exec(urllib.request.urlopen('https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/install-remote.py').read())"
+```
+
+Use `python scripts/update.py` for a local checkout update. This path avoids
+spawning `powershell.exe` and does not modify persistent `PATH`.
+
 After install, open your target project and run `/sybermem-update` for existing projects, or `/sybermem-init-project` for new projects.
 Those project-local steps create or refresh the default project-level `.claude/settings.json` for SyberMem `auto` / `remind` mode, `.sybermem/hooks/record_change_on_stop.py` for automatic `change` records, `.sybermem/hooks/detect_record_intent.py` for reminder-first record-intent capture, and `.sybermem/hooks/task_recall.py` for read-only task recall.
 In Claude Code projects, the managed `UserPromptSubmit` hook performs natural-language record-intent capture, read-only task recall, and bounded User Habit Memory reminders. Habit reminders never create active habits automatically; they either point to prompt-approved habits or ask the user to confirm `/sybermem-habit`.
@@ -120,6 +129,11 @@ cd sybermem && git pull && ./scripts/update.sh
 ```powershell
 # Windows (PowerShell)
 cd sybermem; git pull; .\scripts\update.ps1
+```
+
+```cmd
+:: Windows OpenCode / cmd.exe
+cd sybermem && git pull && python scripts/update.py
 ```
 
 After the script finishes, open the target project and run `/sybermem-update`.

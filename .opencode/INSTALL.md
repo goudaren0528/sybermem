@@ -117,6 +117,16 @@ injection.
 The OpenCode side is refreshed by the same global install/update scripts used for
 the rest of SyberMem.
 
+On Windows OpenCode, prefer the Python path because it does not spawn
+`powershell.exe`:
+
+```cmd
+python -c "import urllib.request; exec(urllib.request.urlopen('https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/install-remote.py').read())"
+```
+
+From a SyberMem checkout, use `python scripts/update.py`. The PowerShell and
+shell installers remain supported alternatives.
+
 - global install or global update refreshes `~/.config/opencode/skills/`
 - global install or global update refreshes `~/.config/opencode/plugins/sybermem.ts`
 - global install or global update refreshes the fixed SyberMem CLI launcher at `$HOME/.claude/sybermem/cli/sybermem` on macOS / Linux or `%USERPROFILE%\.claude\sybermem\cli\sybermem.cmd` on Windows
