@@ -594,6 +594,7 @@ def test_package_integrity_exposes_opencode_source_bundle_and_privacy_guards() -
     assert checker["OPENCODE_PLUGIN_SOURCE_MODULES"] == [
         Path("packages/opencode-plugin/src/index.ts"),
         Path("packages/opencode-plugin/src/plugin.ts"),
+        Path("packages/opencode-plugin/src/injection_toast.ts"),
         Path("packages/opencode-plugin/src/runtime.ts"),
         Path("packages/opencode-plugin/src/project_state.ts"),
         Path("packages/opencode-plugin/src/followup.ts"),
