@@ -51,6 +51,7 @@ export interface InjectionSummary {
   readonly injected: boolean
   readonly recallCount: number
   readonly recallChars: number
+  readonly digestCount: number
   readonly habitCount: number
   readonly habitChars: number
   readonly habitCandidate: boolean
@@ -59,12 +60,13 @@ export interface InjectionSummary {
   readonly injectedIds: readonly string[]
 }
 
-const NO_INJECTION: InjectionSummary = { injected: false, recallCount: 0, recallChars: 0, habitCount: 0, habitChars: 0, habitCandidate: false, normCount: 0, normChars: 0, injectedIds: [] }
+const NO_INJECTION: InjectionSummary = { injected: false, recallCount: 0, recallChars: 0, digestCount: 0, habitCount: 0, habitChars: 0, habitCandidate: false, normCount: 0, normChars: 0, injectedIds: [] }
 
 export function classifyPackets(packets: readonly string[]): InjectionSummary {
   if (packets.length === 0) return NO_INJECTION
   let recallCount = 0
   let recallChars = 0
+  let digestCount = 0
   let habitCount = 0
   let habitChars = 0
   let habitCandidate = false
@@ -91,7 +93,8 @@ export function classifyPackets(packets: readonly string[]): InjectionSummary {
       collectIds(trimmed, injectedIds)
     }
   }
-  return { injected: recallCount > 0 || habitCount > 0 || habitCandidate || normCount > 0, recallCount, recallChars, habitCount, habitChars, habitCandidate, normCount, normChars, injectedIds: [...injectedIds] }
+  digestCount = [...injectedIds].filter((id) => id.startsWith("digest-")).length
+  return { injected: recallCount > 0 || habitCount > 0 || habitCandidate || normCount > 0, recallCount, recallChars, digestCount, habitCount, habitChars, habitCandidate, normCount, normChars, injectedIds: [...injectedIds] }
 }
 
 function collectIds(text: string, ids: Set<string>): void {

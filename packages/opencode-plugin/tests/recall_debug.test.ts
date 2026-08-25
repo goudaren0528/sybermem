@@ -8,14 +8,15 @@ import { compactJsonlJournal } from "../src/state"
 describe("recall debug", () => {
   it("builds inject entries from bounded recall packet metadata", () => {
     // Given
-    const packet = "## SyberMem Recall Hints\n- 💡 [change-abc123] match: topic\nsecret-unicorn-8472"
+    const packet = "## SyberMem Recall Hints\n- 💡 [digest-abc123] match: topic\n- [change-abc123] match: topic\nsecret-unicorn-8472"
 
     // When
     const entry = buildRecallDebugEntry([packet], "2026-08-14T00:00:00.000Z")
 
     // Then
     expect(entry.event).toBe("inject")
-    expect(entry.record_ids).toEqual(["change-abc123"])
+    expect(entry.record_ids).toEqual(["digest-abc123", "change-abc123"])
+    expect(entry.has_digest).toBe(true)
     expect(entry.match_classes).toEqual(["topic"])
     expect(JSON.stringify(entry)).not.toContain("secret-unicorn-8472")
   })
@@ -26,6 +27,7 @@ describe("recall debug", () => {
 
     // Then
     expect(entry.event).toBe("abstain")
+    expect(entry.has_digest).toBe(false)
     expect(entry.reason).toBe("no-high-signal-recall")
   })
 

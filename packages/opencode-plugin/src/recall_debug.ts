@@ -7,6 +7,7 @@ export interface RecallDebugEntry {
   readonly timestamp: string
   readonly event: RecallDebugEvent
   readonly record_ids: readonly string[]
+  readonly has_digest: boolean
   readonly match_classes: readonly string[]
   readonly reason: string
 }
@@ -20,8 +21,9 @@ function uniqueMatches(text: string, pattern: RegExp): readonly string[] {
 
 export function buildRecallDebugEntry(packets: readonly string[], timestamp = new Date().toISOString()): RecallDebugEntry {
   const recallPacket = packets.find((packet) => packet.trim().startsWith("## SyberMem Recall Hints")) ?? ""
-  if (!recallPacket) return { source: "opencode-chat-message", timestamp, event: "abstain", record_ids: [], match_classes: [], reason: "no-high-signal-recall" }
-  return { source: "opencode-chat-message", timestamp, event: "inject", record_ids: uniqueMatches(recallPacket, RECORD_ID_RE), match_classes: uniqueMatches(recallPacket, MATCH_CLASS_RE), reason: "high-signal-recall" }
+  if (!recallPacket) return { source: "opencode-chat-message", timestamp, event: "abstain", record_ids: [], has_digest: false, match_classes: [], reason: "no-high-signal-recall" }
+  const recordIDs = uniqueMatches(recallPacket, RECORD_ID_RE)
+  return { source: "opencode-chat-message", timestamp, event: "inject", record_ids: recordIDs, has_digest: recordIDs.some((recordID) => recordID.startsWith("digest-")), match_classes: uniqueMatches(recallPacket, MATCH_CLASS_RE), reason: "high-signal-recall" }
 }
 
 export function appendRecallDebug(root: string, packets: readonly string[], timestamp?: string): void {
