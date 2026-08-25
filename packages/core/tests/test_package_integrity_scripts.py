@@ -419,6 +419,25 @@ def test_package_integrity_guards_cli_first_project_memory_stats_contract() -> N
     assert 'project_sub.add_parser("memory-stats")' in cli_main
 
 
+def test_package_integrity_guards_memory_observability_upgrade_contract() -> None:
+    # Given: old users must be able to learn how the new OpenCode observability reaches them
+    for relative_path in [
+        Path("packages/claude-skills/sybermem-update/SKILL.md"),
+        Path("skills/sybermem-update/SKILL.md"),
+    ]:
+        text = (ROOT / relative_path).read_text(encoding="utf-8")
+        lowered = text.lower()
+
+        # When / Then: the update skill distinguishes global runtime/plugin refresh
+        # from project-local refresh and explicitly names the new runtime log.
+        assert ".memory-usage.jsonl" in text
+        assert "prompt-memory-injected" in text
+        assert "global opencode plugin" in lowered
+        assert "global cli/core" in lowered
+        assert "do not create, refresh, or migrate any project-local managed files" in lowered
+        assert "runtime log" in lowered
+
+
 def test_local_install_and_update_scripts_force_refresh_core_and_cli_packages() -> None:
     # Given: local install/update scripts are supported runtime refresh entrypoints
     scripts = (
