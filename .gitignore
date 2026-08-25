@@ -33,3 +33,17 @@ dist/
 # the shipped project-file templates under packages/**/project-files/.sybermem/
 # and skills/**/project-files/.sybermem/ are NOT ignored.
 /.sybermem/
+
+# >>> SyberMem >>>
+# SyberMem machine-local runtime, scripts, and hook wiring (not shareable memory).
+/.sybermem/hooks/
+/.sybermem/.recall-debug.jsonl
+/.sybermem/.recall-outcomes.jsonl
+/.sybermem/.auto-trail.jsonl
+/.sybermem/.nudge-state.json
+/.sybermem/.opencode-nudge-state.json
+/.sybermem/.record-intent.json
+/.sybermem/.auto-change-state.json
+/.sybermem/.codex-compact-marker.json
+/.claude/settings.json
+# <<< SyberMem <<<
