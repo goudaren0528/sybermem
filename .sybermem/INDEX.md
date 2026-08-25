@@ -20,6 +20,7 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 - [change-7f75f17f01cc4d249ca8468e7bbfec7d] #habit #opencode #ux — Habits were invisible because add_habit defaulted to compaction_ok while the prompt-time selector required prompt_ok_when_supported, and _terms\(\) never tokenized CJK so applies_to killed every Chinese context; fixed by defaulting to prompt-ok, CJK-aware weighted relevance, and a suggested_scope routing hint (2026-08-24)
 - [change-bcac35f53e004164adb47471d7cf094d] #norm #opencode #ux — Delivered norm P1 — per-prompt scoped-norm recall + compaction constitution reuse \(OpenCode\), memory-stats norm coverage, and digest-time emergent nomination of recurring constraints \(confirmation-first\) — so norms reach relevant work and recurring rules get proactively surfaced for crystallization (2026-08-24)
 - [change-c2be7cced7eb4250b288606869f1e726] #uninstall #distribution #safety — Added explicit project/global uninstall routing because users need safe natural-language scope selection while preserving project memory histories. (2026-08-25)
+- [change-e3777a9e3b784c43b6af93be99707348] #opencode #installer #windows — Added a Python-based SyberMem install/update path so Windows OpenCode users can refresh globally without spawning powershell.exe. (2026-08-25)
 - [change-f8bd388c7bac4ee584c68edc97951e18] #documentation #norm #digest — Brought docs/feature_map.md and both READMEs \(zh + en\) up to date with the three recent subsystems \(prompt-time habit perceptibility + CJK relevance, digest backlog + digest-conclusion feedback, and the full project-norm subsystem\) so public capability claims match the shipped code (2026-08-24)
 - [decision-c24f122fbe5d46ee8095022e6b8c53c8] #architecture #memory #retrieval — The 7 record types are the right main split, but the schema is NOT sufficient for high-quality future summarize/recall/review/QA; the accepted upgrade is typed relations + provenance/verification + selective temporal/confidence fields + an open-item type + entity/question fields + schema-assisted retrieval — all Markdown-first, optional, fail-open, with reverse edges and salience DERIVED not agent-authored (2026-08-25)
 - [decision-f780ec7166e14fc2ab1ac595c0edda03] #architecture #team #distribution — For a single team sharing one repo's .sybermem/ via Git, Team mode's only genuinely unique value \(cross-repo management projection\) targets a persona that does not exist here, so it is chicken-rib; the accepted path is DEPRECATE-THEN-REMOVE \(not direct delete, not demote-to-optional\), preceded by a mandatory shared-seam migration, with a read-only registry-based portfolio as the cheaper replacement (2026-08-25)
@@ -67,6 +68,7 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 | change-7f75f17f01cc4d249ca8468e7bbfec7d | 2026-08-24 | Make user habits perceptible at prompt time \(default prompt-ok, CJK match, scope routing\) | done | [link](changes/2026-08-24-change-7f75f17f01cc4d249ca8468e7bbfec7d-habit-prompt-time-perceptibility.md) |
 | change-bcac35f53e004164adb47471d7cf094d | 2026-08-24 | Norm subsystem P1 — scoped recall, compaction constitution, memory-stats visibility, emergent nomination | done | [link](changes/2026-08-24-change-bcac35f53e004164adb47471d7cf094d-norm-p1-scoped-recall-nomination.md) |
 | change-c2be7cced7eb4250b288606869f1e726 | 2026-08-25 | Scoped uninstall CLI and natural-language uninstall skill | active | [link](changes/2026-08-25-change-c2be7cced7eb4250b288606869f1e726-scoped-uninstall.md) |
+| change-e3777a9e3b784c43b6af93be99707348 | 2026-08-25 | OpenCode Python update path for Windows PowerShell spawn failures | active | [link](changes/2026-08-25-change-e3777a9e3b784c43b6af93be99707348-opencode-python-update-path.md) |
 | change-f8bd388c7bac4ee584c68edc97951e18 | 2026-08-24 | Refresh Feature Map and READMEs for habit perceptibility, digest backlog/feedback, and the norm subsystem | done | [link](changes/2026-08-24-change-f8bd388c7bac4ee584c68edc97951e18-docs-refresh-habit-digest-norm.md) |
 
 ## Technical Decisions
@@ -111,9 +113,10 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 - distribution: change-0c35875b8fde4feb93837ce354533b9b, change-13b0a327e1544f3e8e5ac5d3992c5c97, change-2b4df42e0ff942718e9afef5897ecc4c, change-2b9c79a39ea64b178c9902894cbd49fd, change-657dd8880ab24e889e1f3b2b1521ee3a, change-c2be7cced7eb4250b288606869f1e726, decision-f780ec7166e14fc2ab1ac595c0edda03
 - documentation: change-f8bd388c7bac4ee584c68edc97951e18
 - habit: change-7f75f17f01cc4d249ca8468e7bbfec7d
+- installer: change-e3777a9e3b784c43b6af93be99707348
 - memory: decision-c24f122fbe5d46ee8095022e6b8c53c8
 - norm: change-2011a3f2b21e40dbb926187ebae50cf8, change-3d8c9c844d5747c3b15e84838a2d4fe8, change-bcac35f53e004164adb47471d7cf094d, change-f8bd388c7bac4ee584c68edc97951e18, requirement-75f7b0e98b7043eeac310fa2a36ba36d
-- opencode: change-2011a3f2b21e40dbb926187ebae50cf8, change-33b663865936415c9ae9a34e28f6ea6c, change-76481099f07c4f1f9de150a0281fb58f, change-7f75f17f01cc4d249ca8468e7bbfec7d, change-bcac35f53e004164adb47471d7cf094d, requirement-75f7b0e98b7043eeac310fa2a36ba36d
+- opencode: change-2011a3f2b21e40dbb926187ebae50cf8, change-33b663865936415c9ae9a34e28f6ea6c, change-76481099f07c4f1f9de150a0281fb58f, change-7f75f17f01cc4d249ca8468e7bbfec7d, change-bcac35f53e004164adb47471d7cf094d, change-e3777a9e3b784c43b6af93be99707348, requirement-75f7b0e98b7043eeac310fa2a36ba36d
 - process: norm-e86ae226dbbf4e28af3de8c1db92f552
 - qa: change-13b0a327e1544f3e8e5ac5d3992c5c97, change-2b4df42e0ff942718e9afef5897ecc4c
 - quality: bug-146ffbf8c1d9415d9708e8f18b003971
@@ -125,6 +128,7 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 - team: change-0c35875b8fde4feb93837ce354533b9b, change-13b0a327e1544f3e8e5ac5d3992c5c97, change-2b9c79a39ea64b178c9902894cbd49fd, change-657dd8880ab24e889e1f3b2b1521ee3a, decision-f780ec7166e14fc2ab1ac595c0edda03
 - uninstall: change-c2be7cced7eb4250b288606869f1e726
 - ux: change-33b663865936415c9ae9a34e28f6ea6c, change-3d8c9c844d5747c3b15e84838a2d4fe8, change-76481099f07c4f1f9de150a0281fb58f, change-7f75f17f01cc4d249ca8468e7bbfec7d, change-bcac35f53e004164adb47471d7cf094d
+- windows: change-e3777a9e3b784c43b6af93be99707348
 
 ## Project Norms
 
