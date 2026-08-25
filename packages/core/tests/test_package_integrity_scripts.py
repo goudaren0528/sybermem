@@ -169,6 +169,7 @@ def test_package_integrity_checks_cli_using_skills_with_fixed_launcher_guidance(
         Path("packages/claude-skills/sybermem-update/SKILL.md"),
         Path("packages/claude-skills/sybermem-summary/SKILL.md"),
         Path("packages/claude-skills/sybermem-phase-analyze/SKILL.md"),
+        Path("packages/claude-skills/sybermem-uninstall/SKILL.md"),
     ]
     assert callable(checker["check_skill_cli_resolution_guidance"])
     assert callable(checker["check_project_refresh_contract"])
@@ -234,9 +235,29 @@ def test_package_integrity_requires_distribution_scripts_clean_retired_skills() 
             continue
         for retired in checker["RETIRED_SKILL_NAMES"]:
             assert retired in text, f"{relative_path.as_posix()} must clean retired skill {retired}"
-    manifest = (ROOT / "scripts" / "managed-install.json").read_text(encoding="utf-8")
+    import json
+
+    manifest = json.loads((ROOT / "scripts" / "managed-install.json").read_text(encoding="utf-8"))
     for retired in checker["RETIRED_SKILL_NAMES"]:
-        assert retired in manifest
+        assert retired in manifest["retired_skills"]
+        assert retired not in manifest["skills"]
+
+
+def test_package_integrity_guards_uninstall_scope_skill_distribution() -> None:
+    # Given: /sybermem-uninstall is a CLI-using skill distributed to every host
+    checker = runpy.run_path(str(CHECK_SCRIPT))
+
+    # When / Then: it is tracked by launcher guidance and every distribution script exposes it
+    assert Path("packages/claude-skills/sybermem-uninstall/SKILL.md") in checker["CLI_USING_SKILLS"]
+    for relative_path in checker["VISIBLE_SKILL_SCRIPTS"]:
+        text = (ROOT / relative_path).read_text(encoding="utf-8")
+        assert "sybermem-uninstall" in text
+        assert "/sybermem-uninstall" in text
+
+    cli_main = (ROOT / "packages" / "cli" / "sybermem_cli" / "main.py").read_text(encoding="utf-8")
+    assert 'sub.add_parser("uninstall")' in cli_main
+    assert 'choices=["project", "global"]' in cli_main
+    assert 'cmd_uninstall' in cli_main
 
 
 def test_cli_using_skills_include_fixed_launcher_contract_fragments() -> None:
