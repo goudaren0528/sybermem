@@ -117,6 +117,7 @@ PACKAGE_METADATA: Final = [
 OPENCODE_PLUGIN_SOURCE_MODULES: Final = [
     Path("packages/opencode-plugin/src/index.ts"),
     Path("packages/opencode-plugin/src/plugin.ts"),
+    Path("packages/opencode-plugin/src/injection_toast.ts"),
     Path("packages/opencode-plugin/src/runtime.ts"),
     Path("packages/opencode-plugin/src/project_state.ts"),
     Path("packages/opencode-plugin/src/followup.ts"),
@@ -940,11 +941,12 @@ def check_opencode_recall_relevance_wiring(root: Path) -> None:
 
 
 def check_habit_awareness_wiring(root: Path) -> None:
-    """Guard candidate-only habit intent capture, distinct habit toast, and awareness.
+    """Guard candidate-only habit intent capture, prompt-time summary toast, and awareness.
 
     Habit perception must stay honest and privacy-safe: capture is candidate-only
-    (never an active habit, never persists secrets), the applied-habit toast is
-    distinct from recall, and awareness surfaces only counts, not statements.
+    (never an active habit, never persists secrets), prompt-time success emits one
+    bounded injection summary after actual model-visible insertion, and awareness
+    surfaces only counts, not statements.
     """
     plugin_path = root / "packages" / "opencode-plugin" / "sybermem.ts"
     if not plugin_path.is_file():
@@ -954,15 +956,20 @@ def check_habit_awareness_wiring(root: Path) -> None:
         "captureHabitIntentWithCli",
         "habit intent --prompt",
         "habit awareness",
-        "user habit reminder",  # distinct habit toast text (lowercased check below)
+        "user habit reminder",
+        "prompt-memory-injected",
     ]
     lowered = plugin_text.lower()
     missing = [fragment for fragment in required_bundle if fragment.lower() not in lowered]
     if missing:
         fail(f"packages/opencode-plugin/sybermem.ts is missing habit awareness wiring: {', '.join(missing)}")
-    # The habit toast must be its own message, not merged into the recall toast.
-    if "applied" not in lowered or "habit" not in lowered:
-        fail("packages/opencode-plugin/sybermem.ts must emit a distinct applied-habit toast")
+    if "habit-injected" in lowered or "norm-injected" in lowered or "recall-injected" in lowered:
+        fail("packages/opencode-plugin/sybermem.ts must use the Phase 3 prompt-memory summary toast instead of separate success toasts")
+    injection_toast_text = (root / "packages" / "opencode-plugin" / "src" / "injection_toast.ts").read_text(encoding="utf-8")
+    required_summary_source = ["items=", "chars=", "laneCounts", "recall", "habit", "norm"]
+    missing_summary_source = [fragment for fragment in required_summary_source if fragment not in injection_toast_text]
+    if missing_summary_source:
+        fail(f"packages/opencode-plugin/src/injection_toast.ts is missing Phase 3 summary toast fragments: {', '.join(missing_summary_source)}")
     # Core: candidate-only capture with a blocked-secret guard and awareness summary.
     habits_text = (root / "packages" / "core" / "sybermem_core" / "user_habits.py").read_text(encoding="utf-8")
     required_core = ["classify_habit_intent", "capture_habit_intent", "candidate_only", "habit_awareness_summary", "_BLOCKED_INTENT_RE", ".habit-intent.json"]

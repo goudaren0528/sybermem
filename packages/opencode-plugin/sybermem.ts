@@ -1391,7 +1391,7 @@ function appendMemoryUsage(root, input, options = {}) {
   return entry;
 }
 
-// packages/opencode-plugin/src/plugin.ts
+// packages/opencode-plugin/src/injection_toast.ts
 async function showToast(client, message) {
   try {
     await client.tui.showToast({ body: { message, variant: "info" } });
@@ -1407,33 +1407,25 @@ function throttledToast(client, key, message) {
   LAST_TOAST.set(key, now);
   showToast(client, message);
 }
-function readSessionID(source) {
-  if (typeof source !== "object" || source === null)
-    return "";
-  for (const key of ["sessionID", "sessionId", "session"]) {
-    const value = Reflect.get(source, key);
-    if (typeof value === "string" && value)
-      return value;
-  }
-  return "";
-}
-function recallToastMessage(summary) {
-  if (summary.recallCount === 0)
+function buildPromptInjectionToastSummary(summary, usageEntry) {
+  const laneCounts = [];
+  if (summary.recallCount > 0)
+    laneCounts.push({ lane: "recall", count: summary.recallCount });
+  if (summary.habitCount > 0)
+    laneCounts.push({ lane: "habit", count: summary.habitCount });
+  if (summary.normCount > 0)
+    laneCounts.push({ lane: "norm", count: summary.normCount });
+  if (laneCounts.length === 0)
     return null;
-  const n = summary.recallCount;
-  return `\u2B50 SyberMem \u8BB0\u5FC6\u5DF2\u52A0\u5165\u672C\u8F6E\u56DE\u7B54\u53C2\u8003\uFF1A${n} \u6761\u76F8\u5173\u8BB0\u5F55 (recall)`;
+  return {
+    totalItems: usageEntry.recall_items + usageEntry.habit_items + usageEntry.norm_items,
+    totalChars: usageEntry.recall_chars + usageEntry.habit_chars + usageEntry.norm_chars,
+    laneCounts
+  };
 }
-function habitToastMessage(summary) {
-  if (summary.habitCount === 0)
-    return null;
-  const n = summary.habitCount;
-  return `\uD83E\uDDE0 SyberMem \u5DF2\u5E94\u7528\u4F60\u7684 ${n} \u6761\u4E60\u60EF (applied ${n} user habit reminder${n === 1 ? "" : "s"})`;
-}
-function normToastMessage(summary) {
-  if (summary.normCount === 0)
-    return null;
-  const n = summary.normCount;
-  return `\uD83D\uDCCF SyberMem \u5DF2\u5E94\u7528 ${n} \u6761\u76F8\u5173\u9879\u76EE\u89C4\u8303 (applied ${n} project norm${n === 1 ? "" : "s"})`;
+function promptInjectionToastMessage(summary) {
+  const laneCounts = summary.laneCounts.map(({ lane, count }) => `${lane}=${count}`).join(", ");
+  return `\u2B50 SyberMem \u6CE8\u5165\u6458\u8981: items=${summary.totalItems}, chars=${summary.totalChars}, ${laneCounts}`;
 }
 function habitCandidateToast(habitIntent) {
   if (habitIntent.captured && habitIntent.suggestedScope === "project") {
@@ -1443,6 +1435,18 @@ function habitCandidateToast(habitIntent) {
     return "\uD83D\uDCA1 SyberMem \u53D1\u73B0\u4E00\u6761\u53EF\u590D\u7528\u7684\u4E2A\u4EBA\u4E60\u60EF \u2014 \u9700\u8981\u7684\u8BDD\u7528 /sybermem-habit \u4E00\u6B65\u786E\u8BA4";
   }
   return "\uD83D\uDCA1 SyberMem \u53D1\u73B0\u4E00\u6761\u53EF\u590D\u7528\u7684\u504F\u597D/\u89C4\u8303 \u2014 \u9700\u8981\u7684\u8BDD\u7528 /sybermem-habit \u4E00\u6B65\u786E\u8BA4\uFF08\u4F1A\u95EE\u4F60\u8BB0\u6210\u4E60\u60EF\u8FD8\u662F\u9879\u76EE\u7EA6\u5B9A\uFF09";
+}
+
+// packages/opencode-plugin/src/plugin.ts
+function readSessionID(source) {
+  if (typeof source !== "object" || source === null)
+    return "";
+  for (const key of ["sessionID", "sessionId", "session"]) {
+    const value = Reflect.get(source, key);
+    if (typeof value === "string" && value)
+      return value;
+  }
+  return "";
 }
 async function handleSessionCreated(args, root, sessionID) {
   const versionNudge = updateNudgeMessage(root);
@@ -1602,16 +1606,9 @@ var SyberMemPlugin = async ({ $, directory, client }) => {
       const usageEntry = appendMemoryUsage(root, { sessionID: sessionID ?? "", packets, startup });
       if (sessionID)
         recordMemoryUsage(sessionID, usageEntry);
-      if (!summary.habitCandidate) {
-        const recallMessage = recallToastMessage(summary);
-        if (recallMessage)
-          throttledToast(args.client, "recall-injected", recallMessage);
-        const habitMessage = habitToastMessage(summary);
-        if (habitMessage)
-          throttledToast(args.client, "habit-injected", habitMessage);
-        const normMessage = normToastMessage(summary);
-        if (normMessage)
-          throttledToast(args.client, "norm-injected", normMessage);
+      const promptInjectionToast = buildPromptInjectionToastSummary(summary, usageEntry);
+      if (promptInjectionToast) {
+        throttledToast(args.client, "prompt-memory-injected", promptInjectionToastMessage(promptInjectionToast));
       }
       armReplyMarker(sessionID ?? "", summary.recallCount, summary.habitCount);
     },
