@@ -16,12 +16,12 @@ Goal: add an OpenCode-first observability loop for actual memory injection usage
 
 ### 1. Actual Injection Usage Journal
 
-- [ ] Add focused tests for extracting actual injected lane counts, record ids, startup presence, and rendered character counts from the OpenCode transform path.
-- [ ] Add a bounded `.sybermem/.memory-usage.jsonl` writer that records only `schema_version`, timestamp, host, session id, total items/chars, lane totals, injected ids, and startup presence.
-- [ ] Write the journal only after context is actually inserted into the model-visible system prompt.
-- [ ] Verify no raw prompt or complete injected memory content is persisted and all write failures remain fail-open.
-- [ ] Run focused OpenCode plugin tests and TypeScript diagnostics.
-- [ ] Commit: `feat(opencode): log actual memory injection usage`.
+- [x] Add focused tests for extracting actual injected lane counts, record ids, startup presence, and rendered character counts from the OpenCode transform path.
+- [x] Add a bounded `.sybermem/.memory-usage.jsonl` writer that records only `schema_version`, timestamp, host, session id, total items/chars, lane totals, injected ids, and startup presence.
+- [x] Write the journal only after context is actually inserted into the model-visible system prompt.
+- [x] Verify no raw prompt or complete injected memory content is persisted and all write failures remain fail-open.
+- [x] Run focused OpenCode plugin tests and TypeScript diagnostics.
+- [x] Commit: `feat(opencode): log actual memory injection usage`.
 
 ### 2. Session Outcome Reuse
 
