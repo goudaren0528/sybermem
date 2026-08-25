@@ -663,8 +663,9 @@ function uniqueMatches(text, pattern) {
 function buildRecallDebugEntry(packets, timestamp = new Date().toISOString()) {
   const recallPacket = packets.find((packet) => packet.trim().startsWith("## SyberMem Recall Hints")) ?? "";
   if (!recallPacket)
-    return { source: "opencode-chat-message", timestamp, event: "abstain", record_ids: [], match_classes: [], reason: "no-high-signal-recall" };
-  return { source: "opencode-chat-message", timestamp, event: "inject", record_ids: uniqueMatches(recallPacket, RECORD_ID_RE), match_classes: uniqueMatches(recallPacket, MATCH_CLASS_RE), reason: "high-signal-recall" };
+    return { source: "opencode-chat-message", timestamp, event: "abstain", record_ids: [], has_digest: false, match_classes: [], reason: "no-high-signal-recall" };
+  const recordIDs = uniqueMatches(recallPacket, RECORD_ID_RE);
+  return { source: "opencode-chat-message", timestamp, event: "inject", record_ids: recordIDs, has_digest: recordIDs.some((recordID) => recordID.startsWith("digest-")), match_classes: uniqueMatches(recallPacket, MATCH_CLASS_RE), reason: "high-signal-recall" };
 }
 function appendRecallDebug(root, packets, timestamp) {
   boundedJsonlAppend(root, ".recall-debug.jsonl", buildRecallDebugEntry(packets, timestamp), 200);
@@ -773,12 +774,13 @@ function stashPromptPackets(sessionID, packets) {
   else
     RECALL_STASH.delete(sessionID);
 }
-var NO_INJECTION = { injected: false, recallCount: 0, recallChars: 0, habitCount: 0, habitChars: 0, habitCandidate: false, normCount: 0, normChars: 0, injectedIds: [] };
+var NO_INJECTION = { injected: false, recallCount: 0, recallChars: 0, digestCount: 0, habitCount: 0, habitChars: 0, habitCandidate: false, normCount: 0, normChars: 0, injectedIds: [] };
 function classifyPackets(packets) {
   if (packets.length === 0)
     return NO_INJECTION;
   let recallCount = 0;
   let recallChars = 0;
+  let digestCount = 0;
   let habitCount = 0;
   let habitChars = 0;
   let habitCandidate = false;
@@ -806,7 +808,8 @@ function classifyPackets(packets) {
       collectIds(trimmed, injectedIds);
     }
   }
-  return { injected: recallCount > 0 || habitCount > 0 || habitCandidate || normCount > 0, recallCount, recallChars, habitCount, habitChars, habitCandidate, normCount, normChars, injectedIds: [...injectedIds] };
+  digestCount = [...injectedIds].filter((id) => id.startsWith("digest-")).length;
+  return { injected: recallCount > 0 || habitCount > 0 || habitCandidate || normCount > 0, recallCount, recallChars, digestCount, habitCount, habitChars, habitCandidate, normCount, normChars, injectedIds: [...injectedIds] };
 }
 function collectIds(text, ids) {
   for (const match of text.matchAll(/\b(?:change|decision|requirement|bug|digest|habit|norm)-[a-z0-9-]+\b/gi))
@@ -1436,6 +1439,7 @@ function buildMemoryUsageEntry(input, options = {}) {
   const habitChars = packetChars(input.packets, "## User Habit Reminder");
   const normChars = packetChars(input.packets, "## Relevant Project Norms");
   const injectedIds = uniqueStructuredIds(input.packets, startup);
+  const digestItems = injectedIds.filter((id) => id.startsWith("digest-")).length;
   return {
     schema_version: 1,
     timestamp: options.timestamp ?? new Date().toISOString(),
@@ -1443,6 +1447,7 @@ function buildMemoryUsageEntry(input, options = {}) {
     session_id: boundText(input.sessionID, MAX_SESSION_ID_CHARS),
     total_items: summary.recallCount + summary.habitCount + summary.normCount + startupItems,
     total_chars: recallChars + habitChars + normChars + startup.length,
+    digest_items: digestItems,
     recall_items: summary.recallCount,
     recall_chars: recallChars,
     habit_items: summary.habitCount,
