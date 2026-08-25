@@ -39,6 +39,9 @@ def is_sybermem_project(root: Path) -> bool:
 
 
 def read_team_from_project_yaml(root: Path) -> dict[str, str]:
+    # DEPRECATED-compat reader (Team mode is being removed; decision-f780ec). Existing
+    # `team:` blocks are read for the deprecation window; after removal they are ignored as
+    # inert legacy metadata and are never auto-rewritten.
     yaml_path = root / ".sybermem" / "project.yaml"
     if not yaml_path.is_file():
         return {}
@@ -59,6 +62,9 @@ def read_team_from_project_yaml(root: Path) -> dict[str, str]:
 
 
 def write_team_to_project_yaml(root: Path, team_id: str, team_path: str) -> None:
+    # DEPRECATED (Team mode is being removed; decision-f780ec). Only the Team publish flow
+    # calls this; ordinary project init/refresh never writes a `team:` block. Removed with
+    # the Team subsystem in the breaking release.
     yaml_path = root / ".sybermem" / "project.yaml"
     if not yaml_path.is_file():
         return

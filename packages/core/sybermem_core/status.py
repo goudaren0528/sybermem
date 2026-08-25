@@ -139,7 +139,13 @@ def build_publication_preview(root: Path, status: dict | None = None) -> dict:
 
 
 def team_publication_metadata(root: Path, slug: str, preview: dict | None = None) -> dict:
-    """Return additive Team trust metadata without touching Team or Project files."""
+    """Return additive Team trust metadata without touching Team or Project files.
+
+    DEPRECATED (Team mode is being removed; see decision-f780ec). Returns {} whenever the
+    project has no Team association, so ordinary project status stays valid without Team.
+    The `publication.team` field will be removed in a future breaking release; consumers
+    should not rely on its presence.
+    """
     team = read_team_from_project_yaml(root)
     if not team.get("team_path"):
         return {}

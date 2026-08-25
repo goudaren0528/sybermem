@@ -197,6 +197,9 @@ def recommend_next_step_read_only(
             "reason": f"{backlog_uncovered} records are not covered by any digest yet. Consider a new phase digest to compress the accumulated work."
         }
 
+    # DEPRECATED Team-publish recommendation (Team mode is being removed; decision-f780ec).
+    # Fires ONLY for projects that already have a Team association, so new projects never
+    # see it. Removed entirely in the breaking release.
     if team.get("team_path"):
         team_root = Path(team["team_path"])
         meta_path = team_root / "projects" / status["slug"] / "meta.json"
