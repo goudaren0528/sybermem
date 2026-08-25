@@ -228,11 +228,12 @@ def check_session_start_hook(root: Path) -> dict:
     # Stale if it still injects full Topic Index or skill list into output
     has_topic_dump = "Topic Index:" in content and "for topic, records" in content
     has_skill_list = "SyberMem skills available:" in content
-    # Also stale if it predates the digest-governance heads-up (G5): a content-check,
-    # not just existence, so this capability actually propagates to older projects
-    # via /sybermem-update (the same lesson as bug-9e13ab868).
+    # Also stale if it predates digest governance or latest-digest injection:
+    # content-check, not just existence, so these capabilities actually propagate
+    # to older projects via /sybermem-update.
     missing_digest_heads_up = "detect_stale_digests" not in content
-    is_stale = has_topic_dump or has_skill_list or missing_digest_heads_up
+    missing_latest_digest_injection = "latest_digest_section" not in content
+    is_stale = has_topic_dump or has_skill_list or missing_digest_heads_up or missing_latest_digest_injection
     return {"status": "stale" if is_stale else "fresh"}
 
 
