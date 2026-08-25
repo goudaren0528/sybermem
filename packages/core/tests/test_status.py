@@ -300,6 +300,40 @@ def test_project_memory_stats_marks_recall_unavailable_without_debug_log(tmp_pat
     assert stats["recall_health"]["status"] == "no_log"
 
 
+def test_project_memory_stats_includes_mixed_memory_usage_and_outcome_coverage(tmp_path: Path, monkeypatch) -> None:
+    # Given: a mixed OpenCode usage journal with one turn and one session outcome
+    project_root = tmp_path / "project"
+    sybermem = project_root / ".sybermem"
+    sybermem.mkdir(parents=True)
+    (sybermem / "project.yaml").write_text("project_id: project-1\nslug: demo\n", encoding="utf-8")
+    (sybermem / ".memory-usage.jsonl").write_text(
+        "\n".join(
+            [
+                json.dumps({"schema_version": 1, "host": "opencode", "timestamp": "2026-08-14T09:00:00+08:00", "session_id": "s1", "total_items": 2, "total_chars": 40, "recall_items": 1, "recall_chars": 20, "habit_items": 1, "habit_chars": 20, "norm_items": 0, "norm_chars": 0, "startup_items": 0, "startup_chars": 0}),
+                json.dumps({"schema_version": 1, "host": "opencode", "event": "session_outcome", "timestamp": "2026-08-14T09:01:00+08:00", "recall_evidence_available": True, "recall_measurable": 1, "recall_unmeasurable": 1, "recall_hit": 1}),
+            ],
+        ) + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(memory_stats_module, "now_iso", lambda: "2026-08-14T12:00:00+08:00")
+
+    # When: the public project stats payload is built
+    stats = project_memory_stats(project_root)
+
+    # Then: usage is measured from turns only and outcome coverage is explicit
+    assert stats["windows"]["7d"]["memory_usage"]["turns"] == 1
+    assert stats["windows"]["30d"]["memory_usage"]["chars"] == 40
+    assert stats["windows"]["7d"]["relevance"] == {
+        "sessions": 1,
+        "injected": 1,
+        "measurable": 1,
+        "unmeasurable": 1,
+        "hit": 1,
+        "precision": 1.0,
+        "evidence_available": True,
+    }
+
+
 def _make_recall_health_project(tmp_path: Path, lines: list[str], monkeypatch, outcome_lines: list[str] | None = None) -> Path:
     project_root = tmp_path / "project"
     sybermem = project_root / ".sybermem"
