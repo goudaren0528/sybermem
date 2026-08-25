@@ -33,6 +33,7 @@ describe("prompt context helpers", () => {
     // Then
     expect(injected.injected).toBe(true)
     expect(injected.recallCount).toBe(1)
+    expect(injected.digestCount).toBe(0)
     expect(injected.habitCount).toBe(0)
     expect(output.system[0].startsWith("## SyberMem Recall Hints")).toBe(true)
   })
@@ -42,7 +43,7 @@ describe("prompt context helpers", () => {
     const injected = injectStashedPromptPackets("session-empty", { system: ["base"] })
 
     // Then
-    expect(injected).toEqual({ injected: false, recallCount: 0, recallChars: 0, habitCount: 0, habitChars: 0, habitCandidate: false, normCount: 0, normChars: 0, injectedIds: [] })
+    expect(injected).toEqual({ injected: false, recallCount: 0, recallChars: 0, digestCount: 0, habitCount: 0, habitChars: 0, habitCandidate: false, normCount: 0, normChars: 0, injectedIds: [] })
   })
 
   it("classifies recall and habit packets with counts", () => {
@@ -58,11 +59,25 @@ describe("prompt context helpers", () => {
     // Then
     expect(summary.recallCount).toBe(2)
     expect(summary.habitCount).toBe(2)
+    expect(summary.digestCount).toBe(0)
     expect(summary.habitCandidate).toBe(false)
     expect(summary.injected).toBe(true)
     expect(summary.recallChars).toBe(48)
     expect(summary.habitChars).toBe(92)
     expect(summary.injectedIds).toEqual(["change-1", "decision-2", "habit-a", "habit-b"])
+  })
+
+  it("counts digest ids inside injected structured record ids", () => {
+    // Given
+    const packets = ["## SyberMem Recall Hints\n- [digest-phase-a] phase digest\n- [change-a] raw record"]
+
+    // When
+    const summary = classifyPackets(packets)
+
+    // Then
+    expect(summary.recallCount).toBe(2)
+    expect(summary.digestCount).toBe(1)
+    expect(summary.injectedIds).toEqual(["digest-phase-a", "change-a"])
   })
 
   it("flags a habit packet with no concrete habit as a preference candidate", () => {
