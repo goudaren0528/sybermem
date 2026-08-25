@@ -229,8 +229,7 @@ silently write — to create one small illustrative `change` record that capture
 - Use `/sybermem-record` after meaningful work
 - (Fresh projects) if you accepted the sample record, try `/sybermem-resume` now to see the continuity view in action
 - Use `/sybermem-summary` for weekly or monthly progress reports
-- If this project belongs in Team memory, use `/sybermem-team-publish`
-- If the project is already linked to Team memory, use `/sybermem-team-summary` to generate a Team management summary
+- Use `sybermem portfolio` for a read-only cross-project view of registered projects
 - Use `/sybermem-update` later to refresh global skills and re-check this project
 ```
 

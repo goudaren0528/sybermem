@@ -65,13 +65,13 @@ try {
                 Remove-Item -Path $legacyPath -Recurse -Force -Confirm:$false
             }
         }
-        foreach ($retiredSkill in @("sybermem-phase-confirm")) {
+        foreach ($retiredSkill in @("sybermem-phase-confirm", "sybermem-team-publish", "sybermem-team-summary")) {
             $retiredPath = Join-Path $target.Path $retiredSkill
             if (Test-Path $retiredPath) {
                 Remove-Item -Path $retiredPath -Recurse -Force -Confirm:$false
             }
         }
-        foreach ($skill in @("sybermem-init-project", "sybermem-record", "sybermem-summary", "sybermem-resume", "sybermem-digest", "sybermem-phase-analyze", "using-sybermem", "sybermem-update", "sybermem-search", "sybermem-link", "sybermem-theme-digest", "sybermem-team-publish", "sybermem-team-summary", "sybermem-habit")) {
+        foreach ($skill in @("sybermem-init-project", "sybermem-record", "sybermem-summary", "sybermem-resume", "sybermem-digest", "sybermem-phase-analyze", "using-sybermem", "sybermem-update", "sybermem-search", "sybermem-link", "sybermem-theme-digest", "sybermem-habit")) {
             $src = Join-Path $SkillsSrc $skill
             $dst = Join-Path $target.Path $skill
             if (Test-Path $src) {
@@ -243,8 +243,7 @@ Write-Host "  /sybermem-update        - Refresh global skills, then re-check the
 Write-Host "  /sybermem-search        - Search/query records by keyword, topic, phase range, date range, or record ID"
 Write-Host "  /sybermem-link          - Add a forward relation between two existing records"
 Write-Host "  /sybermem-theme-digest  - Create a durable topic-level digest"
-Write-Host "  /sybermem-team-publish  - Publish the current project into Team memory"
-Write-Host "  /sybermem-team-summary  - Generate the Team management summary"
+
 Write-Host "  /sybermem-habit         - Manage user-level habit memory and reminders"
 Write-Host ""
 # Honest PATH guidance: the wrapper lives in $CliDir, not on PATH by default on

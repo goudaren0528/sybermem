@@ -4,7 +4,7 @@
 
 Refreshing the global install alone does not automatically refresh project-local hooks, templates, or managed settings patches. After every global install or update, open each target project and run `/sybermem-update`.
 
-That matters for resume, search, and Team publish behavior too. A global refresh makes the latest skills and runtime available to the user, but existing projects still need `/sybermem-update` when you want refreshed managed instructions, hook files, templates, or settings surgery inside the project.
+That matters for resume and search behavior too. A global refresh makes the latest skills and runtime available to the user, but existing projects still need `/sybermem-update` when you want refreshed managed instructions, hook files, templates, or settings surgery inside the project.
 
 Installers write the installed version to `~/.claude/sybermem/VERSION`, and `sybermem project refresh` stamps `sybermem_version` into each project's `.sybermem/project.yaml`. When a project trails the installed SyberMem, session-start surfaces a throttled, fail-open `⭐ run /sybermem-update` nudge (OpenCode `session.created` toast; Claude/Codex `SessionStart` additionalContext). Run `sybermem doctor` to see installed vs project version on demand. Unknown/empty versions never nag.
 

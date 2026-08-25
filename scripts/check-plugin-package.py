@@ -26,7 +26,7 @@ DISTRIBUTION_SCRIPTS: Final = [
 # install-remote, update, uninstall) MUST clean these from existing user installs so a
 # user upgrading to a newer version never ends up with a stale retired skill. Keeping this
 # list forces us to remember retirement when we delete a skill.
-RETIRED_SKILL_NAMES: Final = ["sybermem-phase-confirm"]
+RETIRED_SKILL_NAMES: Final = ["sybermem-phase-confirm", "sybermem-team-publish", "sybermem-team-summary"]
 VISIBLE_SKILL_SCRIPTS: Final = [
     Path("scripts/install.sh"),
     Path("scripts/install.ps1"),
@@ -119,8 +119,6 @@ CLI_USING_SKILLS: Final = [
     Path("packages/claude-skills/sybermem-record/SKILL.md"),
     Path("packages/claude-skills/sybermem-search/SKILL.md"),
     Path("packages/claude-skills/sybermem-habit/SKILL.md"),
-    Path("packages/claude-skills/sybermem-team-publish/SKILL.md"),
-    Path("packages/claude-skills/sybermem-team-summary/SKILL.md"),
     Path("packages/claude-skills/sybermem-init-project/SKILL.md"),
     Path("packages/claude-skills/sybermem-update/SKILL.md"),
     Path("packages/claude-skills/sybermem-summary/SKILL.md"),

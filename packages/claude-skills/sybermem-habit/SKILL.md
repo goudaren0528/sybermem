@@ -7,13 +7,13 @@ description: Use when the user wants SyberMem to remember, review, search, pause
 
 **Announce at start:** "I'm using the sybermem-habit skill to manage user-level habit memory."
 
-Manage explicit User Habit Memory. Habits are personal preferences stored under `~/.sybermem/user-habits/` or `SYBERMEM_HOME/user-habits/`, not project `.sybermem/` records and not Team memory.
+Manage explicit User Habit Memory. Habits are personal preferences stored under `~/.sybermem/user-habits/` or `SYBERMEM_HOME/user-habits/`, not project `.sybermem/` records.
 
 ## Hard Rules
 
 - Confirmation first: do not create an active habit unless the user explicitly asks to remember it or confirms your normalized statement.
 - Never use `/sybermem-record` for personal habits.
-- Never write raw prompt text into project records or Team memory.
+- Never write raw prompt text into project records.
 - Do not infer habits silently from behavior.
 - Prefer normalized, durable statements over verbatim user phrasing.
 - OpenCode supports bounded prompt-time habit reminders through `chat.message` + `experimental.chat.system.transform`; this skill and the CLI remain the explicit management path.

@@ -63,9 +63,6 @@ Then report:
 - whether `.sybermem/digests/` exists
 - whether `.sybermem/analysis/phase-index.md` exists
 - whether any legacy SyberMem protocol block remains in `CLAUDE.md` / `AGENTS.md` (should be removed by init/update)
-- whether `.sybermem/project.yaml` contains a `team:` block
-- whether the configured Team path is accessible
-- whether the current project appears Team-publishable
 
 ### Step 2: Report current routing behavior
 
@@ -75,8 +72,6 @@ Explain what would currently happen if the user runs:
 - `/sybermem-phase-analyze`
 - `/sybermem-record`
 - `/sybermem-update`
-- `/sybermem-team-publish`
-- `/sybermem-team-summary`
 
 ### Step 3: Recommend the next command
 
@@ -91,10 +86,10 @@ If the `sybermem` CLI is unavailable in this environment, and only then, fall
 back to the decision graph below to derive an equivalent recommendation manually.
 The graph documents the router's logic; it is not a second, competing source.
 
-Team-aware priority order when several actions seem plausible:
+Priority order when several actions seem plausible:
 
 ```text
-record > digest > team-publish
+record > digest
 ```
 
 ```dot
@@ -120,7 +115,6 @@ Examples:
 - if no phase index exists and the user wants phase-aware workflows → recommend `/sybermem-phase-analyze`
 - if important work is happening and only a lightweight trail exists → recommend `/sybermem-record`
 - if the current project has enough material but no digest → recommend `/sybermem-digest`
-- if the project has a Team association and Team memory is stale → recommend `/sybermem-team-publish`
 - if the project appears partially upgraded → recommend `/sybermem-update`
 
 ## Output Style

@@ -56,8 +56,8 @@ install_skills() {
     local label="$2"
     mkdir -p "$target"
     rm -rf "$target/init-project" "$target/record" "$target/summary"
-    rm -rf "$target/sybermem-phase-confirm"
-    for skill in sybermem-init-project sybermem-record sybermem-summary sybermem-resume sybermem-digest sybermem-phase-analyze using-sybermem sybermem-update sybermem-search sybermem-link sybermem-theme-digest sybermem-team-publish sybermem-team-summary sybermem-habit; do
+    rm -rf "$target/sybermem-phase-confirm" "$target/sybermem-team-publish" "$target/sybermem-team-summary"
+    for skill in sybermem-init-project sybermem-record sybermem-summary sybermem-resume sybermem-digest sybermem-phase-analyze using-sybermem sybermem-update sybermem-search sybermem-link sybermem-theme-digest sybermem-habit; do
         if [ -d "$SKILLS_SRC/$skill" ]; then
             rm -rf "$target/$skill"
             cp -r "$SKILLS_SRC/$skill" "$target/"
@@ -236,8 +236,7 @@ echo "  /sybermem-update        — Refresh global skills, then re-check the cur
 echo "  /sybermem-search        — Search/query records by keyword, topic, phase range, date range, or record ID"
 echo "  /sybermem-link          — Add a forward relation between two existing records (implements / fixes / related / superseded-by)"
 echo "  /sybermem-theme-digest  — Create a durable topic-level digest that compresses one theme across multiple related phases or records"
-echo "  /sybermem-team-publish  — Publish the current project into Team memory"
-echo "  /sybermem-team-summary  — Generate the Team management summary"
+
 echo "  /sybermem-habit         — Manage user-level habit memory and reminders"
 echo ""
 if [ "$SYBERMEM_ON_PATH" = "1" ]; then

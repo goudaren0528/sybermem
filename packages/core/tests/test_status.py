@@ -11,34 +11,6 @@ from sybermem_core.memory_stats import recall_health
 from sybermem_core.status import project_memory_stats, project_status
 
 
-def write_project_with_team(root: Path, team_root: Path) -> None:
-    sybermem = root / ".sybermem"
-    sybermem.mkdir()
-    (sybermem / "project.yaml").write_text(
-        f"project_id: project-1\nslug: demo\nteam:\n  team_id: team-1\n  team_path: {team_root.as_posix()}\n",
-        encoding="utf-8",
-    )
-    records = sybermem / "changes"
-    records.mkdir()
-    (records / "2026-08-04-001-current.md").write_text(
-        "\n".join(
-            [
-                "---",
-                "type: change",
-                "date: 2026-08-04",
-                "title: Current",
-                "status: implemented",
-                "---",
-                "",
-                "## Summary",
-                "Current project source.",
-            ]
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-
-
 def test_project_status_returns_empty_snapshot_when_project_is_uninitialized(tmp_path: Path) -> None:
     # Given: a directory with no .sybermem project state
     project_root = tmp_path / "empty"
@@ -56,8 +28,8 @@ def test_project_status_returns_empty_snapshot_when_project_is_uninitialized(tmp
     assert status["open_requirements"] == []
 
 
-def test_project_status_publication_team_is_empty_without_team_association(tmp_path: Path) -> None:
-    # Given: an ordinary project with NO team: block in project.yaml
+def test_project_status_has_no_publication_field_after_team_removal(tmp_path: Path) -> None:
+    # Given: an ordinary project (Team mode removed; decision-f780ec)
     project_root = tmp_path / "p"
     sybermem = project_root / ".sybermem"
     sybermem.mkdir(parents=True)
@@ -66,11 +38,10 @@ def test_project_status_publication_team_is_empty_without_team_association(tmp_p
     # When
     status = project_status(project_root)
 
-    # Then: the publication contract is preserved (shape stays) but team metadata is empty,
-    # so ordinary status stays valid without Team. (Team mode is deprecated; decision-f780ec.)
-    assert "publication" in status
-    assert status["publication"]["team"] == {}
-    assert "preview" in status["publication"]
+    # Then: the Team publication contract is gone; ordinary status is unaffected
+    assert "publication" not in status
+    assert status["slug"] == "demo"
+    assert status["open_bugs"] == []
 
 
 def test_project_status_treats_fixed_bug_as_closed_but_statusless_as_open(tmp_path: Path) -> None:
@@ -118,45 +89,6 @@ def test_recommend_next_step_returns_phase_analyze_without_commit_probe(tmp_path
     # Then: the structural prerequisite wins before any git-backed record gap check
     assert step["action"] == "/sybermem-phase-analyze"
     assert "phase index" in step["reason"]
-
-
-def test_project_status_exposes_team_trust_metadata_for_unpublished_local_changes(tmp_path: Path) -> None:
-    # Given: a project with a remembered Team publication whose source hash is outdated
-    project_root = tmp_path / "project"
-    team_root = tmp_path / "team"
-    project_root.mkdir()
-    team_project = team_root / "projects" / "demo"
-    team_project.mkdir(parents=True)
-    write_project_with_team(project_root, team_root)
-    team_project.joinpath("meta.json").write_text(
-        json.dumps(
-            {
-                "published_at": "2026-08-01T00:00:00+08:00",
-                "source_scope": "project_records_digests_identity",
-                "source_hash": "old-source-hash",
-                "stale": False,
-                "conflict": False,
-                "review_required": True,
-            }
-        ),
-        encoding="utf-8",
-    )
-
-    # When: project status is rendered
-    status = project_status(project_root)
-
-    # Then: Team metadata reports local changes without mutating Project truth
-    assert status["publication"]["preview"]["source_hash"] != "old-source-hash"
-    assert status["publication"]["team"] == {
-        "team_id": "team-1",
-        "team_path": str(team_root).replace("\\", "/"),
-        "published_at": "2026-08-01T00:00:00+08:00",
-        "source_scope": "project_records_digests_identity",
-        "local_changes_after_publish": True,
-        "stale": True,
-        "conflict": False,
-        "review_required": True,
-    }
 
 
 def test_project_memory_stats_counts_records_by_type_and_window(tmp_path: Path, monkeypatch) -> None:

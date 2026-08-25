@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import json
-from datetime import datetime, timedelta
 from pathlib import Path
 import sys
 
@@ -36,23 +34,11 @@ def write_project(root: Path) -> None:
     )
 
 
-def test_record_candidate_wins_before_digest_and_team_publish(tmp_path: Path) -> None:
-    # Given: a project that also has digest and Team-publish signals
+def test_record_candidate_wins_before_digest(tmp_path: Path) -> None:
+    # Given: a project with a pending record candidate plus digest/commit-gap signals
     project_root = tmp_path / "project"
-    team_root = tmp_path / "team"
     project_root.mkdir()
-    team_root.mkdir()
     write_project(project_root)
-    (project_root / ".sybermem" / "project.yaml").write_text(
-        f"project_id: project-1\nslug: demo\nteam_path: {team_root.as_posix()}\n",
-        encoding="utf-8",
-    )
-    meta_dir = team_root / "projects" / "demo"
-    meta_dir.mkdir(parents=True)
-    meta_dir.joinpath("meta.json").write_text(
-        json.dumps({"published_at": (datetime.now() - timedelta(days=7)).isoformat()}),
-        encoding="utf-8",
-    )
     candidate = {"classification": "decision", "action": "/sybermem-record", "reason": "decision needs durable rationale"}
 
     # When: the shared read-only router chooses one next action
@@ -65,7 +51,7 @@ def test_record_candidate_wins_before_digest_and_team_publish(tmp_path: Path) ->
         record_candidate=candidate,
     )
 
-    # Then: record still wins over digest and Team publish
+    # Then: an explicit record candidate wins over digest/summary routing
     assert step == {"action": "/sybermem-record", "reason": "decision needs durable rationale"}
 
 
