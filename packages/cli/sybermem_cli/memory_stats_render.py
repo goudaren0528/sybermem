@@ -5,7 +5,7 @@ def render_project_memory_stats_text(payload: dict) -> None:
     print(f"Memory stats for {payload['slug']}")
     print("")
     _print_table(
-        ["Window", "Records", "Recall Events", "Injected", "Abstained", "Recall Rate", "Recall Precision"],
+        ["Window", "Records", "Recall Events", "Injected", "Abstained", "Recall Rate", "Edit Alignment"],
         [
             _window_summary_row("7d", payload["windows"]["7d"]),
             _window_summary_row("30d", payload["windows"]["30d"]),
@@ -28,10 +28,14 @@ def render_project_memory_stats_text(payload: dict) -> None:
     if payload["totals"]["recall"].get("status") == "no_log":
         print("")
         print("Recall debug log: unavailable (.sybermem/.recall-debug.jsonl not found)")
+        _print_relevance(payload)
+        _print_memory_usage(payload)
         _print_recall_health(payload)
         _print_digest_coverage(payload)
         return
     _print_recall_detail_tables(payload)
+    _print_relevance(payload)
+    _print_memory_usage(payload)
     _print_recall_health(payload)
     _print_digest_coverage(payload)
 
@@ -76,9 +80,62 @@ def _print_recall_health(payload: dict) -> None:
     print("")
     hint = health.get("hint", "")
     precision = health.get("precision")
-    precision_note = f" (precision {_format_rate(precision)})" if precision is not None else ""
+    precision_note = f" (edit alignment {_format_rate(precision)})" if precision is not None else ""
     line = f"Recall health: {health.get('status', 'unknown')}{precision_note}"
     print(f"{line} — {hint}" if hint else line)
+
+
+def _print_relevance(payload: dict) -> None:
+    print("")
+    print("Edit Alignment")
+    _print_table(
+        ["Window", "Hit", "Measurable", "Unmeasurable", "Precision", "Evidence"],
+        [_relevance_row("7d", payload["windows"]["7d"].get("relevance", {})), _relevance_row("30d", payload["windows"]["30d"].get("relevance", {}))],
+    )
+
+
+def _relevance_row(label: str, relevance: dict) -> list[str]:
+    evidence = relevance.get("evidence_available")
+    evidence_label = "available" if evidence is True else "unavailable" if evidence is False else "n/a"
+    return [
+        label,
+        str(relevance.get("hit", 0)),
+        str(relevance.get("measurable", relevance.get("injected", 0))),
+        str(relevance.get("unmeasurable", 0)),
+        _format_rate(relevance.get("precision")),
+        evidence_label,
+    ]
+
+
+def _print_memory_usage(payload: dict) -> None:
+    print("")
+    print("Memory injection")
+    _print_table(
+        ["Window", "Turns", "Items", "Chars", "Avg chars/turn", "P95 chars/turn"],
+        [_memory_usage_row("7d", payload["windows"]["7d"].get("memory_usage", {})), _memory_usage_row("30d", payload["windows"]["30d"].get("memory_usage", {}))],
+    )
+    usage = payload.get("totals", {}).get("memory_usage", {})
+    if usage.get("status") == "no_log":
+        print("Memory usage journal: unavailable (.sybermem/.memory-usage.jsonl not found)")
+        return
+    print("")
+    print("Memory injection lanes (30d)")
+    _print_table(
+        ["Lane", "Items", "Chars"],
+        [[lane, str(values.get("items", 0)), str(values.get("chars", 0))] for lane, values in usage.get("lanes", {}).items()],
+    )
+
+
+def _memory_usage_row(label: str, usage: dict) -> list[str]:
+    available = usage.get("status") == "available"
+    return [
+        label,
+        str(usage.get("turns", 0)) if available else "n/a",
+        str(usage.get("items", 0)) if available else "n/a",
+        str(usage.get("chars", 0)) if available else "n/a",
+        _format_number(usage.get("avg_chars_per_turn")) if available else "n/a",
+        str(usage.get("p95_chars_per_turn")) if available else "n/a",
+    ]
 
 
 def _window_summary_row(label: str, window: dict) -> list[str]:
@@ -127,6 +184,12 @@ def _format_rate(value) -> str:
     if value is None:
         return "n/a"
     return f"{float(value) * 100:.1f}%"
+
+
+def _format_number(value) -> str:
+    if value is None:
+        return "n/a"
+    return f"{float(value):.1f}".rstrip("0").rstrip(".")
 
 
 def _print_table(headers: list[str], rows: list[list[str]]) -> None:
