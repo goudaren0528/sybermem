@@ -9,5 +9,17 @@ if (-not (Test-Path -LiteralPath $remover)) { $remover = Join-Path $scriptDir "s
 & python $remover uninstall --home $env:USERPROFILE --manifest $manifest
 if ($LASTEXITCODE -ne 0) { throw "SyberMem managed uninstall failed" }
 
+$localBinLink = Join-Path $env:USERPROFILE ".local\bin\sybermem"
+if (Test-Path -LiteralPath $localBinLink) {
+    try {
+        $target = (Get-Item -LiteralPath $localBinLink).Target
+        if ($target -like "*\.claude\sybermem\cli\sybermem") {
+            Remove-Item -LiteralPath $localBinLink -Force
+        }
+    } catch {
+        # Windows installs do not create this link; cleanup is best-effort parity with uninstall.sh.
+    }
+}
+
 Write-Host "SyberMem global uninstall complete."
 Write-Host "Project histories under .sybermem/ were not removed."
