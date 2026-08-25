@@ -120,8 +120,8 @@ SyberMem 有两类执行路径，可靠性不同：
 
 | 路径 | 代表能力 | 说明 |
 |---|---|---|
-| CLI / Core | `sybermem resume`、`search`、`next-step`、`portfolio`、`index build`、`project index build/check`、`project memory-stats`、`record id`、`habit add/list/search/pause/delete/remind/inject`、`digest status/latest`、`norms list/nominate/doctor`、`project uninstall` | 程序执行，可脚本化，适合确定性查询 |
-| Skill 编排 | `/sybermem-record`、`/sybermem-habit`、`/sybermem-link`、`/sybermem-digest`、`/sybermem-theme-digest`、`/sybermem-phase-analyze` | 由 AI 按 skill 指令编辑 `.sybermem/` Markdown 或调用用户级 habit CLI，适合需要判断和整理的工作 |
+| CLI / Core | `sybermem resume`、`search`、`next-step`、`portfolio`、`index build`、`project index build/check`、`project memory-stats`、`record id`、`habit add/list/search/pause/delete/remind/inject`、`digest status/latest`、`norms list/nominate/doctor`、`uninstall --scope project|global`、`project uninstall` | 程序执行，可脚本化，适合确定性查询 |
+| Skill 编排 | `/sybermem-record`、`/sybermem-habit`、`/sybermem-link`、`/sybermem-digest`、`/sybermem-theme-digest`、`/sybermem-phase-analyze`、`/sybermem-uninstall` | 由 AI 按 skill 指令编辑 `.sybermem/` Markdown、调用用户级 habit CLI，或在卸载时询问/确认项目级与全局 scope，适合需要判断和整理的工作 |
 
 `sybermem record id --type <change|decision|requirement|bug>` 只生成 canonical record ID；完整 record 创建仍通过 `/sybermem-record` 完成。
 
@@ -197,6 +197,7 @@ claude --plugin-dir .
 - `/sybermem-record`：记录一轮有价值的工作；收尾时可把绑定的项目规则固化为 `norm`
 - `/sybermem-search`：查找历史 records
 - `/sybermem-habit`：记录、查看、暂停、删除用户级习惯，或触发可见提醒
+- `/sybermem-uninstall`：自然语言卸载入口；不明确时询问项目级或全局，且全局卸载需显式确认
 - `/sybermem-summary`：查看当前项目状态
 - `sybermem norms list/nominate/doctor`：查看项目规范宪法、提名重复约束、检测同 scope 冲突
 - `/sybermem-digest`：沉淀稳定阶段结论
@@ -250,11 +251,16 @@ scripts/                             # 安装、更新、卸载与打包校验�
 
 ```text
 sybermem project uninstall
+sybermem uninstall --scope project
 ```
 
 它会停用项目内 SyberMem runtime 接管，但保留 `.sybermem/` 历史内容，并尽量只移除受管 hook / env / instruction block。
 
 ### 全局卸载
+
+```text
+sybermem uninstall --scope global --yes
+```
 
 ```bash
 # Windows (PowerShell)
@@ -264,7 +270,7 @@ sybermem project uninstall
 ./scripts/uninstall.sh
 ```
 
-全局卸载会移除用户级 skills、CLI、launcher 和 OpenCode plugin，不删除任何项目里的 `.sybermem/` 历史。
+全局卸载会移除用户级 skills、CLI、launcher 和 OpenCode plugin，不删除任何项目里的 `.sybermem/` 历史。自然语言卸载可使用 `/sybermem-uninstall`；如果没有明确说明项目级或全局，它会先询问，全局卸载必须显式确认。
 
 ## 兼容说明
 

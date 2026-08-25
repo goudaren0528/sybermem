@@ -120,8 +120,8 @@ SyberMem has two execution paths with different reliability properties:
 
 | Path | Representative capabilities | Notes |
 |---|---|---|
-| CLI / Core | `sybermem resume`, `search`, `next-step`, `portfolio`, `index build`, `project index build/check`, `project memory-stats`, `record id`, `habit add/list/search/pause/delete/remind/inject`, `digest status/latest`, `norms list/nominate/doctor`, `project uninstall` | Programmatic and scriptable; best for deterministic queries |
-| Skill orchestration | `/sybermem-record`, `/sybermem-habit`, `/sybermem-link`, `/sybermem-digest`, `/sybermem-theme-digest`, `/sybermem-phase-analyze` | AI edits `.sybermem/` Markdown or invokes user-level habit CLI according to skill instructions; best for work that requires judgment and synthesis |
+| CLI / Core | `sybermem resume`, `search`, `next-step`, `portfolio`, `index build`, `project index build/check`, `project memory-stats`, `record id`, `habit add/list/search/pause/delete/remind/inject`, `digest status/latest`, `norms list/nominate/doctor`, `uninstall --scope project|global`, `project uninstall` | Programmatic and scriptable; best for deterministic queries |
+| Skill orchestration | `/sybermem-record`, `/sybermem-habit`, `/sybermem-link`, `/sybermem-digest`, `/sybermem-theme-digest`, `/sybermem-phase-analyze`, `/sybermem-uninstall` | AI edits `.sybermem/` Markdown, invokes user-level habit CLI, or asks/confirms project vs global uninstall scope; best for work that requires judgment and synthesis |
 
 `sybermem record id --type <change|decision|requirement|bug>` only mints a canonical record ID. Full record creation still happens through `/sybermem-record`.
 
@@ -197,6 +197,7 @@ If a project already has custom `.claude/settings.json` content, SyberMem patche
 - `/sybermem-record`: record a meaningful round of work; at closeout, crystallize a binding project rule into a `norm`
 - `/sybermem-search`: search historical records
 - `/sybermem-habit`: add, review, pause, delete, or remind user-level habits
+- `/sybermem-uninstall`: natural-language uninstall entrypoint; asks project vs global scope when unclear, and requires explicit confirmation for global uninstall
 - `/sybermem-summary`: inspect current project state
 - `sybermem norms list/nominate/doctor`: view the project-norm constitution, nominate recurring constraints, detect same-scope conflicts
 - `/sybermem-digest`: capture a stable phase conclusion
@@ -250,11 +251,16 @@ scripts/                             # Install, update, uninstall, and package-c
 
 ```text
 sybermem project uninstall
+sybermem uninstall --scope project
 ```
 
 This deactivates SyberMem runtime management in the project while preserving `.sybermem/` history and removing only managed hook / env / instruction-block content where possible.
 
 ### Global Uninstall
+
+```text
+sybermem uninstall --scope global --yes
+```
 
 ```bash
 # Windows (PowerShell)
@@ -264,7 +270,7 @@ This deactivates SyberMem runtime management in the project while preserving `.s
 ./scripts/uninstall.sh
 ```
 
-Global uninstall removes user-level skills, CLI, launchers, and the OpenCode plugin. It does not delete `.sybermem/` history from any project.
+Global uninstall removes user-level skills, CLI, launchers, and the OpenCode plugin. It does not delete `.sybermem/` history from any project. Use `/sybermem-uninstall` for natural-language uninstall routing; when scope is unclear, it asks whether you want project-level deactivation or global removal, and global removal requires explicit confirmation.
 
 ## Compatibility
 
