@@ -10,6 +10,7 @@ from .identity import now_iso
 from .digest_governance import digest_backlog
 from .norms import norm_coverage
 from .records import iter_record_files, parse_project_yaml, parse_record_file
+from .memory_usage_stats import aggregate_memory_outcomes, aggregate_memory_usage_window, read_memory_usage_journal
 
 
 RECORD_TYPES: Final = ("change", "decision", "requirement", "bug", "norm", "digest", "theme-digest")
@@ -32,14 +33,18 @@ def project_memory_stats(root: Path) -> dict:
     records = _record_rows(root, meta.get("project_id", ""), meta.get("slug", root.name))
     recall_entries, malformed_lines, recall_status = _recall_debug_entries(root)
     outcome_entries = _recall_outcome_entries(root)
+    usage_turns, usage_outcomes, usage_status = read_memory_usage_journal(root)
     windows = {}
     for label, days in WINDOWS.items():
         since = today - timedelta(days=days - 1)
+        window_usage_outcomes = aggregate_memory_outcomes(usage_outcomes, since, today)
         windows[label] = {
             "records": _record_counts([row for row in records if _date_in_window(row.get("created_at", ""), since, today)]),
             "recall": _recall_counts([entry for entry in recall_entries if _date_in_window(str(entry.get("timestamp", "")), since, today)], malformed_lines, recall_status),
-            "relevance": _relevance_counts([entry for entry in outcome_entries if _date_in_window(str(entry.get("timestamp", "")), since, today)]),
+            "relevance": _relevance_for_window([entry for entry in outcome_entries if _date_in_window(str(entry.get("timestamp", "")), since, today)], window_usage_outcomes),
+            "memory_usage": aggregate_memory_usage_window(usage_turns, since, today) if usage_status == "available" else _unavailable_memory_usage(),
         }
+    total_usage_outcomes = aggregate_memory_outcomes(usage_outcomes)
     return {
         "project_id": meta.get("project_id", ""),
         "slug": meta.get("slug", root.name),
@@ -48,7 +53,8 @@ def project_memory_stats(root: Path) -> dict:
         "totals": {
             "records": _record_counts(records),
             "recall": _recall_counts(recall_entries, malformed_lines, recall_status),
-            "relevance": _relevance_counts(outcome_entries),
+            "relevance": _relevance_for_window(outcome_entries, total_usage_outcomes),
+            "memory_usage": aggregate_memory_usage_window(usage_turns, today - timedelta(days=29), today) if usage_status == "available" else _unavailable_memory_usage(),
         },
         "windows": windows,
         "recall_health": _recall_health_from_windows(windows, recall_status),
@@ -214,8 +220,29 @@ def _relevance_counts(entries: list[dict]) -> dict:
     return {
         "sessions": len(entries),
         "injected": injected,
+        "measurable": injected,
+        "unmeasurable": 0,
         "hit": hit,
         "precision": hit / injected if injected else None,
+        "evidence_available": bool(entries) if entries else None,
+    }
+
+
+def _relevance_for_window(legacy_entries: list[dict], usage_outcomes: dict) -> dict:
+    if usage_outcomes.get("sessions", 0) > 0:
+        return usage_outcomes
+    return _relevance_counts(legacy_entries)
+
+
+def _unavailable_memory_usage() -> dict:
+    return {
+        "status": "no_log",
+        "turns": 0,
+        "items": 0,
+        "chars": 0,
+        "avg_chars_per_turn": None,
+        "p95_chars_per_turn": None,
+        "lanes": {lane: {"items": 0, "chars": 0} for lane in ("recall", "habit", "norm", "startup")},
     }
 
 
