@@ -3,6 +3,7 @@ import { mkdirSync, readFileSync, rmSync } from "fs"
 import { join } from "path"
 import { tmpdir } from "os"
 import { appendMemoryUsage, buildMemoryUsageEntry } from "../src/memory_usage"
+import { compactJsonlJournal } from "../src/state"
 
 function readSessionEntry(raw: string): { readonly session_id: string } {
   const parsed: unknown = JSON.parse(raw)
@@ -101,7 +102,9 @@ describe("memory usage journal", () => {
         }, { timestamp: `2026-08-25T12:00:${String(index).padStart(2, "0")}.000Z` })
       }
 
-      // Then: the bounded journal contains only the newest 200 entries
+      compactJsonlJournal(root, ".memory-usage.jsonl", 200)
+
+      // Then: lifecycle compaction keeps only the newest 200 entries
       const entries = readFileSync(join(root, ".sybermem", ".memory-usage.jsonl"), "utf-8")
         .trim()
         .split("\n")
