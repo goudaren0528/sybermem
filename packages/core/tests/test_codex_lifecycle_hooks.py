@@ -166,7 +166,11 @@ def test_codex_session_start_compact_source_reseeds_after_marker(tmp_path: Path)
     assert result.returncode == 0
     output = json.loads(result.stdout)
     assert output["hookSpecificOutput"]["hookEventName"] == "SessionStart"
-    assert output["hookSpecificOutput"]["additionalContext"] == f"{session_context}\n"
+    assert output["hookSpecificOutput"]["additionalContext"] == (
+        "## SyberMem Codex Startup\n\n"
+        "SyberMem injected startup context for this Codex session.\n\n"
+        f"{session_context}\n"
+    )
     assert not (project / ".sybermem" / ".codex-compact-marker.json").exists()
 
 

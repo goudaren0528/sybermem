@@ -10,6 +10,7 @@ from typing import Final, TypeAlias, TypedDict
 
 
 HOOK_EVENT_NAME: Final = "SessionStart"
+CODEX_STARTUP_HEADING: Final = "## SyberMem Codex Startup"
 SESSION_HEADING: Final = "## SyberMem Manual Session Context"
 SYBERMEM_TIMEOUT_SECONDS: Final = 5
 COMPACT_MARKER_FILE: Final = ".codex-compact-marker.json"
@@ -168,7 +169,9 @@ def _hook_output(markdown: str) -> HookOutput | None:
     backlog_line = _digest_backlog_line()
     constitution = _constitution_block()
     extras = "\n".join(part for part in (constitution, backlog_line) if part)
-    context = f"{markdown}\n{extras}\n" if extras else f"{markdown}\n"
+    marker = f"{CODEX_STARTUP_HEADING}\n\nSyberMem injected startup context for this Codex session."
+    body = "\n".join(part for part in (markdown, extras) if part)
+    context = f"{marker}\n\n{body}\n"
     return {
         "hookSpecificOutput": {
             "hookEventName": HOOK_EVENT_NAME,

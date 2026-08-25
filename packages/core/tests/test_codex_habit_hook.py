@@ -104,6 +104,8 @@ def write_routed_launcher(home: Path, outputs: dict[str, str], exit_code: int = 
         "    key = 'context recall'\n"
         "elif 'context' in args and 'habit' in args:\n"
         "    key = 'context habit'\n"
+        "elif 'norms' in args and 'list' in args:\n"
+        "    key = 'norms list'\n"
         "sys.stdout.write(outputs.get(key, ''))\n"
         f"raise SystemExit({exit_code})\n",
         encoding="utf-8",
@@ -170,7 +172,13 @@ def test_codex_user_prompt_hook_emits_additional_context_for_habit_reminder(tmp_
     assert output == {
         "hookSpecificOutput": {
             "hookEventName": "UserPromptSubmit",
-            "additionalContext": "## User Habit Reminder\n\n- Apply the saved workflow habit.\n",
+            "additionalContext": (
+                "## SyberMem Codex Context\n\n"
+                "SyberMem injected context for this Codex turn:\n"
+                "- [habit] User habit reminder\n\n"
+                "## User Habit Reminder\n\n"
+                "- Apply the saved workflow habit.\n"
+            ),
         }
     }
     assert result.stderr == ""
@@ -190,7 +198,12 @@ def test_codex_session_start_hook_emits_additional_context(tmp_path: Path) -> No
     assert json.loads(result.stdout) == {
         "hookSpecificOutput": {
             "hookEventName": "SessionStart",
-            "additionalContext": "## SyberMem Manual Session Context\n\n- Project is ready.\n",
+            "additionalContext": (
+                "## SyberMem Codex Startup\n\n"
+                "SyberMem injected startup context for this Codex session.\n\n"
+                "## SyberMem Manual Session Context\n\n"
+                "- Project is ready.\n"
+            ),
         }
     }
     assert result.stderr == ""
@@ -210,6 +223,10 @@ def test_codex_user_prompt_hook_combines_recall_and_habit(tmp_path: Path) -> Non
     assert result.returncode == 0
     context = json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"]
     assert context == (
+        "## SyberMem Codex Context\n\n"
+        "SyberMem injected context for this Codex turn:\n"
+        "- [recall] Project recall\n"
+        "- [habit] User habit reminder\n\n"
         "## SyberMem Recall Hints\n\n- STAR change-1: Recall this architecture.\n\n"
         "## User Habit Reminder\n\n- Apply the saved workflow habit.\n"
     )
@@ -227,7 +244,34 @@ def test_codex_user_prompt_hook_emits_recall_without_habit(tmp_path: Path) -> No
 
     # Then: recall context still reaches Codex without requiring a habit reminder
     assert result.returncode == 0
-    assert json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"] == f"{recall}\n"
+    assert json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"] == (
+        "## SyberMem Codex Context\n\n"
+        "SyberMem injected context for this Codex turn:\n"
+        "- [recall] Project recall\n\n"
+        f"{recall}\n"
+    )
+    assert result.stderr == ""
+
+
+def test_codex_user_prompt_hook_marks_scoped_norms(tmp_path: Path) -> None:
+    # Given: scoped project norms match the prompt while recall and habit abstain.
+    norms_json = json.dumps({"norms": [{"record_id": "norm-1", "scope": "path:docs/**", "statement": "Document public update paths."}]})
+    write_routed_launcher(tmp_path, {"context recall": "", "context habit": "", "norms list": norms_json})
+    payload = json.dumps({"hookEventName": "UserPromptSubmit", "userPrompt": "update docs"})
+
+    # When: Codex invokes the user prompt hook
+    result = run_hook(payload, tmp_path)
+
+    # Then: the additionalContext has a visible Codex marker for project norms.
+    assert result.returncode == 0
+    context = json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"]
+    assert context == (
+        "## SyberMem Codex Context\n\n"
+        "SyberMem injected context for this Codex turn:\n"
+        "- [norms] Relevant project norms\n\n"
+        "## Relevant Project Norms\n"
+        "- [norm-1] (path:docs/**) Document public update paths.\n"
+    )
     assert result.stderr == ""
 
 
@@ -242,7 +286,7 @@ def test_codex_user_prompt_hook_accepts_prompt_key(tmp_path: Path) -> None:
 
     # Then: the prompt value is accepted and reminder context is emitted
     assert result.returncode == 0
-    assert json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"].startswith("## User Habit Reminder")
+    assert json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"].startswith("## SyberMem Codex Context")
 
 
 def test_codex_user_prompt_hook_outputs_nothing_for_empty_cli_markdown(tmp_path: Path) -> None:
