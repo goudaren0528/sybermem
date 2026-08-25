@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 from pathlib import Path
 
 import pytest
@@ -58,3 +59,47 @@ def test_remove_child_unlinks_symlink_without_deleting_target(tmp_path: Path) ->
 
     assert not link.exists()
     assert (outside / "sentinel.txt").read_text(encoding="utf-8") == "preserve\n"
+
+
+def test_remove_child_rejects_linked_ancestor(tmp_path: Path) -> None:
+    module = _module()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "sentinel.txt").write_text("preserve\n", encoding="utf-8")
+    linked_ancestor = tmp_path / "config"
+    try:
+        linked_ancestor.symlink_to(outside, target_is_directory=True)
+    except OSError as exc:
+        pytest.skip(f"symlink creation unavailable: {exc}")
+    # root resolves under a symlinked ancestor -> deletion would escape the home tree.
+    root = linked_ancestor / "skills"
+    root.mkdir()
+    (root / "sybermem-test").write_text("managed\n", encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match="linked ancestor"):
+        module.remove_child(root, "sybermem-test")
+
+    assert (outside / "sentinel.txt").read_text(encoding="utf-8") == "preserve\n"
+
+
+def test_uninstall_rejects_tampered_opencode_plugin(tmp_path: Path) -> None:
+    module = _module()
+    home = tmp_path / "home"
+    home.mkdir()
+    sentinel = tmp_path / "victim.ts"
+    sentinel.write_text("preserve\n", encoding="utf-8")
+    manifest = {
+        "schema_version": 1,
+        "skills": [],
+        "runtime_dirs": [],
+        "runtime_files": [],
+        "codex_hook_files": [],
+        "opencode_plugin": "../../victim.ts",
+    }
+    manifest_path = tmp_path / "managed-install.json"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match="invalid OpenCode plugin path"):
+        module.uninstall(home, manifest_path)
+
+    assert sentinel.read_text(encoding="utf-8") == "preserve\n"
