@@ -10,6 +10,7 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 <!-- add new conclusions here -->
 - [bug-146ffbf8c1d9415d9708e8f18b003971] #schema #retrieval #quality — Decision records authored with `supersedes` were silently parsed without the relation, breaking successor/current-truth guidance and relation recall; parser, derived inverse graph, and search scoring now support both directions compatibly (2026-08-25)
 - [bug-17a87caf3b014254bdc0d284ad010540] #installer #windows #opencode — Fixed the Python updater to reuse an existing CLI venv so Windows OpenCode updates no longer fail on a locked venv python.exe. (2026-08-25)
+- [change-0638a1012020456193d3b469506151af] #memory #observability #opencode — Added an OpenCode-first actual-injection journal, session outcomes, one prompt-time usage summary, and 7d/30d stats so users can inspect memory context cost and Edit Alignment evidence before budget controls are introduced. (2026-08-25)
 - [change-0c35875b8fde4feb93837ce354533b9b] #team #distribution #refactor — Moved latest_phase_digest/latest_theme_digest out of the Team publish subsystem into a neutral digest_sources.py and repointed resume/next-step/publish, so non-Team digest-aware features no longer depend on Team code — zero behavior change, unblocking safe Team removal later (2026-08-25)
 - [change-13b0a327e1544f3e8e5ac5d3992c5c97] #team #distribution #qa — Independent Oracle post-implementation review confirmed the Team removal is correct \(no residual refs, seam decoupled, contract removed, distribution + data-safe\) but flagged 2 P1s in the portfolio replacement + test coverage; both fixed and re-reviewed to GO (2026-08-25)
 - [change-2011a3f2b21e40dbb926187ebae50cf8] #norm #opencode #architecture — Delivered the P0 closed loop for binding project norms — a first-class `norm` record type + constitution/scoped selector + `norms list` CLI + /sybermem-record crystallization + OpenCode startup constitution injection — so norms can be recorded distinctly and reliably govern later OpenCode work (2026-08-24)
@@ -59,6 +60,7 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 | ID | Date | Title | Status | Link |
 |----|------|-------|--------|------|
 <!-- add new records here -->
+| change-0638a1012020456193d3b469506151af | 2026-08-25 | Minimal OpenCode memory injection observability | done | [link](changes/2026-08-25-change-0638a1012020456193d3b469506151af-memory-observability-phase5-docs.md) |
 | change-0c35875b8fde4feb93837ce354533b9b | 2026-08-25 | Team removal stage 0 — extract digest-path seam into neutral digest_sources.py | done | [link](changes/2026-08-25-change-0c35875b8fde4feb93837ce354533b9b-team-removal-stage0-digest-seam.md) |
 | change-13b0a327e1544f3e8e5ac5d3992c5c97 | 2026-08-25 | Team removal review-work — Oracle GO after fixing 2 P1 portfolio/compat blockers | done | [link](changes/2026-08-25-change-13b0a327e1544f3e8e5ac5d3992c5c97-team-removal-reviewwork.md) |
 | change-2011a3f2b21e40dbb926187ebae50cf8 | 2026-08-24 | Norm subsystem P0 — first-class norm type, selector, norms list CLI, crystallization skill, OpenCode startup constitution | done | [link](changes/2026-08-24-change-2011a3f2b21e40dbb926187ebae50cf8-norm-p0-opencode-closed-loop.md) |
@@ -121,10 +123,10 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 - documentation: change-f8bd388c7bac4ee584c68edc97951e18
 - habit: change-7f75f17f01cc4d249ca8468e7bbfec7d
 - installer: bug-17a87caf3b014254bdc0d284ad010540, change-e3777a9e3b784c43b6af93be99707348
-- memory: decision-c24f122fbe5d46ee8095022e6b8c53c8, requirement-ffb8b8130ecd4d33b8a08cfbb9479b59
+- memory: change-0638a1012020456193d3b469506151af, decision-c24f122fbe5d46ee8095022e6b8c53c8, requirement-ffb8b8130ecd4d33b8a08cfbb9479b59
 - norm: change-2011a3f2b21e40dbb926187ebae50cf8, change-3d8c9c844d5747c3b15e84838a2d4fe8, change-bcac35f53e004164adb47471d7cf094d, change-f8bd388c7bac4ee584c68edc97951e18, requirement-75f7b0e98b7043eeac310fa2a36ba36d
-- observability: requirement-ffb8b8130ecd4d33b8a08cfbb9479b59
-- opencode: bug-17a87caf3b014254bdc0d284ad010540, change-2011a3f2b21e40dbb926187ebae50cf8, change-33b663865936415c9ae9a34e28f6ea6c, change-76481099f07c4f1f9de150a0281fb58f, change-7f75f17f01cc4d249ca8468e7bbfec7d, change-bcac35f53e004164adb47471d7cf094d, change-e3777a9e3b784c43b6af93be99707348, requirement-75f7b0e98b7043eeac310fa2a36ba36d, requirement-ffb8b8130ecd4d33b8a08cfbb9479b59
+- observability: change-0638a1012020456193d3b469506151af, requirement-ffb8b8130ecd4d33b8a08cfbb9479b59
+- opencode: bug-17a87caf3b014254bdc0d284ad010540, change-0638a1012020456193d3b469506151af, change-2011a3f2b21e40dbb926187ebae50cf8, change-33b663865936415c9ae9a34e28f6ea6c, change-76481099f07c4f1f9de150a0281fb58f, change-7f75f17f01cc4d249ca8468e7bbfec7d, change-bcac35f53e004164adb47471d7cf094d, change-e3777a9e3b784c43b6af93be99707348, requirement-75f7b0e98b7043eeac310fa2a36ba36d, requirement-ffb8b8130ecd4d33b8a08cfbb9479b59
 - process: norm-e86ae226dbbf4e28af3de8c1db92f552
 - qa: change-13b0a327e1544f3e8e5ac5d3992c5c97, change-2b4df42e0ff942718e9afef5897ecc4c
 - quality: bug-146ffbf8c1d9415d9708e8f18b003971
