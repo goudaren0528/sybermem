@@ -6,6 +6,15 @@ import { computeRecallOutcome, flushRecallOutcome } from "../src/recall_outcome"
 import { getSessionActivity, recordInjectedRecords, resetSessionActivity } from "../src/session_activity"
 import type { ShellCommand } from "../src/runtime"
 
+function unavailableRecordFilesShell(): ShellCommand {
+  const command: ShellCommand = {
+    cwd: () => command,
+    text: async () => { throw new Error("record-files should not run") },
+    nothrow: () => command,
+  }
+  return command
+}
+
 describe("recall outcome", () => {
   it("counts a record as a hit when any related file was edited", () => {
     // Given: two injected records, one whose related file was edited
@@ -163,6 +172,50 @@ describe("recall outcome", () => {
       expect(() => readFileSync(join(root, ".sybermem", ".memory-usage.jsonl"), "utf-8")).toThrow()
     } finally {
       resetSessionActivity(sessionID)
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it("does not write a memory outcome for edit-only activity", async () => {
+    // Given: activity occurred but no model-visible memory was injected
+    const root = join(tmpdir(), `sybermem-session-outcome-edit-only-${crypto.randomUUID()}`)
+    const sessionID = `session-${crypto.randomUUID()}`
+    mkdirSync(join(root, ".sybermem"), { recursive: true })
+    const activity = getSessionActivity(sessionID)
+    activity.editedFiles.set("src/example.ts", 1)
+    try {
+      // When
+      const outcome = await flushRecallOutcome(() => unavailableRecordFilesShell(), root, activity, sessionID)
+
+      // Then
+      expect(outcome.injected).toBe(0)
+      expect(() => readFileSync(join(root, ".sybermem", ".memory-usage.jsonl"), "utf-8")).toThrow()
+    } finally {
+      resetSessionActivity(sessionID)
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it("does not write a memory outcome for todo-only or tool-only activity", async () => {
+    // Given: non-memory activity windows
+    const root = join(tmpdir(), `sybermem-session-outcome-non-memory-${crypto.randomUUID()}`)
+    mkdirSync(join(root, ".sybermem"), { recursive: true })
+    const todoSession = `session-${crypto.randomUUID()}`
+    const toolSession = `session-${crypto.randomUUID()}`
+    const todoActivity = getSessionActivity(todoSession)
+    const toolActivity = getSessionActivity(toolSession)
+    todoActivity.todoCompletedBatches = 1
+    toolActivity.lastToolSignal = "tests_passed"
+    try {
+      // When
+      await flushRecallOutcome(() => unavailableRecordFilesShell(), root, todoActivity, todoSession)
+      await flushRecallOutcome(() => unavailableRecordFilesShell(), root, toolActivity, toolSession)
+
+      // Then
+      expect(() => readFileSync(join(root, ".sybermem", ".memory-usage.jsonl"), "utf-8")).toThrow()
+    } finally {
+      resetSessionActivity(todoSession)
+      resetSessionActivity(toolSession)
       rmSync(root, { recursive: true, force: true })
     }
   })

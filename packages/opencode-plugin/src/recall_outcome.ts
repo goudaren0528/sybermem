@@ -79,7 +79,7 @@ function parseRecordFilesJson(raw: string): Record<string, readonly string[]> {
 // any failure yields no outcome rather than throwing out of the idle handler.
 export async function flushRecallOutcome($: Shell, root: string, activity: SessionActivity, sessionID: string, timestamp = new Date().toISOString()): Promise<RecallOutcome> {
   const injected = [...activity.injectedRecords]
-  if (injected.length === 0 && activity.memoryTurns === 0 && activity.editedFiles.size === 0 && activity.todoCompletedBatches === 0 && activity.lastToolSignal === null) return EMPTY_OUTCOME
+  if (activity.memoryTurns === 0) return EMPTY_OUTCOME
   let mapping: Record<string, readonly string[]> = {}
   let recallEvidenceAvailable = true
   if (injected.length > 0) {
