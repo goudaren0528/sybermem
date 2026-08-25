@@ -7,7 +7,7 @@ import { digestBacklogToast, parseDigestBacklog } from "./digest_backlog_signal"
 import { loadNudgeState, saveNudgeState } from "./state"
 import { appendRecallDebug } from "./recall_debug"
 import { captureRecordIntentWithCli } from "./record_intent"
-import { classifyPackets, collectPromptPackets, extractPromptText, injectStashedPromptPackets, stashPromptPackets, type ChatMessageOutput, type InjectionSummary, type SystemTransformOutput } from "./prompt_context"
+import { classifyPackets, collectPromptPackets, extractPromptText, injectStashedPromptPackets, RECALL_STASH, stashPromptPackets, type ChatMessageOutput, type InjectionSummary, type SystemTransformOutput } from "./prompt_context"
 import { buildStartupContext, consumePendingStartup, markPendingStartup, prependStartupContext } from "./startup_context"
 import { lowSignalRecallToast, parseRecallHealth } from "./recall_health_signal"
 import { extractEditedFile, getSessionActivity, recordEditedFile, recordInjectedRecords, recordToolExecution, recordTodoUpdate, resetSessionActivity } from "./session_activity"
@@ -15,6 +15,7 @@ import { flushRecallOutcome } from "./recall_outcome"
 import { captureHabitIntentWithCli } from "./habit_intent"
 import { updateNudgeMessage } from "./version_signal"
 import { applyReplyMarker, armReplyMarker } from "./reply_marker"
+import { appendMemoryUsage } from "./memory_usage"
 
 interface ToastClient { readonly tui: { readonly showToast: (input: { readonly body: { readonly message: string; readonly variant: "info" } }) => Promise<void> } }
 interface PluginArgs { readonly $: import("./runtime").Shell; readonly directory: string; readonly client: ToastClient }
@@ -247,16 +248,19 @@ export const SyberMemPlugin: Plugin = async ({ $, directory, client }: PluginArg
       // Inject per-prompt recall/habit packets first, THEN prepend startup context,
       // so on a fresh session's first turn the startup packet ends up on top rather
       // than being buried under recall hints.
+      const packets = RECALL_STASH.get(sessionID ?? "") ?? []
       const summary = injectStashedPromptPackets(sessionID ?? "", output)
+      let startup = ""
       // First turn of a freshly created session: prepend bounded startup context so
       // key conclusions/phase/next-step are model-visible, not just a toast. One-shot.
       if (consumePendingStartup(sessionID ?? "")) {
-        const startup = await buildStartupContext(args.$, root)
+        startup = await buildStartupContext(args.$, root) ?? ""
         if (startup) {
           prependStartupContext(output, startup)
           throttledToast(args.client, "startup-context", "⭐ SyberMem: injected project startup context into this session")
         }
       }
+      appendMemoryUsage(root, { sessionID: sessionID ?? "", packets, startup })
       // Toast at injection time (not capture time) so the user only sees a
       // notice when context actually reached the model. Recall and habit get
       // SEPARATE, distinctly-marked toasts so an applied user habit is as
