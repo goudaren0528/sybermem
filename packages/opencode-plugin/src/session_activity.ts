@@ -1,6 +1,7 @@
 // Per-session, in-memory accumulation of edit/activity signals. Events only
 // mutate this map; the real computation and disk write happen at session.idle,
 // so there is no hidden background worker (OpenCode plugin lifecycle scope only).
+import type { MemoryUsageEntry } from "./memory_usage"
 
 const RECORD_ID_RE = /\b(?:change|decision|requirement|bug|digest)-[a-z0-9-]+\b/gi
 const SKIP_PREFIXES = [".git/", ".sybermem/", "ADR/", ".claude/", ".opencode/", "node_modules/"]
@@ -12,12 +13,39 @@ export interface SessionActivity {
   todoCompletedBatches: number
   lastToolSignal: ToolSignal
   injectedRecords: Set<string>
+  memoryTurns: number
+  memoryItems: number
+  memoryChars: number
+  recallItems: number
+  recallChars: number
+  habitItems: number
+  habitChars: number
+  normItems: number
+  normChars: number
+  startupItems: number
+  startupChars: number
 }
 
 const SESSIONS = new Map<string, SessionActivity>()
 
 function freshActivity(): SessionActivity {
-  return { editedFiles: new Map(), todoCompletedBatches: 0, lastToolSignal: null, injectedRecords: new Set() }
+  return {
+    editedFiles: new Map(),
+    todoCompletedBatches: 0,
+    lastToolSignal: null,
+    injectedRecords: new Set(),
+    memoryTurns: 0,
+    memoryItems: 0,
+    memoryChars: 0,
+    recallItems: 0,
+    recallChars: 0,
+    habitItems: 0,
+    habitChars: 0,
+    normItems: 0,
+    normChars: 0,
+    startupItems: 0,
+    startupChars: 0,
+  }
 }
 
 export function getSessionActivity(sessionID: string): SessionActivity {
@@ -110,4 +138,20 @@ export function recordInjectedRecords(sessionID: string, packets: readonly strin
   if (!recallPacket) return
   const activity = getSessionActivity(sessionID)
   for (const match of recallPacket.matchAll(RECORD_ID_RE)) activity.injectedRecords.add(match[0].toLowerCase())
+}
+
+export function recordMemoryUsage(sessionID: string, entry: MemoryUsageEntry): void {
+  if (entry.total_items === 0) return
+  const activity = getSessionActivity(sessionID)
+  activity.memoryTurns += 1
+  activity.memoryItems += entry.total_items
+  activity.memoryChars += entry.total_chars
+  activity.recallItems += entry.recall_items
+  activity.recallChars += entry.recall_chars
+  activity.habitItems += entry.habit_items
+  activity.habitChars += entry.habit_chars
+  activity.normItems += entry.norm_items
+  activity.normChars += entry.norm_chars
+  activity.startupItems += entry.startup_items
+  activity.startupChars += entry.startup_chars
 }

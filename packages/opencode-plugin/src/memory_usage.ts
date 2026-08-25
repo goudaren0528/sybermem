@@ -74,8 +74,8 @@ export function buildMemoryUsageEntry(input: MemoryUsageInput, options: MemoryUs
   }
 }
 
-export function appendMemoryUsage(root: string, input: MemoryUsageInput, options: MemoryUsageOptions = {}): void {
+export function appendMemoryUsage(root: string, input: MemoryUsageInput, options: MemoryUsageOptions = {}): MemoryUsageEntry {
   const entry = buildMemoryUsageEntry(input, options)
-  if (entry.total_items === 0) return
-  boundedJsonlAppend(root, ".memory-usage.jsonl", entry, 200)
+  if (entry.total_items > 0) boundedJsonlAppend(root, ".memory-usage.jsonl", entry, 200)
+  return entry
 }

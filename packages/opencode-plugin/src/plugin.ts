@@ -10,7 +10,7 @@ import { captureRecordIntentWithCli } from "./record_intent"
 import { classifyPackets, collectPromptPackets, extractPromptText, injectStashedPromptPackets, RECALL_STASH, stashPromptPackets, type ChatMessageOutput, type InjectionSummary, type SystemTransformOutput } from "./prompt_context"
 import { buildStartupContext, consumePendingStartup, markPendingStartup, prependStartupContext } from "./startup_context"
 import { lowSignalRecallToast, parseRecallHealth } from "./recall_health_signal"
-import { extractEditedFile, getSessionActivity, recordEditedFile, recordInjectedRecords, recordToolExecution, recordTodoUpdate, resetSessionActivity } from "./session_activity"
+import { extractEditedFile, getSessionActivity, recordEditedFile, recordInjectedRecords, recordMemoryUsage, recordToolExecution, recordTodoUpdate, resetSessionActivity } from "./session_activity"
 import { flushRecallOutcome } from "./recall_outcome"
 import { captureHabitIntentWithCli } from "./habit_intent"
 import { updateNudgeMessage } from "./version_signal"
@@ -260,7 +260,8 @@ export const SyberMemPlugin: Plugin = async ({ $, directory, client }: PluginArg
           throttledToast(args.client, "startup-context", "⭐ SyberMem: injected project startup context into this session")
         }
       }
-      appendMemoryUsage(root, { sessionID: sessionID ?? "", packets, startup })
+      const usageEntry = appendMemoryUsage(root, { sessionID: sessionID ?? "", packets, startup })
+      if (sessionID) recordMemoryUsage(sessionID, usageEntry)
       // Toast at injection time (not capture time) so the user only sees a
       // notice when context actually reached the model. Recall and habit get
       // SEPARATE, distinctly-marked toasts so an applied user habit is as
