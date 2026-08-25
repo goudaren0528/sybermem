@@ -98,6 +98,23 @@ def test_parse_record_file_reads_norm_type_and_scope(tmp_path: Path) -> None:
     assert record["key_conclusion"] == "Use pnpm in this repo"
 
 
+def test_parse_record_file_reads_decision_supersedes(tmp_path: Path) -> None:
+    record_path = tmp_path / "2026-08-24-decision-new.md"
+    record_path.write_text(
+        "---\n"
+        "type: decision\n"
+        "record_id: decision-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n"
+        "date: 2026-08-24\n"
+        "title: New decision\n"
+        "supersedes: decision-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n"
+        "---\n\nDecision body.\n",
+        encoding="utf-8",
+    )
+
+    record = parse_record_file(record_path, "", "")
+    assert record["supersedes"] == "decision-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+
+
 def test_parse_record_file_tolerates_utf8_bom(tmp_path: Path) -> None:
     # Given: a record whose file begins with a UTF-8 BOM (e.g. written by some editors)
     record_path = tmp_path / "2026-08-24-norm-bom.md"

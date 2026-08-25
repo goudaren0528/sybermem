@@ -4,12 +4,71 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from sybermem_core.retrieval import (
+    apply_successor_guidance,
     classify_authority,
     classify_freshness,
     classify_lifecycle,
     classify_source_kind,
     derive_continuity_metadata,
 )
+from sybermem_core.search_query import query_terms, score_row
+
+
+def test_search_scores_supersedes_as_a_relation() -> None:
+    target = "decision-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    scored = score_row(
+        {
+            "record_id": "decision-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "title": "New decision",
+            "content": "",
+            "topics": "",
+            "fixes": "",
+            "implements": "",
+            "related": "",
+            "superseded_by": "",
+            "supersedes": target,
+        },
+        query_terms(target),
+    )
+    assert scored is not None
+    assert scored.match == "relation"
+
+
+def test_supersedes_derives_successor_guidance_without_writing_inverse() -> None:
+    old_id = "decision-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    new_id = "decision-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    old = {
+        "record_id": old_id,
+        "title": "Old decision",
+        "status": "completed",
+        "authority": "authoritative",
+        "lifecycle": "resolved",
+        "freshness": "historical",
+        "superseded_by": "",
+        "supersedes": "",
+        "fixes": "",
+    }
+    new = {
+        "record_id": new_id,
+        "title": "New decision",
+        "status": "active",
+        "authority": "authoritative",
+        "lifecycle": "active",
+        "freshness": "current",
+        "superseded_by": "",
+        "supersedes": old_id,
+        "fixes": "",
+    }
+
+    rows = [dict(old), dict(new)]
+    apply_successor_guidance(rows, rows)
+
+    old_row = rows[0]
+    assert old_row["superseded_by"] == new_id
+    assert old_row["successor_record"] == new_id
+    assert old_row["current_guidance"] == f"Prefer successor {new_id} for current guidance."
+    # The inverse is derived in memory only; the forward record remains the source of truth.
+    assert rows[1]["supersedes"] == old_id
 
 
 def test_declared_frontmatter_overrides_inferred_trust_metadata() -> None:
