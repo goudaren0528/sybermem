@@ -9,6 +9,7 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 <!-- One-line core conclusion per record. Format: [id] #topic1 #topic2 — description (date) -->
 <!-- add new conclusions here -->
 - [bug-146ffbf8c1d9415d9708e8f18b003971] #schema #retrieval #quality — Decision records authored with `supersedes` were silently parsed without the relation, breaking successor/current-truth guidance and relation recall; parser, derived inverse graph, and search scoring now support both directions compatibly (2026-08-25)
+- [bug-17a87caf3b014254bdc0d284ad010540] #installer #windows #opencode — Fixed the Python updater to reuse an existing CLI venv so Windows OpenCode updates no longer fail on a locked venv python.exe. (2026-08-25)
 - [change-0c35875b8fde4feb93837ce354533b9b] #team #distribution #refactor — Moved latest_phase_digest/latest_theme_digest out of the Team publish subsystem into a neutral digest_sources.py and repointed resume/next-step/publish, so non-Team digest-aware features no longer depend on Team code — zero behavior change, unblocking safe Team removal later (2026-08-25)
 - [change-13b0a327e1544f3e8e5ac5d3992c5c97] #team #distribution #qa — Independent Oracle post-implementation review confirmed the Team removal is correct \(no residual refs, seam decoupled, contract removed, distribution + data-safe\) but flagged 2 P1s in the portfolio replacement + test coverage; both fixed and re-reviewed to GO (2026-08-25)
 - [change-2011a3f2b21e40dbb926187ebae50cf8] #norm #opencode #architecture — Delivered the P0 closed loop for binding project norms — a first-class `norm` record type + constitution/scoped selector + `norms list` CLI + /sybermem-record crystallization + OpenCode startup constitution injection — so norms can be recorded distinctly and reliably govern later OpenCode work (2026-08-24)
@@ -92,6 +93,7 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 |----|------|-------|----------|------|
 <!-- add new records here -->
 | bug-146ffbf8c1d9415d9708e8f18b003971 | 2026-08-25 | Decision supersedes relation was silently dropped from parsing and recall | high | [link](bugs/2026-08-25-bug-146ffbf8c1d9415d9708e8f18b003971-supersedes-relation-drop.md) |
+| bug-17a87caf3b014254bdc0d284ad010540 | 2026-08-25 | Python updater recreated existing CLI venv on Windows | medium | [link](bugs/2026-08-25-bug-17a87caf3b014254bdc0d284ad010540-python-update-recreates-existing-venv.md) |
 
 ## Usage
 
@@ -113,10 +115,10 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 - distribution: change-0c35875b8fde4feb93837ce354533b9b, change-13b0a327e1544f3e8e5ac5d3992c5c97, change-2b4df42e0ff942718e9afef5897ecc4c, change-2b9c79a39ea64b178c9902894cbd49fd, change-657dd8880ab24e889e1f3b2b1521ee3a, change-c2be7cced7eb4250b288606869f1e726, decision-f780ec7166e14fc2ab1ac595c0edda03
 - documentation: change-f8bd388c7bac4ee584c68edc97951e18
 - habit: change-7f75f17f01cc4d249ca8468e7bbfec7d
-- installer: change-e3777a9e3b784c43b6af93be99707348
+- installer: bug-17a87caf3b014254bdc0d284ad010540, change-e3777a9e3b784c43b6af93be99707348
 - memory: decision-c24f122fbe5d46ee8095022e6b8c53c8
 - norm: change-2011a3f2b21e40dbb926187ebae50cf8, change-3d8c9c844d5747c3b15e84838a2d4fe8, change-bcac35f53e004164adb47471d7cf094d, change-f8bd388c7bac4ee584c68edc97951e18, requirement-75f7b0e98b7043eeac310fa2a36ba36d
-- opencode: change-2011a3f2b21e40dbb926187ebae50cf8, change-33b663865936415c9ae9a34e28f6ea6c, change-76481099f07c4f1f9de150a0281fb58f, change-7f75f17f01cc4d249ca8468e7bbfec7d, change-bcac35f53e004164adb47471d7cf094d, change-e3777a9e3b784c43b6af93be99707348, requirement-75f7b0e98b7043eeac310fa2a36ba36d
+- opencode: bug-17a87caf3b014254bdc0d284ad010540, change-2011a3f2b21e40dbb926187ebae50cf8, change-33b663865936415c9ae9a34e28f6ea6c, change-76481099f07c4f1f9de150a0281fb58f, change-7f75f17f01cc4d249ca8468e7bbfec7d, change-bcac35f53e004164adb47471d7cf094d, change-e3777a9e3b784c43b6af93be99707348, requirement-75f7b0e98b7043eeac310fa2a36ba36d
 - process: norm-e86ae226dbbf4e28af3de8c1db92f552
 - qa: change-13b0a327e1544f3e8e5ac5d3992c5c97, change-2b4df42e0ff942718e9afef5897ecc4c
 - quality: bug-146ffbf8c1d9415d9708e8f18b003971
@@ -128,7 +130,7 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 - team: change-0c35875b8fde4feb93837ce354533b9b, change-13b0a327e1544f3e8e5ac5d3992c5c97, change-2b9c79a39ea64b178c9902894cbd49fd, change-657dd8880ab24e889e1f3b2b1521ee3a, decision-f780ec7166e14fc2ab1ac595c0edda03
 - uninstall: change-c2be7cced7eb4250b288606869f1e726
 - ux: change-33b663865936415c9ae9a34e28f6ea6c, change-3d8c9c844d5747c3b15e84838a2d4fe8, change-76481099f07c4f1f9de150a0281fb58f, change-7f75f17f01cc4d249ca8468e7bbfec7d, change-bcac35f53e004164adb47471d7cf094d
-- windows: change-e3777a9e3b784c43b6af93be99707348
+- windows: bug-17a87caf3b014254bdc0d284ad010540, change-e3777a9e3b784c43b6af93be99707348
 
 ## Project Norms
 
