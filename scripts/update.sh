@@ -47,7 +47,7 @@ sync_skills() {
     for retired in sybermem-phase-confirm sybermem-team-publish sybermem-team-summary; do
         safe_remove_managed_dir "$target" "$target/$retired"
     done
-    for skill in sybermem-init-project sybermem-record sybermem-summary sybermem-resume sybermem-digest sybermem-phase-analyze using-sybermem sybermem-update sybermem-search sybermem-link sybermem-theme-digest sybermem-habit; do
+    for skill in sybermem-init-project sybermem-record sybermem-summary sybermem-resume sybermem-digest sybermem-phase-analyze using-sybermem sybermem-update sybermem-search sybermem-link sybermem-theme-digest sybermem-habit sybermem-uninstall; do
         if [ -d "$SKILL_SOURCE/$skill" ]; then
             safe_remove_managed_dir "$target" "$target/$skill"
             cp -r "$SKILL_SOURCE/$skill" "$target/"
@@ -211,6 +211,7 @@ echo "  /sybermem-link          — 在两条已有记录间建立正向关系�
 echo "  /sybermem-theme-digest  — 为单个 topic 创建跨多个 phase 的持久化高阶摘要"
 
 echo "  /sybermem-habit         — 管理用户级习惯记忆与提醒"
+echo "  /sybermem-uninstall     — 安全选择项目级或全局卸载"
 echo ""
 if command -v sybermem >/dev/null 2>&1; then
     echo "sybermem CLI 已安装并在 PATH 中，可直接运行：sybermem project init --register"
