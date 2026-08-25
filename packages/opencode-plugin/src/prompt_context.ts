@@ -50,34 +50,52 @@ export function stashPromptPackets(sessionID: string, packets: readonly string[]
 export interface InjectionSummary {
   readonly injected: boolean
   readonly recallCount: number
+  readonly recallChars: number
   readonly habitCount: number
+  readonly habitChars: number
   readonly habitCandidate: boolean
   readonly normCount: number
+  readonly normChars: number
+  readonly injectedIds: readonly string[]
 }
 
-const NO_INJECTION: InjectionSummary = { injected: false, recallCount: 0, habitCount: 0, habitCandidate: false, normCount: 0 }
+const NO_INJECTION: InjectionSummary = { injected: false, recallCount: 0, recallChars: 0, habitCount: 0, habitChars: 0, habitCandidate: false, normCount: 0, normChars: 0, injectedIds: [] }
 
 export function classifyPackets(packets: readonly string[]): InjectionSummary {
   if (packets.length === 0) return NO_INJECTION
   let recallCount = 0
+  let recallChars = 0
   let habitCount = 0
+  let habitChars = 0
   let habitCandidate = false
   let normCount = 0
+  let normChars = 0
+  const injectedIds = new Set<string>()
   for (const packet of packets) {
     const trimmed = packet.trim()
     if (trimmed.startsWith("## SyberMem Recall Hints")) {
       recallCount += countBullets(trimmed)
+      recallChars += packet.length
+      collectIds(trimmed, injectedIds)
     } else if (trimmed.startsWith("## User Habit Reminder")) {
       const habitLines = trimmed.split("\n").filter((line) => line.startsWith("- [habit-"))
       habitCount += habitLines.length
+      habitChars += packet.length
+      collectIds(trimmed, injectedIds)
       // A habit packet with no concrete habit reference is a "preference candidate":
       // the prompt looked like a reusable preference but no stored habit matched.
       if (habitLines.length === 0) habitCandidate = true
     } else if (trimmed.startsWith("## Relevant Project Norms")) {
       normCount += trimmed.split("\n").filter((line) => line.startsWith("- [norm-")).length
+      normChars += packet.length
+      collectIds(trimmed, injectedIds)
     }
   }
-  return { injected: recallCount > 0 || habitCount > 0 || habitCandidate || normCount > 0, recallCount, habitCount, habitCandidate, normCount }
+  return { injected: recallCount > 0 || habitCount > 0 || habitCandidate || normCount > 0, recallCount, recallChars, habitCount, habitChars, habitCandidate, normCount, normChars, injectedIds: [...injectedIds] }
+}
+
+function collectIds(text: string, ids: Set<string>): void {
+  for (const match of text.matchAll(/\b(?:change|decision|requirement|bug|digest|habit|norm)-[a-z0-9-]+\b/gi)) ids.add(match[0].toLowerCase())
 }
 
 function countBullets(packet: string): number {
