@@ -129,6 +129,7 @@ CLI_USING_SKILLS: Final = [
     Path("packages/claude-skills/sybermem-update/SKILL.md"),
     Path("packages/claude-skills/sybermem-summary/SKILL.md"),
     Path("packages/claude-skills/sybermem-phase-analyze/SKILL.md"),
+    Path("packages/claude-skills/sybermem-uninstall/SKILL.md"),
 ]
 CODEX_HEALTH_CHECK_FILES: Final = [
     Path("packages/claude-skills/sybermem-init-project/project-files/.sybermem/hooks/check_project_health.py"),
@@ -307,10 +308,14 @@ def check_retired_skill_cleanup(root: Path) -> None:
     """
     if not RETIRED_SKILL_NAMES:
         return
-    manifest_text = (root / "scripts" / "managed-install.json").read_text(encoding="utf-8")
-    manifest_missing = [name for name in RETIRED_SKILL_NAMES if name not in manifest_text]
+    manifest = json.loads((root / "scripts" / "managed-install.json").read_text(encoding="utf-8"))
+    manifest_retired = manifest.get("retired_skills", [])
+    manifest_missing = [name for name in RETIRED_SKILL_NAMES if name not in manifest_retired]
     if manifest_missing:
-        fail(f"scripts/managed-install.json is missing retired skills: {', '.join(manifest_missing)}")
+        fail(f"scripts/managed-install.json retired_skills is missing: {', '.join(manifest_missing)}")
+    active_overlap = sorted(set(skill_names(root / "packages" / "claude-skills")) & set(manifest_retired))
+    if active_overlap:
+        fail(f"scripts/managed-install.json retired_skills includes active skills: {', '.join(active_overlap)}")
     for script in DISTRIBUTION_SCRIPTS:
         script_path = root / script
         script_text = script_path.read_text(encoding="utf-8")

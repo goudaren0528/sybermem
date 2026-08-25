@@ -122,7 +122,8 @@ def test_uninstall_cleans_retired_skill_from_all_roots(tmp_path: Path) -> None:
 
     manifest = {
         "schema_version": 1,
-        "skills": ["sybermem-team-summary"],
+        "skills": [],
+        "retired_skills": ["sybermem-team-summary"],
         "runtime_dirs": [],
         "runtime_files": ["managed-install.json", "safe-managed-remove.py"],
         "codex_hook_files": [],
