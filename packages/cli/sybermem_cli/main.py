@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import subprocess
 import sys
 
 from pathlib import Path
@@ -413,6 +415,48 @@ def cmd_project_uninstall(args: argparse.Namespace) -> int:
     return 0
 
 
+def _global_runtime_dir() -> Path:
+    home = Path(os.environ.get("USERPROFILE") or os.environ.get("HOME") or str(Path.home()))
+    return home / ".claude" / "sybermem"
+
+
+def _run_global_uninstall(format_: str) -> int:
+    runtime = _global_runtime_dir()
+    manifest = runtime / "managed-install.json"
+    remover = runtime / "safe-managed-remove.py"
+    if not manifest.is_file() or not remover.is_file():
+        print(
+            "SyberMem managed global uninstall files were not found. Re-run the global installer/update first, or use scripts/uninstall.ps1/sh from a repository checkout.",
+            file=sys.stderr,
+        )
+        return 1
+    home = runtime.parent.parent
+    result = subprocess.run(
+        [sys.executable, str(remover), "uninstall", "--home", str(home), "--manifest", str(manifest)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        print(result.stderr.strip() or "SyberMem managed global uninstall failed", file=sys.stderr)
+        return result.returncode
+    if format_ == "json":
+        print(dump_json({"status": "global_uninstalled", "home": str(home).replace('\\', '/'), "history_preserved": True}))
+    else:
+        print("SyberMem global uninstall complete.")
+        print("Project histories under .sybermem/ were not removed.")
+    return 0
+
+
+def cmd_uninstall(args: argparse.Namespace) -> int:
+    if args.scope == "project":
+        return cmd_project_uninstall(args)
+    if not args.yes:
+        print("Global uninstall removes SyberMem skills, hooks, plugins, and the CLI. Re-run with --yes to confirm.", file=sys.stderr)
+        return 2
+    return _run_global_uninstall(args.format)
+
+
 def _project_index_path(root: Path) -> str:
     return str(root / ".sybermem" / "INDEX.md").replace('\\', '/')
 
@@ -736,6 +780,12 @@ def main() -> int:
     record_intent.add_argument("--prompt", required=True)
     record_intent.add_argument("--format", choices=["text", "json"], default="text")
     record_intent.set_defaults(func=cmd_record_intent)
+
+    uninstall = sub.add_parser("uninstall")
+    uninstall.add_argument("--scope", choices=["project", "global"], required=True)
+    uninstall.add_argument("--yes", action="store_true", help="Confirm global uninstall. Project uninstall does not require this flag.")
+    uninstall.add_argument("--format", choices=["text", "json"], default="text")
+    uninstall.set_defaults(func=cmd_uninstall)
 
     version_cmd = sub.add_parser("version")
     version_cmd.add_argument("--format", choices=["text", "json"], default="text")
