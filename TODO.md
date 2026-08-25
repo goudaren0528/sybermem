@@ -25,12 +25,12 @@ Goal: add an OpenCode-first observability loop for actual memory injection usage
 
 ### 2. Session Outcome Reuse
 
-- [ ] Add focused tests for accumulating memory turns, total injected characters, item counts, and lane totals in the existing `SessionActivity` lifecycle.
-- [ ] Extend recall outcome evidence with `measurable` and `unmeasurable` injected counts while preserving the current edit-alignment calculation.
-- [ ] Reuse `session.idle` to flush a bounded session usage/outcome entry with edit, todo, tool, and memory evidence.
-- [ ] Verify session reset behavior and repeated idle events cannot double-count one completed activity window.
-- [ ] Run focused session activity and recall outcome tests.
-- [ ] Commit: `feat(opencode): record memory session outcomes`.
+- [x] Add focused tests for accumulating memory turns, total injected characters, item counts, and lane totals in the existing `SessionActivity` lifecycle.
+- [x] Extend recall outcome evidence with `measurable` and `unmeasurable` injected counts while preserving the current edit-alignment calculation.
+- [x] Reuse `session.idle` to flush a bounded session usage/outcome entry with edit, todo, tool, and memory evidence.
+- [x] Verify session reset behavior and repeated idle events cannot double-count one completed activity window.
+- [x] Run focused session activity and recall outcome tests.
+- [x] Commit: `feat(opencode): record memory session outcomes`.
 
 ### 3. User-Visible Injection Summary
 
