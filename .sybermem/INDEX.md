@@ -28,6 +28,7 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 - [decision-f780ec7166e14fc2ab1ac595c0edda03] #architecture #team #distribution — For a single team sharing one repo's .sybermem/ via Git, Team mode's only genuinely unique value \(cross-repo management projection\) targets a persona that does not exist here, so it is chicken-rib; the accepted path is DEPRECATE-THEN-REMOVE \(not direct delete, not demote-to-optional\), preceded by a mandatory shared-seam migration, with a read-only registry-based portfolio as the cheaper replacement (2026-08-25)
 - [norm-e86ae226dbbf4e28af3de8c1db92f552] #architecture #process — New cross-host features are implemented OpenCode-complete first, then Claude Code and Codex in their existing hook frameworks (2026-08-24)
 - [requirement-75f7b0e98b7043eeac310fa2a36ba36d] #norm #opencode #architecture — Add a first-class `norm` record type + dual feedback \(always-on bounded global constitution at startup + scope-matched high-signal recall\) + dual identification \(explicit crystallization + digest-time emergent nomination, both confirmation-first\), reusing existing trust/relation/distribution machinery without lowering the recall gate; deliver OpenCode-complete first, then Claude Code and Codex in their existing hook frameworks (2026-08-24)
+- [requirement-ffb8b8130ecd4d33b8a08cfbb9479b59] #memory #observability #opencode — Add an OpenCode-first injection usage and session outcome observability loop so users can see memory cost and quality evidence before SyberMem introduces budget controls. (2026-08-25)
 
 ## Archived Conclusions
 
@@ -88,6 +89,7 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 |----|------|-------|--------|----------|------|
 <!-- add new records here -->
 | requirement-75f7b0e98b7043eeac310fa2a36ba36d | 2026-08-24 | Project binding-norm subsystem — identify, record distinctly, and reliably feed norms back into future work | user request — crystallize recurring/binding project decisions into governing norms that reliably reach later work | high | [link](requirements/2026-08-24-requirement-75f7b0e98b7043eeac310fa2a36ba36d-project-norm-subsystem.md) |
+| requirement-ffb8b8130ecd4d33b8a08cfbb9479b59 | 2026-08-25 | Minimal memory injection observability for OpenCode | product discussion | high | [link](requirements/2026-08-25-requirement-ffb8b8130ecd4d33b8a08cfbb9479b59-minimal-memory-observability.md) |
 
 ## Bug Fix Records
 
@@ -119,9 +121,10 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 - documentation: change-f8bd388c7bac4ee584c68edc97951e18
 - habit: change-7f75f17f01cc4d249ca8468e7bbfec7d
 - installer: bug-17a87caf3b014254bdc0d284ad010540, change-e3777a9e3b784c43b6af93be99707348
-- memory: decision-c24f122fbe5d46ee8095022e6b8c53c8
+- memory: decision-c24f122fbe5d46ee8095022e6b8c53c8, requirement-ffb8b8130ecd4d33b8a08cfbb9479b59
 - norm: change-2011a3f2b21e40dbb926187ebae50cf8, change-3d8c9c844d5747c3b15e84838a2d4fe8, change-bcac35f53e004164adb47471d7cf094d, change-f8bd388c7bac4ee584c68edc97951e18, requirement-75f7b0e98b7043eeac310fa2a36ba36d
-- opencode: bug-17a87caf3b014254bdc0d284ad010540, change-2011a3f2b21e40dbb926187ebae50cf8, change-33b663865936415c9ae9a34e28f6ea6c, change-76481099f07c4f1f9de150a0281fb58f, change-7f75f17f01cc4d249ca8468e7bbfec7d, change-bcac35f53e004164adb47471d7cf094d, change-e3777a9e3b784c43b6af93be99707348, requirement-75f7b0e98b7043eeac310fa2a36ba36d
+- observability: requirement-ffb8b8130ecd4d33b8a08cfbb9479b59
+- opencode: bug-17a87caf3b014254bdc0d284ad010540, change-2011a3f2b21e40dbb926187ebae50cf8, change-33b663865936415c9ae9a34e28f6ea6c, change-76481099f07c4f1f9de150a0281fb58f, change-7f75f17f01cc4d249ca8468e7bbfec7d, change-bcac35f53e004164adb47471d7cf094d, change-e3777a9e3b784c43b6af93be99707348, requirement-75f7b0e98b7043eeac310fa2a36ba36d, requirement-ffb8b8130ecd4d33b8a08cfbb9479b59
 - process: norm-e86ae226dbbf4e28af3de8c1db92f552
 - qa: change-13b0a327e1544f3e8e5ac5d3992c5c97, change-2b4df42e0ff942718e9afef5897ecc4c
 - quality: bug-146ffbf8c1d9415d9708e8f18b003971
