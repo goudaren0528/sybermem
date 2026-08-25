@@ -104,9 +104,10 @@ def _install_runtime(root: Path, home: Path) -> None:
     cli_dir = launcher_dir / "cli"
     cli_dir.mkdir(parents=True, exist_ok=True)
     venv = cli_dir / "venv"
-    subprocess.run([sys.executable, "-m", "venv", str(venv)], check=True)
     python_exe = venv / ("Scripts" if os.name == "nt" else "bin") / "python"
     pip_exe = venv / ("Scripts" if os.name == "nt" else "bin") / "pip"
+    if not python_exe.is_file():
+        subprocess.run([sys.executable, "-m", "venv", str(venv)], check=True)
     subprocess.run([str(python_exe), "-m", "pip", "install", "--upgrade", "pip"], check=True)
     subprocess.run([str(pip_exe), "install", "--upgrade", "--force-reinstall", str(root / "packages" / "core"), str(root / "packages" / "cli")], check=True)
     if os.name == "nt":
