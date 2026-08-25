@@ -43,13 +43,13 @@ Goal: add an OpenCode-first observability loop for actual memory injection usage
 
 ### 4. Existing Memory Stats Extension
 
-- [ ] Add Core tests for parsing the bounded usage/outcome journal and aggregating 7-day and 30-day totals.
-- [ ] Add totals for memory turns, items, characters, average characters per memory turn, p95 characters per memory turn, and lane distribution.
-- [ ] Rename the displayed recall proxy to `Edit Alignment` and show hit/measurable plus unmeasurable counts.
-- [ ] Extend `sybermem project memory-stats --format json` without removing existing fields in the same release.
-- [ ] Extend the existing terminal renderer instead of creating a separate stats command.
-- [ ] Run focused Core/CLI tests, then the relevant package test suites.
-- [ ] Commit: `feat(stats): report memory injection usage`.
+- [x] Add Core tests for parsing the bounded usage/outcome journal and aggregating 7-day and 30-day totals.
+- [x] Add totals for memory turns, items, characters, average characters per memory turn, p95 characters per memory turn, and lane distribution.
+- [x] Rename the displayed recall proxy to `Edit Alignment` and show hit/measurable plus unmeasurable counts.
+- [x] Extend `sybermem project memory-stats --format json` without removing existing fields in the same release.
+- [x] Extend the existing terminal renderer instead of creating a separate stats command.
+- [x] Run focused Core/CLI tests, then the relevant package test suites.
+- [x] Commit: `feat(stats): report memory injection usage`.
 
 ### 5. Documentation and SyberMem Record
 
