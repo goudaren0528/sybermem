@@ -733,30 +733,44 @@ function stashPromptPackets(sessionID, packets) {
   else
     RECALL_STASH.delete(sessionID);
 }
-var NO_INJECTION = { injected: false, recallCount: 0, habitCount: 0, habitCandidate: false, normCount: 0 };
+var NO_INJECTION = { injected: false, recallCount: 0, recallChars: 0, habitCount: 0, habitChars: 0, habitCandidate: false, normCount: 0, normChars: 0, injectedIds: [] };
 function classifyPackets(packets) {
   if (packets.length === 0)
     return NO_INJECTION;
   let recallCount = 0;
+  let recallChars = 0;
   let habitCount = 0;
+  let habitChars = 0;
   let habitCandidate = false;
   let normCount = 0;
+  let normChars = 0;
+  const injectedIds = new Set;
   for (const packet of packets) {
     const trimmed = packet.trim();
     if (trimmed.startsWith("## SyberMem Recall Hints")) {
       recallCount += countBullets(trimmed);
+      recallChars += packet.length;
+      collectIds(trimmed, injectedIds);
     } else if (trimmed.startsWith("## User Habit Reminder")) {
       const habitLines = trimmed.split(`
 `).filter((line) => line.startsWith("- [habit-"));
       habitCount += habitLines.length;
+      habitChars += packet.length;
+      collectIds(trimmed, injectedIds);
       if (habitLines.length === 0)
         habitCandidate = true;
     } else if (trimmed.startsWith("## Relevant Project Norms")) {
       normCount += trimmed.split(`
 `).filter((line) => line.startsWith("- [norm-")).length;
+      normChars += packet.length;
+      collectIds(trimmed, injectedIds);
     }
   }
-  return { injected: recallCount > 0 || habitCount > 0 || habitCandidate || normCount > 0, recallCount, habitCount, habitCandidate, normCount };
+  return { injected: recallCount > 0 || habitCount > 0 || habitCandidate || normCount > 0, recallCount, recallChars, habitCount, habitChars, habitCandidate, normCount, normChars, injectedIds: [...injectedIds] };
+}
+function collectIds(text, ids) {
+  for (const match of text.matchAll(/\b(?:change|decision|requirement|bug|digest|habit|norm)-[a-z0-9-]+\b/gi))
+    ids.add(match[0].toLowerCase());
 }
 function countBullets(packet) {
   return packet.split(`
@@ -1257,6 +1271,56 @@ function applyReplyMarker(sessionID, messageID, text) {
 ${text}`;
 }
 
+// packages/opencode-plugin/src/memory_usage.ts
+var RECORD_ID_RE3 = /\b(?:change|decision|requirement|bug|digest|habit|norm)-[a-z0-9-]+\b/gi;
+function uniqueIds(text) {
+  return [...new Set([...text.matchAll(RECORD_ID_RE3)].map((match) => match[0].toLowerCase()))].slice(0, 40);
+}
+function packetChars(packets, heading) {
+  return packets.find((packet) => packet.trim().startsWith(heading))?.length ?? 0;
+}
+function startupItemCount(startup) {
+  if (!startup)
+    return 0;
+  const bullets = startup.split(`
+`).filter((line) => /^-\s/.test(line.trim())).length;
+  return bullets > 0 ? bullets : 1;
+}
+function buildMemoryUsageEntry(input, options = {}) {
+  const summary = classifyPackets(input.packets);
+  const startup = input.startup.trim();
+  const startupItems = startupItemCount(startup);
+  const recallChars = packetChars(input.packets, "## SyberMem Recall Hints");
+  const habitChars = packetChars(input.packets, "## User Habit Reminder");
+  const normChars = packetChars(input.packets, "## Relevant Project Norms");
+  const injectedIds = uniqueIds([...input.packets, startup].join(`
+`));
+  return {
+    schema_version: 1,
+    timestamp: options.timestamp ?? new Date().toISOString(),
+    host: "opencode",
+    session_id: input.sessionID,
+    total_items: summary.recallCount + summary.habitCount + summary.normCount + startupItems,
+    total_chars: recallChars + habitChars + normChars + startup.length,
+    recall_items: summary.recallCount,
+    recall_chars: recallChars,
+    habit_items: summary.habitCount,
+    habit_chars: habitChars,
+    norm_items: summary.normCount,
+    norm_chars: normChars,
+    startup_items: startupItems,
+    startup_chars: startup.length,
+    injected_ids: injectedIds,
+    startup_present: startupItems > 0
+  };
+}
+function appendMemoryUsage(root, input, options = {}) {
+  const entry = buildMemoryUsageEntry(input, options);
+  if (entry.total_items === 0)
+    return;
+  boundedJsonlAppend(root, ".memory-usage.jsonl", entry, 200);
+}
+
 // packages/opencode-plugin/src/plugin.ts
 async function showToast(client, message) {
   try {
@@ -1455,14 +1519,17 @@ var SyberMemPlugin = async ({ $, directory, client }) => {
     "experimental.chat.system.transform": async ({ sessionID }, output) => {
       if (!root)
         return;
+      const packets = RECALL_STASH.get(sessionID ?? "") ?? [];
       const summary = injectStashedPromptPackets(sessionID ?? "", output);
+      let startup = "";
       if (consumePendingStartup(sessionID ?? "")) {
-        const startup = await buildStartupContext(args.$, root);
+        startup = await buildStartupContext(args.$, root) ?? "";
         if (startup) {
           prependStartupContext(output, startup);
           throttledToast(args.client, "startup-context", "\u2B50 SyberMem: injected project startup context into this session");
         }
       }
+      appendMemoryUsage(root, { sessionID: sessionID ?? "", packets, startup });
       if (!summary.habitCandidate) {
         const recallMessage = recallToastMessage(summary);
         if (recallMessage)
