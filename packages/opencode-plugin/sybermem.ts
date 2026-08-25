@@ -537,8 +537,8 @@ function digestBacklogToast(backlog) {
 }
 
 // packages/opencode-plugin/src/state.ts
-import { existsSync as existsSync4, readFileSync as readFileSync3, statSync, writeFileSync as writeFileSync2 } from "fs";
-import { join as join4 } from "path";
+import { appendFileSync, existsSync as existsSync4, lstatSync, readFileSync as readFileSync3, realpathSync, statSync, writeFileSync as writeFileSync2 } from "fs";
+import { join as join4, relative } from "path";
 function isObject(value) {
   return typeof value === "object" && value !== null;
 }
@@ -581,6 +581,33 @@ function parseNumberMap(raw) {
 var NUDGE_STATE_FILE = ".nudge-state.json";
 var LEGACY_NUDGE_STATE_FILE = ".opencode-nudge-state.json";
 var MAX_EXISTING_JSONL_BYTES = 1e6;
+var MAX_JSONL_ENTRY_BYTES = 16384;
+function isInside(parent, child) {
+  const rel = relative(parent, child);
+  return rel === "" || !rel.startsWith("..") && !rel.includes(":");
+}
+function safeJsonlPath(root, fileName) {
+  if (fileName.includes("/") || fileName.includes("\\") || !fileName.endsWith(".jsonl"))
+    return null;
+  const memoryDir = join4(root, ".sybermem");
+  const p = join4(memoryDir, fileName);
+  try {
+    const dirStat = lstatSync(memoryDir);
+    if (!dirStat.isDirectory() || dirStat.isSymbolicLink())
+      return null;
+    const realDir = realpathSync(memoryDir);
+    if (existsSync4(p)) {
+      const fileStat = lstatSync(p);
+      if (!fileStat.isFile() || fileStat.isSymbolicLink())
+        return null;
+      if (!isInside(realDir, realpathSync(p)))
+        return null;
+    }
+    return p;
+  } catch {
+    return null;
+  }
+}
 function loadNudgeState(root) {
   const p = join4(root, ".sybermem", NUDGE_STATE_FILE);
   if (existsSync4(p)) {
@@ -603,11 +630,24 @@ function saveNudgeState(root, state) {
 `, "utf-8");
 }
 function boundedJsonlAppend(root, fileName, entry, limit) {
-  const p = join4(root, ".sybermem", fileName);
   try {
-    const existing = existsSync4(p) && statSync(p).size <= MAX_EXISTING_JSONL_BYTES ? readFileSync3(p, "utf-8").split(`
-`).filter((line) => line.trim()) : [];
-    existing.push(JSON.stringify(entry));
+    const p = safeJsonlPath(root, fileName);
+    if (!p)
+      return;
+    const line = JSON.stringify(entry);
+    if (Buffer.byteLength(line, "utf-8") > MAX_JSONL_ENTRY_BYTES)
+      return;
+    appendFileSync(p, `${line}
+`, "utf-8");
+  } catch {}
+}
+function compactJsonlJournal(root, fileName, limit) {
+  try {
+    const p = safeJsonlPath(root, fileName);
+    if (!p || limit <= 0 || statSync(p).size > MAX_EXISTING_JSONL_BYTES)
+      return;
+    const existing = readFileSync3(p, "utf-8").split(`
+`).filter((line) => line.trim());
     writeFileSync2(p, existing.slice(-limit).join(`
 `) + `
 `, "utf-8");
@@ -1136,7 +1176,7 @@ function parseRecordFilesJson(raw) {
 }
 async function flushRecallOutcome($, root, activity, sessionID, timestamp = new Date().toISOString()) {
   const injected = [...activity.injectedRecords];
-  if (injected.length === 0 && activity.memoryTurns === 0 && activity.editedFiles.size === 0 && activity.todoCompletedBatches === 0 && activity.lastToolSignal === null)
+  if (activity.memoryTurns === 0)
     return EMPTY_OUTCOME;
   let mapping = {};
   let recallEvidenceAvailable = true;
@@ -1343,8 +1383,40 @@ ${text}`;
 
 // packages/opencode-plugin/src/memory_usage.ts
 var RECORD_ID_RE3 = /\b(?:change|decision|requirement|bug|digest|habit|norm)-[a-z0-9-]+\b/gi;
-function uniqueIds(text) {
-  return [...new Set([...text.matchAll(RECORD_ID_RE3)].map((match) => match[0].toLowerCase()))].slice(0, 40);
+var STRUCTURED_ID_RE = /^\s*-\s*\[([^\]]{1,120})\]/;
+var MAX_PACKET_SCAN_CHARS = 8000;
+var MAX_TOTAL_SCAN_CHARS = 24000;
+var MAX_SESSION_ID_CHARS = 80;
+var MAX_INJECTED_IDS = 40;
+function boundText(value, maxChars) {
+  return value.length > maxChars ? value.slice(0, maxChars) : value;
+}
+function structuredIds(text) {
+  const ids = [];
+  for (const line of boundText(text, MAX_PACKET_SCAN_CHARS).split(`
+`)) {
+    const id = line.match(STRUCTURED_ID_RE)?.[1]?.match(RECORD_ID_RE3)?.[0];
+    if (id)
+      ids.push(id.toLowerCase());
+  }
+  return ids;
+}
+function uniqueStructuredIds(packets, startup) {
+  const ids = new Set;
+  let scanned = 0;
+  for (const text of [...packets, startup]) {
+    if (scanned >= MAX_TOTAL_SCAN_CHARS || ids.size >= MAX_INJECTED_IDS)
+      break;
+    const remaining = MAX_TOTAL_SCAN_CHARS - scanned;
+    const bounded = boundText(text, Math.min(MAX_PACKET_SCAN_CHARS, remaining));
+    scanned += bounded.length;
+    for (const id of structuredIds(bounded)) {
+      ids.add(id);
+      if (ids.size >= MAX_INJECTED_IDS)
+        break;
+    }
+  }
+  return [...ids];
 }
 function packetChars(packets, heading) {
   return packets.find((packet) => packet.trim().startsWith(heading))?.length ?? 0;
@@ -1363,13 +1435,12 @@ function buildMemoryUsageEntry(input, options = {}) {
   const recallChars = packetChars(input.packets, "## SyberMem Recall Hints");
   const habitChars = packetChars(input.packets, "## User Habit Reminder");
   const normChars = packetChars(input.packets, "## Relevant Project Norms");
-  const injectedIds = uniqueIds([...input.packets, startup].join(`
-`));
+  const injectedIds = uniqueStructuredIds(input.packets, startup);
   return {
     schema_version: 1,
     timestamp: options.timestamp ?? new Date().toISOString(),
     host: "opencode",
-    session_id: input.sessionID,
+    session_id: boundText(input.sessionID, MAX_SESSION_ID_CHARS),
     total_items: summary.recallCount + summary.habitCount + summary.normCount + startupItems,
     total_chars: recallChars + habitChars + normChars + startup.length,
     recall_items: summary.recallCount,
@@ -1490,6 +1561,9 @@ async function flushSessionRelevance(args, root, sessionID) {
   try {
     const activity = getSessionActivity(sessionID);
     await flushRecallOutcome(args.$, root, activity, sessionID);
+    compactJsonlJournal(root, ".memory-usage.jsonl", 200);
+    compactJsonlJournal(root, ".recall-outcomes.jsonl", 200);
+    compactJsonlJournal(root, ".recall-debug.jsonl", 200);
   } catch {} finally {
     resetSessionActivity(sessionID);
   }

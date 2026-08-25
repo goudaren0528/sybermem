@@ -3,6 +3,7 @@ import { mkdirSync, readFileSync, rmSync } from "fs"
 import { join } from "path"
 import { tmpdir } from "os"
 import { appendRecallDebug, buildRecallDebugEntry } from "../src/recall_debug"
+import { compactJsonlJournal } from "../src/state"
 
 describe("recall debug", () => {
   it("builds inject entries from bounded recall packet metadata", () => {
@@ -35,6 +36,8 @@ describe("recall debug", () => {
     try {
       // When
       for (let index = 0; index < 205; index += 1) appendRecallDebug(root, [], `2026-08-14T00:00:${String(index).padStart(2, "0")}.000Z`)
+
+      compactJsonlJournal(root, ".recall-debug.jsonl", 200)
 
       // Then
       const lines = readFileSync(join(root, ".sybermem", ".recall-debug.jsonl"), "utf-8").trim().split("\n")
