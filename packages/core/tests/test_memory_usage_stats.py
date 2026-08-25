@@ -3,6 +3,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 import sys
+from typing import NoReturn
+
+import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -118,3 +121,50 @@ def test_memory_usage_is_explicitly_unavailable_when_journal_is_missing(tmp_path
             "startup": {"items": 0, "chars": 0},
         },
     }
+
+
+def test_memory_usage_is_unavailable_when_journal_read_fails(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Given: the usage journal exists but cannot be read
+    _write_journal(tmp_path, [_turn("2026-08-14T09:00:00+08:00", 10)])
+
+    def fail_read_text(self: Path, encoding: str | None = None) -> NoReturn:  # noqa: ARG001
+        raise OSError("permission denied")
+
+    monkeypatch.setattr(Path, "read_text", fail_read_text)
+
+    # When
+    turns, outcomes, status = read_memory_usage_journal(tmp_path)
+
+    # Then
+    assert turns == []
+    assert outcomes == []
+    assert status == "unavailable"
+
+
+def test_memory_usage_is_unavailable_when_journal_is_not_utf8(tmp_path: Path) -> None:
+    # Given: a usage journal with invalid UTF-8 bytes
+    sybermem = tmp_path / ".sybermem"
+    sybermem.mkdir(parents=True)
+    (sybermem / ".memory-usage.jsonl").write_bytes(b"\xff\xfe\xfd")
+
+    # When
+    result = aggregate_memory_usage(tmp_path, "2026-08-14")
+
+    # Then
+    assert result["status"] == "unavailable"
+    assert result["turns"] == 0
+
+
+def test_memory_usage_is_unavailable_when_journal_is_oversized(tmp_path: Path) -> None:
+    # Given: a usage journal larger than the parser cap
+    sybermem = tmp_path / ".sybermem"
+    sybermem.mkdir(parents=True)
+    (sybermem / ".memory-usage.jsonl").write_text("x" * 1_000_001, encoding="utf-8")
+
+    # When
+    turns, outcomes, status = read_memory_usage_journal(tmp_path)
+
+    # Then
+    assert turns == []
+    assert outcomes == []
+    assert status == "unavailable"
