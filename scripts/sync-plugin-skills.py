@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import shutil
+import os
 from pathlib import Path
+import stat
+from uuid import uuid4
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -17,8 +20,19 @@ def iter_top_level_skill_dirs(source_root: Path) -> list[Path]:
 
 def sync_skill_dir(source_dir: Path, target_root: Path) -> None:
     target_dir = target_root / source_dir.name
-    if target_dir.exists():
-        shutil.rmtree(target_dir)
+    if target_root.is_symlink() or target_dir.parent.resolve() != target_root.resolve():
+        raise RuntimeError(f"Refusing sync outside managed skills root: {target_dir}")
+    if target_dir.exists() or target_dir.is_symlink():
+        if target_dir.is_symlink():
+            target_dir.unlink()
+        else:
+            quarantine = target_root / f".sybermem-sync-remove-{uuid4().hex}"
+            os.replace(target_dir, quarantine)
+            info = quarantine.lstat()
+            if stat.S_ISDIR(info.st_mode):
+                shutil.rmtree(quarantine)
+            else:
+                quarantine.unlink()
     shutil.copytree(source_dir, target_dir)
 
 
