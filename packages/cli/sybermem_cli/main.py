@@ -347,10 +347,18 @@ def cmd_portfolio(args: argparse.Namespace) -> int:
                     phase = p["phase"]
                     phase_label = phase.get("id") or phase.get("name") or "(no phase)"
                     phase_name = phase.get("name", "")
-                    if phase_name and phase.get("id"):
-                        print(f"- {p['slug']} → {phase_label} {phase_name}")
-                    else:
-                        print(f"- {p['slug']} → {phase_label}")
+                    head = f"{phase_label} {phase_name}".strip() if (phase_name and phase.get("id")) else phase_label
+                    signals = []
+                    if p.get("open_bugs"):
+                        signals.append(f"{p['open_bugs']} open bug(s)")
+                    if p.get("open_requirements"):
+                        signals.append(f"{p['open_requirements']} open req(s)")
+                    if p.get("digest_uncovered"):
+                        signals.append(f"{p['digest_uncovered']} undigested")
+                    if p.get("latest_record_date"):
+                        signals.append(f"last {p['latest_record_date']}")
+                    suffix = f"  [{'; '.join(signals)}]" if signals else ""
+                    print(f"- {p['slug']} → {head}{suffix}")
             print("")
     return 0
 
