@@ -42,7 +42,7 @@ def project_memory_stats(root: Path) -> dict:
             "records": _record_counts([row for row in records if _date_in_window(row.get("created_at", ""), since, today)]),
             "recall": _recall_counts([entry for entry in recall_entries if _date_in_window(str(entry.get("timestamp", "")), since, today)], malformed_lines, recall_status),
             "relevance": _relevance_for_window([entry for entry in outcome_entries if _date_in_window(str(entry.get("timestamp", "")), since, today)], window_usage_outcomes),
-            "memory_usage": aggregate_memory_usage_window(usage_turns, since, today) if usage_status == "available" else _unavailable_memory_usage(),
+            "memory_usage": aggregate_memory_usage_window(usage_turns, since, today) if usage_status == "available" else _empty_memory_usage(usage_status),
         }
     total_usage_outcomes = aggregate_memory_outcomes(usage_outcomes)
     return {
@@ -54,7 +54,7 @@ def project_memory_stats(root: Path) -> dict:
             "records": _record_counts(records),
             "recall": _recall_counts(recall_entries, malformed_lines, recall_status),
             "relevance": _relevance_for_window(outcome_entries, total_usage_outcomes),
-            "memory_usage": aggregate_memory_usage_window(usage_turns, today - timedelta(days=29), today) if usage_status == "available" else _unavailable_memory_usage(),
+            "memory_usage": aggregate_memory_usage_window(usage_turns, today - timedelta(days=29), today) if usage_status == "available" else _empty_memory_usage(usage_status),
         },
         "windows": windows,
         "recall_health": _recall_health_from_windows(windows, recall_status),
@@ -234,9 +234,9 @@ def _relevance_for_window(legacy_entries: list[dict], usage_outcomes: dict) -> d
     return _relevance_counts(legacy_entries)
 
 
-def _unavailable_memory_usage() -> dict:
+def _empty_memory_usage(status: str) -> dict:
     return {
-        "status": "no_log",
+        "status": status,
         "turns": 0,
         "items": 0,
         "chars": 0,
