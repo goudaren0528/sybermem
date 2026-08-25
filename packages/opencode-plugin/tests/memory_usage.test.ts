@@ -4,6 +4,14 @@ import { join } from "path"
 import { tmpdir } from "os"
 import { appendMemoryUsage, buildMemoryUsageEntry } from "../src/memory_usage"
 
+function readSessionEntry(raw: string): { readonly session_id: string } {
+  const parsed: unknown = JSON.parse(raw)
+  if (typeof parsed !== "object" || parsed === null) throw new Error("expected usage entry object")
+  const sessionID = Reflect.get(parsed, "session_id")
+  if (typeof sessionID !== "string") throw new Error("expected usage session id")
+  return { session_id: sessionID }
+}
+
 describe("memory usage journal", () => {
   it("builds lane measurements from model-visible rendered packets", () => {
     // Given: rendered recall, habit, norm, and startup packets
@@ -97,7 +105,7 @@ describe("memory usage journal", () => {
       const entries = readFileSync(join(root, ".sybermem", ".memory-usage.jsonl"), "utf-8")
         .trim()
         .split("\n")
-        .map((line) => JSON.parse(line) as { readonly session_id: string })
+        .map(readSessionEntry)
       expect(entries).toHaveLength(200)
       expect(entries[0]?.session_id).toBe("session-1")
       expect(entries[199]?.session_id).toBe("session-200")
