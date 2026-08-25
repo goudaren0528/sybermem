@@ -26,13 +26,28 @@ def _remove_link(path: Path) -> None:
         path.unlink()
 
 
+def _assert_no_linked_ancestor(path: Path) -> None:
+    # Walk every existing ancestor and refuse if any component is a symlink /
+    # reparse point. A linked ANCESTOR (e.g. ~/.config) can redirect an
+    # otherwise-valid final component to a location outside the home tree.
+    seen: set[Path] = set()
+    current = path
+    while current not in seen:
+        seen.add(current)
+        if _is_link_or_reparse(current):
+            raise RuntimeError(f"refusing linked ancestor on managed path: {current}")
+        parent = current.parent
+        if parent == current:
+            break
+        current = parent
+
+
 def _assert_direct_child(root: Path, target: Path) -> None:
     root = root.absolute()
     target = target.absolute()
     if target.parent != root:
         raise RuntimeError(f"refusing path outside managed root: {target}")
-    if _is_link_or_reparse(root):
-        raise RuntimeError(f"refusing linked managed root: {root}")
+    _assert_no_linked_ancestor(root)
 
 
 def _identity(path: Path) -> tuple[int, int]:
@@ -92,8 +107,9 @@ def remove_child(root: Path, name: str) -> None:
 def _remove_codex_handlers(hooks_json: Path, managed: set[str]) -> None:
     if not hooks_json.is_file():
         return
-    if hooks_json.is_symlink() or hooks_json.parent.is_symlink():
+    if hooks_json.is_symlink():
         raise RuntimeError(f"refusing linked Codex hooks path: {hooks_json}")
+    _assert_no_linked_ancestor(hooks_json.parent.absolute())
     data = json.loads(hooks_json.read_text(encoding="utf-8-sig"))
     hooks = data.get("hooks")
     if not isinstance(hooks, dict):
@@ -115,6 +131,13 @@ def _remove_codex_handlers(hooks_json: Path, managed: set[str]) -> None:
     os.replace(temporary, hooks_json)
 
 
+def _remove_fixed_plugin(home: Path, manifest: dict[str, object]) -> None:
+    expected = ".config/opencode/plugins/sybermem.ts"
+    if manifest.get("opencode_plugin") != expected:
+        raise RuntimeError("managed manifest contains an invalid OpenCode plugin path")
+    remove_child(home / ".config" / "opencode" / "plugins", "sybermem.ts")
+
+
 def uninstall(home: Path, manifest_path: Path) -> None:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     if manifest.get("schema_version") != 1:
@@ -129,8 +152,7 @@ def uninstall(home: Path, manifest_path: Path) -> None:
     runtime_files = [name for name in manifest["runtime_files"] if name not in {"managed-install.json", "safe-managed-remove.py"}]
     for name in runtime_files:
         remove_child(runtime, name)
-    plugin = home / manifest["opencode_plugin"]
-    remove_child(plugin.parent, plugin.name)
+    _remove_fixed_plugin(home, manifest)
     codex_hooks = home / ".codex" / "hooks"
     for name in manifest["codex_hook_files"]:
         remove_child(codex_hooks, name)
