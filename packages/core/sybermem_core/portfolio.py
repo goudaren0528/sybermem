@@ -41,21 +41,38 @@ def build_portfolio() -> dict:
             })
             continue
 
-        if (path / ".sybermem" / "INDEX.md").is_file():
-            status = project_status(path)
-            backlog = digest_backlog(path)
+        if not (path / ".sybermem" / "INDEX.md").is_file():
+            # Path exists but the project has no derived INDEX yet (uninitialized or the
+            # index is temporarily absent/stale). Represent it explicitly rather than
+            # silently dropping the registry entry — the portfolio must show EVERY
+            # registered project.
             projects.append({
                 "project_id": entry["project_id"],
                 "slug": entry["slug"],
-                "status": entry.get("status", "active"),
-                "phase": status["phase"],
-                # Locally-derivable attention signals — no Team publish trust envelope,
-                # no preview hash, no dashboards.
-                "open_bugs": len(status.get("open_bugs", [])),
-                "open_requirements": len(status.get("open_requirements", [])),
-                "digest_uncovered": backlog.get("uncovered", 0),
-                "latest_record_date": _latest_record_date(path),
-                "reason": "",
+                "status": "uninitialized",
+                "phase": {"id": "", "name": "", "lifecycle": ""},
+                "open_bugs": 0,
+                "open_requirements": 0,
+                "digest_uncovered": 0,
+                "latest_record_date": "",
+                "reason": "no .sybermem/INDEX.md (run /sybermem-init-project or project index build)",
             })
+            continue
+
+        status = project_status(path)
+        backlog = digest_backlog(path)
+        projects.append({
+            "project_id": entry["project_id"],
+            "slug": entry["slug"],
+            "status": entry.get("status", "active"),
+            "phase": status["phase"],
+            # Locally-derivable attention signals — no Team publish trust envelope,
+            # no preview hash, no dashboards.
+            "open_bugs": len(status.get("open_bugs", [])),
+            "open_requirements": len(status.get("open_requirements", [])),
+            "digest_uncovered": backlog.get("uncovered", 0),
+            "latest_record_date": _latest_record_date(path),
+            "reason": "",
+        })
 
     return {"projects": projects}

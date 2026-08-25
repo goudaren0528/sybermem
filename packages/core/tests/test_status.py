@@ -44,6 +44,25 @@ def test_project_status_has_no_publication_field_after_team_removal(tmp_path: Pa
     assert status["open_bugs"] == []
 
 
+def test_project_status_ignores_legacy_team_block(tmp_path: Path) -> None:
+    # Given: a project whose project.yaml still carries a legacy nested `team:` block
+    # (from before Team mode was removed; decision-f780ec)
+    project_root = tmp_path / "p"
+    sybermem = project_root / ".sybermem"
+    sybermem.mkdir(parents=True)
+    (sybermem / "project.yaml").write_text(
+        "project_id: project-1\nslug: demo\nteam:\n  team_id: team-1\n  team_path: /some/old/team\n",
+        encoding="utf-8",
+    )
+
+    # When / Then: the inert legacy block must not crash status and must not resurface
+    # any Team/publication field.
+    status = project_status(project_root)
+    assert "publication" not in status
+    assert status["slug"] == "demo"
+    assert "team" not in status
+
+
 def test_project_status_treats_fixed_bug_as_closed_but_statusless_as_open(tmp_path: Path) -> None:
     # Given: a project with one bug marked `fixed`, one marked `resolved`, and one with no status
     project_root = tmp_path / "project"
