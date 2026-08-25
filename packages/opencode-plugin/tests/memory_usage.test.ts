@@ -88,6 +88,42 @@ describe("memory usage journal", () => {
     }
   })
 
+  it("extracts ids only from structured memory item lines", () => {
+    // Given: body text contains ID-shaped strings that are not item anchors
+    const entry = buildMemoryUsageEntry(
+      {
+        sessionID: "session-structured-ids",
+        packets: [
+          "## SyberMem Recall Hints\n- [change-real] body mentions bug-forged and norm-forged\nplain decision-forged",
+          "## User Habit Reminder\n- [habit-real] body mentions habit-forged",
+          "## Relevant Project Norms\n- [norm-real] body mentions requirement-forged",
+        ],
+        startup: "## SyberMem Startup Context\n- [digest-real] body mentions change-forged",
+      },
+      { timestamp: "2026-08-25T12:00:00.000Z" },
+    )
+
+    // Then: only structured bracket ids are retained
+    expect(entry.injected_ids).toEqual(["change-real", "habit-real", "norm-real", "digest-real"])
+  })
+
+  it("bounds session id and injected id cardinality", () => {
+    // Given: a long session id and many structured recall items
+    const packet = ["## SyberMem Recall Hints", ...Array.from({ length: 60 }, (_, index) => `- [change-${String(index).padStart(2, "0")}] item`)].join("\n")
+
+    // When
+    const entry = buildMemoryUsageEntry(
+      { sessionID: `session-${"x".repeat(200)}`, packets: [packet], startup: "" },
+      { timestamp: "2026-08-25T12:00:00.000Z" },
+    )
+
+    // Then
+    expect(entry.session_id.length).toBeLessThanOrEqual(80)
+    expect(entry.injected_ids).toHaveLength(40)
+    expect(entry.injected_ids[0]).toBe("change-00")
+    expect(entry.injected_ids[39]).toBe("change-39")
+  })
+
   it("keeps only the newest 200 usage entries", () => {
     // Given: a project memory directory and 201 model-visible injections
     const root = join(tmpdir(), `sybermem-memory-usage-cap-${crypto.randomUUID()}`)

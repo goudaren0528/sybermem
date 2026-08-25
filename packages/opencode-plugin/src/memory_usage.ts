@@ -31,9 +31,39 @@ export interface MemoryUsageOptions {
 }
 
 const RECORD_ID_RE = /\b(?:change|decision|requirement|bug|digest|habit|norm)-[a-z0-9-]+\b/gi
+const STRUCTURED_ID_RE = /^\s*-\s*\[([^\]]{1,120})\]/
+const MAX_PACKET_SCAN_CHARS = 8_000
+const MAX_TOTAL_SCAN_CHARS = 24_000
+const MAX_SESSION_ID_CHARS = 80
+const MAX_INJECTED_IDS = 40
 
-function uniqueIds(text: string): readonly string[] {
-  return [...new Set([...text.matchAll(RECORD_ID_RE)].map((match) => match[0].toLowerCase()))].slice(0, 40)
+function boundText(value: string, maxChars: number): string {
+  return value.length > maxChars ? value.slice(0, maxChars) : value
+}
+
+function structuredIds(text: string): readonly string[] {
+  const ids: string[] = []
+  for (const line of boundText(text, MAX_PACKET_SCAN_CHARS).split("\n")) {
+    const id = line.match(STRUCTURED_ID_RE)?.[1]?.match(RECORD_ID_RE)?.[0]
+    if (id) ids.push(id.toLowerCase())
+  }
+  return ids
+}
+
+function uniqueStructuredIds(packets: readonly string[], startup: string): readonly string[] {
+  const ids = new Set<string>()
+  let scanned = 0
+  for (const text of [...packets, startup]) {
+    if (scanned >= MAX_TOTAL_SCAN_CHARS || ids.size >= MAX_INJECTED_IDS) break
+    const remaining = MAX_TOTAL_SCAN_CHARS - scanned
+    const bounded = boundText(text, Math.min(MAX_PACKET_SCAN_CHARS, remaining))
+    scanned += bounded.length
+    for (const id of structuredIds(bounded)) {
+      ids.add(id)
+      if (ids.size >= MAX_INJECTED_IDS) break
+    }
+  }
+  return [...ids]
 }
 
 function packetChars(packets: readonly string[], heading: string): number {
@@ -53,12 +83,12 @@ export function buildMemoryUsageEntry(input: MemoryUsageInput, options: MemoryUs
   const recallChars = packetChars(input.packets, "## SyberMem Recall Hints")
   const habitChars = packetChars(input.packets, "## User Habit Reminder")
   const normChars = packetChars(input.packets, "## Relevant Project Norms")
-  const injectedIds = uniqueIds([...input.packets, startup].join("\n"))
+  const injectedIds = uniqueStructuredIds(input.packets, startup)
   return {
     schema_version: 1,
     timestamp: options.timestamp ?? new Date().toISOString(),
     host: "opencode",
-    session_id: input.sessionID,
+    session_id: boundText(input.sessionID, MAX_SESSION_ID_CHARS),
     total_items: summary.recallCount + summary.habitCount + summary.normCount + startupItems,
     total_chars: recallChars + habitChars + normChars + startup.length,
     recall_items: summary.recallCount,
