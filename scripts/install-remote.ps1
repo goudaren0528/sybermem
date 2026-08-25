@@ -181,10 +181,10 @@ $RemoverSource = Join-Path $TmpDir "$ArchivePrefix\scripts\safe-managed-remove.p
     # Global launchers: only needed by the Claude Code lifecycle hooks.
     if (Test-Path (Join-Path $env:USERPROFILE ".claude")) {
         if (-not (Test-Path $LauncherDir)) {
-    New-Item -ItemType Directory -Path $LauncherDir -Force | Out-Null
-    Copy-Item -Path $ManifestSource -Destination $ManifestPath -Force
-    Copy-Item -Path $RemoverSource -Destination $RemoverPath -Force
+            New-Item -ItemType Directory -Path $LauncherDir -Force | Out-Null
         }
+        Copy-Item -Path $ManifestSource -Destination $ManifestPath -Force
+        Copy-Item -Path $RemoverSource -Destination $RemoverPath -Force
         Copy-Item -Path $LauncherSource -Destination $LauncherPath -Force
         Write-Host "  [Claude Code] installed stop hook launcher: $LauncherPath"
         if (Test-Path $SessionLauncherSource) {

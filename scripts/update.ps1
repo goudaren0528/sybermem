@@ -157,11 +157,11 @@ function Install-CodexUserPromptHook {
 
 Install-CodexUserPromptHook
 
-if (-not (Test-Path $LauncherDir)) {
-New-Item -ItemType Directory -Path $LauncherDir -Force | Out-Null
-Copy-Item -Path $ManifestSource -Destination $ManifestPath -Force
-Copy-Item -Path $RemoverSource -Destination $RemoverPath -Force
-}
+    if (-not (Test-Path $LauncherDir)) {
+        New-Item -ItemType Directory -Path $LauncherDir -Force | Out-Null
+    }
+    Copy-Item -Path $ManifestSource -Destination $ManifestPath -Force
+    Copy-Item -Path $RemoverSource -Destination $RemoverPath -Force
 Copy-Item -Path $LauncherSource -Destination $LauncherPath -Force
 Write-Host "  [Global] installed stop hook launcher: $LauncherPath"
 Copy-Item -Path $SessionLauncherSource -Destination $SessionLauncherPath -Force
