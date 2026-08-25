@@ -614,6 +614,52 @@ def test_high_signal_recall_stays_silent_for_keyword_only_matches(tmp_path: Path
     assert reason == "matched rows were keyword-only and below the high-signal floor"
 
 
+def test_high_signal_recall_keeps_digest_preference_behind_keyword_gate(tmp_path: Path, monkeypatch) -> None:
+    # Given: digest matches are eligible for compact ordering, but only through weak keyword overlap.
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    write_project(project_root)
+    write_record(
+        project_root,
+        "digests",
+        "2026-08-01-001-current-digest.md",
+        ["type: digest", "kind: phase", "date: 2026-08-01", "number: 001", "title: Current digest", "status: completed"],
+        "## Core Conclusions\n- digestgate-token summarizes the current covered phase.",
+    )
+    write_record(
+        project_root,
+        "digests",
+        "2026-08-09-002-archived-digest.md",
+        [
+            "type: digest",
+            "kind: phase",
+            "date: 2026-08-09",
+            "number: 002",
+            "title: Archived digest",
+            "status: completed",
+            "lifecycle: archived",
+        ],
+        "## Core Conclusions\n- digestgate-token summarizes archived phase history.",
+    )
+    write_record(
+        project_root,
+        "decisions",
+        "2026-08-10-003-current-decision.md",
+        ["type: decision", "date: 2026-08-10", "title: Current digestgate decision", "status: active"],
+        "## Summary\ndigestgate-token keeps compact recall in the current lane.",
+    )
+    monkeypatch.chdir(project_root)
+
+    # When: compact search ranks digest candidates, while the hot-path gate evaluates them.
+    compact_rows = compact_project_search("digestgate-token", limit=3)
+    hints, reason = high_signal_recall_hints("digestgate-token", limit=3)
+
+    # Then: current digest preference affects ordering, but keyword-only matches still do not auto-inject.
+    assert [row["record_id"] for row in compact_rows] == ["decision-003", "digest-001", "digest-002"]
+    assert hints == []
+    assert reason == "matched rows were keyword-only and below the high-signal floor"
+
+
 def test_high_signal_recall_injects_relation_and_record_id_matches(tmp_path: Path, monkeypatch) -> None:
     # Given: a record reachable by an explicit relation match
     project_root = tmp_path / "project"
@@ -695,3 +741,50 @@ def test_compact_search_ranks_specific_match_above_newer_generic_match(tmp_path:
     # Then: the specific (topic) match ranks first despite being older (E5)
     assert rows[0]["record_id"] == "decision-001"
     assert rows[0]["match"] == "topic"
+
+
+def test_compact_search_prefers_current_digest_over_newer_archived_digest_with_same_tier(tmp_path: Path, monkeypatch) -> None:
+    # Given: two digest matches share the same authority and keyword specificity, but only
+    # one digest is still current coverage rather than archived history, and a current
+    # authoritative row keeps compact recall eligible.
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    write_project(project_root)
+    write_record(
+        project_root,
+        "digests",
+        "2026-08-01-001-current-digest.md",
+        ["type: digest", "kind: phase", "date: 2026-08-01", "number: 001", "title: Current digest", "status: completed"],
+        "## Core Conclusions\n- digestpref-token summarizes the current covered phase.",
+    )
+    write_record(
+        project_root,
+        "digests",
+        "2026-08-09-002-archived-digest.md",
+        [
+            "type: digest",
+            "kind: phase",
+            "date: 2026-08-09",
+            "number: 002",
+            "title: Archived digest",
+            "status: completed",
+            "lifecycle: archived",
+        ],
+        "## Core Conclusions\n- digestpref-token summarizes archived phase history.",
+    )
+    write_record(
+        project_root,
+        "decisions",
+        "2026-08-10-003-current-decision.md",
+        ["type: decision", "date: 2026-08-10", "title: Current digestpref decision", "status: active"],
+        "## Summary\ndigestpref-token keeps compact recall in the current lane.",
+    )
+    monkeypatch.chdir(project_root)
+
+    # When: compact recall ranks same-tier digest matches
+    rows = compact_project_search("digestpref-token", limit=3)
+
+    # Then: the current digest outranks newer archived digest history within the summarized tier
+    assert [row["record_id"] for row in rows] == ["decision-003", "digest-001", "digest-002"]
+    assert rows[1]["lifecycle"] == "resolved"
+    assert rows[2]["lifecycle"] == "archived"
