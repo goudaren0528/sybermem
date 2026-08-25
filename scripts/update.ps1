@@ -54,7 +54,7 @@ foreach ($target in $Targets) {
             Remove-ManagedDirectory -Root $target.Path -Target $retiredPath
         }
     }
-    foreach ($skill in @("sybermem-init-project", "sybermem-record", "sybermem-summary", "sybermem-resume", "sybermem-digest", "sybermem-phase-analyze", "using-sybermem", "sybermem-update", "sybermem-search", "sybermem-link", "sybermem-theme-digest", "sybermem-habit")) {
+    foreach ($skill in @("sybermem-init-project", "sybermem-record", "sybermem-summary", "sybermem-resume", "sybermem-digest", "sybermem-phase-analyze", "using-sybermem", "sybermem-update", "sybermem-search", "sybermem-link", "sybermem-theme-digest", "sybermem-habit", "sybermem-uninstall")) {
         $src = Join-Path $SkillSource $skill
         $dst = Join-Path $target.Path $skill
         if (Test-Path $src) {
@@ -214,6 +214,7 @@ Write-Host "  /sybermem-link          - Link existing records"
 Write-Host "  /sybermem-theme-digest  - Create a cross-phase topic digest"
 
 Write-Host "  /sybermem-habit         - Manage user-level habit memory and reminders"
+Write-Host "  /sybermem-uninstall     - Safely choose project-level or global uninstall"
 Write-Host ""
 $sybermemOnPath = ($env:PATH -split ';' | Where-Object { $_.TrimEnd('\') -ieq $CliDir.TrimEnd('\') }).Count -gt 0
 if ($sybermemOnPath) {
