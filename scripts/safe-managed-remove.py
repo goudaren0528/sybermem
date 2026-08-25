@@ -142,8 +142,9 @@ def uninstall(home: Path, manifest_path: Path) -> None:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     if manifest.get("schema_version") != 1:
         raise RuntimeError("unsupported managed-install manifest version")
+    skill_names = [*manifest["skills"], *manifest.get("retired_skills", [])]
     for root in (home / ".claude" / "skills", home / ".config" / "opencode" / "skills", home / ".agents" / "skills"):
-        for name in manifest["skills"]:
+        for name in skill_names:
             remove_child(root, name)
     runtime = home / ".claude" / "sybermem"
     for name in manifest["runtime_dirs"]:
