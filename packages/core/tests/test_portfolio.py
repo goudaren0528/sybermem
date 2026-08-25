@@ -73,13 +73,20 @@ def test_portfolio_is_read_only(tmp_path: Path, monkeypatch) -> None:
     proj = tmp_path / "proj"
     proj.mkdir()
     _make_project(proj, "demo")
-    before = sorted(p.name for p in (proj / ".sybermem").rglob("*"))
+
+    def snapshot() -> dict[str, bytes]:
+        return {
+            str(p.relative_to(proj)): p.read_bytes()
+            for p in (proj / ".sybermem").rglob("*")
+            if p.is_file()
+        }
+
+    before = snapshot()
     registry = [{"project_id": "demo-id", "slug": "demo", "path": str(proj)}]
     monkeypatch.setattr(portfolio_module, "load_registry", lambda: registry)
 
     # When
     build_portfolio()
 
-    # Then: the portfolio never writes to project files (read-only projection)
-    after = sorted(p.name for p in (proj / ".sybermem").rglob("*"))
-    assert before == after
+    # Then: the portfolio never writes to project files (byte-identical, read-only projection)
+    assert snapshot() == before
