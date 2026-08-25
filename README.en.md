@@ -22,6 +22,9 @@ curl -sSL https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/i
 
 # Windows (PowerShell)
 irm https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/install-remote.ps1 | iex
+
+# Windows OpenCode / cmd.exe (PowerShell-free)
+python -c "import urllib.request; exec(urllib.request.urlopen('https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/install-remote.py').read())"
 ```
 
 Then open a target project:
@@ -147,6 +150,9 @@ curl -sSL https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/i
 
 # Windows (PowerShell)
 irm https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/install-remote.ps1 | iex
+
+# Windows OpenCode / cmd.exe (PowerShell-free)
+python -c "import urllib.request; exec(urllib.request.urlopen('https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/install-remote.py').read())"
 ```
 
 This refreshes user-level Claude Code skills, OpenCode skills, Codex skills (`~/.agents/skills`), the OpenCode plugin, the Codex `SessionStart` / `UserPromptSubmit` / `Stop` / `PostCompact` hooks, and the CLI / Core runtime. The installer creates a fixed CLI launcher at `$HOME/.claude/sybermem/cli/sybermem` on macOS / Linux and `%USERPROFILE%\.claude\sybermem\cli\sybermem.cmd` on Windows. SyberMem's OpenCode plugin, Codex hooks, and CLI-using skills prefer this fixed launcher when a subprocess cannot resolve bare `sybermem`; install scripts do not modify persistent PATH by default.
