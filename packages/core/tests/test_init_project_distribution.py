@@ -141,6 +141,31 @@ def test_health_check_replaces_legacy_digest_template_missing_coverage_hash(tmp_
     assert "replace .sybermem/templates/digest-template.md from template" in actions
 
 
+def test_health_check_replaces_session_start_hook_missing_latest_digest_injection(tmp_path: Path) -> None:
+    # Given: an existing project whose SessionStart hook has digest stale/backlog heads-up
+    # but predates latest digest Core Conclusions injection.
+    project = tmp_path / "project"
+    hook_dir = project / ".sybermem" / "hooks"
+    hook_dir.mkdir(parents=True)
+    hook = hook_dir / "session_start_context.py"
+    hook.write_text(
+        "def detect_stale_digests(root):\n"
+        "    return {'stale': 0, 'uncovered': 0}\n",
+        encoding="utf-8",
+    )
+
+    # When: the distributed health checker classifies managed hooks.
+    health = runpy.run_path(str(HEALTH_SCRIPT))
+    check_session_start_hook = health["check_session_start_hook"]
+    generate_actions = health["generate_actions"]
+    files = {".sybermem/hooks/session_start_context.py": check_session_start_hook(project)}
+    actions = generate_actions(files)
+
+    # Then: old projects are marked stale so /sybermem-update propagates the new hook.
+    assert files[".sybermem/hooks/session_start_context.py"]["status"] == "stale"
+    assert "replace .sybermem/hooks/session_start_context.py from template" in actions
+
+
 def test_managed_file_copies_stay_byte_identical_across_distribution() -> None:
     # Given: managed files that exist as multiple distributed copies which must not drift
     mirror_project_files = ROOT / "skills" / "sybermem-init-project" / "project-files"
