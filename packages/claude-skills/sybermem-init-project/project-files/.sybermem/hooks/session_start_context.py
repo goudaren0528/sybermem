@@ -289,6 +289,69 @@ def detect_stale_digests(root: Path) -> dict:
         return empty
 
 
+def latest_digest_section(root: Path) -> list[str]:
+    """Return a bounded latest-digest section when the newest digest is current.
+
+    Uses digest governance as the single source of truth for staleness: only inject
+    Core Conclusions when the latest digest can be checked and is not marked stale.
+    Fail-open to [] on CLI/JSON issues so session start never breaks.
+    """
+    try:
+        status_result = subprocess.run(
+            ["sybermem", "digest", "status", "--format", "json"],
+            cwd=root, capture_output=True, text=True, encoding="utf-8", check=False,
+        )
+        if status_result.returncode not in (0, 1) or not status_result.stdout.strip():
+            return []
+        status_payload = json.loads(status_result.stdout)
+        digests = status_payload.get("digests")
+        if not isinstance(digests, list) or not digests:
+            return []
+
+        latest_result = subprocess.run(
+            ["sybermem", "digest", "latest", "--format", "json"],
+            cwd=root, capture_output=True, text=True, encoding="utf-8", check=False,
+        )
+        if latest_result.returncode != 0 or not latest_result.stdout.strip():
+            return []
+        latest_payload = json.loads(latest_result.stdout)
+        if not isinstance(latest_payload, dict):
+            return []
+
+        latest_id = latest_payload.get("record_id")
+        if not isinstance(latest_id, str) or not latest_id.strip():
+            return []
+
+        latest_digest = next(
+            (
+                digest for digest in digests
+                if isinstance(digest, dict) and digest.get("record_id") == latest_id
+            ),
+            None,
+        )
+        if latest_digest is None:
+            return []
+
+        verdict = latest_digest.get("verdict")
+        if not isinstance(verdict, str) or verdict != "current":
+            return []
+
+        raw_conclusions = latest_payload.get("conclusions")
+        if not isinstance(raw_conclusions, list):
+            return []
+        conclusions = [line for line in raw_conclusions if isinstance(line, str)][:5]
+        if not conclusions:
+            return []
+
+        title = latest_payload.get("title")
+        heading = "### Latest Digest"
+        if isinstance(title, str) and title.strip():
+            heading = f"{heading}: {title.strip()}"
+        return ["", heading, *conclusions]
+    except Exception:
+        return []
+
+
 def detect_constitution(root: Path) -> list[dict]:
     """Return active GLOBAL norms (the project constitution) via the CLI.
 
@@ -445,6 +508,8 @@ def build_context(root: Path) -> str:
             f"⭐ Digest heads-up: {digest_status['uncovered']} records are not covered by any digest yet"
             f"{age_note}. Consider /sybermem-digest to compress the accumulated work."
         )
+
+    lines.extend(latest_digest_section(root))
 
     if conclusions:
         lines.append("")
