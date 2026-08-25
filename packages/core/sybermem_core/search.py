@@ -413,13 +413,22 @@ def compact_project_search(query: str, limit: int = 3, *, include_abstention: bo
 _MATCH_SPECIFICITY: dict[str, int] = {"record-id": 0, "relation": 1, "topic": 2, "keyword": 3}
 
 
-def _compact_sort_key(row: SearchRow) -> tuple[int, int, int, int, int]:
+def _digest_staleness_rank(row: SearchRow) -> int:
+    if _text(row, "source_kind") != "digest":
+        return 0
+    if _text(row, "freshness") == "stale" or _text(row, "lifecycle") == "archived":
+        return 1
+    return 0
+
+
+def _compact_sort_key(row: SearchRow) -> tuple[int, int, int, int, int, int]:
     authority_rank = {"authoritative": 0, "summarized": 1, "evidence": 2}.get(_text(row, "authority") or "summarized", 3)
     specificity_rank = _MATCH_SPECIFICITY.get(_text(row, "match"), 4)
+    digest_staleness_rank = _digest_staleness_rank(row)
     freshness_rank = {"current": 0, "historical": 1, "stale": 2}.get(_text(row, "freshness") or "historical", 3)
     match_rank = -int(float(row.get("score", 0.0) or 0.0))
     created_rank = -_created_rank(row)
-    return (authority_rank, specificity_rank, freshness_rank, match_rank, created_rank)
+    return (authority_rank, specificity_rank, digest_staleness_rank, freshness_rank, match_rank, created_rank)
 
 
 # Explicit `sybermem search` sort: unlike compact recall (which leads with trust so a
