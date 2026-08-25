@@ -32,15 +32,27 @@ LEGACY_LOCAL_SKILLS="$ADR_PATH/.claude/skills"
 
 echo "=== SyberMem 安装 ==="
 
+safe_remove_managed_dir() {
+    local root="$1" target="$2"
+    [ -e "$target" ] || [ -L "$target" ] || return 0
+    [ ! -L "$root" ] || { echo "Refusing linked managed root: $root" >&2; return 1; }
+    local root_real parent_real
+    root_real="$(cd "$root" && pwd -P)" || return 1
+    parent_real="$(cd "$(dirname "$target")" && pwd -P)" || return 1
+    [ "$parent_real" = "$root_real" ] || { echo "Refusing to remove path outside managed root: $target" >&2; return 1; }
+    if [ -L "$target" ]; then rm -f -- "$target"; else rm -rf -- "$target"; fi
+}
+
 install_skills() {
     local target="$1"
     local label="$2"
     mkdir -p "$target"
-    rm -rf "$target/init-project" "$target/record" "$target/summary"
-    rm -rf "$target/sybermem-phase-confirm" "$target/sybermem-team-publish" "$target/sybermem-team-summary"
+    for retired in init-project record summary sybermem-phase-confirm sybermem-team-publish sybermem-team-summary; do
+        safe_remove_managed_dir "$target" "$target/$retired"
+    done
     for skill in sybermem-init-project sybermem-record sybermem-summary sybermem-resume sybermem-digest sybermem-phase-analyze using-sybermem sybermem-update sybermem-search sybermem-link sybermem-theme-digest sybermem-habit; do
         if [ -d "$SKILL_SOURCE/$skill" ]; then
-            rm -rf "$target/$skill"
+            safe_remove_managed_dir "$target" "$target/$skill"
             cp -r "$SKILL_SOURCE/$skill" "$target/"
             echo "  [$label] 已安装: /$skill"
         fi
