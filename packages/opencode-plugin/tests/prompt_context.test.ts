@@ -42,7 +42,7 @@ describe("prompt context helpers", () => {
     const injected = injectStashedPromptPackets("session-empty", { system: ["base"] })
 
     // Then
-    expect(injected).toEqual({ injected: false, recallCount: 0, habitCount: 0, habitCandidate: false, normCount: 0 })
+    expect(injected).toEqual({ injected: false, recallCount: 0, recallChars: 0, habitCount: 0, habitChars: 0, habitCandidate: false, normCount: 0, normChars: 0, injectedIds: [] })
   })
 
   it("classifies recall and habit packets with counts", () => {
@@ -60,6 +60,9 @@ describe("prompt context helpers", () => {
     expect(summary.habitCount).toBe(2)
     expect(summary.habitCandidate).toBe(false)
     expect(summary.injected).toBe(true)
+    expect(summary.recallChars).toBe(48)
+    expect(summary.habitChars).toBe(92)
+    expect(summary.injectedIds).toEqual(["change-1", "decision-2", "habit-a", "habit-b"])
   })
 
   it("flags a habit packet with no concrete habit as a preference candidate", () => {
