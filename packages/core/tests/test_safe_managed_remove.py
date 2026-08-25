@@ -1,0 +1,60 @@
+from __future__ import annotations
+
+import importlib.util
+from pathlib import Path
+
+import pytest
+
+
+ROOT = Path(__file__).resolve().parents[3]
+
+
+def _module():
+    path = ROOT / "scripts" / "safe-managed-remove.py"
+    spec = importlib.util.spec_from_file_location("safe_managed_remove", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_remove_child_removes_only_direct_managed_child(tmp_path: Path) -> None:
+    module = _module()
+    root = tmp_path / "skills"
+    target = root / "sybermem-test"
+    target.mkdir(parents=True)
+    (target / "file.txt").write_text("managed\n", encoding="utf-8")
+    outside = tmp_path / "outside.txt"
+    outside.write_text("preserve\n", encoding="utf-8")
+
+    module.remove_child(root, "sybermem-test")
+
+    assert not target.exists()
+    assert outside.read_text(encoding="utf-8") == "preserve\n"
+
+
+def test_remove_child_rejects_path_traversal(tmp_path: Path) -> None:
+    module = _module()
+    root = tmp_path / "skills"
+    root.mkdir()
+    with pytest.raises(RuntimeError, match="invalid managed child name"):
+        module.remove_child(root, "../outside")
+
+
+def test_remove_child_unlinks_symlink_without_deleting_target(tmp_path: Path) -> None:
+    module = _module()
+    root = tmp_path / "skills"
+    root.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "sentinel.txt").write_text("preserve\n", encoding="utf-8")
+    link = root / "sybermem-link"
+    try:
+        link.symlink_to(outside, target_is_directory=True)
+    except OSError as exc:
+        pytest.skip(f"symlink creation unavailable: {exc}")
+
+    module.remove_child(root, "sybermem-link")
+
+    assert not link.exists()
+    assert (outside / "sentinel.txt").read_text(encoding="utf-8") == "preserve\n"

@@ -67,6 +67,12 @@ RUNTIME_REFRESH_SCRIPTS: Final = [
     Path("scripts/update.sh"),
     Path("scripts/update.ps1"),
 ]
+MANAGED_REMOVAL_SCRIPTS: Final = [
+    Path("scripts/install.sh"), Path("scripts/install.ps1"),
+    Path("scripts/install-remote.sh"), Path("scripts/install-remote.ps1"),
+    Path("scripts/update.sh"), Path("scripts/update.ps1"),
+    Path("scripts/uninstall.sh"), Path("scripts/uninstall.ps1"),
+]
 NO_CACHE_ROOTS: Final = [
     Path("packages/claude-skills"),
     Path("packages/core"),
@@ -276,6 +282,10 @@ def check_distribution_script_coverage(root: Path, names: list[str]) -> None:
         if not script_path.is_file():
             fail(f"Missing distribution script: {script.as_posix()}")
         script_text = script_path.read_text(encoding="utf-8")
+        if script.name.startswith("uninstall"):
+            if "managed-install.json" not in script_text:
+                fail(f"{script.as_posix()} must consume managed-install.json")
+            continue
         missing = [name for name in names if name not in script_text]
         if missing:
             fail(f"{script.as_posix()} is missing skill inventory entries: {', '.join(missing)}")
@@ -297,9 +307,17 @@ def check_retired_skill_cleanup(root: Path) -> None:
     """
     if not RETIRED_SKILL_NAMES:
         return
+    manifest_text = (root / "scripts" / "managed-install.json").read_text(encoding="utf-8")
+    manifest_missing = [name for name in RETIRED_SKILL_NAMES if name not in manifest_text]
+    if manifest_missing:
+        fail(f"scripts/managed-install.json is missing retired skills: {', '.join(manifest_missing)}")
     for script in DISTRIBUTION_SCRIPTS:
         script_path = root / script
         script_text = script_path.read_text(encoding="utf-8")
+        if script.name.startswith("uninstall"):
+            if "managed-install.json" not in script_text:
+                fail(f"{script.as_posix()} must consume the managed install manifest")
+            continue
         missing = [name for name in RETIRED_SKILL_NAMES if name not in script_text]
         if missing:
             fail(f"{script.as_posix()} is missing retired-skill cleanup entries: {', '.join(missing)}")
@@ -493,6 +511,22 @@ def check_runtime_refresh_wiring(root: Path) -> None:
         missing = [fragment for fragment in required_fragments if fragment not in script_text]
         if missing:
             fail(f"{script.as_posix()} is missing runtime refresh wiring: {', '.join(missing)}")
+
+
+def check_managed_removal_wiring(root: Path) -> None:
+    for required in (Path("scripts/managed-install.json"), Path("scripts/safe-managed-remove.py")):
+        if not (root / required).is_file():
+            fail(f"Missing managed removal source: {required.as_posix()}")
+    manifest = json.loads((root / "scripts/managed-install.json").read_text(encoding="utf-8"))
+    active_names = set(skill_names(root / "packages" / "claude-skills"))
+    missing_manifest = sorted(active_names - set(manifest.get("skills", [])))
+    if missing_manifest:
+        fail(f"scripts/managed-install.json is missing active skills: {', '.join(missing_manifest)}")
+    for script in MANAGED_REMOVAL_SCRIPTS:
+        text = (root / script).read_text(encoding="utf-8")
+        missing = [name for name in ("managed-install.json", "safe-managed-remove.py") if name not in text]
+        if missing:
+            fail(f"{script.as_posix()} is missing managed removal wiring: {', '.join(missing)}")
 
 
 def check_cli_wrapper_wiring(root: Path) -> None:
@@ -1104,6 +1138,7 @@ def main(root: Path = ROOT) -> int:
     check_codex_runtime_discoverability(root)
     check_unsupported_platform_claims(root)
     check_runtime_refresh_wiring(root)
+    check_managed_removal_wiring(root)
     check_cli_wrapper_wiring(root)
 
     claude_cli = shutil.which("claude")
