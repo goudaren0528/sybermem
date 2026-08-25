@@ -9,6 +9,7 @@ from typing import Final, TypedDict
 
 
 LANES: Final = ("recall", "habit", "norm", "startup")
+MAX_JOURNAL_BYTES: Final = 1_000_000
 
 
 class LaneStats(TypedDict):
@@ -48,9 +49,15 @@ def read_memory_usage_journal(root: Path) -> tuple[list[UsageTurn], list[UsageOu
     path = root / ".sybermem" / ".memory-usage.jsonl"
     if not path.is_file():
         return [], [], "no_log"
+    try:
+        if path.stat().st_size > MAX_JOURNAL_BYTES:
+            return [], [], "unavailable"
+        content = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        return [], [], "unavailable"
     turns: list[UsageTurn] = []
     outcomes: list[UsageOutcome] = []
-    for line in path.read_text(encoding="utf-8").splitlines():
+    for line in content.splitlines():
         parsed = _parse_line(line)
         if parsed is None:
             continue
