@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "skills": [
+    "sybermem-init-project", "sybermem-record", "sybermem-summary", "sybermem-digest",
+    "sybermem-resume", "sybermem-phase-analyze", "using-sybermem", "sybermem-update",
+    "sybermem-search", "sybermem-link", "sybermem-theme-digest", "sybermem-habit",
+    "sybermem-phase-confirm", "sybermem-team-publish", "sybermem-team-summary"
+  ],
+  "runtime_dirs": ["cli"],
+  "runtime_files": [
+    "launch_record_change_on_stop.py", "launch_session_start_context.py", "VERSION",
+    "managed-install.json", "safe-managed-remove.py"
+  ],
+  "codex_hook_files": [
+    "sybermem_user_prompt.py", "sybermem_session_start.py", "sybermem_stop.py",
+    "sybermem_post_compact.py"
+  ],
+  "opencode_plugin": ".config/opencode/plugins/sybermem.ts"
+}

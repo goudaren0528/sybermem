@@ -23,6 +23,13 @@ def test_package_integrity_checks_all_runtime_refresh_scripts() -> None:
     ]
 
 
+def test_package_integrity_checks_managed_removal_wiring() -> None:
+    checker = runpy.run_path(str(CHECK_SCRIPT))
+    assert len(checker["MANAGED_REMOVAL_SCRIPTS"]) == 8
+    assert callable(checker["check_managed_removal_wiring"])
+    assert "check_managed_removal_wiring(root)" in CHECK_SCRIPT.read_text(encoding="utf-8")
+
+
 def test_package_integrity_checks_codex_runtime_distribution() -> None:
     # Given: Codex installs skills plus bounded managed lifecycle hooks
     checker = runpy.run_path(str(CHECK_SCRIPT))
@@ -222,8 +229,14 @@ def test_package_integrity_requires_distribution_scripts_clean_retired_skills() 
     # references every retired skill so it gets cleaned from old installs.
     for relative_path in checker["DISTRIBUTION_SCRIPTS"]:
         text = (ROOT / relative_path).read_text(encoding="utf-8")
+        if relative_path.name.startswith("uninstall"):
+            assert "managed-install.json" in text
+            continue
         for retired in checker["RETIRED_SKILL_NAMES"]:
             assert retired in text, f"{relative_path.as_posix()} must clean retired skill {retired}"
+    manifest = (ROOT / "scripts" / "managed-install.json").read_text(encoding="utf-8")
+    for retired in checker["RETIRED_SKILL_NAMES"]:
+        assert retired in manifest
 
 
 def test_cli_using_skills_include_fixed_launcher_contract_fragments() -> None:
