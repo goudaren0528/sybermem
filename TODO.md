@@ -53,9 +53,9 @@ Goal: add an OpenCode-first observability loop for actual memory injection usage
 
 ### 5. Documentation and SyberMem Record
 
-- [ ] Document `.memory-usage.jsonl`, privacy boundaries, fail-open behavior, and the meaning of Edit Alignment in README/CLI docs.
-- [ ] Create a SyberMem change record linked with `implements: [requirement-ffb8b8130ecd4d33b8a08cfbb9479b59]`.
-- [ ] Build and check the derived SyberMem INDEX.
+- [x] Document `.memory-usage.jsonl`, privacy boundaries, fail-open behavior, and the meaning of Edit Alignment in README/CLI docs.
+- [x] Create a SyberMem change record linked with `implements: [requirement-ffb8b8130ecd4d33b8a08cfbb9479b59]`.
+- [x] Build and check the derived SyberMem INDEX.
 - [ ] Commit: `docs(memory): document injection observability`.
 
 ### 6. Final Verification and Review Work
