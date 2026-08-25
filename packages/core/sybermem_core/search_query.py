@@ -69,7 +69,7 @@ def score_row(row: dict[str, str], terms: QueryTerms) -> OverlapScore | None:
     fields = {
         "title": row.get("title", "").lower(),
         "topic": row.get("topics", "").lower(),
-        "relation": f"{row.get('fixes', '')} {row.get('implements', '')} {row.get('related', '')}".lower(),
+        "relation": f"{row.get('fixes', '')} {row.get('implements', '')} {row.get('related', '')} {row.get('superseded_by', '')} {row.get('supersedes', '')}".lower(),
         "body": _body_text(row.get("content", "")).lower(),
     }
     weighted = {

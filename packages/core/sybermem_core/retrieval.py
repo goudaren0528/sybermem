@@ -134,6 +134,7 @@ def derive_continuity_metadata(
 
 def apply_successor_guidance(rows: Sequence[MutableMapping[str, RetrievalValue]], all_rows: Sequence[Mapping[str, RetrievalValue]]) -> None:
     by_id = {_row_text(row, 'record_id'): row for row in all_rows if _row_text(row, 'record_id')}
+    _derive_superseded_by_from_supersedes(all_rows, by_id)
     for row in rows:
         successor_id = _successor_id(row, by_id)
         if successor_id:
@@ -158,8 +159,37 @@ def compact_abstention_row(query: str, candidates: Sequence[Mapping[str, Retriev
     return {'result': 'no_reliable_recall', 'reason': reason, 'query': query}
 
 
+def _derive_superseded_by_from_supersedes(
+    all_rows: Sequence[Mapping[str, RetrievalValue]],
+    by_id: Mapping[str, Mapping[str, RetrievalValue]],
+) -> None:
+    """Derive the inverse edge so `supersedes` and `superseded_by` are interchangeable.
+
+    A record A declaring `supersedes: B` means B is `superseded_by: A`. The successor /
+    lifecycle machinery is built on `superseded_by`, and the decision template offers the
+    forward `supersedes` field, so without this a decision authored with `supersedes` would
+    silently break "what led to this / what is the current truth" traversal. We back-fill
+    the inverse in memory only (never written to Markdown), and never overwrite a `superseded_by`
+    the target already declares.
+    """
+    for row in all_rows:
+        source_id = _row_text(row, 'record_id')
+        for target_id in _record_ids(_row_text(row, 'supersedes')):
+            if not target_id or target_id == source_id:
+                continue
+            target = by_id.get(target_id)
+            if target is None or _row_text(target, 'superseded_by'):
+                continue
+            if isinstance(target, MutableMapping):
+                target['superseded_by'] = source_id
+
+
 def _successor_id(row: Mapping[str, RetrievalValue], by_id: Mapping[str, Mapping[str, RetrievalValue]]) -> str:
-    direct = _first_record_id(_row_text(row, 'superseded_by'))
+    # `rows` may be enriched copies while `all_rows` is the canonical in-memory graph
+    # where the derived inverse edge was attached. Read the canonical row first so a
+    # derived `superseded_by` is visible to the result copy as well.
+    canonical = by_id.get(_row_text(row, 'record_id'), row)
+    direct = _first_record_id(_row_text(canonical, 'superseded_by') or _row_text(row, 'superseded_by'))
     if direct:
         return _resolve_current_id(direct, by_id, {_row_text(row, 'record_id')})
     return _fix_successor_id(_row_text(row, 'record_id'), by_id, {_row_text(row, 'record_id')})

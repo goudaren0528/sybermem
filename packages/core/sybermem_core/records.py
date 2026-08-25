@@ -193,6 +193,7 @@ def parse_record_file(path: Path, project_id: str, slug: str) -> dict[str, str]:
     priority = ""
     severity = ""
     superseded_by = ""
+    supersedes = ""
     fixes = ""
     implements = ""
     related = ""
@@ -241,6 +242,8 @@ def parse_record_file(path: Path, project_id: str, slug: str) -> dict[str, str]:
             severity = unwrap_scalar(line.split(":", 1)[1])
         elif line.startswith("superseded_by:"):
             superseded_by = unwrap_scalar(line.split(":", 1)[1])
+        elif line.startswith("supersedes:"):
+            supersedes = unwrap_scalar(line.split(":", 1)[1])
         elif line.startswith("fixes:"):
             fixes = unwrap_scalar(line.split(":", 1)[1])
         elif line.startswith("implements:"):
@@ -292,6 +295,7 @@ def parse_record_file(path: Path, project_id: str, slug: str) -> dict[str, str]:
         "priority": priority,
         "severity": severity,
         "superseded_by": superseded_by,
+        "supersedes": supersedes,
         "fixes": fixes,
         "implements": implements,
         "related": related,

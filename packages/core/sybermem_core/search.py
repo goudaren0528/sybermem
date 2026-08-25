@@ -106,7 +106,7 @@ def _text(row: SearchRow, key: str) -> str:
 
 
 def _score_input(row: SearchRow) -> dict[str, str]:
-    return {key: _text(row, key) for key in ("record_id", "title", "content", "topics", "fixes", "implements", "related")}
+    return {key: _text(row, key) for key in ("record_id", "title", "content", "topics", "fixes", "implements", "related", "superseded_by", "supersedes")}
 
 
 def _search_row(row: dict[str, str]) -> SearchRow:
