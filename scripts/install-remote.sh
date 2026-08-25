@@ -66,7 +66,7 @@ install_skills() {
     for retired in sybermem-phase-confirm sybermem-team-publish sybermem-team-summary; do
         safe_remove_managed_dir "$target" "$target/$retired"
     done
-    for skill in sybermem-init-project sybermem-record sybermem-summary sybermem-resume sybermem-digest sybermem-phase-analyze using-sybermem sybermem-update sybermem-search sybermem-link sybermem-theme-digest sybermem-habit; do
+    for skill in sybermem-init-project sybermem-record sybermem-summary sybermem-resume sybermem-digest sybermem-phase-analyze using-sybermem sybermem-update sybermem-search sybermem-link sybermem-theme-digest sybermem-habit sybermem-uninstall; do
         if [ -d "$SKILLS_SRC/$skill" ]; then
             safe_remove_managed_dir "$target" "$target/$skill"
             cp -r "$SKILLS_SRC/$skill" "$target/"
@@ -249,6 +249,7 @@ echo "  /sybermem-link          — Add a forward relation between two existing 
 echo "  /sybermem-theme-digest  — Create a durable topic-level digest that compresses one theme across multiple related phases or records"
 
 echo "  /sybermem-habit         — Manage user-level habit memory and reminders"
+echo "  /sybermem-uninstall     — Safely choose project-level or global uninstall"
 echo ""
 if [ "$SYBERMEM_ON_PATH" = "1" ]; then
     echo "sybermem CLI is installed and on PATH. You can now run: sybermem project init --register"
