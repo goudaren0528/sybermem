@@ -38,7 +38,7 @@ The repository already includes `.claude-plugin/plugin.json` and `.claude-plugin
 
 ### Claude Code / OpenCode / Codex 脚本安装（兼容模式）
 
-Script install remains supported as the compatibility path. These commands refresh the user-level Claude Code skills, OpenCode skills, Codex skills, the OpenCode plugin, the Codex `SessionStart` / `UserPromptSubmit` / `Stop` / `PostCompact` hooks, and the CLI/Core runtime. User Habit Memory ships through the Core/CLI runtime plus `/sybermem-habit`, and stores data in the user-owned `~/.sybermem/user-habits/` tree, so it does not require a project `.sybermem/` migration.
+Script install remains supported as the compatibility path. These commands refresh the user-level Claude Code skills, OpenCode skills, Codex skills, the OpenCode plugin, the Codex `SessionStart` / `UserPromptSubmit` / `Stop` / `PostCompact` hooks, and the CLI/Core runtime. User Habit Memory ships through the Core/CLI runtime plus `/sybermem-habit`, and stores data in the user-owned `~/.sybermem/user-habits/` tree, so it does not require a project `.sybermem/` migration. Scoped uninstall ships through the same update path: `/sybermem-uninstall` is copied to all supported skill roots, and the refreshed CLI provides `sybermem uninstall --scope project|global`.
 
 Installers also create an agent-safe fixed CLI launcher: `$HOME/.claude/sybermem/cli/sybermem` on macOS / Linux and `%USERPROFILE%\.claude\sybermem\cli\sybermem.cmd` on Windows. OpenCode plugin code, the Codex hooks, and CLI-using skills prefer that launcher when a child agent process cannot resolve bare `sybermem`. The scripts do not modify persistent PATH by default; adding the launcher directory to PATH is optional user configuration.
 
@@ -128,6 +128,8 @@ That follow-up is where project-local hook files, templates, and settings entrie
 That same project-local refresh is also how older Claude projects pick up updated guidance and managed prompt hooks, including `/sybermem-resume` routing, read-only recall, and User Habit Memory reminders.
 
 For CLI availability fixes, OpenCode plugin fixes, Codex hook fixes, or skill instruction fixes, use the same propagation path: re-run the global installer/updater to refresh the runtime, fixed launcher, OpenCode plugin, Codex hook, and user-level skills; then run `/sybermem-update` inside each existing project so project-local instructions and managed files are refreshed.
+
+For uninstall routing fixes, the global installer/updater is sufficient to refresh the CLI and `/sybermem-uninstall` skill. Existing project histories remain in `.sybermem/`; project-level deactivation is `sybermem uninstall --scope project`, and machine-level removal is `sybermem uninstall --scope global --yes`.
 
 ## Subdirectory Hook Fix
 
