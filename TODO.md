@@ -34,12 +34,12 @@ Goal: add an OpenCode-first observability loop for actual memory injection usage
 
 ### 3. User-Visible Injection Summary
 
-- [ ] Add focused tests for one bounded post-injection summary containing total items, total characters, and recall/habit/norm/startup counts.
-- [ ] Replace multiple successful-injection notices with one summary notice while preserving the existing habit-candidate notice.
-- [ ] Keep silent when no model-visible memory was injected.
-- [ ] Verify the summary is emitted at injection time, not candidate collection time.
-- [ ] Run focused toast and system-transform tests.
-- [ ] Commit: `feat(opencode): summarize injected memory usage`.
+- [x] Add focused tests for one bounded post-injection summary containing total items, total characters, and recall/habit/norm/startup counts.
+- [x] Replace multiple successful-injection notices with one summary notice while preserving the existing habit-candidate notice.
+- [x] Keep silent when no model-visible memory was injected.
+- [x] Verify the summary is emitted at injection time, not candidate collection time.
+- [x] Run focused toast and system-transform tests.
+- [x] Commit: `feat(opencode): summarize injected memory usage`.
 
 ### 4. Existing Memory Stats Extension
 
