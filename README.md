@@ -130,7 +130,7 @@ implements: [requirement-002]
 - 可见提醒：`sybermem habit remind --context planning --format markdown` 与 `/sybermem-habit`
 - 手动/compaction 注入：`sybermem habit inject --context planning --format markdown`
 - 默认 prompt-time 可感知：`habit add` 默认 `injection_policy=prompt_ok_when_supported`，确认过的习惯在支持的宿主上开箱即可在逐 prompt 注入（弹 `🧠`），无需额外参数；相关性用 CJK 感知的加权匹配（命中 `applies_to` tag 为强信号，否则需 ≥2 个多字符语句重叠），中文上下文可命中，无关习惯保持静默
-- 被动候选捕获（仅候选，永不自动写入）：OpenCode `chat.message` 检测到"以后都…/我习惯…"这类可复用偏好时，调用 `sybermem habit intent --prompt <text>` 把候选写入用户级 `~/.sybermem/.habit-intent.json`（绝不创建 active habit，绝不持久化密钥/注入文本）；`/sybermem-habit` 读取 `habit intent-status` 后经用户确认一键转为 habit，再 `habit intent-clear` 清除
+- 被动候选捕获（仅候选，永不自动写入）：OpenCode `chat.message` 检测到"以后都…/我习惯…"这类可复用偏好时，调用 `sybermem habit intent --prompt <text>` 把候选追加到用户级 `~/.sybermem/.habit-intent.json` 的**有界候选列表**（最近 5 条、10 天过期、按 summary 去重；绝不创建 active habit）。候选带 `candidate_id`、建议 type/scope，以及一段**有界、过密钥/注入过滤的 prompt 摘要**（不是完整原文，与 record-intent 的摘要契约一致），供确认时据此提议规范化 statement。`/sybermem-habit` 默认先展示 active + pending 状态视图，`habit intent-status` 列出候选，用户可一键确认某条转为 habit（随后 `habit intent-discard <id>` 单条清除），或 `habit intent-clear` 清空全部
 - 注入可见性：同轮真正注入 recall / habit / 规范后只弹一条有界 post-injection summary（total items / chars / lane counts）；捕获候选时另弹 scope 感知的 `💡`（个人习惯→`/sybermem-habit`，项目约定→`/sybermem-record`，模糊时追问），startup context 用独立一次性提示
 - 感知层：`sybermem habit awareness` 及 OpenCode 首轮 startup context 展示 active 习惯数量、类型分布与是否有待确认候选（只报数量，不暴露 habit 内容，也不与逐 prompt 提醒重复）
 - 保守门槛：只注入 active、高置信、未被排除、与上下文直接相关的习惯，最多 3 条

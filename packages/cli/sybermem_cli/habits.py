@@ -11,7 +11,9 @@ from sybermem_core.user_habits import (
     capture_habit_intent,
     clear_habit_intent,
     delete_habit,
+    discard_habit_candidate,
     habit_awareness_summary,
+    list_habit_candidates,
     list_habits,
     pause_habit,
     pending_habit_reminder,
@@ -157,15 +159,36 @@ def cmd_habit_intent(args: argparse.Namespace) -> int:
 
 
 def cmd_habit_intent_status(args: argparse.Namespace) -> int:
-    candidate = read_habit_intent()
-    payload = {"pending": candidate is not None, "candidate": candidate}
+    candidates = list_habit_candidates()
+    # Keep the legacy single `candidate` field (newest) for backward compatibility while
+    # exposing the full bounded list so the skill can present a selectable status view.
+    payload = {
+        "pending": len(candidates) > 0,
+        "count": len(candidates),
+        "candidates": candidates,
+        "candidate": candidates[0] if candidates else None,
+    }
     if args.format == "json":
         print(dump_json(payload))
-    elif candidate is not None:
-        print(f"pending habit candidate ({candidate.get('habit_type', 'workflow')}): confirm with /sybermem-habit")
+    elif candidates:
+        print(f"{len(candidates)} pending habit candidate(s): confirm or discard with /sybermem-habit")
+        for cand in candidates:
+            summary = str(cand.get("summary", "") or "").strip()
+            quoted = f' "{summary}"' if summary else ""
+            print(f"- [{cand.get('candidate_id', '?')}] ({cand.get('habit_type', 'workflow')}/{cand.get('suggested_scope', 'ambiguous')}){quoted}")
     else:
         print("no pending habit candidate")
     return 0
+
+
+def cmd_habit_intent_discard(args: argparse.Namespace) -> int:
+    discarded = discard_habit_candidate(args.candidate_id)
+    payload = {"discarded": discarded, "candidate_id": args.candidate_id}
+    if args.format == "json":
+        print(dump_json(payload))
+    else:
+        print(f"discarded habit candidate {args.candidate_id}" if discarded else f"no habit candidate with id {args.candidate_id}")
+    return 0 if discarded else 1
 
 
 def cmd_habit_intent_clear(args: argparse.Namespace) -> int:
@@ -174,7 +197,7 @@ def cmd_habit_intent_clear(args: argparse.Namespace) -> int:
     if args.format == "json":
         print(dump_json(payload))
     else:
-        print("cleared pending habit candidate" if cleared else "no pending habit candidate to clear")
+        print("cleared all pending habit candidates" if cleared else "no pending habit candidate to clear")
     return 0
 
 
@@ -193,7 +216,8 @@ def cmd_habit_awareness(args: argparse.Namespace) -> int:
             print("no active user habits")
         else:
             types = ", ".join(f"{name} {count}" for name, count in summary["by_type"].items())
-            pending = " (1 pending candidate)" if summary["pending_intent"] else ""
+            pending_count = summary.get("pending_count", 1 if summary["pending_intent"] else 0)
+            pending = f" ({pending_count} pending candidate{'s' if pending_count != 1 else ''})" if summary["pending_intent"] else ""
             print(f"{summary['active']} active user habits [{types}]{pending}")
     return 0
 
@@ -256,6 +280,11 @@ def register_habit_commands(sub) -> None:
     intent_clear = habit_sub.add_parser("intent-clear")
     intent_clear.add_argument("--format", choices=["text", "json"], default="text")
     intent_clear.set_defaults(func=cmd_habit_intent_clear)
+
+    intent_discard = habit_sub.add_parser("intent-discard")
+    intent_discard.add_argument("candidate_id")
+    intent_discard.add_argument("--format", choices=["text", "json"], default="text")
+    intent_discard.set_defaults(func=cmd_habit_intent_discard)
 
     awareness = habit_sub.add_parser("awareness")
     awareness.add_argument("--format", choices=["text", "json"], default="text")

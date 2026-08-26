@@ -16,6 +16,7 @@ Manage explicit User Habit Memory. Habits are personal preferences stored under 
 - Never write raw prompt text into project records.
 - Do not infer habits silently from behavior.
 - Prefer normalized, durable statements over verbatim user phrasing.
+- A pending candidate carries a bounded `summary` of the user's own words (a short, filtered fragment — not the full prompt) plus a suggested type/scope. Use it as a proposal to normalize from, never as an already-active habit.
 - OpenCode supports bounded prompt-time habit reminders through `chat.message` + `experimental.chat.system.transform`; this skill and the CLI remain the explicit management path.
 
 ## CLI Resolution
@@ -34,9 +35,12 @@ Before running SyberMem CLI commands, resolve a command variable first. On Windo
 | Delete | `$SyberMemCli habit delete <habit-id>` / `"$SYBERMEM_CLI" habit delete <habit-id>` |
 | Visible reminder | `$SyberMemCli habit remind --context "<bounded context>" --format markdown` / `"$SYBERMEM_CLI" habit remind --context "<bounded context>" --format markdown` |
 | Manual injection | `$SyberMemCli habit inject --context "<bounded context>" --format markdown` / `"$SYBERMEM_CLI" habit inject --context "<bounded context>" --format markdown` |
-| Pending candidate status | `$SyberMemCli habit intent-status --format json` / `"$SYBERMEM_CLI" habit intent-status --format json` |
-| Clear a candidate | `$SyberMemCli habit intent-clear` / `"$SYBERMEM_CLI" habit intent-clear` |
+| Pending candidates (list) | `$SyberMemCli habit intent-status --format json` / `"$SYBERMEM_CLI" habit intent-status --format json` |
+| Discard ONE candidate | `$SyberMemCli habit intent-discard <candidate-id>` / `"$SYBERMEM_CLI" habit intent-discard <candidate-id>` |
+| Clear ALL candidates | `$SyberMemCli habit intent-clear` / `"$SYBERMEM_CLI" habit intent-clear` |
 | Awareness snapshot | `$SyberMemCli habit awareness --format json` / `"$SYBERMEM_CLI" habit awareness --format json` |
+
+`habit intent-status --format json` returns `{ "count": N, "candidates": [ { "candidate_id", "habit_type", "suggested_scope", "summary", "created_at" }, ... ] }`, newest first (bounded to the last few, expired entries pruned). Use `candidate_id` to confirm or discard a specific one.
 
 Types: `workflow`, `style`, `tooling`, `communication`, `review`, `avoidance`.
 
@@ -44,27 +48,48 @@ Injection policy controls WHERE a user-confirmed habit may surface, not whether 
 
 ## Workflow
 
-1. **Check for a pending candidate first.** Run `habit intent-status --format json`. A pending candidate means a supported host (e.g. OpenCode `chat.message`) passively detected a reusable-preference phrase and wrote a candidate-only intent (it is NOT an active habit). If one is pending, surface it and offer to confirm it in one step (see "Confirming a pending candidate" below) before treating the request as a fresh add.
-2. Classify the request: confirm-candidate, add, list, search, pause, delete, remind, or inject.
-3. For add requests, normalize the habit into one short statement and choose type/tags.
-4. If the user did not explicitly authorize saving, ask one confirmation question and stop.
+**Always start by reading BOTH active habits and pending candidates**, then branch on intent:
+
+1. Read state:
+   - `$SyberMemCli habit list --format json` → active habits.
+   - `$SyberMemCli habit intent-status --format json` → pending candidates (list, newest first).
+2. **Default status view (no explicit add/confirm/discard/pause/delete request).** When the user just invoked `/sybermem-habit` (or said something vague like "看看我的习惯"), present a compact status view and ask what they want — do NOT jump straight to adding:
+   ```
+   Active habits (N):
+   - [habit-…] <statement>  (<type>, applies_to=…)
+   Pending candidates (M):
+   1. [cand-…] <age> ago (<type>/<scope>): "<summary>"
+   2. …
+   下一步：确认某条候选激活 / 舍弃某条候选 / 新增一个习惯 / 什么都不做？
+   ```
+   Render `created_at` as a relative age (e.g. "2h ago", "昨天"). If there are 0 active and 0 pending, say so and offer to add one.
+3. Classify the request: **confirm-candidate**, **discard-candidate**, add, list, search, pause, delete, remind, or inject.
+4. For add / confirm requests, normalize the habit into ONE short statement and choose type/tags. If the user did not explicitly authorize saving, ask one confirmation question and stop (confirmation-first).
 5. Run the matching CLI command.
-6. Summarize the result with habit id and current status.
+6. Summarize the result with the habit id / candidate id and current status.
 
 ## Confirming a pending candidate
 
-The passive capture is candidate-only and never creates a habit on its own. To turn a pending candidate into a real habit in one confirmed step:
+The passive capture is candidate-only and never creates a habit on its own. To turn a specific pending candidate into a real habit in one confirmed step:
 
-1. Read it: `$SyberMemCli habit intent-status --format json`. The candidate JSON carries a suggested `habit_type`, a suggested `suggested_scope` (`user` / `project` / `ambiguous`), and no statement.
-2. Route by `suggested_scope` (it is a suggestion; the user always decides):
-   - `user` → a cross-project personal habit. Propose ONE normalized statement + type and confirm, then add it as a user habit (below).
-   - `project` → a project-specific convention. Do NOT add a user habit; suggest recording it via `/sybermem-record` as a `decision` or `requirement` (that is its real home), then clear the candidate.
+1. Read the list: `$SyberMemCli habit intent-status --format json`. Each candidate carries `candidate_id`, a suggested `habit_type`, a suggested `suggested_scope` (`user` / `project` / `ambiguous`), a bounded `summary` of the user's own words, and `created_at`. If more than one is pending, ask which one (by number / summary) unless the user already pointed at one.
+2. Propose ONE normalized statement. **Prefer the current conversation** (freshest, most complete wording); fall back to the candidate's `summary` when the triggering context has scrolled away. Never present the summary as an already-active habit — it is a proposal to confirm.
+3. Route by `suggested_scope` (a suggestion; the user always decides):
+   - `user` → a cross-project personal habit. Propose statement + type, confirm, then add it (below).
+   - `project` → a project-specific convention. Do NOT add a user habit; suggest recording it via `/sybermem-record` as a `decision` or `requirement`, then discard the candidate.
    - `ambiguous` → ask ONE question: "记成跨项目的个人习惯，还是本项目的约定（走 /sybermem-record）？" Route by the answer.
-3. Propose ONE normalized statement to the user based on the recent conversation, plus the suggested type. Ask them to confirm (confirmation-first still applies — the passive candidate is a hint, not authorization).
 4. On confirmation of a user habit, add it: `$SyberMemCli habit add --type <type> --applies-to <tag> "<normalized statement>"`.
-5. Clear the candidate so it does not linger: `$SyberMemCli habit intent-clear`.
+5. Discard THAT candidate so it does not linger: `$SyberMemCli habit intent-discard <candidate-id>` (discard the single confirmed one, not the whole list).
 
-If the user declines, just clear the candidate with `habit intent-clear` and do not add anything.
+## Discarding a candidate
+
+If the user wants to drop a candidate without activating it, discard just that one:
+
+```
+$SyberMemCli habit intent-discard <candidate-id>
+```
+
+Use `$SyberMemCli habit intent-clear` only when the user wants to drop ALL pending candidates at once. If the user declines a specific candidate, discard that one and do not add anything.
 
 ## Semantic nomination (you judge intent, not keywords)
 
