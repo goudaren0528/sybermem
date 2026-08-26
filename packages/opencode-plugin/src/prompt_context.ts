@@ -110,7 +110,12 @@ export function injectStashedPromptPackets(sessionID: string, output: SystemTran
   RECALL_STASH.delete(sessionID)
   if (!packets || packets.length === 0) return NO_INJECTION
   const hints = packets.join("\n\n")
-  if (output.system && output.system.length > 0) output.system[0] = `${hints}\n\n${output.system[0]}`
-  else output.system = [hints, ...(output.system ?? [])]
+  // Prompt cache is a prefix match: mutating system[0] (OpenCode's stable base
+  // prompt / env / skills header) would invalidate the cached prefix every turn.
+  // Instead APPEND this per-turn recall as a trailing system block so the stable
+  // header stays byte-identical across turns. OpenCode folds trailing blocks into
+  // one second block when system[0] is untouched, keeping the cacheable prefix intact.
+  if (output.system) output.system.push(hints)
+  else output.system = [hints]
   return classifyPackets(packets)
 }

@@ -22,7 +22,7 @@ describe("prompt context helpers", () => {
     expect(packets).toEqual(["## SyberMem Recall Hints\n- change-1"])
   })
 
-  it("injects stashed packets into the first system block", () => {
+  it("appends stashed packets as a trailing system block, keeping system[0] byte-stable for prompt cache", () => {
     // Given
     stashPromptPackets("session-a", ["## SyberMem Recall Hints\n- change-1"])
     const output = { system: ["base"] }
@@ -30,12 +30,26 @@ describe("prompt context helpers", () => {
     // When
     const injected = injectStashedPromptPackets("session-a", output)
 
-    // Then
+    // Then: the stable header (system[0]) is untouched so the cacheable prefix
+    // survives, and recall lands as a NEW trailing block.
     expect(injected.injected).toBe(true)
     expect(injected.recallCount).toBe(1)
     expect(injected.digestCount).toBe(0)
     expect(injected.habitCount).toBe(0)
-    expect(output.system[0].startsWith("## SyberMem Recall Hints")).toBe(true)
+    expect(output.system[0]).toBe("base")
+    expect(output.system[output.system.length - 1].startsWith("## SyberMem Recall Hints")).toBe(true)
+  })
+
+  it("creates the system array when none exists", () => {
+    // Given
+    stashPromptPackets("session-none", ["## SyberMem Recall Hints\n- change-1"])
+    const output: { system?: string[] } = {}
+
+    // When
+    injectStashedPromptPackets("session-none", output)
+
+    // Then
+    expect(output.system).toEqual(["## SyberMem Recall Hints\n- change-1"])
   })
 
   it("returns no injection when no packets were stashed", () => {
