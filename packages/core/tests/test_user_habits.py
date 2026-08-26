@@ -23,6 +23,7 @@ from sybermem_core.user_habits import (
     habit_awareness_summary,
     list_habits,
     pause_habit,
+    pending_habit_reminder,
     read_habit_intent,
     render_habit_markdown,
     render_habit_reminder_markdown,
@@ -611,3 +612,65 @@ def test_habit_awareness_summary_reports_counts_types_and_pending_intent(tmp_pat
     assert summary["by_type"] == {"communication": 1, "workflow": 1}
     assert summary["pending_intent"] is True
     assert summary["latest_confirmed_at"]  # non-empty ISO date
+
+
+def test_pending_habit_reminder_none_when_no_candidate(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SYBERMEM_HOME", str(tmp_path))
+    assert pending_habit_reminder() is None
+
+
+def test_pending_habit_reminder_is_scope_aware(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # A user-scoped candidate yields a habit-focused confirm message referencing /sybermem-habit.
+    monkeypatch.setenv("SYBERMEM_HOME", str(tmp_path))
+    capture_habit_intent("我习惯回复都用中文")  # user-scope signal (习惯)
+    reminder = pending_habit_reminder()
+    assert reminder is not None
+    assert reminder["pending"] is True
+    assert "/sybermem-habit" in reminder["message"]
+    assert reminder["created_at"]  # carries candidate identity for host dedup
+
+
+def test_default_home_imports_legacy_candidate_once_and_respects_clear(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Given: NO explicit SYBERMEM_HOME (so the default ~/.sybermem home is used) and a
+    # legacy launcher home (~/.claude/sybermem/cli) holding a pending candidate but no habits.
+    monkeypatch.delenv("SYBERMEM_HOME", raising=False)
+    fake_user = tmp_path / "user"
+    monkeypatch.setattr("sybermem_core.user_habits.Path.home", classmethod(lambda cls: fake_user))
+    monkeypatch.setenv("USERPROFILE", str(fake_user))
+    monkeypatch.setenv("HOME", str(fake_user))
+    legacy = fake_user / ".claude" / "sybermem" / "cli"
+    legacy.mkdir(parents=True)
+    (legacy / ".habit-intent.json").write_text(
+        json.dumps({"habit_intent": True, "candidate_only": True, "suggested_scope": "user",
+                    "created_at": "2026-01-01T00:00:00+00:00"}),
+        encoding="utf-8",
+    )
+
+    # When: the default home resolves habit storage for the first time
+    home = user_habit_home()
+
+    # Then: it is the documented ~/.sybermem home and the legacy candidate was imported
+    assert home == fake_user / ".sybermem" / "user-habits"
+    assert read_habit_intent() is not None
+    # And: the legacy source is preserved (non-destructive)
+    assert (legacy / ".habit-intent.json").is_file()
+
+    # When: the user clears the candidate
+    assert clear_habit_intent() is True
+
+    # Then: re-accessing must NOT re-import the cleared candidate (one-time migration)
+    user_habit_home()
+    assert read_habit_intent() is None
+
+
+def test_default_home_does_not_reimport_when_canonical_already_has_data(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # An explicit, non-legacy SYBERMEM_HOME (e.g. an isolated test/custom home) must never
+    # be migrated into — the legacy import is gated to the default ~/.sybermem home only.
+    monkeypatch.setenv("USERPROFILE", str(tmp_path / "user"))
+    monkeypatch.setenv("HOME", str(tmp_path / "user"))
+    legacy = tmp_path / "user" / ".claude" / "sybermem" / "cli"
+    legacy.mkdir(parents=True)
+    (legacy / ".habit-intent.json").write_text(json.dumps({"habit_intent": True}), encoding="utf-8")
+    # Explicit custom home:
+    monkeypatch.setenv("SYBERMEM_HOME", str(tmp_path / "custom"))
+    assert read_habit_intent() is None  # no leak from legacy into an explicit home

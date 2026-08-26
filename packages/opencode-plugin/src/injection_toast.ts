@@ -95,6 +95,13 @@ export function promptInjectionToastMessage(summary: PromptInjectionToastSummary
   return `⭐ SyberMem 注入摘要: items=${summary.totalItems}, chars=${summary.totalChars}, ${laneCounts}`
 }
 
+// Supplementary human-visible toast for the model-visible pending-candidate nudge.
+// The durable, non-throttled channel is the model-visible system block + startup
+// context; this toast is best-effort UI on top and is fine to be throttled/swallowed.
+export function pendingHabitToast(): string {
+  return "💡 SyberMem 有一条待确认的习惯候选 — 用 /sybermem-habit 确认后即可在后续会话被注入"
+}
+
 export function habitCandidateToast(habitIntent: import("./habit_intent").HabitIntentResult): string {
   if (habitIntent.captured && habitIntent.suggestedScope === "project") {
     return "💡 SyberMem 发现一条像是本项目的约定 — 可用 /sybermem-record 记为决策/需求，或 /sybermem-habit 确认"

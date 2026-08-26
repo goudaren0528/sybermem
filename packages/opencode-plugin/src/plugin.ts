@@ -17,7 +17,8 @@ import { updateNudgeMessage } from "./version_signal"
 import { evaluateRemoteVersion } from "./remote_version"
 import { applyReplyMarker, armReplyMarker } from "./reply_marker"
 import { appendMemoryUsage } from "./memory_usage"
-import { buildPromptInjectionToastSummary, enqueueToast, habitCandidateToast, promptInjectionToastMessage, throttledToast, type ToastClient } from "./injection_toast"
+import { buildPromptInjectionToastSummary, enqueueToast, habitCandidateToast, pendingHabitToast, promptInjectionToastMessage, throttledToast, type ToastClient } from "./injection_toast"
+import { injectPendingHabitReminder, resetPendingHabit } from "./pending_habit"
 
 interface PluginArgs { readonly $: import("./runtime").Shell; readonly directory: string; readonly client: ToastClient }
 interface EventInput { readonly event: { readonly type: string; readonly properties?: { readonly info?: { readonly id?: string } } } }
@@ -98,6 +99,7 @@ async function flushSessionRelevance(args: PluginArgs, root: string, sessionID: 
     // Relevance measurement is best-effort; swallow all errors.
   } finally {
     resetSessionActivity(sessionID)
+    resetPendingHabit(sessionID)
   }
 }
 
@@ -213,6 +215,15 @@ export const SyberMemPlugin: Plugin = async ({ $, directory, client }: PluginArg
         }
       }
       const summary = injectStashedPromptPackets(sessionID ?? "", output)
+      // Surface a pending habit CANDIDATE (captured passively, not yet confirmed) as a
+      // bounded model-visible block so the assistant reminds the user to confirm it via
+      // /sybermem-habit. Once per candidate per session (deduped in the module). This is
+      // the fix for "candidate reminder was swallowed by a one-shot throttled toast, so
+      // the user never confirmed and habit injection stayed silent forever."
+      try {
+        const pending = await injectPendingHabitReminder(args.$, root, sessionID ?? "", output)
+        if (pending) throttledToast(args.client, "habit-pending", pendingHabitToast())
+      } catch { /* pending-candidate nudge is advisory, never block the transform */ }
       const usageEntry = appendMemoryUsage(root, { sessionID: sessionID ?? "", packets, startup })
       if (sessionID) recordMemoryUsage(sessionID, usageEntry)
       const promptInjectionToast = buildPromptInjectionToastSummary(summary, usageEntry)

@@ -896,7 +896,8 @@ async function buildStartupContext($, root) {
   const conclusions = parsed?.conclusions ?? [];
   const digestSection = await latestDigestSection2($, root);
   const constitution = await constitutionBlock2($, root);
-  if (conclusions.length === 0 && !digestSection && !constitution)
+  const habitAwareness = await habitAwarenessSection($, root);
+  if (conclusions.length === 0 && !digestSection && !constitution && !habitAwareness)
     return null;
   const phaseInfo = parsePhaseIndex(root);
   const identity = parseProjectIdentity(root);
@@ -947,19 +948,30 @@ Status: ${phaseInfo.status}. ${phaseInfo.confirmedCount} confirmed phases.
 ${action}${reason ? ` \u2014 ${reason}` : ""}
 `;
   } catch {}
+  if (habitAwareness)
+    context += habitAwareness;
+  return context.length > 2500 ? `${context.substring(0, 2497)}...` : context;
+}
+async function habitAwarenessSection($, root) {
   try {
     const awareness = JSON.parse(await sybermemText($, root, ["habit", "awareness", "--format", "json"]));
     const activeHabits = numberField2(awareness, "active") ?? 0;
     const pendingIntent = typeof awareness === "object" && awareness !== null && Reflect.get(awareness, "pending_intent") === true;
-    if (activeHabits > 0 || pendingIntent) {
-      const pendingNote = pendingIntent ? " A reusable preference is pending \u2014 confirm with /sybermem-habit." : "";
-      context += `
+    if (activeHabits === 0 && !pendingIntent)
+      return "";
+    let pendingNote = "";
+    if (pendingIntent) {
+      const reminder = typeof awareness === "object" && awareness !== null ? Reflect.get(awareness, "pending_reminder") : null;
+      const message = typeof reminder === "object" && reminder !== null ? Reflect.get(reminder, "message") : null;
+      pendingNote = typeof message === "string" && message.trim() ? ` ${message.trim()}` : " A reusable preference is pending \u2014 confirm with /sybermem-habit.";
+    }
+    return `
 ### User Habits
 ${activeHabits} active user habit${activeHabits === 1 ? "" : "s"} may apply; manage with /sybermem-habit.${pendingNote}
 `;
-    }
-  } catch {}
-  return context.length > 2500 ? `${context.substring(0, 2497)}...` : context;
+  } catch {
+    return "";
+  }
 }
 
 // packages/opencode-plugin/src/recall_health_signal.ts
@@ -1646,6 +1658,9 @@ function promptInjectionToastMessage(summary) {
   const laneCounts = summary.laneCounts.map(({ lane, count }) => `${lane}=${count}`).join(", ");
   return `\u2B50 SyberMem \u6CE8\u5165\u6458\u8981: items=${summary.totalItems}, chars=${summary.totalChars}, ${laneCounts}`;
 }
+function pendingHabitToast() {
+  return "\uD83D\uDCA1 SyberMem \u6709\u4E00\u6761\u5F85\u786E\u8BA4\u7684\u4E60\u60EF\u5019\u9009 \u2014 \u7528 /sybermem-habit \u786E\u8BA4\u540E\u5373\u53EF\u5728\u540E\u7EED\u4F1A\u8BDD\u88AB\u6CE8\u5165";
+}
 function habitCandidateToast(habitIntent) {
   if (habitIntent.captured && habitIntent.suggestedScope === "project") {
     return "\uD83D\uDCA1 SyberMem \u53D1\u73B0\u4E00\u6761\u50CF\u662F\u672C\u9879\u76EE\u7684\u7EA6\u5B9A \u2014 \u53EF\u7528 /sybermem-record \u8BB0\u4E3A\u51B3\u7B56/\u9700\u6C42\uFF0C\u6216 /sybermem-habit \u786E\u8BA4";
@@ -1654,6 +1669,46 @@ function habitCandidateToast(habitIntent) {
     return "\uD83D\uDCA1 SyberMem \u53D1\u73B0\u4E00\u6761\u53EF\u590D\u7528\u7684\u4E2A\u4EBA\u4E60\u60EF \u2014 \u9700\u8981\u7684\u8BDD\u7528 /sybermem-habit \u4E00\u6B65\u786E\u8BA4";
   }
   return "\uD83D\uDCA1 SyberMem \u53D1\u73B0\u4E00\u6761\u53EF\u590D\u7528\u7684\u504F\u597D/\u89C4\u8303 \u2014 \u9700\u8981\u7684\u8BDD\u7528 /sybermem-habit \u4E00\u6B65\u786E\u8BA4\uFF08\u4F1A\u95EE\u4F60\u8BB0\u6210\u4E60\u60EF\u8FD8\u662F\u9879\u76EE\u7EA6\u5B9A\uFF09";
+}
+
+// packages/opencode-plugin/src/pending_habit.ts
+var SURFACED_CANDIDATE = new Map;
+function resetPendingHabit(sessionID) {
+  SURFACED_CANDIDATE.delete(sessionID);
+}
+async function readPendingHabitReminder($, root) {
+  try {
+    const parsed = JSON.parse(await sybermemText($, root, ["habit", "awareness", "--format", "json"]));
+    if (typeof parsed !== "object" || parsed === null)
+      return null;
+    const reminder = Reflect.get(parsed, "pending_reminder");
+    if (typeof reminder !== "object" || reminder === null)
+      return null;
+    const message = Reflect.get(reminder, "message");
+    const createdAt = Reflect.get(reminder, "created_at");
+    if (typeof message !== "string" || !message.trim())
+      return null;
+    return { message: message.trim(), createdAt: typeof createdAt === "string" ? createdAt : "" };
+  } catch {
+    return null;
+  }
+}
+async function injectPendingHabitReminder($, root, sessionID, output) {
+  const reminder = await readPendingHabitReminder($, root);
+  if (!reminder)
+    return null;
+  const key = reminder.createdAt || reminder.message;
+  if (SURFACED_CANDIDATE.get(sessionID) === key)
+    return null;
+  SURFACED_CANDIDATE.set(sessionID, key);
+  const block = `## SyberMem Habit Candidate
+
+${reminder.message}`;
+  if (output.system)
+    output.system.push(block);
+  else
+    output.system = [block];
+  return reminder;
 }
 
 // packages/opencode-plugin/src/plugin.ts
@@ -1717,6 +1772,7 @@ async function flushSessionRelevance(args, root, sessionID) {
     compactJsonlJournal(root, ".recall-debug.jsonl", 200);
   } catch {} finally {
     resetSessionActivity(sessionID);
+    resetPendingHabit(sessionID);
   }
 }
 function deriveActivitySignal(sessionID) {
@@ -1828,6 +1884,11 @@ var SyberMemPlugin = async ({ $, directory, client }) => {
         }
       }
       const summary = injectStashedPromptPackets(sessionID ?? "", output);
+      try {
+        const pending = await injectPendingHabitReminder(args.$, root, sessionID ?? "", output);
+        if (pending)
+          throttledToast(args.client, "habit-pending", pendingHabitToast());
+      } catch {}
       const usageEntry = appendMemoryUsage(root, { sessionID: sessionID ?? "", packets, startup });
       if (sessionID)
         recordMemoryUsage(sessionID, usageEntry);

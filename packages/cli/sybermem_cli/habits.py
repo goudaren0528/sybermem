@@ -14,6 +14,7 @@ from sybermem_core.user_habits import (
     habit_awareness_summary,
     list_habits,
     pause_habit,
+    pending_habit_reminder,
     read_habit_intent,
     render_habit_markdown,
     render_habit_reminder_markdown,
@@ -179,6 +180,12 @@ def cmd_habit_intent_clear(args: argparse.Namespace) -> int:
 
 def cmd_habit_awareness(args: argparse.Namespace) -> int:
     summary = habit_awareness_summary()
+    # Attach the durable pending-candidate reminder so every host (OpenCode startup,
+    # Claude/Codex SessionStart) surfaces the SAME "confirm your habit candidate" line
+    # from one source of truth instead of each reinventing the wording.
+    reminder = pending_habit_reminder()
+    if reminder is not None:
+        summary = {**summary, "pending_reminder": reminder}
     if args.format == "json":
         print(dump_json(summary))
     else:

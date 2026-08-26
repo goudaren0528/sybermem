@@ -114,10 +114,98 @@ _BLOCKED_INTENT_RE: Final = re.compile(
 )
 
 
-def user_habit_home() -> Path:
+# Legacy user home used by older installers/launchers, which FORCED
+# SYBERMEM_HOME=~/.claude/sybermem/cli. That path is install-managed runtime state
+# (a reinstall/uninstall can wipe it), whereas ~/.sybermem is the documented,
+# user-owned data home. We now treat ~/.sybermem as canonical and import any habit
+# data left behind in the legacy location once, non-destructively.
+def _legacy_user_home() -> Path | None:
+    home = os.environ.get("USERPROFILE") or os.environ.get("HOME")
+    if not home:
+        return None
+    return Path(home) / ".claude" / "sybermem" / "cli"
+
+
+def _sybermem_base() -> tuple[Path, bool]:
+    # Returns (base, is_default_home). An explicit SYBERMEM_HOME still wins (tests and
+    # advanced/custom setups rely on it), EXCEPT the legacy launcher value which we
+    # deliberately ignore so the launcher and a bare `sybermem` resolve to the SAME
+    # canonical home. Without this the two diverge and a habit added via one path is
+    # invisible to the other. `is_default_home` is True only when we fell through to the
+    # documented ~/.sybermem — that gates the one-time legacy import so an explicit,
+    # non-legacy SYBERMEM_HOME (e.g. an isolated test home) is never migrated into.
     home = os.environ.get("SYBERMEM_HOME")
-    base = Path(home).expanduser() if home else Path.home() / ".sybermem"
+    if home:
+        resolved = Path(home).expanduser()
+        legacy = _legacy_user_home()
+        try:
+            is_legacy = legacy is not None and resolved.resolve() == legacy.resolve()
+        except OSError:
+            is_legacy = False
+        if not is_legacy:
+            return resolved, False
+    return Path.home() / ".sybermem", True
+
+
+def user_habit_home() -> Path:
+    base, is_default_home = _sybermem_base()
+    if is_default_home:
+        _import_legacy_habit_data(base)
     return base / HABIT_DIR
+
+
+def _import_legacy_habit_data(base: Path) -> None:
+    """One-time, non-destructive import of habit data from the legacy launcher home.
+
+    Older installs stored habits under ~/.claude/sybermem/cli/ because the launcher
+    forced SYBERMEM_HOME there. When the canonical ~/.sybermem/ is missing a given file
+    but the legacy home has it, copy it so upgrading users do not silently "lose" their
+    confirmed habits OR a pending candidate awaiting confirmation. Each file is imported
+    INDEPENDENTLY: a user can have a pending candidate with zero active habits (the exact
+    case that made habit reminders invisible), so importing the candidate must NOT be
+    gated on habits.jsonl having content. We never overwrite existing canonical data and
+    never delete the legacy source, so the operation is idempotent and recoverable.
+    Fail-open: any error leaves both intact.
+    """
+    legacy_base = _legacy_user_home()
+    if legacy_base is None:
+        return
+    try:
+        if base.resolve() == legacy_base.resolve():
+            return  # canonical IS the legacy home (custom setup); nothing to import
+    except OSError:
+        return
+    # One-time marker: without it the import would run on EVERY access and re-copy a
+    # candidate the user just cleared (clear deletes canonical -> "canonical missing" ->
+    # re-import from the still-present legacy file, an infinite loop). The marker makes
+    # the migration genuinely one-time and idempotent.
+    marker = base / ".habit-legacy-imported"
+    try:
+        if marker.exists():
+            return
+    except OSError:
+        return
+    try:
+        # (legacy source, canonical target) for each independently-imported file.
+        pairs = [
+            (legacy_base / HABIT_DIR / HABITS_FILE, base / HABIT_DIR / HABITS_FILE),
+            # The candidate intent lives BESIDE user-habits/, not inside it.
+            (legacy_base / HABIT_INTENT_FILE, base / HABIT_INTENT_FILE),
+            (legacy_base / HABIT_DIR / INJECTION_LOG_FILE, base / HABIT_DIR / INJECTION_LOG_FILE),
+        ]
+        for legacy_path, canonical_path in pairs:
+            # Skip when canonical already has real content, or legacy has nothing to give.
+            if canonical_path.exists() and canonical_path.stat().st_size > 0:
+                continue
+            if not (legacy_path.is_file() and legacy_path.stat().st_size > 0):
+                continue
+            canonical_path.parent.mkdir(parents=True, exist_ok=True)
+            canonical_path.write_text(legacy_path.read_text(encoding="utf-8"), encoding="utf-8")
+        # Mark migration done so it never re-imports (esp. re-copying a cleared candidate).
+        base.mkdir(parents=True, exist_ok=True)
+        marker.write_text(_now() + "\n", encoding="utf-8")
+    except OSError:
+        return
 
 
 def add_habit(
@@ -636,3 +724,42 @@ def habit_awareness_summary() -> dict:
         "latest_confirmed_at": latest_confirmed,
         "pending_intent": read_habit_intent() is not None,
     }
+
+
+def pending_habit_reminder() -> dict | None:
+    """Return a bounded, privacy-safe pending-candidate reminder, or None.
+
+    A passively captured candidate (`.habit-intent.json`) is NOT an active habit and
+    is never injected on its own — the user must confirm it via `/sybermem-habit`.
+    The old surfacing (a per-key throttled toast) was effectively swallowed after its
+    first fire, so users never learned a candidate was waiting and thus never
+    confirmed one, leaving habit injection permanently silent. This helper is the
+    single source of truth every host uses to surface "you have a habit candidate to
+    confirm" on a durable, non-throttled surface (SessionStart / startup context).
+
+    Returns a dict with a short human `message`, the suggested `scope`, and the
+    candidate `created_at` (so hosts can dedupe by candidate identity). Never exposes
+    the captured prompt text. None when nothing is pending.
+    """
+    candidate = read_habit_intent()
+    if not isinstance(candidate, dict):
+        return None
+    scope = str(candidate.get("suggested_scope", "") or "").strip()
+    created_at = str(candidate.get("created_at", "") or "").strip()
+    if scope == "project":
+        message = (
+            "SyberMem captured what looks like a project convention. Confirm it as a "
+            "decision/requirement with /sybermem-record, or as a personal habit with "
+            "/sybermem-habit."
+        )
+    elif scope == "user":
+        message = (
+            "SyberMem captured a reusable personal preference. Confirm it with "
+            "/sybermem-habit so it can be remembered and injected in future sessions."
+        )
+    else:
+        message = (
+            "SyberMem captured a reusable preference. Confirm it with /sybermem-habit "
+            "(it will ask whether to record it as a personal habit or a project convention)."
+        )
+    return {"pending": True, "scope": scope or "ambiguous", "created_at": created_at, "message": message}

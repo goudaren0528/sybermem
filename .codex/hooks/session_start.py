@@ -195,6 +195,35 @@ def _latest_digest_block() -> str:
         return ""
 
 
+def _pending_habit_line() -> str:
+    """Return a durable pending-habit-candidate reminder line, or '' when none.
+
+    A candidate captured passively (`.habit-intent.json`) is NOT an active habit and is
+    never injected on its own — the user must confirm it via /sybermem-habit. Surfacing
+    it at SessionStart (non-throttled) is what makes the user actually notice and
+    confirm; without it, habit injection stays silent forever. Reuses the CLI's
+    `habit awareness --format json` (single source of truth). Fail-open.
+    """
+    try:
+        payload = _sybermem_json("habit", "awareness", "--format", "json")
+        if payload is None or not payload.get("pending_intent"):
+            return ""
+        reminder = payload.get("pending_reminder")
+        message = ""
+        if isinstance(reminder, dict):
+            raw = reminder.get("message")
+            if isinstance(raw, str):
+                message = raw.strip()
+        if not message:
+            message = (
+                "A reusable preference is pending — confirm it with /sybermem-habit so it "
+                "can be remembered and injected in future sessions."
+            )
+        return f"\U0001f4a1 Habit candidate: {message}"
+    except Exception:
+        return ""
+
+
 def _constitution_block() -> str:
     """Return the binding-global-norms constitution block, or '' when none/unavailable.
 
@@ -228,7 +257,8 @@ def _hook_output(markdown: str) -> HookOutput | None:
     backlog_line = _digest_backlog_line()
     latest_digest = _latest_digest_block()
     constitution = _constitution_block()
-    extras = "\n\n".join(part for part in (latest_digest, constitution, backlog_line) if part)
+    pending_habit = _pending_habit_line()
+    extras = "\n\n".join(part for part in (latest_digest, constitution, backlog_line, pending_habit) if part)
     marker = f"{CODEX_STARTUP_HEADING}\n\nSyberMem injected startup context for this Codex session."
     body = "\n".join(part for part in (markdown, extras) if part)
     context = f"{marker}\n\n{body}\n"

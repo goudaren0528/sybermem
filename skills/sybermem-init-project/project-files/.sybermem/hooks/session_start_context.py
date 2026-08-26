@@ -374,6 +374,41 @@ def detect_constitution(root: Path) -> list[dict]:
         return []
 
 
+def detect_pending_habit(root: Path) -> str:
+    """Return a durable pending-habit-candidate reminder line, or '' when none.
+
+    A candidate captured passively (`.habit-intent.json`) is NOT an active habit and is
+    never injected on its own — the user must confirm it via /sybermem-habit. Surfacing
+    it here (SessionStart, non-throttled) is what makes the user actually notice and
+    confirm; without it, habit injection stays silent forever. Reuses the CLI's
+    `habit awareness --format json` (single source of truth). Fail-open.
+    """
+    try:
+        result = subprocess.run(
+            ["sybermem", "habit", "awareness", "--format", "json"],
+            cwd=root, capture_output=True, text=True, encoding="utf-8", check=False,
+        )
+        if result.returncode != 0 or not result.stdout.strip():
+            return ""
+        payload = json.loads(result.stdout)
+        if not isinstance(payload, dict) or not payload.get("pending_intent"):
+            return ""
+        reminder = payload.get("pending_reminder")
+        message = ""
+        if isinstance(reminder, dict):
+            raw = reminder.get("message")
+            if isinstance(raw, str):
+                message = raw.strip()
+        if not message:
+            message = (
+                "A reusable preference is pending — confirm it with /sybermem-habit so it "
+                "can be remembered and injected in future sessions."
+            )
+        return f"💡 Habit candidate: {message}"
+    except Exception:
+        return ""
+
+
 def detect_record_gap(root: Path) -> dict:
     """Count git commits since the most recent record, to nudge timely recording.
 
@@ -426,6 +461,9 @@ def build_context(root: Path) -> str:
                 record_id = str(norm.get("record_id", "")).strip()
                 if statement:
                     base += f"\n- [{record_id}] {statement}"
+        pending_habit = detect_pending_habit(root)
+        if pending_habit:
+            base += f"\n{pending_habit}"
         return f"{base}\n{version_line}" if version_line else base
 
     index_text = index_path.read_text(encoding="utf-8")
@@ -510,6 +548,10 @@ def build_context(root: Path) -> str:
         )
 
     lines.extend(latest_digest_section(root))
+
+    pending_habit = detect_pending_habit(root)
+    if pending_habit:
+        lines.append(pending_habit)
 
     if conclusions:
         lines.append("")
