@@ -5,6 +5,7 @@
 ## 0.2.0 - 2026-08-26
 
 ### Added
+- Latest phase-digest Core Conclusions are now injected as model-visible context on all three hosts: OpenCode at startup/compaction, and Claude Code and Codex at `SessionStart` (via each host's session-start hook). `sybermem digest latest` remains the single source, and `sybermem project memory-stats` reports the digest injection lane.
 - Claude Code plugin skeleton (`.claude-plugin/`, `hooks/hooks.json`, `hooks/session-start`, `hooks/stop`)
 - Plugin-facing `skills/` tree synced from `packages/claude-skills/`
 - Gemini, Cursor, Codex, and Kimi platform entry files

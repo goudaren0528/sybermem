@@ -74,9 +74,9 @@ implements: [requirement-002]
 - phase digests and theme digests for phase/topic compression
 - record relations: `implements` / `fixes` / `related` / `superseded_by` / `crystallized_from`
 - read-only resume: `/sybermem-resume` and `sybermem resume`
-- memory stats: `sybermem project memory-stats` prints 7d/30d terminal tables by default, including Edit Alignment, digest coverage, norm coverage, and Memory injection turns, items, chars, avg chars/turn, p95 chars/turn, plus 30d lane distribution; `--format json` emits the same structured stats for `/sybermem-summary`
-- recall relevance feedback: OpenCode accumulates per-session edit focus, todo-batch completion, and test/build signals via `file.edited` / `todo.updated` / `tool.execute.after`, then at `session.idle` matches injected records against edited files (through each record's `related_files`) into a bounded `.sybermem/.recall-outcomes.jsonl`, producing a precision-based `low_relevance` verdict distinct from frequency; record nudges also carry a semantic trigger reason
-- injection observability: in this phase, only OpenCode writes bounded `.sybermem/.memory-usage.jsonl` rows for memory that actually reached the model, with per-turn metadata plus `session_outcome` summaries. The journal keeps only session/host, items/chars, recall/habit/norm/startup lane totals, injected record ids, startup presence, and idle-time memory/edit/todo/tool/Edit Alignment evidence. It does not persist raw prompts or full injected memory text, and write failures stay fail-open
+- memory stats: `sybermem project memory-stats` prints 7d/30d terminal tables (record counts, type distribution, recall, Edit Alignment, digest/norm coverage, memory-injection lane distribution); `--format json` feeds `/sybermem-summary` and automation. See [Indexing and Search](#indexing-and-search)
+- recall relevance feedback: at `session.idle`, OpenCode matches injected records against edited files (via `related_files`) into a bounded `.sybermem/.recall-outcomes.jsonl`, yielding a precision-based `low_relevance` verdict distinct from frequency. See the [Feature Map](docs/feature_map.md)
+- injection observability: in this phase, only OpenCode writes memory that actually reached the model to the metadata-only `.sybermem/.memory-usage.jsonl` (lane totals, injected record ids, `session_outcome` summaries; no raw prompts or full injected text; write failures stay fail-open). See the [Feature Map](docs/feature_map.md)
 - project search: `/sybermem-search` and `sybermem search`
 - next-step guidance: `/using-sybermem` and `sybermem next-step`
 
@@ -84,7 +84,7 @@ implements: [requirement-002]
 
 - phase/theme digests use a coverage hash for mechanical staleness detection: `sybermem digest status` reports current/stale/unknown verdicts
 - digest backlog signal: `sybermem digest status --format json` carries a `backlog` object (records not covered by any digest + days since the last digest). A project that keeps recording but never digests gets a proactive "N records not yet in any digest" `⭐` heads-up at OpenCode `session.idle` and Claude/Codex `SessionStart`; the first-digest next-step recommendation now uses a digest-specific record threshold rather than the publish threshold
-- digest results actually feed back: digests are in the search/recall corpus (with `related_digest` continuity links and stale conflict notes); `sybermem digest latest` returns the newest phase digest's Core Conclusions, which OpenCode injects into startup/compaction context — digest content is model-visible, not just a "go read it" pointer
+- digest results actually feed back: digests are in the search/recall corpus (with `related_digest` continuity links and stale conflict notes); `sybermem digest latest` returns the newest phase digest's Core Conclusions, which **all three hosts inject into model-visible context** — OpenCode at startup/compaction, Claude Code and Codex at `SessionStart` — so digest content is model-visible, not just a "go read it" pointer
 
 ### Project Norms (binding rules)
 
@@ -113,7 +113,7 @@ implements: [requirement-002]
 - manual/compaction injection: `sybermem habit inject --context planning --format markdown`
 - prompt-time perceptible by default: `habit add` now defaults `injection_policy=prompt_ok_when_supported`, so a confirmed habit is injected at prompt time (`🧠`) on supported hosts without extra flags; relevance uses CJK-aware weighted matching (an `applies_to` tag match is a strong boost, otherwise >=2 distinct multi-char statement overlaps), so Chinese contexts match while unrelated habits stay silent
 - passive candidate capture (candidate-only, never auto-written): when OpenCode `chat.message` detects reusable-preference language ("always…", "I prefer…"), it calls `sybermem habit intent --prompt <text>` to write a candidate to the user-level `~/.sybermem/.habit-intent.json` (never an active habit, never persists secrets/injection text); `/sybermem-habit` reads `habit intent-status` and, after user confirmation, turns it into a habit in one step, then runs `habit intent-clear`
-- injection visibility: after recall, habit, or project norms actually land in the same OpenCode prompt, the plugin emits one bounded post-injection summary with total items, total chars, and lane counts; candidate capture still emits its separate scope-aware `💡` (routes a personal habit to `/sybermem-habit`, a project convention to `/sybermem-record`, or asks when ambiguous), and startup context keeps its separate one-shot notice
+- injection visibility: once recall/habit/norms actually land in the same prompt, the plugin emits one bounded post-injection summary (total items / chars / lane counts); candidate capture emits a separate scope-aware `💡` (personal habit → `/sybermem-habit`, project convention → `/sybermem-record`, or asks when ambiguous), and startup context keeps its own one-shot notice
 - awareness surface: `sybermem habit awareness` and the OpenCode first-turn startup context report the active-habit count, type distribution, and whether a candidate is pending (counts only, never statements, never duplicating prompt-time reminders)
 - conservative gates: only active, high-confidence, directly relevant, non-excluded habits are injected, with a maximum of three
 - habits are not stored in project `.sybermem/` records; a personal preference → habit, a binding project rule → crystallize a `norm` (see Project Norms)
@@ -139,22 +139,34 @@ For the detailed capability matrix, see the [SyberMem Feature Map](docs/feature_
 | OpenCode | Supported integration | skills + TypeScript plugin; session lifecycle, prompt-time project recall, User Habit Memory reminders, record-intent metadata, recall debug logging, and actual-injection observability on supported plugin/chat transform seams |
 | Codex | Partial runtime + skills | user-level skills at `~/.agents/skills`, plus managed `SessionStart` / `UserPromptSubmit` / `Stop` / `PostCompact` hooks for bounded startup context, prompt-time recall, habit reminders, record-intent capture, Stop record nudges, and compact re-seed markers; still no hidden auto-resume, background automation, or agent runtime |
 
-Claude Code managed projects can use `UserPromptSubmit` for bounded reminders when prompts look like reusable preferences or when prompt-approved habits match; existing projects need `/sybermem-update` to refresh the hook. OpenCode uses `chat.message` + `experimental.chat.system.transform` for per-prompt high-signal project recall and injects User Habit Memory reminders into the same turn's system prompt; `chat.message` also writes bounded `.sybermem/.record-intent.json` and `.sybermem/.recall-debug.jsonl` metadata without storing raw prompt text. Memory that actually reaches the model is written to the metadata-only `.sybermem/.memory-usage.jsonl`, and successful injection emits a single `prompt-memory-injected` summary toast. Beyond the startup toast, `session.created` now stashes a one-shot first-turn startup context (key conclusions, phase, stale/digest heads-up, next-step) that the first `experimental.chat.system.transform` prepends into the model-visible system prompt; the startup context omits habits so it does not duplicate the same first prompt's habit injection. `session.idle` also reads the `recall_health` verdict from `sybermem project memory-stats` and emits one throttled, fail-open advisory only when recent recall is `low_signal` or `low_relevance`. `⭐`/`💡` still mark visible recall, while habit reminders stay conservative, only active, high-confidence, directly relevant, prompt-ok-when-supported items, with bounded output and fail-open behavior. Codex now installs `~/.codex/hooks/sybermem_session_start.py`, `sybermem_user_prompt.py`, `sybermem_stop.py`, and `sybermem_post_compact.py` and merges them into `~/.codex/hooks.json` under `SessionStart` / `UserPromptSubmit` / `Stop` / `PostCompact`. `SessionStart` and `UserPromptSubmit` use `hookSpecificOutput.additionalContext` for bounded startup context, prompt-time project recall, and User Habit Memory reminders. `UserPromptSubmit` also writes bounded `.sybermem/.record-intent.json` metadata for explicit record requests without storing raw prompt text; `Stop` provides a loop-safe record nudge; `PostCompact` writes a compact re-seed marker only. Codex still does not support hidden auto-resume, background automation, prompt or agent handler runtimes, and it does not install `.codex/config.toml`. See [`.codex/INSTALL.md`](.codex/INSTALL.md) for Codex details and [`.opencode/INSTALL.md`](.opencode/INSTALL.md) for OpenCode details.
+Each host's integration seam is summarized below. For the full capability matrix, see the [SyberMem Feature Map](docs/feature_map.md).
+
+#### Claude Code
+
+- `UserPromptSubmit` emits bounded reminders when prompts look like reusable preferences or when prompt-approved habits match; existing projects need `/sybermem-update` to refresh the hook.
+- `SessionStart` injects the newest phase digest's Core Conclusions, bounded startup context, and the project-norm constitution.
+
+#### OpenCode
+
+- `chat.message` + `experimental.chat.system.transform` provide per-prompt high-signal project recall, injecting User Habit Memory reminders and recall hints into the same turn's system prompt.
+- `chat.message` writes bounded `.sybermem/.record-intent.json` and `.sybermem/.recall-debug.jsonl` metadata (no raw prompt text); memory that actually reaches the model is written to the metadata-only `.sybermem/.memory-usage.jsonl`, and successful injection emits a single `prompt-memory-injected` summary toast.
+- `session.created` stashes a one-shot first-turn startup context (key conclusions, phase, stale/digest heads-up, next-step) that the first transform prepends; startup context omits habits so it does not duplicate the first prompt's habit injection.
+- `session.idle` reads the `recall_health` verdict from `memory-stats` and emits one throttled, fail-open advisory only when recent recall is `low_signal` / `low_relevance`.
+- `⭐`/`💡` mark visible recall; habit reminders stay conservative — only active, high-confidence, directly relevant, injection-allowed items, bounded and fail-open.
+
+#### Codex
+
+- Installs `sybermem_session_start.py` / `sybermem_user_prompt.py` / `sybermem_stop.py` / `sybermem_post_compact.py`, merged into `~/.codex/hooks.json` under `SessionStart` / `UserPromptSubmit` / `Stop` / `PostCompact`.
+- `SessionStart` / `UserPromptSubmit` use `hookSpecificOutput.additionalContext` for bounded startup context, digest Core Conclusions, prompt-time recall, and habit reminders; `UserPromptSubmit` also writes bounded `.sybermem/.record-intent.json` for explicit record requests (no raw prompt text); `Stop` is a loop-safe record nudge; `PostCompact` writes a compact re-seed marker only.
+- Still no hidden auto-resume, background automation, prompt/agent handler runtimes, and no `.codex/config.toml`.
+
+> Install details: [`.codex/INSTALL.md`](.codex/INSTALL.md) · [`.opencode/INSTALL.md`](.opencode/INSTALL.md)
 
 ## Install and Upgrade
 
 ### One-Line Install
 
-```bash
-# macOS / Linux
-curl -sSL https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/install-remote.sh | bash
-
-# Windows (PowerShell)
-irm https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/install-remote.ps1 | iex
-
-# Windows OpenCode / cmd.exe (PowerShell-free)
-python -c "import urllib.request; exec(urllib.request.urlopen('https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/install-remote.py').read())"
-```
+See the install commands in [Quick Start](#quick-start) above (macOS / Linux, Windows PowerShell, and Windows PowerShell-free).
 
 This refreshes user-level Claude Code skills, OpenCode skills, Codex skills (`~/.agents/skills`), the OpenCode plugin, the Codex `SessionStart` / `UserPromptSubmit` / `Stop` / `PostCompact` hooks, and the CLI / Core runtime. The installer creates a fixed CLI launcher at `$HOME/.claude/sybermem/cli/sybermem` on macOS / Linux and `%USERPROFILE%\.claude\sybermem\cli\sybermem.cmd` on Windows. SyberMem's OpenCode plugin, Codex hooks, and CLI-using skills prefer this fixed launcher when a subprocess cannot resolve bare `sybermem`; install scripts do not modify persistent PATH by default.
 

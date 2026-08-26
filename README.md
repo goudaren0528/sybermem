@@ -74,9 +74,9 @@ implements: [requirement-002]
 - phase digest 与 theme digest，用于阶段和主题级压缩
 - record 关系：`implements` / `fixes` / `related` / `superseded_by` / `crystallized_from`
 - 只读续接：`/sybermem-resume` 与 `sybermem resume`
-- 记忆统计：`sybermem project memory-stats` 默认打印最近 7 天 / 30 天的终端表格，包含 Edit Alignment、digest 覆盖、norm 覆盖，以及 Memory injection 的 turns、items、chars、avg chars/turn、p95 chars/turn 和 30d lane distribution；`--format json` 输出同一批结构化统计供 `/sybermem-summary` 使用
-- 召回相关性反馈：OpenCode 通过 `file.edited` / `todo.updated` / `tool.execute.after` 累积每轮编辑焦点、任务完成与测试/构建信号，`session.idle` 据此把召回注入过的记录与实际编辑的文件（按记录的 `related_files`）比对，写入有界 `.sybermem/.recall-outcomes.jsonl`，得出频率之外的 `low_relevance`（精准度）判定；record 提醒也据此带上语义化触发原因
-- 注入可观测性：本阶段只有 OpenCode 会把实际进入模型的记忆写入有界 `.sybermem/.memory-usage.jsonl`，包含每轮 metadata 和 `session_outcome` 汇总。日志只保留 session/host、items/chars、recall/habit/norm/startup lane totals、注入 record ids、startup presence，以及 idle 时的 memory/edit/todo/tool/Edit Alignment evidence；不保存原始 prompt 或完整注入文本，写入失败保持 fail-open
+- 记忆统计：`sybermem project memory-stats` 打印 7 天 / 30 天终端表格（record 计数、类型分布、recall、Edit Alignment、digest / norm 覆盖、memory injection lane 分布）；`--format json` 供 `/sybermem-summary` 与自动化消费。详见[索引与检索](#索引与检索)
+- 召回相关性反馈：OpenCode 在 `session.idle` 把召回注入过的记录与实际编辑文件（按 `related_files`）比对，写入有界 `.sybermem/.recall-outcomes.jsonl`，得出频率之外的 `low_relevance`（精准度）判定。详见 [Feature Map](docs/feature_map.md)
+- 注入可观测性：本阶段只有 OpenCode 会把实际进入模型的记忆写入 metadata-only 的 `.sybermem/.memory-usage.jsonl`（含 lane totals、注入 record ids 与 `session_outcome` 汇总，不保存原始 prompt / 完整注入文本，写入失败 fail-open）。详见 [Feature Map](docs/feature_map.md)
 - 项目内检索：`/sybermem-search` 与 `sybermem search`
 - 下一步建议：`/using-sybermem` 与 `sybermem next-step`
 
@@ -84,7 +84,7 @@ implements: [requirement-002]
 
 - phase / theme digest 用 coverage hash 做机械陈旧检测：`sybermem digest status` 给出 current/stale/unknown 判定
 - digest 积压信号：`sybermem digest status --format json` 带 `backlog`（未被任何 digest 覆盖的 record 数 + 距上次 digest 天数）。已经做过一次 digest 后仍持续记录的项目，会在 OpenCode `session.idle`、Claude/Codex `SessionStart` 得到"N 条记录尚未进入任何 digest"的 `⭐` 提醒；`next-step` 首次 digest 推荐改用 digest 专属的记录数阈值（而非发布阈值）
-- digest 结果真正反哺：digest 进入搜索/召回语料（带 `related_digest` 连续性关联和 stale 冲突标注）；`sybermem digest latest` 返回最新 phase digest 的 Core Conclusions，OpenCode 在 startup / compaction 里把它注入上下文——digest 内容对模型可见，而不仅仅是"去读"指针
+- digest 结果真正反哺：digest 进入搜索/召回语料（带 `related_digest` 连续性关联和 stale 冲突标注）；`sybermem digest latest` 返回最新 phase digest 的 Core Conclusions，**三宿主都会把它注入模型可见上下文**——OpenCode 在 startup / compaction、Claude Code 与 Codex 在 `SessionStart`——digest 内容对模型可见，而不仅仅是"去读"指针
 
 ### Project Norms（项目规范 / 约束）
 
@@ -113,7 +113,7 @@ implements: [requirement-002]
 - 手动/compaction 注入：`sybermem habit inject --context planning --format markdown`
 - 默认 prompt-time 可感知：`habit add` 默认 `injection_policy=prompt_ok_when_supported`，确认过的习惯在支持的宿主上开箱即可在逐 prompt 注入（弹 `🧠`），无需额外参数；相关性用 CJK 感知的加权匹配（命中 `applies_to` tag 为强信号，否则需 ≥2 个多字符语句重叠），中文上下文可命中，无关习惯保持静默
 - 被动候选捕获（仅候选，永不自动写入）：OpenCode `chat.message` 检测到"以后都…/我习惯…"这类可复用偏好时，调用 `sybermem habit intent --prompt <text>` 把候选写入用户级 `~/.sybermem/.habit-intent.json`（绝不创建 active habit，绝不持久化密钥/注入文本）；`/sybermem-habit` 读取 `habit intent-status` 后经用户确认一键转为 habit，再 `habit intent-clear` 清除
-- 注入可见性：OpenCode 在同一轮 prompt 真正注入 recall / habit / 项目规范后，只弹一条有界 post-injection summary（汇总 total items、total chars 和 lane counts）；捕获到候选时仍弹独立 scope 感知的 `💡`（个人习惯引导到 `/sybermem-habit`，项目约定引导到 `/sybermem-record`，模糊时追问），startup context 继续使用独立的一次性提示
+- 注入可见性：同轮真正注入 recall / habit / 规范后只弹一条有界 post-injection summary（total items / chars / lane counts）；捕获候选时另弹 scope 感知的 `💡`（个人习惯→`/sybermem-habit`，项目约定→`/sybermem-record`，模糊时追问），startup context 用独立一次性提示
 - 感知层：`sybermem habit awareness` 及 OpenCode 首轮 startup context 展示 active 习惯数量、类型分布与是否有待确认候选（只报数量，不暴露 habit 内容，也不与逐 prompt 提醒重复）
 - 保守门槛：只注入 active、高置信、未被排除、与上下文直接相关的习惯，最多 3 条
 - 默认不进入项目 `.sybermem/` records；个人偏好 → habit，绑定的项目规则 → 固化为 `norm`（见 Project Norms）
@@ -139,22 +139,34 @@ SyberMem 有两类执行路径，可靠性不同：
 | OpenCode | 支持集成 | skills + TypeScript plugin；session lifecycle、prompt-time project recall、User Habit Memory 提醒、record-intent metadata、recall debug logging 与 actual-injection observability 都走受支持的 plugin/chat transform 路径 |
 | Codex | Partial runtime + skills | 用户级 skills 安装到 `~/.agents/skills`，并安装 `SessionStart` / `UserPromptSubmit` / `Stop` / `PostCompact` hooks；支持 bounded startup context、prompt-time recall、habit reminder、record-intent capture、Stop record nudge 和 compact re-seed marker；仍无 hidden auto-resume、后台自动化或 agent runtime |
 
-Claude Code 受管项目可通过 `UserPromptSubmit` 对明显偏好语句或 prompt-approved habits 给出有界提醒；老项目需运行 `/sybermem-update` 刷新 hook。OpenCode 通过 `chat.message` + `experimental.chat.system.transform` 提供逐 prompt 高信号项目召回，并把 User Habit Memory 提醒和 recall hints 一起注入同一轮 system prompt；`chat.message` 还会写入 bounded `.sybermem/.record-intent.json` 和 `.sybermem/.recall-debug.jsonl` metadata，不保存原始 prompt；实际进入模型的记忆会写入 metadata-only 的 `.sybermem/.memory-usage.jsonl`，并在成功注入后只弹一条 `prompt-memory-injected` summary toast。`session.created` 现在除了 toast，还会为该会话首轮准备一份一次性 startup context（key conclusions、phase、stale/digest 提示、next-step），由首个 `experimental.chat.system.transform` 前置注入到模型可见的 system prompt；startup context 不含 habit，避免与逐 prompt habit 注入重复。`session.idle` 还会读取 `sybermem project memory-stats` 的 `recall_health`，仅在近窗召回为 `low_signal` 或 `low_relevance` 时给一条节流、fail-open 的提示。`⭐`/`💡` 继续用于可见化 recall，habit 提醒保持保守，只取 active、高置信、直接相关、在受支持 prompt 场景下允许注入的内容，输出有界且 fail-open。Codex 现在会安装 `~/.codex/hooks/sybermem_session_start.py`、`sybermem_user_prompt.py`、`sybermem_stop.py` 和 `sybermem_post_compact.py`，并把它们合并到 `~/.codex/hooks.json` 的 `SessionStart` / `UserPromptSubmit` / `Stop` / `PostCompact`。其中 `SessionStart` / `UserPromptSubmit` 通过 `hookSpecificOutput.additionalContext` 提供 bounded startup context、prompt-time project recall 和 User Habit Memory 提醒；UserPromptSubmit 还会为显式记录请求写入 bounded `.sybermem/.record-intent.json` metadata，不保存原始 prompt；Stop 只做防循环 record nudge；PostCompact 只写 compact re-seed marker。但 Codex 仍不支持 hidden auto-resume、后台自动化、prompt 或 agent handler runtime，也不安装 `.codex/config.toml`。更多说明见 [`.codex/INSTALL.md`](.codex/INSTALL.md)。OpenCode 说明见 [`.opencode/INSTALL.md`](.opencode/INSTALL.md)。
+各宿主的具体接入路径如下。完整功能矩阵仍见 [SyberMem Feature Map](docs/feature_map.md)。
+
+#### Claude Code
+
+- `UserPromptSubmit` 对明显偏好语句或 prompt-approved habits 给出有界提醒；老项目需运行 `/sybermem-update` 刷新 hook。
+- `SessionStart` 注入最新 phase digest 的 Core Conclusions、bounded startup context 与项目规范宪法。
+
+#### OpenCode
+
+- `chat.message` + `experimental.chat.system.transform` 提供逐 prompt 高信号项目召回，并把 User Habit Memory 提醒和 recall hints 注入同一轮 system prompt。
+- `chat.message` 写入 bounded `.sybermem/.record-intent.json` 与 `.sybermem/.recall-debug.jsonl` metadata（不保存原始 prompt）；实际进入模型的记忆写入 metadata-only 的 `.sybermem/.memory-usage.jsonl`，成功注入后只弹一条 `prompt-memory-injected` summary toast。
+- `session.created` 为首轮准备一次性 startup context（key conclusions、phase、stale/digest 提示、next-step），由首个 transform 前置注入；startup context 不含 habit，避免与逐 prompt habit 注入重复。
+- `session.idle` 读取 `memory-stats` 的 `recall_health`，仅在近窗召回为 `low_signal` / `low_relevance` 时给一条节流、fail-open 提示。
+- `⭐`/`💡` 可见化 recall；habit 提醒保守——只取 active、高置信、直接相关、允许注入的内容，输出有界且 fail-open。
+
+#### Codex
+
+- 安装 `sybermem_session_start.py` / `sybermem_user_prompt.py` / `sybermem_stop.py` / `sybermem_post_compact.py`，合并进 `~/.codex/hooks.json` 的 `SessionStart` / `UserPromptSubmit` / `Stop` / `PostCompact`。
+- `SessionStart` / `UserPromptSubmit` 经 `hookSpecificOutput.additionalContext` 提供 bounded startup context、digest Core Conclusions、prompt-time recall 与 habit 提醒；`UserPromptSubmit` 还为显式记录请求写 bounded `.sybermem/.record-intent.json`（不保存原始 prompt）；`Stop` 只做防循环 record nudge；`PostCompact` 只写 compact re-seed marker。
+- 仍不支持 hidden auto-resume、后台自动化、prompt / agent handler runtime，也不安装 `.codex/config.toml`。
+
+> 安装细节：[`.codex/INSTALL.md`](.codex/INSTALL.md) · [`.opencode/INSTALL.md`](.opencode/INSTALL.md)
 
 ## 安装与升级
 
 ### 一行式安装
 
-```bash
-# macOS / Linux
-curl -sSL https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/install-remote.sh | bash
-
-# Windows (PowerShell)
-irm https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/install-remote.ps1 | iex
-
-# Windows OpenCode / cmd.exe (PowerShell-free)
-python -c "import urllib.request; exec(urllib.request.urlopen('https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/install-remote.py').read())"
-```
+安装命令见上文[快速开始](#快速开始)（提供 macOS / Linux、Windows PowerShell、Windows PowerShell-free 三种）。
 
 这会刷新用户级 Claude Code skills、OpenCode skills、Codex skills（`~/.agents/skills`）、OpenCode plugin、Codex `SessionStart` / `UserPromptSubmit` / `Stop` / `PostCompact` hooks，以及 CLI / Core runtime。安装器会创建固定 CLI launcher：macOS / Linux 为 `$HOME/.claude/sybermem/cli/sybermem`，Windows 为 `%USERPROFILE%\.claude\sybermem\cli\sybermem.cmd`。SyberMem 的 OpenCode plugin、Codex hooks 和 CLI 型 skills 在子进程找不到裸 `sybermem` 时会优先使用这个固定 launcher；安装脚本默认不修改持久 PATH。
 
