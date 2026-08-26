@@ -14,9 +14,10 @@ import { extractEditedFile, getSessionActivity, recordEditedFile, recordInjected
 import { flushRecallOutcome } from "./recall_outcome"
 import { captureHabitIntentWithCli } from "./habit_intent"
 import { updateNudgeMessage } from "./version_signal"
+import { evaluateRemoteVersion } from "./remote_version"
 import { applyReplyMarker, armReplyMarker } from "./reply_marker"
 import { appendMemoryUsage } from "./memory_usage"
-import { buildPromptInjectionToastSummary, habitCandidateToast, promptInjectionToastMessage, throttledToast, type ToastClient } from "./injection_toast"
+import { buildPromptInjectionToastSummary, enqueueToast, habitCandidateToast, promptInjectionToastMessage, throttledToast, type ToastClient } from "./injection_toast"
 
 interface PluginArgs { readonly $: import("./runtime").Shell; readonly directory: string; readonly client: ToastClient }
 interface EventInput { readonly event: { readonly type: string; readonly properties?: { readonly info?: { readonly id?: string } } } }
@@ -36,6 +37,13 @@ async function handleSessionCreated(args: PluginArgs, root: string, sessionID: s
   const versionNudge = updateNudgeMessage(root)
   if (versionNudge) throttledToast(args.client, "version-outdated", versionNudge)
 
+  // Remote-version awareness: warn when GitHub `main` publishes a newer SyberMem
+  // than is installed here. Reads a local cache (never blocks) and kicks off a
+  // fire-and-forget refresh when the cache is stale. Distinct key/semantics from
+  // the project-vs-installed nudge above. Fail-open.
+  const remoteNudge = evaluateRemoteVersion()
+  if (remoteNudge) throttledToast(args.client, "remote-outdated", remoteNudge)
+
   const parsed = parseIndex(root)
   if (!parsed || parsed.conclusions.length === 0) return
   // Mark this session so the first system-transform turn injects model-visible
@@ -46,7 +54,7 @@ async function handleSessionCreated(args: PluginArgs, root: string, sessionID: s
   const commitsSinceRecord = await countCommitsSinceLastRecord(args.$, root)
   const recordNote = commitsSinceRecord >= 3 ? `. ${commitsSinceRecord} commits since last record — consider /sybermem-record` : ""
   const ahaMarker = stale.stale || commitsSinceRecord >= 3 ? "⭐ " : ""
-  await args.client.tui.showToast({ body: { message: `${ahaMarker}SyberMem: loaded ${parsed.conclusions.length} key conclusions${staleNote}${recordNote}`, variant: "info" } })
+  enqueueToast(args.client, `${ahaMarker}SyberMem: loaded ${parsed.conclusions.length} key conclusions${staleNote}${recordNote}`)
 }
 
 async function maybeToastRecallHealth(args: PluginArgs, root: string): Promise<void> {
@@ -126,7 +134,7 @@ async function handleSessionIdle(args: PluginArgs, root: string, sessionID: stri
   const digestGuard = { ...(state.digest_nudged_at_window_len ?? {}) }
   if (followup.type === "digest") digestGuard[followup.themeKey] = windows[followup.themeKey].length
   saveNudgeState(root, { ...state, lastFingerprint: fingerprint, lastNudgeCommitCount: commitsSince, theme_recent_stops: windows, digest_nudged_at_window_len: digestGuard, last_theme: followup.themeKey, last_nudge_type: followup.type, last_nudge: followup.type === "none" ? state.last_nudge : { platform: "opencode", type: followup.type, theme: followup.themeKey, date: today } })
-  if (followup.type !== "none") await args.client.tui.showToast({ body: { message: followup.message ?? "SyberMem: consider recording this work.", variant: "info" } })
+  if (followup.type !== "none") enqueueToast(args.client, followup.message ?? "SyberMem: consider recording this work.")
 }
 
 export const SyberMemPlugin: Plugin = async ({ $, directory, client }: PluginArgs) => {

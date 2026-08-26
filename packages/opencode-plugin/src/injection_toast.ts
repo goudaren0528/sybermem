@@ -31,6 +31,41 @@ async function showToast(client: ToastClient, message: string): Promise<void> {
   }
 }
 
+// Serial toast queue with a minimum on-screen gap. OpenCode's showToast replaces
+// the current toast rather than queueing, so several toasts fired in the same tick
+// (e.g. idle emits nudge + recall-health + digest-backlog, or the first transform
+// emits startup + prompt-memory) would clobber each other and only the last would
+// be seen. We drain toasts one at a time with a gap so each is actually perceptible.
+const TOAST_MIN_GAP_MS = 2_500
+const TOAST_QUEUE: Array<{ readonly client: ToastClient; readonly message: string }> = []
+let draining = false
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+async function drainToastQueue(): Promise<void> {
+  if (draining) return
+  draining = true
+  try {
+    while (TOAST_QUEUE.length > 0) {
+      const next = TOAST_QUEUE.shift()
+      if (!next) break
+      await showToast(next.client, next.message)
+      if (TOAST_QUEUE.length > 0) await sleep(TOAST_MIN_GAP_MS)
+    }
+  } finally {
+    draining = false
+  }
+}
+
+// Enqueue a toast for serial delivery. Fire-and-forget: never blocks the caller,
+// and drain errors are swallowed so toasts stay optional UX.
+export function enqueueToast(client: ToastClient, message: string): void {
+  TOAST_QUEUE.push({ client, message })
+  void drainToastQueue().catch(() => {})
+}
+
 const LAST_TOAST = new Map<string, number>()
 const TOAST_COOLDOWN_MS = 30_000
 
@@ -39,7 +74,7 @@ export function throttledToast(client: ToastClient, key: string, message: string
   const last = LAST_TOAST.get(key) ?? 0
   if (now - last < TOAST_COOLDOWN_MS) return
   LAST_TOAST.set(key, now)
-  void showToast(client, message)
+  enqueueToast(client, message)
 }
 
 export function buildPromptInjectionToastSummary(summary: InjectionSummary, usageEntry: MemoryUsageEntry): PromptInjectionToastSummary | null {

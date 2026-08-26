@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.2.0 - 2026-08-26
+
 ### Added
 - Claude Code plugin skeleton (`.claude-plugin/`, `hooks/hooks.json`, `hooks/session-start`, `hooks/stop`)
 - Plugin-facing `skills/` tree synced from `packages/claude-skills/`
@@ -21,6 +23,10 @@
 - OpenCode injection visibility now emits one bounded post-injection summary after recall, habit, or project norm content actually lands in the model-visible prompt; candidate capture still raises a separate scope-aware `💡` toast, and startup context keeps its separate one-shot notice.
 - User-habit awareness surface: `sybermem habit awareness` and the OpenCode first-turn startup context report active-habit counts, type distribution, and a pending-candidate flag (counts only, never habit statements, no duplication of prompt-time reminders).
 - Scoped uninstall: `sybermem uninstall --scope project|global` and `/sybermem-uninstall` separate project-level deactivation from global removal, ask when natural-language scope is unclear, and preserve project `.sybermem/` histories.
+- Remote-version awareness for OpenCode: `session.created` reads a local cache (`~/.claude/sybermem/.remote-version-cache.json`) and, when stale (>24h), kicks off a fire-and-forget 3s-timeout fetch of `main/VERSION`; when the published version exceeds the installed one it raises a distinct `remote-outdated` toast telling the user to re-run the install script. Fully fail-open, never blocks the hot path, and honors a `SYBERMEM_NO_REMOTE_CHECK=1` kill switch. This is separate from the existing project-behind-installed `/sybermem-update` nudge.
+
+### Fixed
+- OpenCode injection toasts fired in the same tick (e.g. `session.idle` nudge + recall-health + digest-backlog, or the first system-transform's startup + prompt-memory) no longer clobber each other: toasts now drain through a serial FIFO queue with a minimum on-screen gap, so each simultaneous SyberMem signal is actually perceptible. `throttledToast` keeps its per-key 30s dedup and the two direct toast callers were rerouted through the queue.
 
 ### Removed (breaking)
 - The standalone **Team memory** publication subsystem has been removed. Removed CLI: `sybermem team init`, `sybermem team summary`, `sybermem publish status`. Removed skills: `/sybermem-team-publish`, `/sybermem-team-summary`. Removed core modules: `team`, `team_summary`, `publish`, `publish_bootstrap`, `publish_render`, `publish_sources`.
@@ -36,3 +42,4 @@
 - Public install docs now describe OpenCode and Codex prompt-time support accurately: OpenCode supports project recall plus habit reminders through its chat transform hooks, while Codex supports startup context through `SessionStart` and prompt recall/habit reminders through `UserPromptSubmit` `additionalContext`.
 - OpenCode plugin source is split under `packages/opencode-plugin/src/` and bundled back to `packages/opencode-plugin/sybermem.ts` for installer compatibility.
 - Managed uninstall manifest now separates active `skills` from `retired_skills`, while the remover still cleans both so old users shed retired Team skills on update/uninstall.
+
