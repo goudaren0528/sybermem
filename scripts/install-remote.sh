@@ -195,8 +195,10 @@ python -m venv "$CLI_VENV"
 "$CLI_VENV/bin/pip" install --upgrade --force-reinstall "$CORE_SOURCE" "$CLI_SOURCE"
 cat > "$CLI_WRAPPER" <<'EOF'
 #!/bin/bash
-SYBERMEM_HOME="$HOME/.claude/sybermem/cli"
-exec "$SYBERMEM_HOME/venv/bin/sybermem" "$@"
+# Do NOT export SYBERMEM_HOME: it used to split the user-habit store away from the
+# documented ~/.sybermem home. The launcher only locates the venv now; Core resolves
+# the canonical home so launcher and bare `sybermem` share one habit store.
+exec "$HOME/.claude/sybermem/cli/venv/bin/sybermem" "$@"
 EOF
 chmod +x "$CLI_WRAPPER"
 echo "  [Global] installed sybermem CLI: $CLI_WRAPPER"

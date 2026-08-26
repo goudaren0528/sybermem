@@ -82,7 +82,12 @@ export async function buildStartupContext($: Shell, root: string): Promise<strin
   // The project constitution (binding global norms) is highest-priority governing context
   // and, like digests, may be the only useful startup content when INDEX conclusions are empty.
   const constitution = await constitutionBlock($, root)
-  if (conclusions.length === 0 && !digestSection && !constitution) return null
+  // Habit awareness (a count + any pending candidate) may be the ONLY useful startup
+  // content — e.g. a project with no conclusions/digest/norms but a habit candidate the
+  // user still needs to confirm. So compute it up front and include it in the "is there
+  // anything worth injecting" decision, otherwise the early-return below would drop it.
+  const habitAwareness = await habitAwarenessSection($, root)
+  if (conclusions.length === 0 && !digestSection && !constitution && !habitAwareness) return null
   const phaseInfo = parsePhaseIndex(root)
   const identity = parseProjectIdentity(root)
   const stale = await detectStaleSignal($, root)
@@ -114,19 +119,32 @@ export async function buildStartupContext($: Shell, root: string): Promise<strin
   } catch {
     // Next-step routing is advisory and must not block startup context.
   }
+  if (habitAwareness) context += habitAwareness
+  return context.length > 2500 ? `${context.substring(0, 2497)}...` : context
+}
+
+// Habit AWARENESS only (a count + any pending candidate, never the statements): tells
+// the model that user habits exist / a candidate is waiting, without duplicating the
+// prompt-time habit reminder. Returned as an appendable section (or "") so the caller
+// can factor it into the "is there anything worth injecting" decision. Fail-open.
+async function habitAwarenessSection($: Shell, root: string): Promise<string> {
   try {
-    // Habit AWARENESS only (a count, never the statements): tells the model that
-    // user habits exist without duplicating the prompt-time habit reminder that
-    // the same first prompt already injects.
     const awareness: unknown = JSON.parse(await sybermemText($, root, ["habit", "awareness", "--format", "json"]))
     const activeHabits = numberField(awareness, "active") ?? 0
     const pendingIntent = typeof awareness === "object" && awareness !== null && Reflect.get(awareness, "pending_intent") === true
-    if (activeHabits > 0 || pendingIntent) {
-      const pendingNote = pendingIntent ? " A reusable preference is pending — confirm with /sybermem-habit." : ""
-      context += `\n### User Habits\n${activeHabits} active user habit${activeHabits === 1 ? "" : "s"} may apply; manage with /sybermem-habit.${pendingNote}\n`
+    if (activeHabits === 0 && !pendingIntent) return ""
+    // Prefer Core's single-source pending-candidate wording when present.
+    let pendingNote = ""
+    if (pendingIntent) {
+      const reminder = typeof awareness === "object" && awareness !== null ? Reflect.get(awareness, "pending_reminder") : null
+      const message = typeof reminder === "object" && reminder !== null ? Reflect.get(reminder, "message") : null
+      pendingNote = typeof message === "string" && message.trim()
+        ? ` ${message.trim()}`
+        : " A reusable preference is pending — confirm with /sybermem-habit."
     }
+    return `\n### User Habits\n${activeHabits} active user habit${activeHabits === 1 ? "" : "s"} may apply; manage with /sybermem-habit.${pendingNote}\n`
   } catch {
     // Habit awareness is advisory and must not block startup context.
+    return ""
   }
-  return context.length > 2500 ? `${context.substring(0, 2497)}...` : context
 }

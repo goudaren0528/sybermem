@@ -111,8 +111,12 @@ def _install_runtime(root: Path, home: Path) -> None:
     subprocess.run([str(python_exe), "-m", "pip", "install", "--upgrade", "pip"], check=True)
     subprocess.run([str(pip_exe), "install", "--upgrade", "--force-reinstall", str(root / "packages" / "core"), str(root / "packages" / "cli")], check=True)
     if os.name == "nt":
+        # Do NOT export SYBERMEM_HOME here. It used to point at this install-managed
+        # cli dir, which split the user-habit store from the documented ~/.sybermem
+        # home (a habit added via a bare `sybermem` was invisible to host injection).
+        # The launcher now only locates the venv; Core resolves the canonical home.
         (cli_dir / "sybermem.cmd").write_text(
-            '@echo off\nset "SYBERMEM_HOME=%USERPROFILE%\\.claude\\sybermem\\cli"\n"%SYBERMEM_HOME%\\venv\\Scripts\\sybermem.exe" %*\n',
+            '@echo off\n"%USERPROFILE%\\.claude\\sybermem\\cli\\venv\\Scripts\\sybermem.exe" %*\n',
             encoding="ascii",
         )
     else:

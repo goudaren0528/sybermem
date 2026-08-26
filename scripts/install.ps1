@@ -179,10 +179,12 @@ if (-not (Test-Path $CliDir)) {
 python -m venv $CliVenv
 & (Join-Path $CliVenv "Scripts\python.exe") -m pip install --upgrade pip
 & (Join-Path $CliVenv "Scripts\pip.exe") install --upgrade --force-reinstall (Join-Path $AdrPath "packages\core") (Join-Path $AdrPath "packages\cli")
+# Do NOT export SYBERMEM_HOME: it used to split the user-habit store away from the
+# documented ~/.sybermem home. The launcher only locates the venv now; Core resolves
+# the canonical home so launcher and bare `sybermem` share one habit store.
 @'
 @echo off
-set "SYBERMEM_HOME=%USERPROFILE%\.claude\sybermem\cli"
-"%SYBERMEM_HOME%\venv\Scripts\sybermem.exe" %*
+"%USERPROFILE%\.claude\sybermem\cli\venv\Scripts\sybermem.exe" %*
 '@ | Set-Content -Path $CliWrapper -Encoding ASCII
 Write-Host "  [Global] installed sybermem CLI: $CliWrapper"
 
