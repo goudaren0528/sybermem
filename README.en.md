@@ -14,6 +14,24 @@ AI agents can move quickly inside one context window, but cross-session work oft
 
 SyberMem preserves those signals through structured records, derived indexes, phase/theme digests, and bounded read-only resume views. Data lives in the project's `.sybermem/` directory, so humans and AI agents can inspect it directly without relying on a black-box service.
 
+## Architecture at a Glance
+
+```mermaid
+flowchart TD
+    subgraph Hosts["AI hosts"]
+        C[Claude Code]
+        O["OpenCode (most complete)"]
+        X[Codex]
+    end
+    Hosts -->|hooks / plugin| Core["sybermem CLI / Core<br/>recall · digest · norm governance"]
+    Core -->|read/write| Proj["project memory .sybermem/<br/>records · digests · norms · INDEX"]
+    Core -->|read/write| Habit["user habits ~/.sybermem/<br/>cross-project preferences"]
+    Core -->|read-only rollup| Hub["Hub registry<br/>portfolio cross-project view"]
+    Proj -.->|shared via Git| Team["team<br/>clone/pull = full memory"]
+```
+
+Memory is project-local Markdown shared through Git; each host injects the relevant memory into the model during a session via its own hook/plugin, all through the same CLI/Core — no second black-box store.
+
 ## Quick Start
 
 ```bash
@@ -131,36 +149,15 @@ SyberMem has two execution paths with different reliability properties:
 
 ## Platform Support
 
-For the detailed capability matrix, see the [SyberMem Feature Map](docs/feature_map.md); this section keeps only the common platform summary.
+All three hosts can record, recall, and resume; **OpenCode is the most complete** — per-prompt recall, habit injection, and injection observability are all automatic and native.
 
-| Platform | Support level | Notes |
+| Platform | Automation | Integration |
 |---|---|---|
-| Claude Code | Full integration | plugin metadata, skills, SessionStart / Stop / UserPromptSubmit hooks |
-| OpenCode | Supported integration | skills + TypeScript plugin; session lifecycle, prompt-time project recall, User Habit Memory reminders, record-intent metadata, recall debug logging, and actual-injection observability on supported plugin/chat transform seams |
-| Codex | Partial runtime + skills | user-level skills at `~/.agents/skills`, plus managed `SessionStart` / `UserPromptSubmit` / `Stop` / `PostCompact` hooks for bounded startup context, prompt-time recall, habit reminders, record-intent capture, Stop record nudges, and compact re-seed markers; still no hidden auto-resume, background automation, or agent runtime |
+| **OpenCode** | Most complete: automatic per-prompt recall + habit injection + injection observability | native TypeScript plugin (`chat.message` / `system.transform` seams) + skills |
+| **Claude Code** | Full: session-start context + per-prompt reminders | plugin metadata + `SessionStart` / `UserPromptSubmit` / `Stop` hooks + skills |
+| **Codex** | Bounded: startup context + per-prompt recall/reminders | `~/.agents/skills` + `SessionStart` / `UserPromptSubmit` / `Stop` / `PostCompact` hooks (no hidden automation) |
 
-Each host's integration seam is summarized below. For the full capability matrix, see the [SyberMem Feature Map](docs/feature_map.md).
-
-#### Claude Code
-
-- `UserPromptSubmit` emits bounded reminders when prompts look like reusable preferences or when prompt-approved habits match; existing projects need `/sybermem-update` to refresh the hook.
-- `SessionStart` injects the newest phase digest's Core Conclusions, bounded startup context, and the project-norm constitution.
-
-#### OpenCode
-
-- `chat.message` + `experimental.chat.system.transform` provide per-prompt high-signal project recall, injecting User Habit Memory reminders and recall hints into the same turn's system prompt.
-- `chat.message` writes bounded `.sybermem/.record-intent.json` and `.sybermem/.recall-debug.jsonl` metadata (no raw prompt text); memory that actually reaches the model is written to the metadata-only `.sybermem/.memory-usage.jsonl`, and successful injection emits a single `prompt-memory-injected` summary toast.
-- `session.created` stashes a one-shot first-turn startup context (key conclusions, phase, stale/digest heads-up, next-step) that the first transform prepends; startup context omits habits so it does not duplicate the first prompt's habit injection.
-- `session.idle` reads the `recall_health` verdict from `memory-stats` and emits one throttled, fail-open advisory only when recent recall is `low_signal` / `low_relevance`.
-- `⭐`/`💡` mark visible recall; habit reminders stay conservative — only active, high-confidence, directly relevant, injection-allowed items, bounded and fail-open.
-
-#### Codex
-
-- Installs `sybermem_session_start.py` / `sybermem_user_prompt.py` / `sybermem_stop.py` / `sybermem_post_compact.py`, merged into `~/.codex/hooks.json` under `SessionStart` / `UserPromptSubmit` / `Stop` / `PostCompact`.
-- `SessionStart` / `UserPromptSubmit` use `hookSpecificOutput.additionalContext` for bounded startup context, digest Core Conclusions, prompt-time recall, and habit reminders; `UserPromptSubmit` also writes bounded `.sybermem/.record-intent.json` for explicit record requests (no raw prompt text); `Stop` is a loop-safe record nudge; `PostCompact` writes a compact re-seed marker only.
-- Still no hidden auto-resume, background automation, prompt/agent handler runtimes, and no `.codex/config.toml`.
-
-> Install details: [`.codex/INSTALL.md`](.codex/INSTALL.md) · [`.opencode/INSTALL.md`](.opencode/INSTALL.md)
+All three share the same records, CLI/Core, and `.sybermem/` data; the difference is only the depth of injection automation. Per-host hook details and the full capability matrix live in the [Feature Map](docs/feature_map.md), [`.opencode/INSTALL.md`](.opencode/INSTALL.md), and [`.codex/INSTALL.md`](.codex/INSTALL.md).
 
 ## Install and Upgrade
 
@@ -170,13 +167,13 @@ See the install commands in [Quick Start](#quick-start) above (macOS / Linux, Wi
 
 This refreshes user-level Claude Code skills, OpenCode skills, Codex skills (`~/.agents/skills`), the OpenCode plugin, the Codex `SessionStart` / `UserPromptSubmit` / `Stop` / `PostCompact` hooks, and the CLI / Core runtime. The installer creates a fixed CLI launcher at `$HOME/.claude/sybermem/cli/sybermem` on macOS / Linux and `%USERPROFILE%\.claude\sybermem\cli\sybermem.cmd` on Windows. SyberMem's OpenCode plugin, Codex hooks, and CLI-using skills prefer this fixed launcher when a subprocess cannot resolve bare `sybermem`; install scripts do not modify persistent PATH by default.
 
-### Local Plugin Validation
+### Validating from Source
 
-```bash
-claude --plugin-dir .
-```
+Validation differs per platform:
 
-Use this from a repository checkout to validate the Claude Code plugin, hooks, and skills locally.
+- **OpenCode**: re-run the installer (or `python scripts/update.py` in a checkout) to refresh `~/.config/opencode/plugins/sybermem.ts`, then send a prompt that hits stored memory and watch for the `⭐`/`🧠`/`💡` toasts.
+- **Claude Code**: `claude --plugin-dir .` loads the plugin, hooks, and skills straight from the checkout.
+- **Codex**: re-run the installer and confirm the skills under `~/.agents/skills` and the `~/.codex/hooks/*.py` files (plus the `~/.codex/hooks.json` merge) are in place.
 
 ### Upgrade Order
 
@@ -293,8 +290,8 @@ Global uninstall removes user-level skills, CLI, launchers, and the OpenCode plu
 
 ## Compatibility
 
-- `.sybermem/` is the canonical project data directory.
-- Claude prompt-time recall applies to managed Claude hooks; OpenCode uses `chat.message` + `experimental.chat.system.transform` for high-signal project recall and conservative User Habit Memory reminders, and `chat.message` writes prompt-free record-intent and recall debug metadata. In this phase, only OpenCode also writes `.sybermem/.memory-usage.jsonl` after context actually lands in the model-visible prompt, and it emits one bounded prompt-time post-injection summary with total items and total chars for recall/habit/norm; startup context keeps its separate one-shot notice. Codex uses `SessionStart` / `UserPromptSubmit` / `Stop` / `PostCompact` for bounded startup context, prompt-time recall, habit reminders, record-intent capture, loop-safe record nudges, and compact re-seed markers, but still does not claim hidden auto-resume, background automation, or direct compaction prompt injection.
+- `.sybermem/` is the canonical project data directory, shareable via Git.
+- Per-host prompt-time recall and injection differences are covered in [Platform Support](#platform-support); implementation details live in each platform's INSTALL.
 - For more installation, upgrade, and compatibility details, see [INSTALL.md](INSTALL.md).
 
 ## License
