@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+## 0.2.1 - 2026-08-26
+
+### Added
+- User Habit candidates now carry a bounded, secret/injection-filtered `summary` of the triggering prompt (≤160 chars, mirroring the record-intent summary contract) plus a stable `candidate_id`, so `/sybermem-habit` can propose a normalized statement from your own words instead of having only a type/scope with no content.
+- Habit candidates are stored as a bounded list (most recent 5, 10-day expiry, deduped by summary) instead of a single overwritable entry, so a stale unrelated candidate can no longer mask the one you want to confirm. New CLI: `sybermem habit intent-discard <candidate-id>` discards one candidate; `sybermem habit intent-clear` now clears all. `habit intent-status --format json` returns `{count, candidates[], candidate}` (newest first) and `habit awareness` reports `pending_count`. The legacy single-object candidate file is still read for backward compatibility.
+- The `sybermem-habit` skill now opens with a default status view (active habits + pending candidates with relative age and summary) and supports one-step confirm-from-summary and single-candidate discard.
+- Pending habit candidates are now surfaced across all three hosts on a durable, non-throttled surface: OpenCode injects a model-visible "Habit Candidate" reminder (once per candidate set per session) and startup context, and Claude Code and Codex add a pending-candidate line at `SessionStart`, all from the single `habit awareness` source of truth.
+
+### Fixed
+- Habit injection could stay silent forever: the candidate-confirmation reminder was only shown via a one-shot throttled toast (swallowed after its first fire) and was not surfaced on Claude Code or Codex at all, so users never confirmed a candidate and no active habit was ever created. Reminders are now durable and cross-host.
+- Unified the user-habit home: the launcher no longer forces `SYBERMEM_HOME` to the install-managed `~/.claude/sybermem/cli`, so a habit added via a bare `sybermem` and one added via the launcher no longer land in two divergent stores (which made habits silently invisible to host injection). Core now treats the documented `~/.sybermem` as canonical and performs a one-time, non-destructive import of any habit data (habits, pending candidate, injection log) left in the legacy home, guarded so a cleared candidate is never re-imported and the legacy source is preserved.
+- OpenCode startup context no longer skips habit awareness / pending-candidate for projects that have no key conclusions, digest, or norms (previously an early return dropped it).
+
 ## 0.2.0 - 2026-08-26
 
 ### Added
