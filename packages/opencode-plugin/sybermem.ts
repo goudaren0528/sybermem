@@ -1337,6 +1337,126 @@ function updateNudgeMessage(root) {
   return `\u2B50 SyberMem ${installed} is installed; ${wasRefreshed}. Run /sybermem-update to apply the latest fixes.`;
 }
 
+// packages/opencode-plugin/src/remote_version.ts
+import { existsSync as existsSync6, mkdirSync, readFileSync as readFileSync5, writeFileSync as writeFileSync4 } from "fs";
+import { dirname, join as join7 } from "path";
+var REMOTE_VERSION_URL = "https://raw.githubusercontent.com/goudaren0528/sybermem/main/VERSION";
+var CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+var FETCH_TIMEOUT_MS = 3000;
+function userHome3() {
+  return process.env.USERPROFILE ?? process.env.HOME ?? null;
+}
+function remoteVersionCachePath() {
+  const home = userHome3();
+  if (!home)
+    return null;
+  return join7(home, ".claude", "sybermem", ".remote-version-cache.json");
+}
+function remoteCheckDisabled() {
+  const flag = process.env.SYBERMEM_NO_REMOTE_CHECK;
+  return flag === "1" || flag === "true";
+}
+function parseRemoteVersionCache(raw) {
+  try {
+    const data = JSON.parse(raw);
+    if (typeof data !== "object" || data === null)
+      return null;
+    const remote = Reflect.get(data, "remote_version");
+    const checked = Reflect.get(data, "checked_at");
+    if (typeof remote !== "string" || !remote.trim())
+      return null;
+    if (typeof checked !== "string" || !checked.trim())
+      return null;
+    return { remote_version: remote.trim(), checked_at: checked.trim() };
+  } catch {
+    return null;
+  }
+}
+function readRemoteVersionCache() {
+  const path = remoteVersionCachePath();
+  if (!path || !existsSync6(path))
+    return null;
+  try {
+    return parseRemoteVersionCache(readFileSync5(path, "utf-8"));
+  } catch {
+    return null;
+  }
+}
+function writeRemoteVersionCache(cache) {
+  const path = remoteVersionCachePath();
+  if (!path)
+    return;
+  try {
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync4(path, JSON.stringify(cache, null, 2) + `
+`, "utf-8");
+  } catch {}
+}
+function cacheIsStale(cache, now = Date.now()) {
+  if (!cache)
+    return true;
+  const checkedAt = Date.parse(cache.checked_at);
+  if (Number.isNaN(checkedAt))
+    return true;
+  return now - checkedAt >= CACHE_TTL_MS;
+}
+function remoteIsNewer(remoteVersion, installedVersion) {
+  if (!remoteVersion || !installedVersion)
+    return false;
+  return compareVersions(remoteVersion, installedVersion) > 0;
+}
+function remoteUpdateNudgeMessage(cache, installed) {
+  if (remoteCheckDisabled())
+    return null;
+  if (!cache || !installed)
+    return null;
+  if (!remoteIsNewer(cache.remote_version, installed))
+    return null;
+  return `\u2B50 SyberMem ${cache.remote_version} is available on GitHub (you have ${installed}). Re-run the install script to upgrade this machine.`;
+}
+async function fetchRemoteVersion() {
+  try {
+    const controller = new AbortController;
+    const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+    try {
+      const response = await fetch(REMOTE_VERSION_URL, {
+        signal: controller.signal,
+        headers: { Accept: "text/plain" }
+      });
+      if (!response.ok)
+        return null;
+      const body = (await response.text()).trim();
+      const firstLine = body.split(`
+`)[0]?.trim() ?? "";
+      if (!firstLine || firstLine.length > 32 || !/^[0-9]/.test(firstLine))
+        return null;
+      return firstLine;
+    } finally {
+      clearTimeout(timer);
+    }
+  } catch {
+    return null;
+  }
+}
+async function refreshRemoteVersionCache(now = Date.now()) {
+  if (remoteCheckDisabled())
+    return;
+  const remote = await fetchRemoteVersion();
+  if (!remote)
+    return;
+  writeRemoteVersionCache({ remote_version: remote, checked_at: new Date(now).toISOString() });
+}
+function evaluateRemoteVersion() {
+  if (remoteCheckDisabled())
+    return null;
+  const cache = readRemoteVersionCache();
+  const installed = readInstalledVersion();
+  if (cacheIsStale(cache)) {
+    refreshRemoteVersionCache().catch(() => {});
+  }
+  return remoteUpdateNudgeMessage(cache, installed);
+}
+
 // packages/opencode-plugin/src/reply_marker.ts
 var PENDING = new Map;
 var MARKED = new Set;
@@ -1469,6 +1589,33 @@ async function showToast(client, message) {
     await client.tui.showToast({ body: { message, variant: "info" } });
   } catch {}
 }
+var TOAST_MIN_GAP_MS = 2500;
+var TOAST_QUEUE = [];
+var draining = false;
+function sleep(ms) {
+  return new Promise((resolve2) => setTimeout(resolve2, ms));
+}
+async function drainToastQueue() {
+  if (draining)
+    return;
+  draining = true;
+  try {
+    while (TOAST_QUEUE.length > 0) {
+      const next = TOAST_QUEUE.shift();
+      if (!next)
+        break;
+      await showToast(next.client, next.message);
+      if (TOAST_QUEUE.length > 0)
+        await sleep(TOAST_MIN_GAP_MS);
+    }
+  } finally {
+    draining = false;
+  }
+}
+function enqueueToast(client, message) {
+  TOAST_QUEUE.push({ client, message });
+  drainToastQueue().catch(() => {});
+}
 var LAST_TOAST = new Map;
 var TOAST_COOLDOWN_MS = 30000;
 function throttledToast(client, key, message) {
@@ -1477,7 +1624,7 @@ function throttledToast(client, key, message) {
   if (now - last < TOAST_COOLDOWN_MS)
     return;
   LAST_TOAST.set(key, now);
-  showToast(client, message);
+  enqueueToast(client, message);
 }
 function buildPromptInjectionToastSummary(summary, usageEntry) {
   const laneCounts = [];
@@ -1524,6 +1671,9 @@ async function handleSessionCreated(args, root, sessionID) {
   const versionNudge = updateNudgeMessage(root);
   if (versionNudge)
     throttledToast(args.client, "version-outdated", versionNudge);
+  const remoteNudge = evaluateRemoteVersion();
+  if (remoteNudge)
+    throttledToast(args.client, "remote-outdated", remoteNudge);
   const parsed = parseIndex(root);
   if (!parsed || parsed.conclusions.length === 0)
     return;
@@ -1534,7 +1684,7 @@ async function handleSessionCreated(args, root, sessionID) {
   const commitsSinceRecord = await countCommitsSinceLastRecord(args.$, root);
   const recordNote = commitsSinceRecord >= 3 ? `. ${commitsSinceRecord} commits since last record \u2014 consider /sybermem-record` : "";
   const ahaMarker = stale.stale || commitsSinceRecord >= 3 ? "\u2B50 " : "";
-  await args.client.tui.showToast({ body: { message: `${ahaMarker}SyberMem: loaded ${parsed.conclusions.length} key conclusions${staleNote}${recordNote}`, variant: "info" } });
+  enqueueToast(args.client, `${ahaMarker}SyberMem: loaded ${parsed.conclusions.length} key conclusions${staleNote}${recordNote}`);
 }
 async function maybeToastRecallHealth(args, root) {
   try {
@@ -1605,7 +1755,7 @@ async function handleSessionIdle(args, root, sessionID) {
     digestGuard[followup.themeKey] = windows[followup.themeKey].length;
   saveNudgeState(root, { ...state, lastFingerprint: fingerprint, lastNudgeCommitCount: commitsSince, theme_recent_stops: windows, digest_nudged_at_window_len: digestGuard, last_theme: followup.themeKey, last_nudge_type: followup.type, last_nudge: followup.type === "none" ? state.last_nudge : { platform: "opencode", type: followup.type, theme: followup.themeKey, date: today } });
   if (followup.type !== "none")
-    await args.client.tui.showToast({ body: { message: followup.message ?? "SyberMem: consider recording this work.", variant: "info" } });
+    enqueueToast(args.client, followup.message ?? "SyberMem: consider recording this work.");
 }
 var SyberMemPlugin = async ({ $, directory, client }) => {
   const args = { $, directory, client };
