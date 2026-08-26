@@ -20,7 +20,9 @@ from sybermem_core.user_habits import (
     classify_habit_intent,
     clear_habit_intent,
     delete_habit,
+    discard_habit_candidate,
     habit_awareness_summary,
+    list_habit_candidates,
     list_habits,
     pause_habit,
     pending_habit_reminder,
@@ -574,8 +576,11 @@ def test_capture_habit_intent_writes_candidate_without_creating_a_habit(tmp_path
     assert intent_path.is_file()
     assert list_habits(status=HabitStatus.ACTIVE) == []
     stored = json.loads(intent_path.read_text(encoding="utf-8"))
-    assert stored["candidate_only"] is True
-    assert stored["action"] == "/sybermem-habit"
+    # New bounded-list format: {"candidates": [ {candidate}, ... ]}
+    assert isinstance(stored["candidates"], list) and len(stored["candidates"]) == 1
+    candidate = stored["candidates"][0]
+    assert candidate["candidate_only"] is True
+    assert candidate["action"] == "/sybermem-habit"
 
 
 def test_capture_habit_intent_returns_none_and_writes_nothing_for_non_candidate(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -640,9 +645,12 @@ def test_default_home_imports_legacy_candidate_once_and_respects_clear(tmp_path:
     monkeypatch.setenv("HOME", str(fake_user))
     legacy = fake_user / ".claude" / "sybermem" / "cli"
     legacy.mkdir(parents=True)
+    from datetime import datetime, timezone
+
+    recent = datetime.now(timezone.utc).isoformat()  # fresh so it is not pruned by the expiry window
     (legacy / ".habit-intent.json").write_text(
         json.dumps({"habit_intent": True, "candidate_only": True, "suggested_scope": "user",
-                    "created_at": "2026-01-01T00:00:00+00:00"}),
+                    "created_at": recent}),
         encoding="utf-8",
     )
 
@@ -674,3 +682,120 @@ def test_default_home_does_not_reimport_when_canonical_already_has_data(tmp_path
     # Explicit custom home:
     monkeypatch.setenv("SYBERMEM_HOME", str(tmp_path / "custom"))
     assert read_habit_intent() is None  # no leak from legacy into an explicit home
+
+
+# --- Bounded candidate list: summary capture, cap, expiry, dedup, discard, back-compat ---
+
+
+def test_candidate_stores_bounded_filtered_summary(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SYBERMEM_HOME", str(tmp_path))
+    captured = capture_habit_intent("以后提交前都先跑测试再 commit")
+    assert captured is not None
+    assert captured["summary"] == "以后提交前都先跑测试再 commit"
+    assert captured["candidate_id"].startswith("cand-")
+
+
+def test_candidate_summary_is_bounded_to_160_chars(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SYBERMEM_HOME", str(tmp_path))
+    long_prompt = "以后都要" + ("很长的偏好描述" * 60)  # well over 160 chars
+    captured = capture_habit_intent(long_prompt)
+    assert captured is not None
+    assert len(captured["summary"]) == 160
+
+
+def test_secret_prompt_is_never_captured_as_candidate(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SYBERMEM_HOME", str(tmp_path))
+    # Contains a habit trigger word AND a secret; the blocklist must win (no candidate, no summary).
+    assert capture_habit_intent("always use api_key=SECRET123 for the deploy") is None
+    assert list_habit_candidates() == []
+
+
+def test_candidates_are_a_bounded_list_newest_first(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SYBERMEM_HOME", str(tmp_path))
+    capture_habit_intent("以后偏好一保持这个做法")
+    capture_habit_intent("以后偏好二保持这个做法")
+    candidates = list_habit_candidates()
+    assert len(candidates) == 2
+    # Newest first
+    assert candidates[0]["summary"] == "以后偏好二保持这个做法"
+    assert candidates[1]["summary"] == "以后偏好一保持这个做法"
+
+
+def test_candidate_list_is_capped_at_max_keeping_newest(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SYBERMEM_HOME", str(tmp_path))
+    for i in range(7):
+        capture_habit_intent(f"以后偏好编号{i}保持这个做法")
+    candidates = list_habit_candidates()
+    assert len(candidates) == 5  # MAX_HABIT_CANDIDATES
+    # The 5 most recent (2..6) survive, newest first
+    assert candidates[0]["summary"] == "以后偏好编号6保持这个做法"
+    assert candidates[-1]["summary"] == "以后偏好编号2保持这个做法"
+
+
+def test_capture_dedupes_by_summary(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SYBERMEM_HOME", str(tmp_path))
+    capture_habit_intent("以后都用简洁风格回复")
+    capture_habit_intent("以后都用简洁风格回复")
+    assert len(list_habit_candidates()) == 1
+
+
+def test_expired_candidates_are_pruned_on_read(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SYBERMEM_HOME", str(tmp_path))
+    capture_habit_intent("以后都保持这个新做法")  # fresh
+    # Inject an expired candidate directly (11 days old > 10-day window).
+    from datetime import datetime, timedelta, timezone
+
+    old = (datetime.now(timezone.utc) - timedelta(days=11)).isoformat()
+    path = tmp_path / ".habit-intent.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["candidates"].append({"habit_intent": True, "candidate_id": "cand-old", "habit_type": "workflow", "suggested_scope": "user", "summary": "expired", "created_at": old})
+    path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+    candidates = list_habit_candidates()
+    assert all(c["candidate_id"] != "cand-old" for c in candidates)
+    assert len(candidates) == 1
+
+
+def test_discard_single_candidate_leaves_others(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SYBERMEM_HOME", str(tmp_path))
+    capture_habit_intent("以后偏好甲保持这个做法")
+    capture_habit_intent("以后偏好乙保持这个做法")
+    candidates = list_habit_candidates()
+    target = candidates[0]["candidate_id"]
+    assert discard_habit_candidate(target) is True
+    remaining = list_habit_candidates()
+    assert len(remaining) == 1
+    assert all(c["candidate_id"] != target for c in remaining)
+    # Discarding an unknown id is a no-op
+    assert discard_habit_candidate("cand-doesnotexist") is False
+
+
+def test_clear_removes_all_candidates(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SYBERMEM_HOME", str(tmp_path))
+    capture_habit_intent("以后偏好甲保持这个做法")
+    capture_habit_intent("以后偏好乙保持这个做法")
+    assert clear_habit_intent() is True
+    assert list_habit_candidates() == []
+    assert clear_habit_intent() is False  # nothing left
+
+
+def test_read_habit_intent_backward_compatible_with_legacy_single_object(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SYBERMEM_HOME", str(tmp_path))
+    # Legacy single-object format (pre-list). read_habit_intent + list must still see it.
+    legacy = {"habit_intent": True, "candidate_only": True, "habit_type": "avoidance", "suggested_scope": "user", "created_at": "2026-08-25T10:00:00+00:00"}
+    (tmp_path / ".habit-intent.json").write_text(json.dumps(legacy), encoding="utf-8")
+    candidates = list_habit_candidates()
+    assert len(candidates) == 1
+    assert candidates[0]["habit_type"] == "avoidance"
+    newest = read_habit_intent()
+    assert newest is not None and newest["habit_type"] == "avoidance"
+
+
+def test_pending_reminder_reports_count_and_summary(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SYBERMEM_HOME", str(tmp_path))
+    capture_habit_intent("以后偏好甲保持这个做法")
+    capture_habit_intent("以后偏好乙保持这个做法")
+    reminder = pending_habit_reminder()
+    assert reminder is not None
+    assert reminder["count"] == 2
+    assert reminder["fingerprint"]  # non-empty set fingerprint for host dedup
+    assert "/sybermem-habit" in reminder["message"]

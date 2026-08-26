@@ -1686,9 +1686,14 @@ async function readPendingHabitReminder($, root) {
       return null;
     const message = Reflect.get(reminder, "message");
     const createdAt = Reflect.get(reminder, "created_at");
+    const fingerprint = Reflect.get(reminder, "fingerprint");
     if (typeof message !== "string" || !message.trim())
       return null;
-    return { message: message.trim(), createdAt: typeof createdAt === "string" ? createdAt : "" };
+    return {
+      message: message.trim(),
+      createdAt: typeof createdAt === "string" ? createdAt : "",
+      fingerprint: typeof fingerprint === "string" ? fingerprint : ""
+    };
   } catch {
     return null;
   }
@@ -1697,7 +1702,7 @@ async function injectPendingHabitReminder($, root, sessionID, output) {
   const reminder = await readPendingHabitReminder($, root);
   if (!reminder)
     return null;
-  const key = reminder.createdAt || reminder.message;
+  const key = reminder.fingerprint || reminder.createdAt || reminder.message;
   if (SURFACED_CANDIDATE.get(sessionID) === key)
     return null;
   SURFACED_CANDIDATE.set(sessionID, key);

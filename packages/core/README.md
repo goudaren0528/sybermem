@@ -13,7 +13,10 @@ or `SYBERMEM_HOME/user-habits/`. It is separate from project `.sybermem/` record
 only active, high-confidence, directly relevant habits
 are eligible for bounded Markdown injection. Visible reminders are available through
 `render_habit_reminder_markdown` and `sybermem habit remind`; they do not create active
-habits without user confirmation and do not persist raw prompt context.
+habits without user confirmation. Passive candidate capture never persists unbounded or
+unfiltered prompt text: it stores only a bounded, secret/injection-filtered summary of the
+triggering prompt (mirroring the record-intent summary contract) in a user-scoped,
+bounded candidate list so the confirm step can propose a normalized statement.
 
 ## License
 

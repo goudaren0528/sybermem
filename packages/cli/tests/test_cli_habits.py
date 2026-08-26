@@ -155,6 +155,51 @@ def test_cli_habit_intent_captures_candidate_and_status_and_clear(tmp_path: Path
     assert status_after["pending"] is False
 
 
+def test_cli_habit_intent_status_lists_multiple_candidates_with_ids_and_summaries(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    monkeypatch.setenv("SYBERMEM_HOME", str(tmp_path))
+    run_cli(["habit", "intent", "--prompt", "以后偏好甲保持这个做法", "--format", "json"], monkeypatch)
+    capsys.readouterr()
+    run_cli(["habit", "intent", "--prompt", "以后偏好乙保持这个做法", "--format", "json"], monkeypatch)
+    capsys.readouterr()
+
+    assert run_cli(["habit", "intent-status", "--format", "json"], monkeypatch) == 0
+    status = json.loads(capsys.readouterr().out)
+
+    assert status["pending"] is True
+    assert status["count"] == 2
+    assert len(status["candidates"]) == 2
+    # Newest first, each with an id and a bounded summary.
+    assert status["candidates"][0]["summary"] == "以后偏好乙保持这个做法"
+    assert all(c["candidate_id"].startswith("cand-") for c in status["candidates"])
+    # Legacy single `candidate` field still points at the newest for back-compat.
+    assert status["candidate"]["summary"] == "以后偏好乙保持这个做法"
+
+
+def test_cli_habit_intent_discard_removes_one_candidate(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    monkeypatch.setenv("SYBERMEM_HOME", str(tmp_path))
+    run_cli(["habit", "intent", "--prompt", "以后偏好甲保持这个做法", "--format", "json"], monkeypatch)
+    capsys.readouterr()
+    run_cli(["habit", "intent", "--prompt", "以后偏好乙保持这个做法", "--format", "json"], monkeypatch)
+    capsys.readouterr()
+    run_cli(["habit", "intent-status", "--format", "json"], monkeypatch)
+    status = json.loads(capsys.readouterr().out)
+    target = status["candidates"][0]["candidate_id"]
+
+    # When: discarding that specific candidate
+    assert run_cli(["habit", "intent-discard", target, "--format", "json"], monkeypatch) == 0
+    discarded = json.loads(capsys.readouterr().out)
+    assert discarded["discarded"] is True
+
+    # Then: only the other candidate remains
+    run_cli(["habit", "intent-status", "--format", "json"], monkeypatch)
+    after = json.loads(capsys.readouterr().out)
+    assert after["count"] == 1
+    assert after["candidates"][0]["candidate_id"] != target
+
+    # And: discarding an unknown id is a non-zero no-op
+    assert run_cli(["habit", "intent-discard", "cand-nope", "--format", "json"], monkeypatch) == 1
+
+
 def test_cli_habit_intent_ignores_non_preference_prompt(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
     monkeypatch.setenv("SYBERMEM_HOME", str(tmp_path))
     assert run_cli(["habit", "intent", "--prompt", "fix the crash", "--format", "json"], monkeypatch) == 0

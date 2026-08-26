@@ -20,9 +20,11 @@ const AWARENESS_WITH_CANDIDATE = JSON.stringify({
   pending_intent: true,
   pending_reminder: {
     pending: true,
+    count: 1,
     scope: "user",
     created_at: "2026-01-01T00:00:00+00:00",
     message: "SyberMem captured a reusable personal preference. Confirm it with /sybermem-habit.",
+    fingerprint: "cand-aaaa1111",
   },
 })
 
@@ -74,18 +76,31 @@ describe("pending habit reminder", () => {
     expect(await injectPendingHabitReminder($, "/root", "s2", outB)).not.toBeNull()
   })
 
-  it("re-injects after a NEW candidate (different created_at) in the same session", async () => {
+  it("re-injects when the candidate SET fingerprint changes in the same session", async () => {
     const first = fakeShell(AWARENESS_WITH_CANDIDATE)
     const out1: { system?: string[] } = {}
     expect(await injectPendingHabitReminder(first, "/root", "s1", out1)).not.toBeNull()
 
     const newerCandidate = JSON.stringify({
       pending_intent: true,
-      pending_reminder: { pending: true, scope: "user", created_at: "2026-02-02T00:00:00+00:00", message: "Confirm with /sybermem-habit." },
+      pending_reminder: { pending: true, count: 2, scope: "user", created_at: "2026-02-02T00:00:00+00:00", message: "Confirm with /sybermem-habit.", fingerprint: "cand-aaaa1111|cand-bbbb2222" },
     })
     const out2: { system?: string[] } = {}
     const again = await injectPendingHabitReminder(fakeShell(newerCandidate), "/root", "s1", out2)
     expect(again).not.toBeNull()
     expect(out2.system?.some((b) => b.startsWith("## SyberMem Habit Candidate"))).toBe(true)
+  })
+
+  it("does NOT re-inject when only created_at changes but the set fingerprint is unchanged", async () => {
+    const out1: { system?: string[] } = {}
+    expect(await injectPendingHabitReminder(fakeShell(AWARENESS_WITH_CANDIDATE), "/root", "s1", out1)).not.toBeNull()
+
+    // Same fingerprint (same candidate set), different created_at — must stay deduped.
+    const sameSetNewTimestamp = JSON.stringify({
+      pending_intent: true,
+      pending_reminder: { pending: true, count: 1, scope: "user", created_at: "2099-09-09T00:00:00+00:00", message: "x", fingerprint: "cand-aaaa1111" },
+    })
+    const out2: { system?: string[] } = {}
+    expect(await injectPendingHabitReminder(fakeShell(sameSetNewTimestamp), "/root", "s1", out2)).toBeNull()
   })
 })

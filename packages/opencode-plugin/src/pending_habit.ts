@@ -14,6 +14,9 @@ import type { SystemTransformOutput } from "./prompt_context"
 export interface PendingHabitReminder {
   readonly message: string
   readonly createdAt: string
+  // Stable fingerprint of the whole candidate SET (all candidate ids), so the per-session
+  // dedup re-fires when the set changes (a new candidate is captured) but not every turn.
+  readonly fingerprint: string
 }
 
 // Per-session record of which candidate (by created_at) we have already surfaced, so
@@ -36,8 +39,13 @@ export async function readPendingHabitReminder($: Shell, root: string): Promise<
     if (typeof reminder !== "object" || reminder === null) return null
     const message = Reflect.get(reminder, "message")
     const createdAt = Reflect.get(reminder, "created_at")
+    const fingerprint = Reflect.get(reminder, "fingerprint")
     if (typeof message !== "string" || !message.trim()) return null
-    return { message: message.trim(), createdAt: typeof createdAt === "string" ? createdAt : "" }
+    return {
+      message: message.trim(),
+      createdAt: typeof createdAt === "string" ? createdAt : "",
+      fingerprint: typeof fingerprint === "string" ? fingerprint : "",
+    }
   } catch {
     return null
   }
@@ -55,7 +63,9 @@ export async function injectPendingHabitReminder(
 ): Promise<PendingHabitReminder | null> {
   const reminder = await readPendingHabitReminder($, root)
   if (!reminder) return null
-  const key = reminder.createdAt || reminder.message
+  // Dedup by the candidate-SET fingerprint so a newly captured candidate re-surfaces the
+  // reminder, but an unchanged set is not re-injected every turn.
+  const key = reminder.fingerprint || reminder.createdAt || reminder.message
   if (SURFACED_CANDIDATE.get(sessionID) === key) return null
   SURFACED_CANDIDATE.set(sessionID, key)
   const block = `## SyberMem Habit Candidate\n\n${reminder.message}`

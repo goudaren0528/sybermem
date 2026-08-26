@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from enum import Enum
 import json
 import os
@@ -34,6 +34,16 @@ HABIT_INTENT_FILE: Final = ".habit-intent.json"
 MAX_INJECTED_HABITS: Final = 3
 MAX_LOG_EVENTS: Final = 200
 MAX_STATEMENT_CHARS: Final = 300
+# Bounded candidate list. Passive capture keeps only the most recent few candidates so a
+# stale, unrelated candidate cannot mask the one the user actually wants to confirm, and
+# candidates older than the expiry window are pruned on read/write. These are still
+# user-originated prompt fragments, so the retention is deliberately small and short-lived.
+MAX_HABIT_CANDIDATES: Final = 5
+HABIT_CANDIDATE_EXPIRY_DAYS: Final = 10
+# Bounded, blocklist-filtered summary of the triggering prompt stored on a candidate so the
+# confirm step can propose a normalized statement from the user's own words. Mirrors the
+# record_intent summary contract (bounded + secret/control filtered), NOT raw unbounded text.
+MAX_CANDIDATE_SUMMARY_CHARS: Final = 160
 HABIT_INTENT_TERMS: Final = {
     # ASCII single-word triggers (matched as tokens via _terms()).
     "always",
@@ -649,58 +659,154 @@ def classify_habit_intent(text: str) -> dict | None:
         "habit_intent": True,
         "candidate_only": True,
         "action": "/sybermem-habit",
+        # Stable id so a specific candidate can be selected/discarded from the list.
+        "candidate_id": f"cand-{uuid4().hex[:8]}",
         "habit_type": _classify_habit_type(text),
         # Suggested routing for the confirm step: "user" (cross-project habit),
         # "project" (belongs in a /sybermem-record decision/requirement), or
         # "ambiguous" (ask the user). Never auto-routes; suggestion only.
         "suggested_scope": _classify_scope(text),
+        # Bounded, blocklist-filtered summary of the user's own words so the confirm step
+        # can propose a statement instead of guessing. Already past _BLOCKED_INTENT_RE
+        # above (secrets/injection are never classified), and bounded to a short prefix.
+        "summary": _candidate_summary(text),
         "reason": "prompt looks like a reusable user preference",
         "created_at": _now(),
     }
 
 
-def capture_habit_intent(text: str) -> dict | None:
-    """Persist a candidate-only habit intent to the user-level intent file.
+def _candidate_summary(text: str) -> str:
+    """Bounded, whitespace-compacted prompt summary for a habit candidate.
 
-    Writes ~/.sybermem/.habit-intent.json (or SYBERMEM_HOME/.habit-intent.json).
-    Never creates an active habit. Returns the candidate metadata on capture,
-    or None when the prompt does not look like a durable preference. Fail-open:
-    a write error yields None rather than raising into the caller's hot path.
+    Mirrors record_intent's summary contract: a short, compacted prefix of the triggering
+    prompt (never the full/unbounded prompt). Callers only reach this AFTER the secret /
+    prompt-injection blocklist has rejected sensitive text, so this stores a filtered,
+    bounded fragment of the user's own words — the documented exception to "no raw prompt".
+    """
+    compact = " ".join(text.split())
+    return compact[:MAX_CANDIDATE_SUMMARY_CHARS]
+
+
+def _parse_candidate_created(candidate: dict) -> datetime | None:
+    raw = candidate.get("created_at")
+    if not isinstance(raw, str) or not raw:
+        return None
+    try:
+        parsed = datetime.fromisoformat(raw)
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+
+
+def _is_expired_candidate(candidate: dict, now: datetime) -> bool:
+    created = _parse_candidate_created(candidate)
+    if created is None:
+        return False  # keep undated candidates rather than silently dropping them
+    return now - created > timedelta(days=HABIT_CANDIDATE_EXPIRY_DAYS)
+
+
+def _read_candidate_list() -> list[dict]:
+    """Read the candidate list, tolerating the legacy single-object format.
+
+    Old installs wrote a single candidate object to .habit-intent.json; new installs write
+    {"candidates": [...]}. We accept both so upgrading users keep their pending candidate.
+    Expired and malformed entries are pruned on read.
+    """
+    path = _habit_intent_path()
+    if not path.is_file():
+        return []
+    try:
+        parsed = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return []
+    if isinstance(parsed, dict) and isinstance(parsed.get("candidates"), list):
+        raw_candidates = parsed["candidates"]
+    elif isinstance(parsed, dict) and parsed.get("habit_intent"):
+        raw_candidates = [parsed]  # legacy single-object format
+    else:
+        return []
+    now = datetime.now(timezone.utc)
+    return [c for c in raw_candidates if isinstance(c, dict) and not _is_expired_candidate(c, now)]
+
+
+def _write_candidate_list(candidates: list[dict]) -> bool:
+    path = _habit_intent_path()
+    try:
+        if not candidates:
+            if path.is_file():
+                path.unlink()
+            return True
+        path.parent.mkdir(parents=True, exist_ok=True)
+        payload = {"candidates": candidates[:MAX_HABIT_CANDIDATES]}
+        path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        return True
+    except OSError:
+        return False
+
+
+def capture_habit_intent(text: str) -> dict | None:
+    """Append a candidate-only habit intent to the bounded user-level candidate list.
+
+    Writes ~/.sybermem/.habit-intent.json (or SYBERMEM_HOME/.habit-intent.json) as
+    {"candidates": [...]}. Never creates an active habit. Keeps at most MAX_HABIT_CANDIDATES
+    most-recent candidates, dedupes by summary (refreshing the existing one instead of piling
+    up duplicates), and prunes expired entries. Returns the captured candidate metadata, or
+    None when the prompt does not look like a durable preference. Fail-open: a write error
+    yields None rather than raising into the caller's hot path.
     """
     metadata = classify_habit_intent(text)
     if metadata is None:
         return None
     try:
-        path = _habit_intent_path()
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(metadata, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        candidates = _read_candidate_list()
+        summary = metadata.get("summary", "")
+        # Dedupe by summary: drop an existing candidate with the same summary so a repeated
+        # phrase refreshes (moves to newest) rather than accumulating duplicates.
+        if summary:
+            candidates = [c for c in candidates if c.get("summary") != summary]
+        candidates.append(metadata)
+        # Newest-last in storage; keep only the most recent MAX_HABIT_CANDIDATES.
+        candidates = candidates[-MAX_HABIT_CANDIDATES:]
+        if not _write_candidate_list(candidates):
+            return None
     except OSError:
         return None
     return metadata
 
 
+def list_habit_candidates() -> list[dict]:
+    """Return pending habit candidates, newest first, expired entries pruned."""
+    return list(reversed(_read_candidate_list()))
+
+
 def read_habit_intent() -> dict | None:
-    """Read the pending candidate habit intent, or None if absent/malformed."""
-    path = _habit_intent_path()
-    if not path.is_file():
-        return None
-    try:
-        parsed = json.loads(path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
-        return None
-    return parsed if isinstance(parsed, dict) else None
+    """Read the most recent pending candidate, or None. Backward-compatible helper.
+
+    Retained so existing single-candidate callers (awareness, reminder) keep working after
+    the migration to a bounded list. Returns the newest candidate.
+    """
+    candidates = list_habit_candidates()
+    return candidates[0] if candidates else None
+
+
+def discard_habit_candidate(candidate_id: str) -> bool:
+    """Discard ONE pending candidate by id. Returns True when one was removed."""
+    if not candidate_id:
+        return False
+    candidates = _read_candidate_list()
+    remaining = [c for c in candidates if c.get("candidate_id") != candidate_id]
+    if len(remaining) == len(candidates):
+        return False
+    _write_candidate_list(remaining)
+    return True
 
 
 def clear_habit_intent() -> bool:
-    """Delete the pending candidate intent file after it has been acted on."""
+    """Delete ALL pending candidates (the whole intent file). Returns True if anything existed."""
     path = _habit_intent_path()
-    try:
-        if path.is_file():
-            path.unlink()
-            return True
-    except OSError:
-        return False
-    return False
+    existed = bool(_read_candidate_list()) or path.is_file()
+    _write_candidate_list([])
+    return existed
 
 
 def habit_awareness_summary() -> dict:
@@ -718,11 +824,13 @@ def habit_awareness_summary() -> dict:
         by_type[habit.habit_type.value] = by_type.get(habit.habit_type.value, 0) + 1
         if habit.last_confirmed_at > latest_confirmed:
             latest_confirmed = habit.last_confirmed_at
+    candidates = list_habit_candidates()
     return {
         "active": len(active),
         "by_type": dict(sorted(by_type.items())),
         "latest_confirmed_at": latest_confirmed,
-        "pending_intent": read_habit_intent() is not None,
+        "pending_intent": len(candidates) > 0,
+        "pending_count": len(candidates),
     }
 
 
@@ -737,29 +845,37 @@ def pending_habit_reminder() -> dict | None:
     single source of truth every host uses to surface "you have a habit candidate to
     confirm" on a durable, non-throttled surface (SessionStart / startup context).
 
-    Returns a dict with a short human `message`, the suggested `scope`, and the
-    candidate `created_at` (so hosts can dedupe by candidate identity). Never exposes
-    the captured prompt text. None when nothing is pending.
+    Returns a dict with a short human `message`, the number of pending candidates, and the
+    newest candidate's `scope` / `created_at` (so hosts can dedupe by the candidate set).
+    Only exposes the bounded candidate summary, never the raw prompt. None when nothing is
+    pending.
     """
-    candidate = read_habit_intent()
-    if not isinstance(candidate, dict):
+    candidates = list_habit_candidates()
+    if not candidates:
         return None
-    scope = str(candidate.get("suggested_scope", "") or "").strip()
-    created_at = str(candidate.get("created_at", "") or "").strip()
-    if scope == "project":
+    newest = candidates[0]
+    count = len(candidates)
+    scope = str(newest.get("suggested_scope", "") or "").strip()
+    created_at = str(newest.get("created_at", "") or "").strip()
+    summary = str(newest.get("summary", "") or "").strip()
+    quoted = f' ("{summary}")' if summary else ""
+    plural = "s" if count > 1 else ""
+    lead = f"SyberMem has {count} habit candidate{plural} awaiting confirmation" if count > 1 else "SyberMem captured a reusable preference"
+    if scope == "project" and count == 1:
         message = (
-            "SyberMem captured what looks like a project convention. Confirm it as a "
-            "decision/requirement with /sybermem-record, or as a personal habit with "
-            "/sybermem-habit."
+            f"{lead}{quoted}. Confirm it as a decision/requirement with /sybermem-record, "
+            "or as a personal habit with /sybermem-habit."
         )
-    elif scope == "user":
-        message = (
-            "SyberMem captured a reusable personal preference. Confirm it with "
-            "/sybermem-habit so it can be remembered and injected in future sessions."
-        )
+    elif scope == "user" and count == 1:
+        message = f"{lead}{quoted}. Confirm it with /sybermem-habit so it can be injected in future sessions."
     else:
-        message = (
-            "SyberMem captured a reusable preference. Confirm it with /sybermem-habit "
-            "(it will ask whether to record it as a personal habit or a project convention)."
-        )
-    return {"pending": True, "scope": scope or "ambiguous", "created_at": created_at, "message": message}
+        message = f"{lead}{quoted}. Review and confirm or discard with /sybermem-habit."
+    return {
+        "pending": True,
+        "count": count,
+        "scope": scope or "ambiguous",
+        "created_at": created_at,
+        "message": message,
+        # Stable fingerprint of the whole candidate set for host-side per-session dedup.
+        "fingerprint": "|".join(str(c.get("candidate_id") or c.get("created_at") or "") for c in candidates),
+    }
