@@ -8,7 +8,7 @@ import { compactJsonlJournal, loadNudgeState, saveNudgeState } from "./state"
 import { appendRecallDebug } from "./recall_debug"
 import { captureRecordIntentWithCli } from "./record_intent"
 import { classifyPackets, collectPromptPackets, extractPromptText, injectStashedPromptPackets, RECALL_STASH, stashPromptPackets, type ChatMessageOutput, type SystemTransformOutput } from "./prompt_context"
-import { buildStartupContext, consumePendingStartup, markPendingStartup, prependStartupContext } from "./startup_context"
+import { appendStartupContext, buildStartupContext, consumePendingStartup, markPendingStartup } from "./startup_context"
 import { lowSignalRecallToast, parseRecallHealth } from "./recall_health_signal"
 import { extractEditedFile, getSessionActivity, recordEditedFile, recordInjectedRecords, recordMemoryUsage, recordToolExecution, recordTodoUpdate, resetSessionActivity } from "./session_activity"
 import { flushRecallOutcome } from "./recall_outcome"
@@ -189,21 +189,22 @@ export const SyberMemPlugin: Plugin = async ({ $, directory, client }: PluginArg
     },
     "experimental.chat.system.transform": async ({ sessionID }: { readonly sessionID?: string }, output: SystemTransformOutput) => {
       if (!root) return
-      // Inject per-prompt recall/habit packets first, THEN prepend startup context,
-      // so on a fresh session's first turn the startup packet ends up on top rather
-      // than being buried under recall hints.
+      // Prompt-cache-friendly injection: both blocks are APPENDED as trailing system
+      // blocks (never mutating system[0], OpenCode's stable base header). Append the
+      // more stable startup context FIRST, then the per-turn recall, so volatile
+      // recall lands at the very end and the cacheable prefix stays byte-identical.
       const packets = RECALL_STASH.get(sessionID ?? "") ?? []
-      const summary = injectStashedPromptPackets(sessionID ?? "", output)
       let startup = ""
-      // First turn of a freshly created session: prepend bounded startup context so
+      // First turn of a freshly created session: append bounded startup context so
       // key conclusions/phase/next-step are model-visible, not just a toast. One-shot.
       if (consumePendingStartup(sessionID ?? "")) {
         startup = await buildStartupContext(args.$, root) ?? ""
         if (startup) {
-          prependStartupContext(output, startup)
+          appendStartupContext(output, startup)
           throttledToast(args.client, "startup-context", "⭐ SyberMem: injected project startup context into this session")
         }
       }
+      const summary = injectStashedPromptPackets(sessionID ?? "", output)
       const usageEntry = appendMemoryUsage(root, { sessionID: sessionID ?? "", packets, startup })
       if (sessionID) recordMemoryUsage(sessionID, usageEntry)
       const promptInjectionToast = buildPromptInjectionToastSummary(summary, usageEntry)

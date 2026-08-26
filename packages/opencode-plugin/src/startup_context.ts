@@ -45,11 +45,15 @@ export function consumePendingStartup(sessionID: string): boolean {
   return PENDING_STARTUP.delete(sessionID)
 }
 
-export function prependStartupContext(output: SystemTransformOutput, startup: string): void {
+export function appendStartupContext(output: SystemTransformOutput, startup: string): void {
   const trimmed = startup.trim()
   if (!trimmed) return
-  if (output.system && output.system.length > 0) output.system[0] = `${trimmed}\n\n${output.system[0]}`
-  else output.system = [trimmed, ...(output.system ?? [])]
+  // Prompt cache is a prefix match: never mutate system[0] (OpenCode's stable base
+  // header). Append the one-shot startup block as a trailing system block so the
+  // cacheable prefix stays byte-identical. The caller pushes this BEFORE per-turn
+  // recall, keeping the more stable startup context ahead of volatile recall.
+  if (output.system) output.system.push(trimmed)
+  else output.system = [trimmed]
 }
 
 function numberField(value: unknown, key: string): number | null {

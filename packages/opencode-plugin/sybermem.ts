@@ -827,12 +827,10 @@ function injectStashedPromptPackets(sessionID, output) {
   const hints = packets.join(`
 
 `);
-  if (output.system && output.system.length > 0)
-    output.system[0] = `${hints}
-
-${output.system[0]}`;
+  if (output.system)
+    output.system.push(hints);
   else
-    output.system = [hints, ...output.system ?? []];
+    output.system = [hints];
   return classifyPackets(packets);
 }
 
@@ -872,16 +870,14 @@ function markPendingStartup(sessionID) {
 function consumePendingStartup(sessionID) {
   return PENDING_STARTUP.delete(sessionID);
 }
-function prependStartupContext(output, startup) {
+function appendStartupContext(output, startup) {
   const trimmed = startup.trim();
   if (!trimmed)
     return;
-  if (output.system && output.system.length > 0)
-    output.system[0] = `${trimmed}
-
-${output.system[0]}`;
+  if (output.system)
+    output.system.push(trimmed);
   else
-    output.system = [trimmed, ...output.system ?? []];
+    output.system = [trimmed];
 }
 function numberField2(value, key) {
   if (typeof value !== "object" || value === null)
@@ -1673,15 +1669,15 @@ var SyberMemPlugin = async ({ $, directory, client }) => {
       if (!root)
         return;
       const packets = RECALL_STASH.get(sessionID ?? "") ?? [];
-      const summary = injectStashedPromptPackets(sessionID ?? "", output);
       let startup = "";
       if (consumePendingStartup(sessionID ?? "")) {
         startup = await buildStartupContext(args.$, root) ?? "";
         if (startup) {
-          prependStartupContext(output, startup);
+          appendStartupContext(output, startup);
           throttledToast(args.client, "startup-context", "\u2B50 SyberMem: injected project startup context into this session");
         }
       }
+      const summary = injectStashedPromptPackets(sessionID ?? "", output);
       const usageEntry = appendMemoryUsage(root, { sessionID: sessionID ?? "", packets, startup });
       if (sessionID)
         recordMemoryUsage(sessionID, usageEntry);
