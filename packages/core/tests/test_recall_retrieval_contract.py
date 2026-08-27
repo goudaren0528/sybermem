@@ -196,6 +196,113 @@ def test_compact_project_search_matches_english_terms_across_record_fields(tmp_p
     assert rows[0]["match"] in {"relation", "topic", "keyword"}
 
 
+def test_project_search_scores_key_conclusion_as_first_class_signal(tmp_path: Path, monkeypatch) -> None:
+    # Given: one record only names the decisive phrase in key_conclusion, while a newer
+    # record has a weaker body-only overlap with the same query.
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    write_project(project_root)
+    write_record(
+        project_root,
+        "decisions",
+        "2026-08-04-001-key-conclusion.md",
+        [
+            "type: decision",
+            "date: 2026-08-04",
+            "title: Recall ranking",
+            "status: decided",
+            "key_conclusion: Prefer keydetail-token anchors for recall ranking.",
+        ],
+        "## Summary\nRanking policy without the exact decisive phrase.",
+    )
+    write_record(
+        project_root,
+        "changes",
+        "2026-08-05-002-body-only.md",
+        ["type: change", "date: 2026-08-05", "title: Generic ranking followup", "status: implemented"],
+        "## Summary\nA body-only keydetail-token mention should not outrank the conclusion.",
+    )
+    monkeypatch.chdir(project_root)
+
+    # When: explicit search asks about the key conclusion phrase.
+    rows = search_project("keydetail-token ranking")
+
+    # Then: key_conclusion contributes to score and remains explainable.
+    assert rows[0]["record_id"] == "decision-001"
+    assert "key_conclusion" in rows[0]["matched_fields_detail"]
+    assert rows[0]["score_breakdown"]["key_conclusion"] > 0
+
+
+def test_related_files_path_boost_breaks_recall_ties_without_penalizing_anchorless_records(tmp_path: Path, monkeypatch) -> None:
+    # Given: two current records tie on ordinary text, but only one declares the queried path.
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    write_project(project_root)
+    write_record(
+        project_root,
+        "changes",
+        "2026-08-04-001-path-hit.md",
+        [
+            "type: change",
+            "date: 2026-08-04",
+            "title: Recall scoring",
+            "status: implemented",
+            "related_files:",
+            "  - packages/core/sybermem_core/search_query.py",
+        ],
+        "## Summary\npathboost-token keeps recall scoring explainable.",
+    )
+    write_record(
+        project_root,
+        "changes",
+        "2026-08-05-002-anchorless.md",
+        ["type: change", "date: 2026-08-05", "title: Recall scoring", "status: implemented"],
+        "## Summary\npathboost-token search_query.py keeps recall scoring explainable.",
+    )
+    monkeypatch.chdir(project_root)
+
+    # When: the query includes a concrete file path.
+    rows = search_project("pathboost-token packages/core/sybermem_core/search_query.py")
+
+    # Then: the anchored row wins, while the anchorless row is still retrievable.
+    assert [row["record_id"] for row in rows[:2]] == ["change-001", "change-002"]
+    assert "related_files" in rows[0]["matched_fields_detail"]
+    assert rows[0]["score_breakdown"]["related_files"] > 0
+
+
+def test_key_conclusion_and_path_keyword_hits_do_not_bypass_high_signal_gate(tmp_path: Path, monkeypatch) -> None:
+    # Given: a weak keyword-only match comes from the new Phase 1 scoring facets.
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    write_project(project_root)
+    write_record(
+        project_root,
+        "requirements",
+        "2026-08-04-001-weak-facets.md",
+        [
+            "type: requirement",
+            "date: 2026-08-04",
+            "title: Weak facet record",
+            "status: accepted",
+            "key_conclusion: weakfacet-token should stay diagnostic.",
+            "related_files:",
+            "  - packages/core/weakfacet.py",
+        ],
+        "## Summary\nNo extra strong signal here.",
+    )
+    monkeypatch.chdir(project_root)
+
+    # When: automatic prompt-time recall evaluates the facet-only hit.
+    compact_rows = compact_project_search("weakfacet-token packages/core/weakfacet.py", limit=3)
+    hints, reason = high_signal_recall_hints("weakfacet-token packages/core/weakfacet.py", limit=3)
+
+    # Then: compact diagnostics can show it, but the high-signal hook still abstains.
+    assert [row["record_id"] for row in compact_rows] == ["requirement-001"]
+    assert compact_rows[0]["match"] == "keyword"
+    assert hints == []
+    assert reason == "matched rows were keyword-only and below the high-signal floor"
+
+
 def test_compact_project_search_matches_natural_chinese_prompt(tmp_path: Path, monkeypatch) -> None:
     # Given: a Chinese requirement record with no ASCII query terms
     project_root = tmp_path / "project"

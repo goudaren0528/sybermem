@@ -43,6 +43,8 @@ class OverlapScore:
     score: float
     match: str
     matched_fields: int
+    matched_fields_detail: tuple[str, ...]
+    score_breakdown: dict[str, float]
 
 
 def query_terms(query: str) -> QueryTerms:
@@ -64,31 +66,45 @@ def like_patterns(terms: QueryTerms) -> list[str]:
 def score_row(row: dict[str, str], terms: QueryTerms) -> OverlapScore | None:
     record_id = row.get("record_id", "").lower()
     if record_id and record_id in terms.ascii:
-        return OverlapScore(score=100.0, match="record-id", matched_fields=1)
+        return OverlapScore(
+            score=100.0,
+            match="record-id",
+            matched_fields=1,
+            matched_fields_detail=("record_id",),
+            score_breakdown={"record_id": 100.0},
+        )
 
     fields = {
         "title": row.get("title", "").lower(),
         "topic": row.get("topics", "").lower(),
         "relation": f"{row.get('fixes', '')} {row.get('implements', '')} {row.get('related', '')} {row.get('superseded_by', '')} {row.get('supersedes', '')}".lower(),
+        "key_conclusion": row.get("key_conclusion", "").lower(),
+        "related_files": row.get("related_files", "").lower(),
         "body": _body_text(row.get("content", "")).lower(),
     }
     weighted = {
         "title": _field_overlap(fields["title"], terms) * 4,
         "topic": _field_overlap(fields["topic"], terms) * 3,
         "relation": _field_overlap(fields["relation"], terms) * 3,
+        "key_conclusion": _field_overlap(fields["key_conclusion"], terms) * 4,
+        "related_files": min(_field_overlap(fields["related_files"], terms), 2),
         "body": min(_field_overlap(fields["body"], terms), 3),
     }
     total = sum(weighted.values())
     matched_fields = sum(1 for value in weighted.values() if value)
+    matched_fields_detail = tuple(field for field, value in weighted.items() if value)
+    score_breakdown = {field: float(value) for field, value in weighted.items() if value}
     if total == 1 and len(terms.all) == 1 and "-" in terms.all[0]:
-        return OverlapScore(score=5.0, match="keyword", matched_fields=matched_fields)
+        return OverlapScore(score=5.0, match="keyword", matched_fields=matched_fields, matched_fields_detail=matched_fields_detail, score_breakdown=score_breakdown)
     if total < 2:
         return None
     for match in ("relation", "topic", "keyword"):
         if match == "keyword" and (weighted["title"] or weighted["body"]):
-            return OverlapScore(score=float(min(total, 20)), match=match, matched_fields=matched_fields)
+            return OverlapScore(score=float(min(total, 20)), match=match, matched_fields=matched_fields, matched_fields_detail=matched_fields_detail, score_breakdown=score_breakdown)
         if weighted.get(match, 0):
-            return OverlapScore(score=float(min(total, 20)), match=match, matched_fields=matched_fields)
+            return OverlapScore(score=float(min(total, 20)), match=match, matched_fields=matched_fields, matched_fields_detail=matched_fields_detail, score_breakdown=score_breakdown)
+    if weighted["key_conclusion"] or weighted["related_files"]:
+        return OverlapScore(score=float(min(total, 20)), match="keyword", matched_fields=matched_fields, matched_fields_detail=matched_fields_detail, score_breakdown=score_breakdown)
     return None
 
 
