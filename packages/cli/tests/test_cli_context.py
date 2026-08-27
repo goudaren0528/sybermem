@@ -232,6 +232,38 @@ def test_cli_context_recall_markdown_uses_high_signal_hints_with_markers(
     assert "💡 [change-def] Topic hit below floor" in output
 
 
+def test_cli_context_recall_json_includes_explanation_without_markdown_bloat(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    # Given: high-signal recall returns bounded scoring metadata from core.
+    row = {
+        "record_id": "change-abc",
+        "title": "Explainable recall",
+        "type": "change",
+        "score": 12,
+        "match": "keyword",
+        "match_reason": "keyword",
+        "matched_fields_detail": ["key_conclusion", "related_files"],
+        "score_breakdown": {"key_conclusion": 4.0, "related_files": 2.0, "title": 4.0, "body": 2.0},
+    }
+    monkeypatch.setattr(context_module, "high_signal_recall_hints", lambda query, limit=3: ([row], ""))
+
+    # When: JSON and Markdown recall surfaces render the same hit.
+    json_exit = run_cli(["context", "recall", "--query", "auth", "--format", "json"], monkeypatch)
+    json_payload = json.loads(capsys.readouterr().out)
+    markdown_exit = run_cli(["context", "recall", "--query", "auth", "--format", "markdown"], monkeypatch)
+    markdown = capsys.readouterr().out
+
+    # Then: machine-readable JSON explains scoring, while prompt Markdown stays compact.
+    assert json_exit == 0
+    assert markdown_exit == 0
+    assert json_payload["results"][0]["explanation"]["matched_fields"] == ["key_conclusion", "related_files"]
+    assert json_payload["results"][0]["explanation"]["score_breakdown"]["key_conclusion"] == 4.0
+    assert "key_conclusion" not in markdown
+    assert "score_breakdown" not in markdown
+
+
 def test_cli_context_recall_json_reports_abstention_when_gate_blocks(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
