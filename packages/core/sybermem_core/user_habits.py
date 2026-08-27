@@ -76,8 +76,12 @@ _DURABLE_PREFERENCE_RE: Final = re.compile(
     r"(?:please\s+)?remember\s+(?:that\s+)?(?:i\s+)?(?:prefer|want|usually|always)|"
     r"i\s+prefer\b|i\s+usually\b|by\s+default\b|make\s+this\s+the\s+default\b|"
     r"from\s+now\s+on\b)|"
-    r"以后(?:都|请|记得|默认|一律)?|请记住|帮我记住|记住我|我(?:习惯|偏好|希望)|"
-    r"每次都|默认(?:用|先|都)?|一律(?:用|先|都)?|总是(?:用|先|都)?)",
+    r"以后(?:都|请|记得|默认|一律)?|请记住|帮我记住|记住我|"
+    # "我习惯/我偏好" are durable-preference markers; "我希望" alone is a generic one-off
+    # request ("我希望你帮我规划…") so it only counts when paired with a standing-time word.
+    r"我(?:习惯|偏好)|我希望(?:以后|每次|默认|一律|总是)|"
+    # "默认" must be followed by a verb; bare "默认" is a common noun/adjective ("默认调用的模型").
+    r"每次都|默认(?:用|先|都)|一律(?:用|先|都)?|总是(?:用|先|都)?)",
     re.IGNORECASE,
 )
 _NOISY_HABIT_DISCUSSION_RE: Final = re.compile(

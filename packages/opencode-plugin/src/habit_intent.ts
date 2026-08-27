@@ -12,7 +12,9 @@ const NO_CAPTURE: HabitIntentResult = { captured: false, habitType: "", suggeste
 
 // Cheap prefilter for durable preference phrasing. Core is authoritative; this
 // only prevents obvious non-preferences from spawning a CLI subprocess.
-const DURABLE_PREFERENCE_RE = /(\b(always\s+(?:prefer|use|reply|respond|run|keep|write|ask|show|include|avoid)|usually\s+(?:i\s+)?(?:prefer|use|want|ask|run|keep|write)|(?:please\s+)?remember\s+(?:that\s+)?(?:i\s+)?(?:prefer|want|usually|always)|i\s+prefer\b|i\s+usually\b|by\s+default\b|make\s+this\s+the\s+default\b|from\s+now\s+on\b)|以后(?:都|请|记得|默认|一律)?|请记住|帮我记住|记住我|我(?:习惯|偏好|希望)|每次都|默认(?:用|先|都)?|一律(?:用|先|都)?|总是(?:用|先|都)?)/i
+// "我习惯/我偏好" are durable markers; bare "我希望" is a generic one-off request so it only
+// counts with a standing-time word. "默认" must be followed by a verb (bare "默认" is a noun).
+const DURABLE_PREFERENCE_RE = /(\b(always\s+(?:prefer|use|reply|respond|run|keep|write|ask|show|include|avoid)|usually\s+(?:i\s+)?(?:prefer|use|want|ask|run|keep|write)|(?:please\s+)?remember\s+(?:that\s+)?(?:i\s+)?(?:prefer|want|usually|always)|i\s+prefer\b|i\s+usually\b|by\s+default\b|make\s+this\s+the\s+default\b|from\s+now\s+on\b)|以后(?:都|请|记得|默认|一律)?|请记住|帮我记住|记住我|我(?:习惯|偏好)|我希望(?:以后|每次|默认|一律|总是)|每次都|默认(?:用|先|都)|一律(?:用|先|都)?|总是(?:用|先|都)?)/i
 const NOISY_HABIT_DISCUSSION_RE = /(why|debug|investigate|research|review|analy[sz]e|improve|design|logic|classifier|candidate|capture|为什么|怎么|调研|研究|评审|审查|改进|设计|逻辑|候选|捕获|命中).{0,80}(habit|preference|memory|norm|习惯|偏好|记忆|规范|约定)|(habit|preference|memory|norm|习惯|偏好|记忆|规范|约定).{0,80}(why|debug|investigate|research|review|analy[sz]e|improve|design|logic|classifier|candidate|capture|为什么|怎么|调研|研究|评审|审查|改进|设计|逻辑|候选|捕获|命中)/i
 const AGENT_PROMPT_PREFIX_RE = /^\s*(?:TASK|CONTEXT|AXIS|EXPECTED OUTCOME|MUST DO|MUST NOT DO|REQUEST):/i
 const ONE_OFF_WORK_RE = /(fix|repair|update|submit|publish|release|commit|create\s+pr|修复|更新|提交|发布|上线).{0,80}(pr|readme|docs?|todo|ui|bug|文档|待办|规范|约定|项目|下拉|按钮)/i

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.2.4 - 2026-08-27
+
+### Fixed
+- Habit candidate capture no longer fires on one-off requests that merely contain a preference-shaped word: bare "我希望" (a generic "I want you to …" request) now only counts as a durable preference when paired with a standing-time word (以后/每次/默认/一律/总是), and "默认" must be followed by a verb (默认用/先/都) so a plain noun usage like "指定默认调用的模型" is not captured. This closes a class of noisy pending candidates left after the 0.2.3 discussion/task filter while still capturing genuine preferences like "我希望以后都用中文回复".
+
 ## 0.2.3 - 2026-08-27
 
 ### Fixed
