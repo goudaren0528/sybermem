@@ -1004,6 +1004,10 @@ function lowSignalRecallToast(health) {
     const hint = health.hint ? ` \u2014 ${health.hint}` : "";
     return `\uD83D\uDCA1 SyberMem: recall relevance is low${hint}`;
   }
+  if (health.status === "low_measurability") {
+    const hint = health.hint ? ` \u2014 ${health.hint}` : "";
+    return `\uD83D\uDCA1 SyberMem: recall measurability is low${hint}`;
+  }
   return null;
 }
 
