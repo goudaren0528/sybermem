@@ -25,6 +25,11 @@ LOW_RELEVANCE_PRECISION: Final = 0.34
 # this, precision stays advisory-only so a couple of misses never look like a
 # systemic relevance problem.
 MIN_PRECISION_SAMPLES: Final = 3
+# Minimum injected-record samples before unmeasurable anchors can lower the verdict.
+MIN_MEASURABILITY_SAMPLES: Final = 3
+# Recent unmeasurable ratio at or above this threshold means recall may be useful, but
+# Edit Alignment cannot verify it because records lack useful related_files anchors.
+LOW_MEASURABILITY_UNMEASURABLE_RATE: Final = 0.5
 
 
 def project_memory_stats(root: Path) -> dict:
@@ -110,6 +115,16 @@ def _recall_health_from_windows(windows: dict, recall_status: str) -> dict:
     relevance = relevance_7d if relevance_7d.get("injected", 0) > 0 else relevance_30d
     precision = relevance.get("precision")
     injected_samples = relevance.get("injected", 0)
+    unmeasurable = relevance.get("unmeasurable", 0)
+    measurability_samples = injected_samples + unmeasurable
+    evidence_available = relevance.get("evidence_available") is True
+    if evidence_available and measurability_samples >= MIN_MEASURABILITY_SAMPLES and unmeasurable / measurability_samples >= LOW_MEASURABILITY_UNMEASURABLE_RATE:
+        return {
+            "status": "low_measurability",
+            "recall_rate": rate,
+            "precision": precision if injected_samples >= MIN_PRECISION_SAMPLES else None,
+            "hint": "Recall is firing, but many injected records cannot be checked against edited files; add or refresh related_files anchors on key records.",
+        }
     if precision is not None and injected_samples >= MIN_PRECISION_SAMPLES and precision < LOW_RELEVANCE_PRECISION:
         return {
             "status": "low_relevance",

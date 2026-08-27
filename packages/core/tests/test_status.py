@@ -351,7 +351,13 @@ def test_project_memory_stats_includes_mixed_memory_usage_and_outcome_coverage(t
     }
 
 
-def _make_recall_health_project(tmp_path: Path, lines: list[str], monkeypatch, outcome_lines: list[str] | None = None) -> Path:
+def _make_recall_health_project(
+    tmp_path: Path,
+    lines: list[str],
+    monkeypatch,
+    outcome_lines: list[str] | None = None,
+    usage_outcome_lines: list[str] | None = None,
+) -> Path:
     project_root = tmp_path / "project"
     sybermem = project_root / ".sybermem"
     sybermem.mkdir(parents=True)
@@ -361,6 +367,8 @@ def _make_recall_health_project(tmp_path: Path, lines: list[str], monkeypatch, o
         (sybermem / ".recall-debug.jsonl").write_text("\n".join(lines) + "\n", encoding="utf-8")
     if outcome_lines:
         (sybermem / ".recall-outcomes.jsonl").write_text("\n".join(outcome_lines) + "\n", encoding="utf-8")
+    if usage_outcome_lines:
+        (sybermem / ".memory-usage.jsonl").write_text("\n".join(usage_outcome_lines) + "\n", encoding="utf-8")
     return project_root
 
 
@@ -475,6 +483,38 @@ def test_recall_health_reports_low_relevance_when_injected_records_miss_edits(tm
     assert health["status"] == "low_relevance"
     assert health["precision"] == 1 / 8
     assert health["hint"]
+
+
+def test_recall_health_reports_low_measurability_when_anchors_are_sparse(tmp_path: Path, monkeypatch) -> None:
+    # Given: recall fires at a healthy rate, but most injected records cannot be checked
+    # against edits because they lack usable related_files anchors.
+    outcome_lines = [
+        json.dumps({"schema_version": 1, "host": "opencode", "event": "session_outcome", "timestamp": "2026-08-13T09:00:00+08:00", "recall_evidence_available": True, "recall_measurable": 2, "recall_unmeasurable": 3, "recall_hit": 2}),
+        json.dumps({"schema_version": 1, "host": "opencode", "event": "session_outcome", "timestamp": "2026-08-12T09:00:00+08:00", "recall_evidence_available": True, "recall_measurable": 1, "recall_unmeasurable": 3, "recall_hit": 1}),
+    ]
+    project_root = _make_recall_health_project(tmp_path, _healthy_recall_lines(), monkeypatch, usage_outcome_lines=outcome_lines)
+
+    # When: recall health is derived.
+    health = recall_health(project_root)
+
+    # Then: sparse anchors get their own advisory instead of being mislabeled as relevance.
+    assert health["status"] == "low_measurability"
+    assert health["precision"] == 1.0
+    assert "related_files" in health["hint"]
+
+
+def test_recall_health_does_not_report_low_measurability_without_edit_evidence(tmp_path: Path, monkeypatch) -> None:
+    # Given: unmeasurable rows exist, but the host had no edited-file evidence to compare.
+    outcome_lines = [
+        json.dumps({"schema_version": 1, "host": "opencode", "event": "session_outcome", "timestamp": "2026-08-13T09:00:00+08:00", "recall_evidence_available": False, "recall_measurable": 0, "recall_unmeasurable": 4, "recall_hit": 0}),
+    ]
+    project_root = _make_recall_health_project(tmp_path, _healthy_recall_lines(), monkeypatch, usage_outcome_lines=outcome_lines)
+
+    # When: recall health is derived.
+    health = recall_health(project_root)
+
+    # Then: absence of edit evidence is not blamed on record anchor quality.
+    assert health["status"] == "healthy"
 
 
 def test_recall_health_stays_healthy_when_precision_sample_is_too_small(tmp_path: Path, monkeypatch) -> None:
