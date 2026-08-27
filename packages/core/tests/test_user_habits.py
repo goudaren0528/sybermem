@@ -547,6 +547,11 @@ def test_classify_habit_intent_rejects_noisy_system_and_task_prompts(tmp_path: P
         "Research how to improve preference detection and habit candidate capture.",
         "Review current SyberMem memory/habit/norm recall logic and product design.",
         "还有一个问题，顶部选择项目的下拉按钮错位，然后更新todo list，及时更新相关文档，包括readme，然后提交PR发布，PR要规范。",
+        # "我希望" here is a generic one-off request ("I want you to plan…"), not a durable
+        # preference — it must NOT be captured just because it contains 希望.
+        "我希望你帮我规划一下这个岗位，然后先直接借用OMO的一些角色和声音",
+        # bare "默认" is a noun/adjective ("the default model to call"), not a preference verb.
+        "我需要你先整理成一个方案，就是Agent要能够指定默认调用的模型，模型不可用时要有兜底的模型",
     ]
 
     # When / Then: none of them are habit candidates
@@ -562,6 +567,9 @@ def test_classify_habit_intent_preserves_explicit_durable_preferences(tmp_path: 
         "请记住我偏好先看计划再改代码",
         "always prefer concise PR summaries",
         "Please remember that I usually want a plan before edits",
+        # "我希望" paired with a standing-time word IS a durable preference and must capture.
+        "我希望以后都用中文回复我",
+        "默认用中文回复",
     ]
 
     # When / Then: each prompt remains a candidate-only habit intent
