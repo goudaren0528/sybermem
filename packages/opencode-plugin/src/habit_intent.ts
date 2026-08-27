@@ -10,18 +10,19 @@ export interface HabitIntentResult {
 
 const NO_CAPTURE: HabitIntentResult = { captured: false, habitType: "", suggestedScope: "" }
 
-// Cheap prefilter that mirrors Core's HABIT_INTENT_TERMS so ordinary prompts do
-// NOT pay for an extra CLI subprocess. Only prompts that plausibly look like a
-// durable preference reach the authoritative Core classifier. ASCII terms match
-// on word boundaries; CJK terms match as substrings (no word boundaries there).
-// Keep in sync with Core's HABIT_INTENT_TERMS (packages/core/sybermem_core/user_habits.py).
-// Core is authoritative; this is only a hot-path prefilter so ordinary prompts skip the
-// subprocess. If it under-matches, Core never sees the prompt, so the two MUST agree.
-const HABIT_INTENT_HINT_RE = /\b(always|habit|preference|prefer|remember|usually|default|convention)\b/i
-const CJK_HABIT_INTENT_HINTS = ["以后", "偏好", "习惯", "记住", "总是", "每次", "默认", "一律", "记得", "尽量", "规范", "约定"]
+// Cheap prefilter for durable preference phrasing. Core is authoritative; this
+// only prevents obvious non-preferences from spawning a CLI subprocess.
+const DURABLE_PREFERENCE_RE = /(\b(always\s+(?:prefer|use|reply|respond|run|keep|write|ask|show|include|avoid)|usually\s+(?:i\s+)?(?:prefer|use|want|ask|run|keep|write)|(?:please\s+)?remember\s+(?:that\s+)?(?:i\s+)?(?:prefer|want|usually|always)|i\s+prefer\b|i\s+usually\b|by\s+default\b|make\s+this\s+the\s+default\b|from\s+now\s+on\b)|以后(?:都|请|记得|默认|一律)?|请记住|帮我记住|记住我|我(?:习惯|偏好|希望)|每次都|默认(?:用|先|都)?|一律(?:用|先|都)?|总是(?:用|先|都)?)/i
+const NOISY_HABIT_DISCUSSION_RE = /(why|debug|investigate|research|review|analy[sz]e|improve|design|logic|classifier|candidate|capture|为什么|怎么|调研|研究|评审|审查|改进|设计|逻辑|候选|捕获|命中).{0,80}(habit|preference|memory|norm|习惯|偏好|记忆|规范|约定)|(habit|preference|memory|norm|习惯|偏好|记忆|规范|约定).{0,80}(why|debug|investigate|research|review|analy[sz]e|improve|design|logic|classifier|candidate|capture|为什么|怎么|调研|研究|评审|审查|改进|设计|逻辑|候选|捕获|命中)/i
+const AGENT_PROMPT_PREFIX_RE = /^\s*(?:TASK|CONTEXT|AXIS|EXPECTED OUTCOME|MUST DO|MUST NOT DO|REQUEST):/i
+const ONE_OFF_WORK_RE = /(fix|repair|update|submit|publish|release|commit|create\s+pr|修复|更新|提交|发布|上线).{0,80}(pr|readme|docs?|todo|ui|bug|文档|待办|规范|约定|项目|下拉|按钮)/i
 
 export function looksLikeHabitIntent(text: string): boolean {
-  return HABIT_INTENT_HINT_RE.test(text) || CJK_HABIT_INTENT_HINTS.some((hint) => text.includes(hint))
+  return DURABLE_PREFERENCE_RE.test(text) && !isNoisyHabitCandidate(text)
+}
+
+function isNoisyHabitCandidate(text: string): boolean {
+  return AGENT_PROMPT_PREFIX_RE.test(text) || NOISY_HABIT_DISCUSSION_RE.test(text) || ONE_OFF_WORK_RE.test(text)
 }
 
 // Ask Core to capture a candidate-only habit intent from the prompt. Core writes

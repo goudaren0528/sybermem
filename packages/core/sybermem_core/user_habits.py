@@ -70,6 +70,31 @@ HABIT_INTENT_TERMS: Final = {
     "规范",
     "约定",
 }
+_DURABLE_PREFERENCE_RE: Final = re.compile(
+    r"(\b(always\s+(?:prefer|use|reply|respond|run|keep|write|ask|show|include|avoid)|"
+    r"usually\s+(?:i\s+)?(?:prefer|use|want|ask|run|keep|write)|"
+    r"(?:please\s+)?remember\s+(?:that\s+)?(?:i\s+)?(?:prefer|want|usually|always)|"
+    r"i\s+prefer\b|i\s+usually\b|by\s+default\b|make\s+this\s+the\s+default\b|"
+    r"from\s+now\s+on\b)|"
+    r"以后(?:都|请|记得|默认|一律)?|请记住|帮我记住|记住我|我(?:习惯|偏好|希望)|"
+    r"每次都|默认(?:用|先|都)?|一律(?:用|先|都)?|总是(?:用|先|都)?)",
+    re.IGNORECASE,
+)
+_NOISY_HABIT_DISCUSSION_RE: Final = re.compile(
+    r"(why|debug|investigate|research|review|analy[sz]e|improve|design|logic|classifier|candidate|capture|"
+    r"为什么|怎么|调研|研究|评审|审查|改进|设计|逻辑|候选|捕获|命中).{0,80}"
+    r"(habit|preference|memory|norm|习惯|偏好|记忆|规范|约定)|"
+    r"(habit|preference|memory|norm|习惯|偏好|记忆|规范|约定).{0,80}"
+    r"(why|debug|investigate|research|review|analy[sz]e|improve|design|logic|classifier|candidate|capture|"
+    r"为什么|怎么|调研|研究|评审|审查|改进|设计|逻辑|候选|捕获|命中)",
+    re.IGNORECASE,
+)
+_AGENT_PROMPT_PREFIX_RE: Final = re.compile(r"^\s*(?:TASK|CONTEXT|AXIS|EXPECTED OUTCOME|MUST DO|MUST NOT DO|REQUEST):", re.IGNORECASE)
+_ONE_OFF_WORK_RE: Final = re.compile(
+    r"(fix|repair|update|submit|publish|release|commit|create\s+pr|修复|更新|提交|发布|上线).{0,80}"
+    r"(pr|readme|docs?|todo|ui|bug|文档|待办|规范|约定|项目|下拉|按钮)",
+    re.IGNORECASE,
+)
 # Signals that a preference is PROJECT-specific (belongs in a decision/requirement
 # record via /sybermem-record) rather than a cross-project USER habit. Deliberately
 # conservative: only fire on phrasing that clearly scopes to "this repo / this project".
@@ -371,10 +396,15 @@ def _select_remindable(context: str, higher_authority_text: str) -> list[Habit]:
 
 
 def _looks_like_habit_intent(context: str) -> bool:
-    terms = _terms(context)
-    if terms.intersection(HABIT_INTENT_TERMS):
-        return True
-    return any(term in context for term in HABIT_INTENT_TERMS if not term.isascii())
+    return _DURABLE_PREFERENCE_RE.search(context) is not None and not _is_noisy_habit_candidate(context)
+
+
+def _is_noisy_habit_candidate(context: str) -> bool:
+    return (
+        _AGENT_PROMPT_PREFIX_RE.search(context) is not None
+        or _NOISY_HABIT_DISCUSSION_RE.search(context) is not None
+        or _ONE_OFF_WORK_RE.search(context) is not None
+    )
 
 
 def _append_status_event(habit_id: str, status: HabitStatus) -> None:

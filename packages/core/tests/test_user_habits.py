@@ -385,7 +385,7 @@ def test_habit_reminder_logging_omits_raw_prompt_text(tmp_path: Path, monkeypatc
 
     # When: reminders are rendered
     render_habit_reminder_markdown(context="planning with secret token unicorn-8472")
-    render_habit_reminder_markdown(context="remember this secret token unicorn-8472")
+    render_habit_reminder_markdown(context="remember that I prefer concise replies secret token unicorn-8472")
 
     # Then: logs contain ids/reasons but never raw prompt text
     events = [json.loads(line) for line in (user_habit_home() / "injection-log.jsonl").read_text(encoding="utf-8").splitlines()]
@@ -533,6 +533,43 @@ def test_classify_habit_intent_ignores_non_preference_and_blocked_text(tmp_path:
     # An incidental type-hint word (工具 = "tool") without preference intent must not
     # be captured — the intent gate runs before type classification.
     assert classify_habit_intent("修复工具栏的崩溃") is None
+
+
+def test_classify_habit_intent_rejects_noisy_system_and_task_prompts(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Given: prompts that mention habit/preference/review/norm vocabulary without
+    # expressing a durable user preference
+    monkeypatch.setenv("SYBERMEM_HOME", str(tmp_path))
+    false_positive_prompts = [
+        "我的项目给我记录的habit看起来跟用户偏好/长期要求一点关系都没有。我想知道为什么会命中候选。",
+        "TASK: Review SyberMem's current memory/habit/norm recall logic and product design for recall accuracy improvements.",
+        "CONTEXT: The user wants a review of current SyberMem memory/habit/norm recall logic and product design.",
+        "AXIS: SyberMem user habit and project norm recall product design.",
+        "Research how to improve preference detection and habit candidate capture.",
+        "Review current SyberMem memory/habit/norm recall logic and product design.",
+        "还有一个问题，顶部选择项目的下拉按钮错位，然后更新todo list，及时更新相关文档，包括readme，然后提交PR发布，PR要规范。",
+    ]
+
+    # When / Then: none of them are habit candidates
+    for prompt in false_positive_prompts:
+        assert classify_habit_intent(prompt) is None
+
+
+def test_classify_habit_intent_preserves_explicit_durable_preferences(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Given: explicit durable preference phrasing
+    monkeypatch.setenv("SYBERMEM_HOME", str(tmp_path))
+    true_positive_prompts = [
+        "以后回复我都用中文",
+        "请记住我偏好先看计划再改代码",
+        "always prefer concise PR summaries",
+        "Please remember that I usually want a plan before edits",
+    ]
+
+    # When / Then: each prompt remains a candidate-only habit intent
+    for prompt in true_positive_prompts:
+        candidate = classify_habit_intent(prompt)
+        assert candidate is not None
+        assert candidate["candidate_only"] is True
+        assert candidate["habit_intent"] is True
 
 
 def test_classify_habit_type_only_applies_after_intent_gate(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

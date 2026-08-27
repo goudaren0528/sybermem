@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Fixed
+- Habit candidate capture now requires explicit durable preference phrasing and ignores habit-system discussion, delegated research/review prompts, and one-off project task wording, reducing noisy pending candidates while preserving confirmation-first habit memory.
+
 ## 0.2.2 - 2026-08-27
 
 ### Added
