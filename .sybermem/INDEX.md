@@ -31,6 +31,7 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 - [change-a40b6aaa5a864b049fd05dd861e283d4] #observability #opencode #distribution — Serialized OpenCode injection toasts through a FIFO queue with a minimum on-screen gap so same-tick multi-toasts no longer clobber each other, and added remote-version awareness that warns when GitHub main publishes a newer SyberMem than the machine has installed — because same-tick toasts were silently lost and users had no signal to re-install when a new version shipped. (2026-08-26)
 - [change-bcac35f53e004164adb47471d7cf094d] #norm #opencode #ux — Delivered norm P1 — per-prompt scoped-norm recall + compaction constitution reuse \(OpenCode\), memory-stats norm coverage, and digest-time emergent nomination of recurring constraints \(confirmation-first\) — so norms reach relevant work and recurring rules get proactively surfaced for crystallization (2026-08-24)
 - [change-c2be7cced7eb4250b288606869f1e726] #uninstall #distribution #safety — Added explicit project/global uninstall routing because users need safe natural-language scope selection while preserving project memory histories. (2026-08-25)
+- [change-dbfdfd62cff541c48fd9df1f4beb057c] #recall #docs #search — Recall accuracy Phase 2 now documents one-hop typed relation expansion and strict prompt-time caps so public guidance matches the shipped conservative recall gate. (2026-08-27)
 - [change-e3777a9e3b784c43b6af93be99707348] #opencode #installer #windows — Added a Python-based SyberMem install/update path so Windows OpenCode users can refresh globally without spawning powershell.exe. (2026-08-25)
 - [change-f8bd388c7bac4ee584c68edc97951e18] #documentation #norm #digest — Brought docs/feature_map.md and both READMEs \(zh + en\) up to date with the three recent subsystems \(prompt-time habit perceptibility + CJK relevance, digest backlog + digest-conclusion feedback, and the full project-norm subsystem\) so public capability claims match the shipped code (2026-08-24)
 - [decision-c24f122fbe5d46ee8095022e6b8c53c8] #architecture #memory #retrieval — The 7 record types are the right main split, but the schema is NOT sufficient for high-quality future summarize/recall/review/QA; the accepted upgrade is typed relations + provenance/verification + selective temporal/confidence fields + an open-item type + entity/question fields + schema-assisted retrieval — all Markdown-first, optional, fail-open, with reverse edges and salience DERIVED not agent-authored (2026-08-25)
@@ -140,6 +141,7 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 | change-a40b6aaa5a864b049fd05dd861e283d4 | 2026-08-26 | OpenCode toast queue and remote-version awareness | done | [link](changes/2026-08-26-change-a40b6aaa5a864b049fd05dd861e283d4-toast-queue-and-remote-version-awareness.md) |
 | change-bcac35f53e004164adb47471d7cf094d | 2026-08-24 | Norm subsystem P1 — scoped recall, compaction constitution, memory-stats visibility, emergent nomination | done | [link](changes/2026-08-24-change-bcac35f53e004164adb47471d7cf094d-norm-p1-scoped-recall-nomination.md) |
 | change-c2be7cced7eb4250b288606869f1e726 | 2026-08-25 | Scoped uninstall CLI and natural-language uninstall skill | active | [link](changes/2026-08-25-change-c2be7cced7eb4250b288606869f1e726-scoped-uninstall.md) |
+| change-dbfdfd62cff541c48fd9df1f4beb057c | 2026-08-27 | Recall accuracy Phase 2 docs and derived index update | implemented | [link](changes/2026-08-27-change-dbfdfd62cff541c48fd9df1f4beb057c-recall-accuracy-phase2-docs-and-index.md) |
 | change-e3777a9e3b784c43b6af93be99707348 | 2026-08-25 | OpenCode Python update path for Windows PowerShell spawn failures | active | [link](changes/2026-08-25-change-e3777a9e3b784c43b6af93be99707348-opencode-python-update-path.md) |
 | change-f8bd388c7bac4ee584c68edc97951e18 | 2026-08-24 | Refresh Feature Map and READMEs for habit perceptibility, digest backlog/feedback, and the norm subsystem | done | [link](changes/2026-08-24-change-f8bd388c7bac4ee584c68edc97951e18-docs-refresh-habit-digest-norm.md) |
 
@@ -197,6 +199,7 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 - collaboration: change-6a3ab8a0e44e4c41843b66bde8b7134a
 - digest: change-33b663865936415c9ae9a34e28f6ea6c, change-76481099f07c4f1f9de150a0281fb58f, change-9a18342f07a64925bad69cbff5b47f89, change-f8bd388c7bac4ee584c68edc97951e18
 - distribution: change-0c35875b8fde4feb93837ce354533b9b, change-13b0a327e1544f3e8e5ac5d3992c5c97, change-2b4df42e0ff942718e9afef5897ecc4c, change-2b9c79a39ea64b178c9902894cbd49fd, change-374880d44753411096e8bd198bae6985, change-657dd8880ab24e889e1f3b2b1521ee3a, change-71c1f4bdc01a4b6cb07731667f1c08c7, change-878c029967b944cca3fc634c7148cf27, change-a40b6aaa5a864b049fd05dd861e283d4, change-c2be7cced7eb4250b288606869f1e726, decision-f780ec7166e14fc2ab1ac595c0edda03
+- docs: change-dbfdfd62cff541c48fd9df1f4beb057c
 - documentation: change-f8bd388c7bac4ee584c68edc97951e18
 - habit: change-374880d44753411096e8bd198bae6985, change-57a47bcef74841b6a454fe5e53d23b2f, change-7f75f17f01cc4d249ca8468e7bbfec7d
 - index: change-71c1f4bdc01a4b6cb07731667f1c08c7
@@ -208,12 +211,12 @@ This file summarizes all project changes, decisions, requirements, and bug recor
 - process: norm-e86ae226dbbf4e28af3de8c1db92f552
 - qa: change-13b0a327e1544f3e8e5ac5d3992c5c97, change-2b4df42e0ff942718e9afef5897ecc4c
 - quality: bug-146ffbf8c1d9415d9708e8f18b003971, change-6a3ab8a0e44e4c41843b66bde8b7134a, change-71c1f4bdc01a4b6cb07731667f1c08c7, change-7fd560c9a8414c8b9cde8ac842fbad0e
-- recall: change-5d2b321fcbd440b393bb2030376043de, change-9a18342f07a64925bad69cbff5b47f89
+- recall: change-5d2b321fcbd440b393bb2030376043de, change-9a18342f07a64925bad69cbff5b47f89, change-dbfdfd62cff541c48fd9df1f4beb057c
 - refactor: change-0c35875b8fde4feb93837ce354533b9b, change-2b9c79a39ea64b178c9902894cbd49fd, change-657dd8880ab24e889e1f3b2b1521ee3a
 - retrieval: bug-146ffbf8c1d9415d9708e8f18b003971, decision-c24f122fbe5d46ee8095022e6b8c53c8
 - safety: change-c2be7cced7eb4250b288606869f1e726
 - schema: bug-146ffbf8c1d9415d9708e8f18b003971
-- search: change-5d2b321fcbd440b393bb2030376043de
+- search: change-5d2b321fcbd440b393bb2030376043de, change-dbfdfd62cff541c48fd9df1f4beb057c
 - security: change-2b4df42e0ff942718e9afef5897ecc4c, change-7fd560c9a8414c8b9cde8ac842fbad0e
 - team: change-0c35875b8fde4feb93837ce354533b9b, change-13b0a327e1544f3e8e5ac5d3992c5c97, change-2b9c79a39ea64b178c9902894cbd49fd, change-657dd8880ab24e889e1f3b2b1521ee3a, decision-f780ec7166e14fc2ab1ac595c0edda03
 - topic: change-032
