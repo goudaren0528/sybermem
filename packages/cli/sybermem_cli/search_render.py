@@ -15,6 +15,8 @@ def render_search_text(results: list[SearchRow]) -> None:
         print(f"  - Lifecycle: {row.get('lifecycle', 'unknown')}")
         print(f"  - Freshness: {row.get('freshness', 'unknown')}")
         print(f"  - Match: {row.get('match', 'keyword')}")
+        if row.get('expanded_from') and row.get('expansion_relation'):
+            print(f"  - Expanded from: {row['expanded_from']} via {row['expansion_relation']}")
         if row.get('related_digest'):
             print(f"  - Related digest: {row['related_digest']}")
         if row.get('conflict_note'):

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -246,6 +246,8 @@ def test_cli_context_recall_json_includes_explanation_without_markdown_bloat(
         "match_reason": "keyword",
         "matched_fields_detail": ["key_conclusion", "related_files"],
         "score_breakdown": {"key_conclusion": 4.0, "related_files": 2.0, "title": 4.0, "body": 2.0},
+        "expanded_from": "requirement-001",
+        "expansion_relation": "implements",
     }
     monkeypatch.setattr(context_module, "high_signal_recall_hints", lambda query, limit=3: ([row], ""))
 
@@ -260,8 +262,14 @@ def test_cli_context_recall_json_includes_explanation_without_markdown_bloat(
     assert markdown_exit == 0
     assert json_payload["results"][0]["explanation"]["matched_fields"] == ["key_conclusion", "related_files"]
     assert json_payload["results"][0]["explanation"]["score_breakdown"]["key_conclusion"] == 4.0
+    assert json_payload["results"][0]["expanded_from"] == "requirement-001"
+    assert json_payload["results"][0]["expansion_relation"] == "implements"
     assert "key_conclusion" not in markdown
     assert "score_breakdown" not in markdown
+    assert "expanded_from" not in markdown
+    assert "expansion_relation" not in markdown
+    assert "requirement-001" not in markdown
+    assert "implements" not in markdown
 
 
 def test_cli_context_recall_json_reports_abstention_when_gate_blocks(
