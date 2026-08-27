@@ -1,8 +1,8 @@
-from argparse import Namespace
-from pathlib import Path
+import json
 import sqlite3
 import sys
-
+from argparse import Namespace
+from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "core"))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -24,6 +24,77 @@ def write_record(root: Path, subdir: str, filename: str, frontmatter: list[str],
     records = root / ".sybermem" / subdir
     records.mkdir(exist_ok=True)
     (records / filename).write_text("\n".join(["---", *frontmatter, "---", "", body]) + "\n", encoding="utf-8")
+
+
+def test_cli_search_json_preserves_expansion_provenance(monkeypatch, capsys) -> None:
+    # Given: Core returns a relation-expanded row with bounded provenance metadata
+    monkeypatch.setattr(
+        "sybermem_cli.main.search_project",
+        lambda query: [
+            {
+                "slug": "demo",
+                "record_id": "change-001",
+                "title": "Implemented requirement",
+                "type": "change",
+                "score": 9.0,
+                "expanded_from": "requirement-001",
+                "expansion_relation": "implements",
+            }
+        ],
+    )
+
+    # When: project search is requested as JSON
+    exit_code = cmd_search(
+        Namespace(
+            query="requirement-001",
+            scope="project",
+            project=None,
+            type=None,
+            project_status=None,
+            format="json",
+        )
+    )
+
+    # Then: the raw Core row reaches machine consumers without losing provenance
+    payload = json.loads(capsys.readouterr().out)
+    assert exit_code == 0
+    assert payload["results"][0]["expanded_from"] == "requirement-001"
+    assert payload["results"][0]["expansion_relation"] == "implements"
+
+
+def test_cli_search_text_prints_concise_expansion_provenance(monkeypatch, capsys) -> None:
+    # Given: Core returns one relation-expanded result
+    monkeypatch.setattr(
+        "sybermem_cli.main.search_project",
+        lambda query: [
+            {
+                "slug": "demo",
+                "record_id": "change-001",
+                "title": "Implemented requirement",
+                "type": "change",
+                "score": 9.0,
+                "expanded_from": "requirement-001",
+                "expansion_relation": "implements",
+            }
+        ],
+    )
+
+    # When: project search is rendered as text
+    exit_code = cmd_search(
+        Namespace(
+            query="requirement-001",
+            scope="project",
+            project=None,
+            type=None,
+            project_status=None,
+            format="text",
+        )
+    )
+
+    # Then: one compact provenance line explains why the result was expanded
+    output = capsys.readouterr().out
+    assert exit_code == 0
+    assert "  - Expanded from: requirement-001 via implements" in output
 
 
 def test_cli_search_text_prints_source_kind_and_conflict_note(tmp_path: Path, monkeypatch, capsys) -> None:

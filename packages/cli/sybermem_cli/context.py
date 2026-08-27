@@ -179,17 +179,19 @@ def cmd_context_recall(args: argparse.Namespace) -> int:
         return 1
     results = []
     for row in rows:
-        results.append(
-            {
-                "record_id": str(row.get("record_id", "")),
-                "type": str(row.get("type", "")),
-                "title": str(row.get("title", "")),
-                "score": int(_score(row)),
-                "match": str(row.get("match_reason") or row.get("match") or "keyword"),
-                "aha": bool(_is_aha(row)),
-                "explanation": _recall_explanation(row),
-            }
-        )
+        result = {
+            "record_id": str(row.get("record_id", "")),
+            "type": str(row.get("type", "")),
+            "title": str(row.get("title", "")),
+            "score": int(_score(row)),
+            "match": str(row.get("match_reason") or row.get("match") or "keyword"),
+            "aha": bool(_is_aha(row)),
+            "explanation": _recall_explanation(row),
+        }
+        if row.get("expanded_from") and row.get("expansion_relation"):
+            result["expanded_from"] = str(row["expanded_from"])
+            result["expansion_relation"] = str(row["expansion_relation"])
+        results.append(result)
     payload = {
         "kind": "recall",
         "delivery": "prompt-time automatic recall (high-signal gate)",
