@@ -237,8 +237,9 @@ SyberMem 有两类执行路径，可靠性不同：
 - `sybermem project memory-stats` 以表格展示最近 7 天 / 30 天的 record 数量、类型分布、recall events、injected/abstained、recall rate、Edit Alignment，以及 Memory injection 的 turns/items/chars、avg chars/turn、p95 chars/turn 和 30d lane distribution；`--format json` 给 skill 和自动化消费。召回频率指标来自 `.sybermem/.recall-debug.jsonl`，Edit Alignment 与 memory injection observability 来自 OpenCode 写入的 `.sybermem/.recall-outcomes.jsonl` 和 `.sybermem/.memory-usage.jsonl`；没有对应日志表示统计不可用，不代表召回活动为 0。Edit Alignment 只是按 `related_files` 锚点计算的编辑对齐代理，不代表语义准确率；它会同时暴露 hit、measurable、unmeasurable 和 evidence availability。`recall_health` 的 `low_relevance` 判定在注入样本足够且该代理值低于阈值时才触发，与频率型 `low_signal` 区分；当召回在触发但太多记录缺少可验证 `related_files` 锚点时，会给出独立的 `low_measurability` 建议。
 - `sybermem project record-files --ids <a,b> --format json` 把记录 id 映射到其 `related_files`，供 OpenCode 召回相关性判定复用 Core 的 Markdown 解析。
 - `sybermem index build` 构建 workspace 级 SQLite FTS5 索引，服务于跨项目搜索。
-- 项目内检索默认基于已解析 Markdown records 的词法匹配和打分；`title` / `topics` / relation / body 之外，`key_conclusion` 作为一等高权重信号参与排序，`related_files` 提供有上限的路径/模块 boost 与 tie-break。`sybermem context recall --format json` 会暴露机器可读的匹配字段与分数拆解；prompt-time Markdown 包保持短小，不注入解释细节。需要跨项目搜索时使用 workspace index。
-- 可选的 `SYBERMEM_SEMANTIC_RECALL=1` 会启用本地 char n-gram 召回补充，用于显式检索，不会自动注入每轮提示。
+- 项目内检索默认基于已解析 Markdown records 的词法匹配和打分；`title` / `topics` / relation / body 之外，`key_conclusion` 作为一等高权重信号参与排序，`related_files` 提供有上限的路径/模块 boost 与 tie-break。显式项目检索还能做一跳 typed relation expansion：当查询直接命中 `record_id`，或先命中 typed relation 时，结果可补入关联 record，并在 JSON / 机器可读结果中带 `match: relation-expanded`、`expanded_from`、`expansion_relation` 溯源字段。`sybermem context recall --format json` 会暴露机器可读的匹配字段、分数拆解与这类 expansion provenance；prompt-time Markdown 包保持短小，不注入解释细节。需要跨项目搜索时使用 workspace index。
+- prompt-time recall 继续走更保守的 shared `context recall` gate：只会在高信号 seed 已经成立后，最多为每个 seed 追加 1 条非 evidence 的一跳 relation expansion，全包最多追加 2 条；弱 keyword-only、topic-only、semantic-only 匹配不会触发 expansion，也不会自动注入每轮提示。
+- 可选的 `SYBERMEM_SEMANTIC_RECALL=1` 会启用本地 char n-gram 召回补充，用于显式检索；它不会触发弱 expansion，也不会自动注入每轮提示。
 
 ## 跨项目协作
 
