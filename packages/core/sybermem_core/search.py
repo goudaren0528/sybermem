@@ -30,7 +30,7 @@ def _semantic_recall_enabled() -> bool:
     return os.environ.get(SEMANTIC_RECALL_ENV, "") == "1"
 
 
-SearchValue: TypeAlias = str | float
+SearchValue: TypeAlias = str | float | list[str] | dict[str, float]
 SearchRow: TypeAlias = dict[str, SearchValue]
 
 
@@ -106,7 +106,14 @@ def _text(row: SearchRow, key: str) -> str:
 
 
 def _score_input(row: SearchRow) -> dict[str, str]:
-    return {key: _text(row, key) for key in ("record_id", "title", "content", "topics", "fixes", "implements", "related", "superseded_by", "supersedes")}
+    return {key: _text(row, key) for key in ("record_id", "title", "content", "topics", "fixes", "implements", "related", "superseded_by", "supersedes", "key_conclusion", "related_files")}
+
+
+def _apply_overlap_score(row: SearchRow, overlap) -> None:
+    row["score"] = overlap.score
+    row["matched_fields"] = str(overlap.matched_fields)
+    row["matched_fields_detail"] = list(overlap.matched_fields_detail)
+    row["score_breakdown"] = overlap.score_breakdown
 
 
 def _search_row(row: dict[str, str]) -> SearchRow:
@@ -345,8 +352,7 @@ def search_project(query: str) -> list[SearchRow]:
             continue
         overlap = score_row(_score_input(row), terms)
         if overlap is not None:
-            row["score"] = overlap.score
-            row["matched_fields"] = str(overlap.matched_fields)
+            _apply_overlap_score(row, overlap)
             enriched = _with_retrieval_metadata(row, match_reason=overlap.match, related_digest=_related_digest(row, digest_coverage), archived=_text(row, "record_id") in archived_ids)
             enriched["match"] = overlap.match
             results.append(enriched)
@@ -383,8 +389,7 @@ def compact_project_search(query: str, limit: int = 3, *, include_abstention: bo
         for row in all_rows:
             overlap = score_row(_score_input(row), terms)
             if overlap is not None and _compact_match_allowed(overlap.score, overlap.match, overlap.matched_fields):
-                row["score"] = overlap.score
-                row["matched_fields"] = str(overlap.matched_fields)
+                _apply_overlap_score(row, overlap)
                 enriched = _with_retrieval_metadata(row, match_reason=overlap.match, related_digest=_related_digest(row, digest_coverage), archived=_text(row, "record_id") in archived_ids)
                 enriched["match"] = overlap.match
                 fallback_rows.append(enriched)
