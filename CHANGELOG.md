@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+## 0.2.2 - 2026-08-27
+
+### Added
+- Recall search now includes machine-readable scoring explanations, including matched fields and score breakdowns, so CLI users can understand why a memory was retrieved.
+- Recall health now reports `low_measurability` when records are missing enough `related_files` anchors to evaluate edit alignment reliably.
+- Project search can expand strong direct record/relation hits through one-hop typed relations (`implements`, `fixes`, `related`, `supersedes`, `superseded_by`) with bounded provenance.
+
+### Changed
+- Prompt-time recall remains conservative while allowing capped relation-expanded rows only behind high-signal seeds; weak keyword, topic, and semantic-only matches still abstain from injection.
+- CLI JSON/text recall surfaces now expose relation expansion provenance without bloating prompt-time Markdown packets.
+
 ## 0.2.1 - 2026-08-26
 
 ### Added
