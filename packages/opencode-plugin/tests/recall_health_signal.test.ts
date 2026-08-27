@@ -21,12 +21,15 @@ describe("recall health signal", () => {
     expect(parseRecallHealth("{}")).toBeNull()
   })
 
-  it("builds a toast for low_signal and low_relevance, but stays silent otherwise", () => {
+  it("builds a toast for actionable recall health verdicts, but stays silent otherwise", () => {
     // Given / When / Then
     expect(lowSignalRecallToast({ status: "low_signal", hint: "add topics" })).toContain("quality is low")
     const relevance = lowSignalRecallToast({ status: "low_relevance", hint: "stale related_files" })
     expect(relevance).toContain("relevance is low")
     expect(relevance).toContain("stale related_files")
+    const measurability = lowSignalRecallToast({ status: "low_measurability", hint: "add related_files" })
+    expect(measurability).toContain("measurability is low")
+    expect(measurability).toContain("add related_files")
     expect(lowSignalRecallToast({ status: "healthy", hint: "ok" })).toBeNull()
     expect(lowSignalRecallToast({ status: "no_log", hint: "no log" })).toBeNull()
     expect(lowSignalRecallToast({ status: "no_activity", hint: "quiet" })).toBeNull()
