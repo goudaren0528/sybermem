@@ -3,7 +3,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from sybermem_core.search import compact_project_search, high_signal_recall_hints, search_project
+from sybermem_core.search import HIGH_SIGNAL_SCORE_FLOOR, compact_project_search, high_signal_recall_hints, search_project
 
 
 def write_project(root: Path) -> None:
@@ -790,6 +790,434 @@ def test_high_signal_recall_injects_relation_and_record_id_matches(tmp_path: Pat
     assert relation_reason == ""
     assert [row["record_id"] for row in id_hints] == ["change-001"]
     assert id_reason == ""
+
+
+def test_high_signal_recall_caps_current_relation_expansion_per_seed(tmp_path: Path, monkeypatch) -> None:
+    # Given: one exact seed linked to evidence, historical, and two current records
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    write_project(project_root)
+    write_record(
+        project_root,
+        "requirements",
+        "2026-08-04-001-prompt-expansion.md",
+        ["type: requirement", "date: 2026-08-04", "title: Prompt expansion gate", "status: accepted"],
+        "## Summary\nThe exact requirement is a high-signal prompt seed.",
+    )
+    write_record(
+        project_root,
+        "changes",
+        "2026-08-05-002-evidence.md",
+        ["type: change", "date: 2026-08-05", "title: Evidence link", "status: implemented", "authority: evidence", "implements: requirement-001"],
+        "## Summary\nEvidence-only context must not enter prompt recall.",
+    )
+    write_record(
+        project_root,
+        "changes",
+        "2026-08-06-003-historical.md",
+        ["type: change", "date: 2026-08-06", "title: Historical link", "status: resolved", "implements: requirement-001"],
+        "## Summary\nHistorical context must not enter prompt recall.",
+    )
+    write_record(
+        project_root,
+        "changes",
+        "2026-08-07-004-current-older.md",
+        ["type: change", "date: 2026-08-07", "title: Current older link", "status: implemented", "implements: requirement-001"],
+        "## Summary\nA current authoritative expansion candidate.",
+    )
+    write_record(
+        project_root,
+        "changes",
+        "2026-08-08-005-current-newer.md",
+        ["type: change", "date: 2026-08-08", "title: Current newer link", "status: implemented", "implements: requirement-001"],
+        "## Summary\nThe newest current authoritative expansion candidate.",
+    )
+    monkeypatch.chdir(project_root)
+
+    # When: prompt-time recall names the exact requirement seed
+    hints, reason = high_signal_recall_hints("requirement-001", limit=5)
+
+    # Then: the seed carries only one current non-evidence expansion
+    assert HIGH_SIGNAL_SCORE_FLOOR == 12.0
+    assert [row["record_id"] for row in hints] == ["requirement-001", "change-005"]
+    assert hints[1]["expanded_from"] == "requirement-001"
+    assert hints[1]["authority"] == "authoritative"
+    assert hints[1]["freshness"] == "current"
+    assert reason == ""
+
+
+def test_high_signal_recall_caps_relation_expansion_globally(tmp_path: Path, monkeypatch) -> None:
+    # Given: three exact high-signal seeds each linked to one current authoritative record
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    write_project(project_root)
+    for number in range(1, 4):
+        write_record(
+            project_root,
+            "requirements",
+            f"2026-08-0{number}-{number:03d}-seed.md",
+            ["type: requirement", f"date: 2026-08-0{number}", f"title: Seed {number}", "status: accepted"],
+            f"## Summary\nHigh-signal seed {number}.",
+        )
+        write_record(
+            project_root,
+            "changes",
+            f"2026-08-1{number}-{number:03d}-linked.md",
+            ["type: change", f"date: 2026-08-1{number}", f"title: Linked {number}", "status: implemented", f"implements: requirement-{number:03d}"],
+            f"## Summary\nCurrent linked context {number}.",
+        )
+    monkeypatch.chdir(project_root)
+
+    # When: one prompt names all three exact record-id seeds
+    hints, reason = high_signal_recall_hints("requirement-001 requirement-002 requirement-003", limit=6)
+
+    # Then: all seeds remain injectable but prompt-time expansion stops at two rows total
+    expanded = [row for row in hints if row.get("match") == "relation-expanded"]
+    assert len(expanded) == 2
+    assert len({row["expanded_from"] for row in expanded}) == 2
+    assert reason == ""
+
+
+def test_relation_expansion_adds_implementing_change_after_explicit_requirement_seed(tmp_path: Path, monkeypatch) -> None:
+    # Given: a requirement and a change that implements it without sharing query text
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    write_project(project_root)
+    write_record(
+        project_root,
+        "requirements",
+        "2026-08-04-001-relation-expansion.md",
+        ["type: requirement", "date: 2026-08-04", "title: Typed relation expansion", "status: accepted"],
+        "## Summary\nExplicit requirement seeds should bring their implementation context.",
+    )
+    write_record(
+        project_root,
+        "changes",
+        "2026-08-05-002-implementation.md",
+        [
+            "type: change",
+            "date: 2026-08-05",
+            "title: Guarded graph traversal",
+            "status: implemented",
+            "implements: requirement-001",
+        ],
+        "## Summary\nOne-hop traversal now returns bounded linked context.",
+    )
+    monkeypatch.chdir(project_root)
+
+    # When: explicit search names the requirement record id
+    rows = search_project("requirement-001")
+
+    # Then: the direct seed stays first and its implementing change follows with bounded provenance
+    assert [row["record_id"] for row in rows[:2]] == ["requirement-001", "change-002"]
+    expanded = rows[1]
+    assert expanded["expanded_from"] == "requirement-001"
+    assert expanded["expansion_relation"] == "implements"
+    assert expanded["match"] == "relation-expanded"
+    assert expanded["match_reason"] == "relation-expanded"
+
+
+def test_relation_expansion_adds_fixing_change_after_explicit_bug_seed(tmp_path: Path, monkeypatch) -> None:
+    # Given: a bug and a fixing change whose only link to the query is fixes metadata
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    write_project(project_root)
+    write_record(
+        project_root,
+        "bugs",
+        "2026-08-04-001-expansion-bug.md",
+        ["type: bug", "date: 2026-08-04", "title: Missing linked fix", "status: resolved"],
+        "## Summary\nThe direct bug record should remain the retrieval seed.",
+    )
+    write_record(
+        project_root,
+        "changes",
+        "2026-08-05-002-fix.md",
+        [
+            "type: change",
+            "date: 2026-08-05",
+            "title: Restore linked context",
+            "status: implemented",
+            "fixes: bug-001",
+        ],
+        "## Summary\nThe current change resolves the linked retrieval defect.",
+    )
+    monkeypatch.chdir(project_root)
+
+    # When: explicit search names the bug record id
+    rows = search_project("bug-001")
+
+    # Then: the fixing change is expanded from the direct bug seed
+    assert [row["record_id"] for row in rows[:2]] == ["bug-001", "change-002"]
+    assert rows[1]["expanded_from"] == "bug-001"
+    assert rows[1]["expansion_relation"] == "fixes"
+
+
+def test_relation_expansion_dedupes_linked_row_already_present_as_direct_match(tmp_path: Path, monkeypatch) -> None:
+    # Given: an exact seed whose implementing change also matches through relation metadata
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    write_project(project_root)
+    write_record(
+        project_root,
+        "requirements",
+        "2026-08-04-001-dedupe-seed.md",
+        ["type: requirement", "date: 2026-08-04", "title: Dedupe relation expansion", "status: accepted"],
+        "## Summary\nThe explicit requirement is the direct retrieval seed.",
+    )
+    write_record(
+        project_root,
+        "changes",
+        "2026-08-05-002-dedupe-target.md",
+        ["type: change", "date: 2026-08-05", "title: Dedupe linked target", "status: implemented", "implements: requirement-001"],
+        "## Summary\nThe linked row is also named explicitly by record id.",
+    )
+    monkeypatch.chdir(project_root)
+
+    # When: explicit search expands the exact requirement seed
+    rows = search_project("requirement-001 change-002")
+
+    # Then: each explicitly matched record id occurs once and neither is reclassified as expanded
+    record_ids = [row["record_id"] for row in rows]
+    assert set(record_ids) == {"requirement-001", "change-002"}
+    assert len(record_ids) == len(set(record_ids))
+    assert all(row["match"] == "record-id" for row in rows)
+    assert all("expanded_from" not in row for row in rows)
+
+
+def test_high_signal_relation_expansion_prefers_current_authoritative_successor(tmp_path: Path, monkeypatch) -> None:
+    # Given: one seed linked to evidence, a superseded record, and its active successor
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    write_project(project_root)
+    write_record(
+        project_root,
+        "requirements",
+        "2026-08-04-001-authority-seed.md",
+        ["type: requirement", "date: 2026-08-04", "title: Authority expansion seed", "status: accepted"],
+        "## Summary\nPrompt recall should expand only to current authoritative context.",
+    )
+    write_record(
+        project_root,
+        "changes",
+        "2026-08-09-002-evidence.md",
+        ["type: change", "date: 2026-08-09", "title: Evidence expansion", "status: implemented", "authority: evidence", "implements: requirement-001"],
+        "## Summary\nEvidence-only relation context.",
+    )
+    write_record(
+        project_root,
+        "decisions",
+        "2026-08-08-003-superseded.md",
+        [
+            "type: decision",
+            "date: 2026-08-08",
+            "title: Superseded expansion",
+            "status: superseded",
+            "superseded_by: decision-004",
+            "related: requirement-001",
+        ],
+        "## Summary\nStale relation context should not enter prompt recall.",
+    )
+    write_record(
+        project_root,
+        "decisions",
+        "2026-08-07-004-current.md",
+        ["type: decision", "date: 2026-08-07", "title: Current expansion", "status: decided", "related: requirement-001"],
+        "## Summary\nCurrent authoritative relation context.",
+    )
+    monkeypatch.chdir(project_root)
+
+    # When: prompt-time recall expands the exact requirement seed
+    hints, reason = high_signal_recall_hints("requirement-001", limit=5)
+
+    # Then: only the active authoritative successor is eligible for expansion
+    assert [row["record_id"] for row in hints] == ["requirement-001", "decision-004"]
+    assert hints[1]["authority"] == "authoritative"
+    assert hints[1]["lifecycle"] == "active"
+    assert hints[1]["freshness"] == "current"
+    assert reason == ""
+
+
+def test_relation_expansion_cycle_stays_one_hop(tmp_path: Path, monkeypatch) -> None:
+    # Given: a three-record relation cycle rooted at an explicit requirement seed
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    write_project(project_root)
+    write_record(
+        project_root,
+        "requirements",
+        "2026-08-04-001-cycle-seed.md",
+        ["type: requirement", "date: 2026-08-04", "title: Cycle seed", "status: accepted", "related: decision-002"],
+        "## Summary\nThe explicit seed starts a cyclic relation graph.",
+    )
+    write_record(
+        project_root,
+        "decisions",
+        "2026-08-05-002-cycle-middle.md",
+        ["type: decision", "date: 2026-08-05", "title: Cycle middle", "status: decided", "related: change-003"],
+        "## Summary\nThe first hop links onward but must not become a traversal seed.",
+    )
+    write_record(
+        project_root,
+        "changes",
+        "2026-08-06-003-cycle-tail.md",
+        ["type: change", "date: 2026-08-06", "title: Cycle tail", "status: implemented", "related: requirement-001"],
+        "## Summary\nThe cycle closes back to the original seed.",
+    )
+    monkeypatch.chdir(project_root)
+
+    # When: explicit search expands the requirement record id
+    rows = search_project("requirement-001")
+
+    # Then: expansion is bounded to direct neighbors without duplicate recursion
+    assert [row["record_id"] for row in rows] == ["requirement-001", "change-003", "decision-002"]
+    assert len({row["record_id"] for row in rows}) == 3
+    assert all(row.get("expanded_from") == "requirement-001" for row in rows[1:])
+
+
+def test_relation_expansion_orders_all_direct_matches_before_expanded_rows(tmp_path: Path, monkeypatch) -> None:
+    # Given: two direct relation matches and one linked row that does not match the query itself
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    write_project(project_root)
+    write_record(
+        project_root,
+        "requirements",
+        "2026-08-04-001-ordering-seed.md",
+        ["type: requirement", "date: 2026-08-04", "title: Ordering seed", "status: accepted", "related: decision-002"],
+        "## Summary\norder-token identifies the first direct relation seed.",
+    )
+    write_record(
+        project_root,
+        "decisions",
+        "2026-08-05-002-ordering-seed.md",
+        ["type: decision", "date: 2026-08-05", "title: Ordering peer", "status: decided", "related: requirement-001"],
+        "## Summary\nThe peer is also named explicitly by record id.",
+    )
+    write_record(
+        project_root,
+        "changes",
+        "2026-08-06-003-ordering-expansion.md",
+        ["type: change", "date: 2026-08-06", "title: Ordering expansion", "status: implemented", "implements: requirement-001"],
+        "## Summary\nLinked context without the direct query term.",
+    )
+    monkeypatch.chdir(project_root)
+
+    # When: search matches both seeds strongly enough to permit relation expansion
+    rows = search_project("requirement-001 decision-002")
+
+    # Then: every direct match is ordered before the relation-expanded row
+    matches = [row["match"] for row in rows]
+    first_expansion = matches.index("relation-expanded")
+    assert {row["record_id"] for row in rows[:first_expansion]} == {"requirement-001", "decision-002"}
+    assert all(match != "relation-expanded" for match in matches[:first_expansion])
+    assert all(match == "relation-expanded" for match in matches[first_expansion:])
+
+
+def test_relation_expansion_stays_off_for_weak_keyword_seed(tmp_path: Path, monkeypatch) -> None:
+    # Given: a requirement matched only by body keywords and a change implementing it
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    write_project(project_root)
+    write_record(
+        project_root,
+        "requirements",
+        "2026-08-04-001-keyword-seed.md",
+        ["type: requirement", "date: 2026-08-04", "title: Conservative retrieval", "status: accepted"],
+        "## Summary\nweakexpand-token appears only as ordinary body context.",
+    )
+    write_record(
+        project_root,
+        "changes",
+        "2026-08-05-002-keyword-implementation.md",
+        ["type: change", "date: 2026-08-05", "title: Unrelated implementation title", "status: implemented", "implements: requirement-001"],
+        "## Summary\nLinked implementation content does not repeat the weak query.",
+    )
+    monkeypatch.chdir(project_root)
+
+    # When: explicit search reaches the requirement only through a weak keyword match
+    rows = search_project("weakexpand-token")
+    hints, reason = high_signal_recall_hints("weakexpand-token")
+
+    # Then: the direct weak result remains visible without relation-expanded rows
+    assert [row["record_id"] for row in rows] == ["requirement-001"]
+    assert rows[0]["match"] == "keyword"
+    assert all("expanded_from" not in row for row in rows)
+    assert hints == []
+    assert reason == "matched rows were keyword-only and below the high-signal floor"
+
+
+def test_relation_expansion_stays_off_for_weak_topic_seed(tmp_path: Path, monkeypatch) -> None:
+    # Given: a requirement matched by topic and a change implementing it
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    write_project(project_root)
+    write_record(
+        project_root,
+        "requirements",
+        "2026-08-04-001-topic-seed.md",
+        [
+            "type: requirement",
+            "date: 2026-08-04",
+            "title: Topic-gated retrieval",
+            "status: accepted",
+            "topics: [topicexpand, guardrail]",
+        ],
+        "## Summary\nTopic overlap remains a weak expansion seed.",
+    )
+    write_record(
+        project_root,
+        "changes",
+        "2026-08-05-002-topic-implementation.md",
+        ["type: change", "date: 2026-08-05", "title: Linked implementation", "status: implemented", "implements: requirement-001"],
+        "## Summary\nThe implementation does not contain the topic query.",
+    )
+    monkeypatch.chdir(project_root)
+
+    # When: explicit search reaches the requirement through topic overlap only
+    rows = search_project("topicexpand guardrail")
+    hints, reason = high_signal_recall_hints("topicexpand guardrail")
+
+    # Then: topic matches do not trigger relation expansion
+    assert [row["record_id"] for row in rows] == ["requirement-001"]
+    assert rows[0]["match"] == "topic"
+    assert all("expanded_from" not in row for row in rows)
+    assert hints == []
+    assert reason == "matches did not cross compact recall reliability threshold"
+
+
+def test_relation_expansion_stays_off_for_semantic_only_seed(tmp_path: Path, monkeypatch) -> None:
+    # Given: semantic recall can reach a requirement, which has an implementing change
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    write_project(project_root)
+    write_record(
+        project_root,
+        "requirements",
+        "2026-08-04-001-semantic-seed.md",
+        ["type: requirement", "date: 2026-08-04", "title: Authentication authorization boundary", "status: accepted"],
+        "## Summary\nAuthentication and authorization must share a typed boundary.",
+    )
+    write_record(
+        project_root,
+        "changes",
+        "2026-08-05-002-semantic-implementation.md",
+        ["type: change", "date: 2026-08-05", "title: Identity boundary implementation", "status: implemented", "implements: requirement-001"],
+        "## Summary\nThe linked change avoids the inflected semantic query terms.",
+    )
+    monkeypatch.setenv("SYBERMEM_SEMANTIC_RECALL", "1")
+    monkeypatch.chdir(project_root)
+
+    # When: an inflected query reaches the requirement through semantic supplement only
+    rows = search_project("authenticating and authorizing")
+    hints, reason = high_signal_recall_hints("authenticating and authorizing")
+
+    # Then: semantic-only results do not trigger relation expansion
+    semantic_rows = [row for row in rows if row.get("match") == "semantic"]
+    assert [row["record_id"] for row in semantic_rows] == ["requirement-001"]
+    assert all("expanded_from" not in row for row in rows)
+    assert hints == []
+    assert reason == "matched rows were keyword-only and below the high-signal floor"
 
 
 def test_high_signal_recall_reports_no_candidate_reason(tmp_path: Path, monkeypatch) -> None:

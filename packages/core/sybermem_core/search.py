@@ -7,6 +7,7 @@ from typing import TypeAlias
 from .digest_coverage import digest_coverage_verdict
 from .project import resolve_project_root
 from .records import iter_record_files, parse_project_yaml, parse_record_file
+from .relation_expansion import expand_typed_relations
 from .retrieval import (
     apply_successor_guidance,
     classify_source_kind,
@@ -310,12 +311,29 @@ def high_signal_recall_hints(query: str, limit: int = 3) -> tuple[list[SearchRow
 
     Returns (rows, abstention_reason). When rows is empty, abstention_reason explains
     why in one bounded phrase for local debug logging; it is never injected into the
-    prompt. rows is a strict subset of compact_project_search under the high-signal gate.
+    prompt. Current non-evidence relation expansions may follow qualifying seed rows.
     """
     rows = compact_project_search(query, limit=limit)
     high_signal = [row for row in rows if _is_high_signal(row)]
     if high_signal:
-        return high_signal[:limit], ""
+        seed_ids = {_text(row, "record_id") for row in high_signal if _text(row, "match") in {"record-id", "relation"}}
+        expanded: list[SearchRow] = []
+        expanded_seeds: set[str] = set()
+        for row in search_project(query):
+            seed_id = _text(row, "expanded_from")
+            if (
+                _text(row, "match") != "relation-expanded"
+                or seed_id not in seed_ids
+                or seed_id in expanded_seeds
+                or _text(row, "authority") == "evidence"
+                or _text(row, "freshness") not in {"current", "conflicted"}
+            ):
+                continue
+            expanded.append(row)
+            expanded_seeds.add(seed_id)
+            if len(expanded) == 2:
+                break
+        return [*high_signal, *expanded][:limit], ""
     if rows:
         return [], "matched rows were keyword-only and below the high-signal floor"
     diagnostic = compact_project_search(query, limit=limit, include_abstention=True)
@@ -358,6 +376,13 @@ def search_project(query: str) -> list[SearchRow]:
             results.append(enriched)
     if _semantic_recall_enabled():
         results = _add_semantic_supplement(query, results)
+    expanded_rows, replaced_ids = expand_typed_relations(all_rows, results)
+    if expanded_rows:
+        results = [row for row in results if _text(row, "record_id") not in replaced_ids]
+        for row in expanded_rows:
+            enriched = _with_retrieval_metadata(row, match_reason="relation-expanded", related_digest=_related_digest(row, digest_coverage), archived=_text(row, "record_id") in archived_ids)
+            enriched["match"] = "relation-expanded"
+            results.append(enriched)
     apply_successor_guidance(results, guidance_rows)
     _annotate_digest_coverage(root, results)
     _annotate_conflicts(results)
@@ -440,8 +465,9 @@ def _compact_sort_key(row: SearchRow) -> tuple[int, int, int, int, int, int]:
 # wrong hint never outranks an authoritative one on the hot path), user-facing search
 # should surface the most *relevant* record first. Rank by raw score, then match
 # specificity (exact id > relation > topic > keyword), then recency as the tiebreak.
-def _explicit_sort_key(row: SearchRow) -> tuple[float, int, int]:
+def _explicit_sort_key(row: SearchRow) -> tuple[int, float, int, int]:
+    expansion_rank = 1 if _text(row, "match") == "relation-expanded" else 0
     score_rank = -float(row.get("score", 0.0) or 0.0)
     specificity_rank = _MATCH_SPECIFICITY.get(_text(row, "match"), 4)
     created_rank = -_created_rank(row)
-    return (score_rank, specificity_rank, created_rank)
+    return (expansion_rank, score_rank, specificity_rank, created_rank)
