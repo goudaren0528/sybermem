@@ -56,6 +56,13 @@ def _search_item(record: dict) -> dict[str, str | int]:  # noqa: DICT_OK
     }
 
 
+def _recall_explanation(row: dict) -> dict[str, object]:  # noqa: DICT_OK, OBJECT_OK
+    return {
+        "matched_fields": list(row.get("matched_fields_detail", [])) if isinstance(row.get("matched_fields_detail"), list) else [],
+        "score_breakdown": row.get("score_breakdown", {}) if isinstance(row.get("score_breakdown"), dict) else {},
+    }
+
+
 def _print_markdown_session(payload: dict) -> None:  # noqa: DICT_OK
     print("## SyberMem Manual Session Context")
     print("Delivery: manual")
@@ -180,6 +187,7 @@ def cmd_context_recall(args: argparse.Namespace) -> int:
                 "score": int(_score(row)),
                 "match": str(row.get("match_reason") or row.get("match") or "keyword"),
                 "aha": bool(_is_aha(row)),
+                "explanation": _recall_explanation(row),
             }
         )
     payload = {
