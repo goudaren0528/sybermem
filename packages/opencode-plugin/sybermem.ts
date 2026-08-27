@@ -1247,10 +1247,15 @@ async function flushRecallOutcome($, root, activity, sessionID, timestamp = new 
 
 // packages/opencode-plugin/src/habit_intent.ts
 var NO_CAPTURE = { captured: false, habitType: "", suggestedScope: "" };
-var HABIT_INTENT_HINT_RE = /\b(always|habit|preference|prefer|remember|usually|default|convention)\b/i;
-var CJK_HABIT_INTENT_HINTS = ["\u4EE5\u540E", "\u504F\u597D", "\u4E60\u60EF", "\u8BB0\u4F4F", "\u603B\u662F", "\u6BCF\u6B21", "\u9ED8\u8BA4", "\u4E00\u5F8B", "\u8BB0\u5F97", "\u5C3D\u91CF", "\u89C4\u8303", "\u7EA6\u5B9A"];
+var DURABLE_PREFERENCE_RE = /(\b(always\s+(?:prefer|use|reply|respond|run|keep|write|ask|show|include|avoid)|usually\s+(?:i\s+)?(?:prefer|use|want|ask|run|keep|write)|(?:please\s+)?remember\s+(?:that\s+)?(?:i\s+)?(?:prefer|want|usually|always)|i\s+prefer\b|i\s+usually\b|by\s+default\b|make\s+this\s+the\s+default\b|from\s+now\s+on\b)|\u4EE5\u540E(?:\u90FD|\u8BF7|\u8BB0\u5F97|\u9ED8\u8BA4|\u4E00\u5F8B)?|\u8BF7\u8BB0\u4F4F|\u5E2E\u6211\u8BB0\u4F4F|\u8BB0\u4F4F\u6211|\u6211(?:\u4E60\u60EF|\u504F\u597D|\u5E0C\u671B)|\u6BCF\u6B21\u90FD|\u9ED8\u8BA4(?:\u7528|\u5148|\u90FD)?|\u4E00\u5F8B(?:\u7528|\u5148|\u90FD)?|\u603B\u662F(?:\u7528|\u5148|\u90FD)?)/i;
+var NOISY_HABIT_DISCUSSION_RE = /(why|debug|investigate|research|review|analy[sz]e|improve|design|logic|classifier|candidate|capture|\u4E3A\u4EC0\u4E48|\u600E\u4E48|\u8C03\u7814|\u7814\u7A76|\u8BC4\u5BA1|\u5BA1\u67E5|\u6539\u8FDB|\u8BBE\u8BA1|\u903B\u8F91|\u5019\u9009|\u6355\u83B7|\u547D\u4E2D).{0,80}(habit|preference|memory|norm|\u4E60\u60EF|\u504F\u597D|\u8BB0\u5FC6|\u89C4\u8303|\u7EA6\u5B9A)|(habit|preference|memory|norm|\u4E60\u60EF|\u504F\u597D|\u8BB0\u5FC6|\u89C4\u8303|\u7EA6\u5B9A).{0,80}(why|debug|investigate|research|review|analy[sz]e|improve|design|logic|classifier|candidate|capture|\u4E3A\u4EC0\u4E48|\u600E\u4E48|\u8C03\u7814|\u7814\u7A76|\u8BC4\u5BA1|\u5BA1\u67E5|\u6539\u8FDB|\u8BBE\u8BA1|\u903B\u8F91|\u5019\u9009|\u6355\u83B7|\u547D\u4E2D)/i;
+var AGENT_PROMPT_PREFIX_RE = /^\s*(?:TASK|CONTEXT|AXIS|EXPECTED OUTCOME|MUST DO|MUST NOT DO|REQUEST):/i;
+var ONE_OFF_WORK_RE = /(fix|repair|update|submit|publish|release|commit|create\s+pr|\u4FEE\u590D|\u66F4\u65B0|\u63D0\u4EA4|\u53D1\u5E03|\u4E0A\u7EBF).{0,80}(pr|readme|docs?|todo|ui|bug|\u6587\u6863|\u5F85\u529E|\u89C4\u8303|\u7EA6\u5B9A|\u9879\u76EE|\u4E0B\u62C9|\u6309\u94AE)/i;
 function looksLikeHabitIntent(text) {
-  return HABIT_INTENT_HINT_RE.test(text) || CJK_HABIT_INTENT_HINTS.some((hint) => text.includes(hint));
+  return DURABLE_PREFERENCE_RE.test(text) && !isNoisyHabitCandidate(text);
+}
+function isNoisyHabitCandidate(text) {
+  return AGENT_PROMPT_PREFIX_RE.test(text) || NOISY_HABIT_DISCUSSION_RE.test(text) || ONE_OFF_WORK_RE.test(text);
 }
 async function captureHabitIntentWithCli($, root, text) {
   if (!text || !looksLikeHabitIntent(text))
