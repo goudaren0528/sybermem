@@ -137,6 +137,46 @@ def test_memory_usage_aggregates_lanes_and_p95_without_outcome_double_counting(t
     }
 
 
+def test_memory_usage_parses_codex_host_rows(tmp_path: Path) -> None:
+    # Given: a journal written by the Codex hooks (host="codex") mixed with an
+    # OpenCode row and a still-rejected foreign host.
+    codex_turn = {**_turn("2026-08-14T09:00:00+08:00", 12, recall_items=1, recall_chars=6), "host": "codex", "session_id": "ses_codex"}
+    codex_outcome = {"schema_version": 1, "host": "codex", "event": "session_outcome", "timestamp": "2026-08-14T09:05:00+08:00", "recall_measurable": 2, "recall_unmeasurable": 1, "recall_hit": 1, "recall_evidence_available": True}
+    opencode_turn = _turn("2026-08-14T09:02:00+08:00", 8, habit_items=1, habit_chars=8)
+    foreign = {**_turn("2026-08-14T09:03:00+08:00", 30), "host": "gemini"}
+    _write_journal(tmp_path, [codex_turn, codex_outcome, opencode_turn, foreign])
+
+    # When: the journal is parsed
+    turns, outcomes, status = read_memory_usage_journal(tmp_path)
+
+    # Then: both codex and opencode rows survive; the foreign host is rejected
+    assert status == "available"
+    assert len(turns) == 2  # codex_turn + opencode_turn, NOT the gemini row
+    assert len(outcomes) == 1  # codex session_outcome parsed
+    assert outcomes[0].measurable == 2
+    assert outcomes[0].hit == 1
+
+
+def test_memory_usage_aggregates_codex_lanes(tmp_path: Path) -> None:
+    # Given: two Codex turns with recall and startup lanes
+    _write_journal(
+        tmp_path,
+        [
+            {**_turn("2026-08-14T09:00:00+08:00", 12, recall_items=2, recall_chars=12), "host": "codex", "session_id": "ses_a"},
+            {**_turn("2026-08-13T09:00:00+08:00", 5, startup_items=3, startup_chars=5), "host": "codex", "session_id": "ses_b"},
+        ],
+    )
+
+    # When
+    result = aggregate_memory_usage(tmp_path, "2026-08-14")
+
+    # Then: Codex lane totals aggregate exactly like OpenCode rows
+    assert result["status"] == "available"
+    assert result["turns"] == 2
+    assert result["lanes"]["recall"] == {"items": 2, "chars": 12}
+    assert result["lanes"]["startup"] == {"items": 3, "chars": 5}
+
+
 def test_memory_usage_is_explicitly_unavailable_when_journal_is_missing(tmp_path: Path) -> None:
     # Given: a project without the bounded usage journal
     # When: usage is aggregated

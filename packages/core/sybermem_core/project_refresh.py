@@ -36,6 +36,7 @@ GITIGNORE_BODY: Final = "\n".join(
         "/.sybermem/hooks/",
         "/.sybermem/.recall-debug.jsonl",
         "/.sybermem/.recall-outcomes.jsonl",
+        "/.sybermem/.memory-usage.jsonl",
         "/.sybermem/.auto-trail.jsonl",
         "/.sybermem/.nudge-state.json",
         "/.sybermem/.opencode-nudge-state.json",
