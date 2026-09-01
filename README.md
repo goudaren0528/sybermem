@@ -93,8 +93,8 @@ implements: [requirement-002]
 - record 关系：`implements` / `fixes` / `related` / `superseded_by` / `crystallized_from`
 - 只读续接：`/sybermem-resume` 与 `sybermem resume`
 - 记忆统计：`sybermem project memory-stats` 打印 7 天 / 30 天终端表格（record 计数、类型分布、recall、Edit Alignment、digest / norm 覆盖、memory injection lane 分布）；`--format json` 供 `/sybermem-summary` 与自动化消费。详见[索引与检索](#索引与检索)
-- 召回相关性反馈：OpenCode 在 `session.idle` 把召回注入过的记录与实际编辑文件（按 `related_files`）比对，写入有界 `.sybermem/.recall-outcomes.jsonl` / `.memory-usage.jsonl`，得出频率之外的 `low_relevance`（精准度）与 `low_measurability`（锚点不足）判定。详见 [Feature Map](docs/feature_map.md)
-- 注入可观测性：本阶段只有 OpenCode 会把实际进入模型的记忆写入 metadata-only 的 `.sybermem/.memory-usage.jsonl`（含 lane totals、注入 record ids 与 `session_outcome` 汇总，不保存原始 prompt / 完整注入文本，写入失败 fail-open）。详见 [Feature Map](docs/feature_map.md)
+- 召回相关性反馈：OpenCode 在 `session.idle`、Codex 在 `SessionEnd`（best-effort）把召回注入过的记录与实际编辑文件（按 `related_files`）比对，写入有界 `.sybermem/.recall-outcomes.jsonl` / `.memory-usage.jsonl`，得出频率之外的 `low_relevance`（精准度）与 `low_measurability`（锚点不足）判定。详见 [Feature Map](docs/feature_map.md)
+- 注入可观测性：OpenCode 与 Codex 会把实际进入模型的记忆写入 metadata-only 的 `.sybermem/.memory-usage.jsonl`（含 lane totals、注入 record ids 与 `session_outcome` 汇总，不保存原始 prompt / 完整注入文本，写入失败 fail-open）。详见 [Feature Map](docs/feature_map.md)
 - 项目内检索：`/sybermem-search` 与 `sybermem search`
 - 下一步建议：`/using-sybermem` 与 `sybermem next-step`
 
@@ -155,7 +155,7 @@ SyberMem 有两类执行路径，可靠性不同：
 |---|---|---|
 | **OpenCode** | 最完整：逐-prompt 自动召回 + 习惯注入 + 注入可观测性 | 原生 TypeScript plugin（`chat.message` / `system.transform` 等 seam）+ skills |
 | **Claude Code** | 完整：会话启动上下文 + 逐-prompt 提醒 | plugin metadata + `SessionStart` / `UserPromptSubmit` / `Stop` hooks + skills |
-| **Codex** | 有界：启动上下文 + 逐-prompt 召回/提醒 | `~/.agents/skills` + `SessionStart` / `UserPromptSubmit` / `Stop` / `PostCompact` hooks（无隐藏自动化） |
+| **Codex** | 有界：启动上下文 + 逐-prompt 召回/提醒 + metadata-only 可观测性 | `~/.agents/skills` + `SessionStart` / `UserPromptSubmit` / `SessionEnd` / `Stop` / `PostCompact` hooks（无隐藏自动化） |
 
 三平台共享同一套 records、CLI/Core 与 `.sybermem/` 数据，差异只在「注入自动化」的深度。逐宿主的 hook 细节与完整功能矩阵见 [Feature Map](docs/feature_map.md)、[`.opencode/INSTALL.md`](.opencode/INSTALL.md) 与 [`.codex/INSTALL.md`](.codex/INSTALL.md)。
 
@@ -165,7 +165,7 @@ SyberMem 有两类执行路径，可靠性不同：
 
 安装命令见上文[快速开始](#快速开始)（提供 macOS / Linux、Windows PowerShell、Windows PowerShell-free 三种）。
 
-这会刷新用户级 Claude Code skills、OpenCode skills、Codex skills（`~/.agents/skills`）、OpenCode plugin、Codex `SessionStart` / `UserPromptSubmit` / `Stop` / `PostCompact` hooks，以及 CLI / Core runtime。安装器会创建固定 CLI launcher：macOS / Linux 为 `$HOME/.claude/sybermem/cli/sybermem`，Windows 为 `%USERPROFILE%\.claude\sybermem\cli\sybermem.cmd`。SyberMem 的 OpenCode plugin、Codex hooks 和 CLI 型 skills 在子进程找不到裸 `sybermem` 时会优先使用这个固定 launcher；安装脚本默认不修改持久 PATH。
+这会刷新用户级 Claude Code skills、OpenCode skills、Codex skills（`~/.agents/skills`）、OpenCode plugin、Codex `SessionStart` / `UserPromptSubmit` / `SessionEnd` / `Stop` / `PostCompact` hooks，以及 CLI / Core runtime。安装器会创建固定 CLI launcher：macOS / Linux 为 `$HOME/.claude/sybermem/cli/sybermem`，Windows 为 `%USERPROFILE%\.claude\sybermem\cli\sybermem.cmd`。SyberMem 的 OpenCode plugin、Codex hooks 和 CLI 型 skills 在子进程找不到裸 `sybermem` 时会优先使用这个固定 launcher；安装脚本默认不修改持久 PATH。
 
 ### 从源码验证
 
@@ -183,7 +183,7 @@ SyberMem 有两类执行路径，可靠性不同：
 
 安装器会把已安装版本写入 `~/.claude/sybermem/VERSION`；`sybermem project refresh` 会在项目 `.sybermem/project.yaml` 写入 `sybermem_version`。当某个项目落后于已安装版本时，会话启动会给出一条节流、fail-open 的 `⭐ 运行 /sybermem-update` 提醒（OpenCode `session.created` toast；Claude/Codex `SessionStart` 上下文）。随时可用 `sybermem doctor` 查看已安装版本与当前项目版本。
 
-全局刷新只更新用户级 runtime、Claude/OpenCode/Codex skills、OpenCode plugin 和 Codex 用户级 hooks；项目内的 `.sybermem/`、hooks、模板和说明文件需要 `/sybermem-update` 才会刷新。`/sybermem-update` 会优先调用 `sybermem project refresh --format json` 做可脚本化的项目内刷新，只有 CLI 缺失、执行失败或输出非 JSON 时才回退到 agent 编排的 `/sybermem-init-project`。Codex 的健康检查会把 `~/.agents/skills/sybermem-init-project/project-files` 作为模板来源之一，因此 Codex 安装路径也能参与项目 freshness 检查。老用户要拿到 OpenCode 新的 habit reminder、record-intent metadata、recall debug logging、actual-injection observability、`.memory-usage.jsonl` 或 `prompt-memory-injected` summary toast 链路，先重跑全局安装/更新以刷新 CLI/Core 与 `~/.config/opencode/plugins/sybermem.ts`，再进项目跑 `/sybermem-update`；`project refresh` 不会脚手架创建 `.memory-usage.jsonl` 这类 runtime log。若修复的是 CLI launcher、OpenCode plugin、Codex hook 或 skill 指令链路，也按这个顺序生效。
+全局刷新只更新用户级 runtime、Claude/OpenCode/Codex skills、OpenCode plugin 和 Codex 用户级 hooks；项目内的 `.sybermem/`、hooks、模板和说明文件需要 `/sybermem-update` 才会刷新。`/sybermem-update` 会优先调用 `sybermem project refresh --format json` 做可脚本化的项目内刷新，只有 CLI 缺失、执行失败或输出非 JSON 时才回退到 agent 编排的 `/sybermem-init-project`。Codex 的健康检查会把 `~/.agents/skills/sybermem-init-project/project-files` 作为模板来源之一，因此 Codex 安装路径也能参与项目 freshness 检查。老用户要拿到 OpenCode/Codex 新的 habit reminder、record-intent metadata、recall debug logging、actual-injection observability、`.memory-usage.jsonl`、Codex `SessionEnd` outcome 或 OpenCode `prompt-memory-injected` summary toast 链路，先重跑全局安装/更新以刷新 CLI/Core、`~/.config/opencode/plugins/sybermem.ts` 与 `~/.codex/hooks/*.py`，再进项目跑 `/sybermem-update`；`project refresh` 不会脚手架创建 `.memory-usage.jsonl` 这类 runtime log。若修复的是 CLI launcher、OpenCode plugin、Codex hook 或 skill 指令链路，也按这个顺序生效。
 
 ## 初始化项目
 
@@ -234,7 +234,7 @@ SyberMem 有两类执行路径，可靠性不同：
 - `.sybermem/INDEX.md` 是项目内派生导航文件，由 `sybermem project index build` 重建，由 `sybermem project index check` 校验。
 - `sybermem project phase analyze` 会确定性地对记录分组并原子写回 `.sybermem/analysis/phase-index.md`（confirmed phases + coverage map + `status: analyzed`），使阶段分析结果不会因为手写 Markdown 而静默丢失。阶段分组是 agent 判断：agent 读取完整 record 历史产出语义分组，用 `sybermem project phase analyze --from-json <file>`（`{ "phases": [ { "title": "...", "covered_records": [...] } ] }`）校验覆盖后确定性落盘；机械分组（不带 `--from-json`，按月份+主题分桶）仅在 agent 无法产出语义分组时兜底。`/sybermem-phase-analyze` 优先走该 CLI，仅在 CLI 缺失、执行失败或输出非 JSON 时回退 agent 编排。
 - `sybermem project coverage-hash --phase-id phase-NNN --format json` 把某阶段的 covered record 解析为真实文件路径（依据各记录 frontmatter `record_id:`，而非文件名）并返回 `source_records` 与确定性的 `coverage_hash`，供 `/sybermem-digest` 填充 digest 的 `coverage_hash` 字段；也可用 `--source-records <relpaths>` 直接对指定源计算哈希。
-- `sybermem project memory-stats` 以表格展示最近 7 天 / 30 天的 record 数量、类型分布、recall events、injected/abstained、recall rate、Edit Alignment，以及 Memory injection 的 turns/items/chars、avg chars/turn、p95 chars/turn 和 30d lane distribution；`--format json` 给 skill 和自动化消费。召回频率指标来自 `.sybermem/.recall-debug.jsonl`，Edit Alignment 与 memory injection observability 来自 OpenCode 写入的 `.sybermem/.recall-outcomes.jsonl` 和 `.sybermem/.memory-usage.jsonl`；没有对应日志表示统计不可用，不代表召回活动为 0。Edit Alignment 只是按 `related_files` 锚点计算的编辑对齐代理，不代表语义准确率；它会同时暴露 hit、measurable、unmeasurable 和 evidence availability。`recall_health` 的 `low_relevance` 判定在注入样本足够且该代理值低于阈值时才触发，与频率型 `low_signal` 区分；当召回在触发但太多记录缺少可验证 `related_files` 锚点时，会给出独立的 `low_measurability` 建议。
+- `sybermem project memory-stats` 以表格展示最近 7 天 / 30 天的 record 数量、类型分布、recall events、injected/abstained、recall rate、Edit Alignment，以及 Memory injection 的 turns/items/chars、avg chars/turn、p95 chars/turn 和 30d lane distribution；`--format json` 给 skill 和自动化消费。召回频率指标来自 `.sybermem/.recall-debug.jsonl`，Edit Alignment 与 memory injection observability 来自 OpenCode/Codex 写入的 `.sybermem/.recall-outcomes.jsonl` 和 `.sybermem/.memory-usage.jsonl`；没有对应日志表示统计不可用，不代表召回活动为 0。Edit Alignment 只是按 `related_files` 锚点计算的编辑对齐代理，不代表语义准确率；它会同时暴露 hit、measurable、unmeasurable 和 evidence availability。Codex 的 Edit Alignment 来自 `SessionEnd` 时的 git diff 近似，不具备 OpenCode per-event 编辑遥测精度。`recall_health` 的 `low_relevance` 判定在注入样本足够且该代理值低于阈值时才触发，与频率型 `low_signal` 区分；当召回在触发但太多记录缺少可验证 `related_files` 锚点时，会给出独立的 `low_measurability` 建议。
 - `sybermem project record-files --ids <a,b> --format json` 把记录 id 映射到其 `related_files`，供 OpenCode 召回相关性判定复用 Core 的 Markdown 解析。
 - `sybermem index build` 构建 workspace 级 SQLite FTS5 索引，服务于跨项目搜索。
 - 项目内检索默认基于已解析 Markdown records 的词法匹配和打分；`title` / `topics` / relation / body 之外，`key_conclusion` 作为一等高权重信号参与排序，`related_files` 提供有上限的路径/模块 boost 与 tie-break。显式项目检索还能做一跳 typed relation expansion：当查询直接命中 `record_id`，或先命中 typed relation 时，结果可补入关联 record，并在 JSON / 机器可读结果中带 `match: relation-expanded`、`expanded_from`、`expansion_relation` 溯源字段。`sybermem context recall --format json` 会暴露机器可读的匹配字段、分数拆解与这类 expansion provenance；prompt-time Markdown 包保持短小，不注入解释细节。需要跨项目搜索时使用 workspace index。

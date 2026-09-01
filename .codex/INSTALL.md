@@ -1,6 +1,6 @@
 # Codex Installation Notes
 
-SyberMem Codex support is **user skills plus bounded SessionStart/UserPromptSubmit/Stop/PostCompact hooks**.
+SyberMem Codex support is **user skills plus bounded SessionStart/UserPromptSubmit/SessionEnd/Stop/PostCompact hooks**.
 
 The global install and update scripts copy the canonical SyberMem skills from
 `packages/claude-skills/` into the Codex user skills directory:
@@ -16,8 +16,10 @@ environment loads user skills from `~/.agents/skills`.
 Codex support includes discoverability and release verification around the
 skills path, plus conservative managed hooks for startup project context,
 prompt-time project recall, User Habit Memory reminders, record-intent capture,
-Stop-time record nudges, and compact re-seed markers. It still does not add
-hidden auto-resume or broader Codex runtime automation.
+bounded recall/memory observability journals, SessionEnd edit-alignment
+outcomes, Stop-time record nudges, and compact re-seed markers. Hidden
+auto-resume, background workers, and broader Codex runtime automation remain
+unsupported.
 
 ## Install and update
 
@@ -41,8 +43,10 @@ Each install/update path refreshes:
 - Codex user skills at `~/.agents/skills`
 - the Codex `SessionStart` startup context hook at `~/.codex/hooks/sybermem_session_start.py`
 - the Codex `UserPromptSubmit` prompt context hook at `~/.codex/hooks/sybermem_user_prompt.py`
+- the Codex `SessionEnd` observability hook at `~/.codex/hooks/sybermem_session_end.py`
 - the Codex `Stop` record nudge hook at `~/.codex/hooks/sybermem_stop.py`
 - the Codex `PostCompact` marker hook at `~/.codex/hooks/sybermem_post_compact.py`
+- the shared Codex observability helper at `~/.codex/hooks/_codex_observability.py`
 - the Codex hook registry merge in `~/.codex/hooks.json`
 - the SyberMem CLI / Core runtime
 - the fixed SyberMem CLI launcher
@@ -56,20 +60,35 @@ CLI-using skills and the Codex hooks include fallback guidance for that launcher
 when a subprocess cannot resolve bare `sybermem`. Install scripts do not modify
 persistent PATH automatically.
 
-The Codex hooks are merged under `SessionStart`, `UserPromptSubmit`, `Stop`, and
-`PostCompact`. `SessionStart` and `UserPromptSubmit` return bounded context
-through `hookSpecificOutput.additionalContext`. When context is injected, the
-managed hooks lead with an ASCII SyberMem marker (`## SyberMem Codex Startup` or
-`## SyberMem Codex Context`) so Codex transcripts can distinguish SyberMem
-startup context, recall, habits, and scoped norms without relying on desktop
-notifications. The prompt hook combines high-signal project recall and User Habit
-Memory reminders when either one qualifies, and it writes bounded
+The Codex hooks are merged under `SessionStart`, `UserPromptSubmit`,
+`SessionEnd`, `Stop`, and `PostCompact`. `SessionStart` and `UserPromptSubmit`
+return bounded context through `hookSpecificOutput.additionalContext`. When
+context is injected, the managed hooks lead with a SyberMem marker
+(`## SyberMem Codex Startup` or `## SyberMem Codex Context`) so Codex transcripts
+can distinguish SyberMem startup context, recall, habits, and scoped norms
+without relying on desktop notifications. Prompt-time markers include lane
+counts and record IDs, plus a model-visible instruction to restate the per-turn
+SyberMem count at the top of the assistant reply. The installed hooks also use
+Codex `statusMessage` strings so Desktop users can see that SyberMem is
+loading/recalling memory even though Codex Desktop does not currently expose
+OpenCode-style toasts. The prompt hook emits a dynamic `systemMessage` count
+when `SYBERMEM_CODEX_SYSTEM_MESSAGE` is not set to a falsey value
+(`0`/`false`/`no`/`off`); this is visible where Codex surfaces hook warnings or
+event-stream messages and is fail-open on Desktop clients that currently swallow
+it. The prompt hook combines high-signal project recall and User Habit Memory
+reminders when either one qualifies, and it writes bounded
 `.sybermem/.record-intent.json` classifier metadata for explicit record requests
-without persisting the raw prompt. `Stop` emits at most one bounded
-`/sybermem-record` continuation nudge per changed-file fingerprint and returns
-nothing when `stop_hook_active` is true. `PostCompact` writes only
-`.sybermem/.codex-compact-marker.json`; it does not inject direct compaction
-context.
+without persisting the raw prompt. Prompt-time injection/abstention and memory
+lane counts are recorded as metadata-only rows in `.sybermem/.recall-debug.jsonl`
+and `.sybermem/.memory-usage.jsonl`, so `sybermem project memory-stats --format
+json` can quantify Codex recall/lane activity. `SessionEnd` best-effort records
+edit-alignment evidence by comparing injected record IDs with edited files via
+`related_files`; if evidence cannot be collected within the tight SessionEnd
+budget, it writes a no-evidence outcome or stays silent without blocking session
+close. `Stop` emits at most one bounded `/sybermem-record` continuation nudge per
+changed-file fingerprint and returns nothing when `stop_hook_active` is true.
+`PostCompact` writes only `.sybermem/.codex-compact-marker.json`; it does not
+inject direct compaction context.
 
 ## Project setup
 
@@ -144,8 +163,10 @@ Verify the Codex managed hooks too:
 ```bash
 ls ~/.codex/hooks/sybermem_user_prompt.py
 ls ~/.codex/hooks/sybermem_session_start.py
+ls ~/.codex/hooks/sybermem_session_end.py
 ls ~/.codex/hooks/sybermem_stop.py
 ls ~/.codex/hooks/sybermem_post_compact.py
+ls ~/.codex/hooks/_codex_observability.py
 cat ~/.codex/hooks.json
 ```
 
@@ -154,17 +175,23 @@ On Windows PowerShell:
 ```powershell
 Test-Path "$env:USERPROFILE\.codex\hooks\sybermem_user_prompt.py"
 Test-Path "$env:USERPROFILE\.codex\hooks\sybermem_session_start.py"
+Test-Path "$env:USERPROFILE\.codex\hooks\sybermem_session_end.py"
 Test-Path "$env:USERPROFILE\.codex\hooks\sybermem_stop.py"
 Test-Path "$env:USERPROFILE\.codex\hooks\sybermem_post_compact.py"
+Test-Path "$env:USERPROFILE\.codex\hooks\_codex_observability.py"
 Test-Path "$env:USERPROFILE\.codex\hooks.json"
 ```
 
 The installed `hooks.json` should contain `SessionStart`, `UserPromptSubmit`,
-`Stop`, and `PostCompact` entries that point to the SyberMem hooks. Only
-`SessionStart` and `UserPromptSubmit` write bounded context through
-`hookSpecificOutput.additionalContext`; injected context starts with a SyberMem
-Codex marker and stays model-visible. `Stop` can return a bounded continuation
-nudge, and `PostCompact` is side-effect-only.
+`SessionEnd`, `Stop`, and `PostCompact` entries that point to the SyberMem hooks
+and use Codex `statusMessage` for visible in-client status. After hook
+definitions change, Codex may require `/hooks` review/trust before non-managed
+hooks run. Only `SessionStart` and `UserPromptSubmit` write bounded context
+through `hookSpecificOutput.additionalContext`; injected context starts with a
+SyberMem Codex marker and stays model-visible. `UserPromptSubmit` and
+`SessionStart` append bounded observability rows; `SessionEnd` is side-effect-only
+and can append best-effort edit-alignment outcomes. `Stop` can return a bounded
+continuation nudge, and `PostCompact` is side-effect-only.
 
 ## Repository verification
 
@@ -200,9 +227,19 @@ For an installed user environment, verify both layers:
   update skill runs the CLI-first project refresh.
 - **Codex startup context or prompt context never appears after an upgrade**
   Re-run the global installer or updater so `~/.codex/hooks/sybermem_user_prompt.py`,
-  `~/.codex/hooks/sybermem_session_start.py`, `~/.codex/hooks/sybermem_stop.py`,
-  `~/.codex/hooks/sybermem_post_compact.py`, and `~/.codex/hooks.json` are refreshed.
+  `~/.codex/hooks/sybermem_session_start.py`,
+  `~/.codex/hooks/sybermem_session_end.py`, `~/.codex/hooks/sybermem_stop.py`,
+  `~/.codex/hooks/sybermem_post_compact.py`,
+  `~/.codex/hooks/_codex_observability.py`, and `~/.codex/hooks.json` are refreshed.
   Then run `/sybermem-update` in the project if you also need fresh project-managed files.
+  If Codex reports hooks need review, open `/hooks` and trust the refreshed SyberMem
+  hook definitions.
+- **Codex memory-stats still shows no recall/lane data**
+  Confirm the refreshed hooks have run inside a SyberMem project. New prompt-time
+  events write `.sybermem/.recall-debug.jsonl` and `.sybermem/.memory-usage.jsonl`;
+  `SessionEnd` can write `.sybermem/.recall-outcomes.jsonl`. Project init/update
+  refreshes the `.gitignore` SyberMem block so these JSONL files remain local
+  runtime logs rather than shared project memory.
 - **A skill subprocess cannot resolve `sybermem`**
   Re-run the global installer or updater so the fixed launcher is refreshed.
   CLI-using skills include guidance for `$HOME/.claude/sybermem/cli/sybermem`
@@ -220,15 +257,22 @@ context session --format markdown`. The Codex `UserPromptSubmit` hook injects
 high-signal project recall from `sybermem context recall --query ...` and bounded
 User Habit Memory reminders from `sybermem context habit --delivery prompt-time`.
 When either hook injects context, it prefixes the `additionalContext` payload with
-a short SyberMem Codex marker. This is Codex's supported visibility path; SyberMem
-does not install Windows desktop toasts or claim an OpenCode-style TUI toast API
-for Codex. It also captures explicit record intent into
-`.sybermem/.record-intent.json` using bounded classifier metadata. The Codex
-`Stop` hook can return one bounded `/sybermem-record` continuation nudge and uses
-both Codex `stop_hook_active` and a local fingerprint to avoid loops. The Codex
-`PostCompact` hook writes a marker so the next compact-source `SessionStart` can
-re-seed ordinary session context; it does not inject direct compaction prompt
-context. All hook paths fail open.
+a SyberMem Codex marker carrying lane counts and injected IDs, and asks the model
+to restate the count in the first reply line so Codex Desktop users can perceive
+recall through the assistant response. The installed `statusMessage` values are
+the hard Desktop-visible signal that SyberMem is running, while dynamic
+`systemMessage` counts are best-effort because some Desktop builds currently
+swallow them. This is Codex's supported visibility path; SyberMem does not
+install Windows desktop toasts or claim an OpenCode-style TUI toast API for Codex.
+It also captures explicit record intent into `.sybermem/.record-intent.json` using
+bounded classifier metadata. The Codex `UserPromptSubmit`, `SessionStart`, and
+`SessionEnd` hooks write only bounded metadata observability rows
+(`.recall-debug.jsonl`, `.memory-usage.jsonl`, `.recall-outcomes.jsonl`) and never
+raw prompt text. The Codex `Stop` hook can return one bounded `/sybermem-record`
+continuation nudge and uses both Codex `stop_hook_active` and a local fingerprint
+to avoid loops. The Codex `PostCompact` hook writes a marker so the next
+compact-source `SessionStart` can re-seed ordinary session context; it does not
+inject direct compaction prompt context. All hook paths fail open.
 
 Manual commands stay documented and supported:
 
@@ -241,8 +285,8 @@ Manual commands stay documented and supported:
 ## Explicitly unsupported
 
 Codex support does not add broad Codex runtime automation. It only adds bounded
-managed command hooks through `SessionStart`, `UserPromptSubmit`, `Stop`, and
-`PostCompact`.
+managed command hooks through `SessionStart`, `UserPromptSubmit`, `SessionEnd`,
+`Stop`, and `PostCompact`.
 
 In particular, SyberMem does **not** install or claim:
 
