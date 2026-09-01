@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## 0.3.0 - 2026-09-01
+
+### Added
+- Codex now writes metadata-only recall/memory observability rows for prompt-time recall, startup context, and best-effort `SessionEnd` edit alignment, so `sybermem project memory-stats` can report Codex recall/lane activity alongside OpenCode.
+- Codex prompt-time memory injection now has explicit visibility markers with lane counts and record IDs, plus a default-on env-gated `systemMessage` summary for clients that surface hook messages.
+
+### Changed
+- Codex installers now register `SessionEnd`, copy the shared observability helper, use `statusMessage` for hook visibility, and keep managed uninstall/guard manifests in sync with the expanded hook set.
+- Project gitignore management now ignores `.sybermem/.memory-usage.jsonl` so local runtime memory-usage journals do not enter Git.
+
 ## 0.2.4 - 2026-08-27
 
 ### Fixed
