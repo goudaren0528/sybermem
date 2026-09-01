@@ -10,6 +10,9 @@ from typing import Final, TypedDict
 
 LANES: Final = ("recall", "habit", "norm", "startup")
 MAX_JOURNAL_BYTES: Final = 1_000_000
+# Hosts that write the memory-usage journal in this schema. OpenCode was first;
+# Codex hooks now write the same schema, so both are aggregated together.
+KNOWN_HOSTS: Final = frozenset(("opencode", "codex"))
 
 
 class LaneStats(TypedDict):
@@ -47,7 +50,7 @@ class UsageOutcome:
 
 
 def read_memory_usage_journal(root: Path) -> tuple[list[UsageTurn], list[UsageOutcome], str]:
-    """Parse valid OpenCode per-turn and session-outcome journal rows."""
+    """Parse valid per-turn and session-outcome journal rows from any known host."""
     path = root / ".sybermem" / ".memory-usage.jsonl"
     if not path.is_file():
         return [], [], "no_log"
@@ -157,7 +160,7 @@ def _parse_line(line: str) -> dict[str, object] | None:
 
 
 def _parse_turn(row: dict[str, object]) -> UsageTurn | None:
-    if row.get("schema_version") != 1 or row.get("host") != "opencode" or "event" in row:
+    if row.get("schema_version") != 1 or row.get("host") not in KNOWN_HOSTS or "event" in row:
         return None
     timestamp = _parse_date(row.get("timestamp"))
     numeric = {key: _non_negative_int(row.get(key)) for key in ("total_items", "total_chars")}
@@ -172,7 +175,7 @@ def _parse_turn(row: dict[str, object]) -> UsageTurn | None:
 
 
 def _parse_outcome(row: dict[str, object]) -> UsageOutcome | None:
-    if row.get("schema_version") != 1 or row.get("host") != "opencode" or row.get("event") != "session_outcome":
+    if row.get("schema_version") != 1 or row.get("host") not in KNOWN_HOSTS or row.get("event") != "session_outcome":
         return None
     timestamp = _parse_date(row.get("timestamp"))
     measurable = _non_negative_int(row.get("recall_measurable"))
