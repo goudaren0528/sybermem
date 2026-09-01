@@ -398,6 +398,12 @@ def check_codex_user_prompt_hook_install_wiring(root: Path) -> None:
     post_compact_hook_source = root / ".codex" / "hooks" / "post_compact.py"
     if not post_compact_hook_source.is_file():
         fail("Missing Codex post compact hook source: .codex/hooks/post_compact.py")
+    session_end_hook_source = root / ".codex" / "hooks" / "session_end.py"
+    if not session_end_hook_source.is_file():
+        fail("Missing Codex session end hook source: .codex/hooks/session_end.py")
+    observability_source = root / ".codex" / "hooks" / "_codex_observability.py"
+    if not observability_source.is_file():
+        fail("Missing Codex observability helper source: .codex/hooks/_codex_observability.py")
 
     hook_source_text = hook_source.read_text(encoding="utf-8")
     required_source_fragments = [
@@ -453,6 +459,31 @@ def check_codex_user_prompt_hook_install_wiring(root: Path) -> None:
     if missing_post_compact:
         fail(f".codex/hooks/post_compact.py is missing Codex PostCompact hook fragments: {', '.join(missing_post_compact)}")
 
+    session_end_source_text = session_end_hook_source.read_text(encoding="utf-8")
+    required_session_end_fragments = [
+        "SessionEnd",
+        "record-files",
+        "append_session_outcome",
+        "evidence_available",
+        ".memory-usage.jsonl",
+        "_codex_observability",
+    ]
+    missing_session_end = [fragment for fragment in required_session_end_fragments if fragment not in session_end_source_text]
+    if missing_session_end:
+        fail(f".codex/hooks/session_end.py is missing Codex SessionEnd hook fragments: {', '.join(missing_session_end)}")
+
+    observability_source_text = observability_source.read_text(encoding="utf-8")
+    required_observability_fragments = [
+        ".recall-debug.jsonl",
+        ".memory-usage.jsonl",
+        ".recall-outcomes.jsonl",
+        '"codex"',
+        "codex-user-prompt",
+    ]
+    missing_observability = [fragment for fragment in required_observability_fragments if fragment not in observability_source_text]
+    if missing_observability:
+        fail(f".codex/hooks/_codex_observability.py is missing journaling fragments: {', '.join(missing_observability)}")
+
     forbidden_source_fragments = [
         "auto-resume",
         "background automation",
@@ -465,28 +496,33 @@ def check_codex_user_prompt_hook_install_wiring(root: Path) -> None:
 
     for script in CODEX_HOOK_INSTALL_SCRIPTS:
         script_text = distribution_script_text(root, script)
+        # Assert on STABLE distribution tokens (event names, hook/helper filenames,
+        # statusMessage field, additionalContextLimit) rather than human-readable
+        # status prose. The prose is localized and churns; the tokens are the real
+        # contract that keeps every install path installing the same hooks.
         if script.suffix == ".sh":
             required_fragments = [
                 ".codex/hooks/user_prompt.py",
                 ".codex/hooks/session_start.py",
+                ".codex/hooks/session_end.py",
                 ".codex/hooks/stop.py",
                 ".codex/hooks/post_compact.py",
+                "_codex_observability.py",
                 ".codex/hooks",
                 "sybermem_user_prompt.py",
                 "sybermem_session_start.py",
+                "sybermem_session_end.py",
                 "sybermem_stop.py",
                 "sybermem_post_compact.py",
                 ".codex/hooks.json",
                 '"UserPromptSubmit"',
                 '"SessionStart"',
+                '"SessionEnd"',
                 '"Stop"',
                 '"PostCompact"',
                 '"type": "command"',
+                "statusMessage",
                 "additionalContextLimit",
-                "SyberMem prompt context adds bounded Codex recall and habit reminders when relevant.",
-                "SyberMem session context adds bounded Codex startup context when available.",
-                "SyberMem Stop nudge adds bounded record reminders without looping.",
-                "SyberMem PostCompact marks compact re-seed for the next SessionStart.",
             ]
             forbidden_fragments = [
                 ".codex/config.toml",
@@ -500,24 +536,25 @@ def check_codex_user_prompt_hook_install_wiring(root: Path) -> None:
             required_fragments = [
                 ".codex\\hooks\\user_prompt.py",
                 ".codex\\hooks\\session_start.py",
+                ".codex\\hooks\\session_end.py",
                 ".codex\\hooks\\stop.py",
                 ".codex\\hooks\\post_compact.py",
+                "_codex_observability.py",
                 ".codex\\hooks",
                 "sybermem_user_prompt.py",
                 "sybermem_session_start.py",
+                "sybermem_session_end.py",
                 "sybermem_stop.py",
                 "sybermem_post_compact.py",
                 ".codex\\hooks.json",
                 '"UserPromptSubmit"',
                 '"SessionStart"',
+                '"SessionEnd"',
                 '"Stop"',
                 '"PostCompact"',
                 'type = "command"',
+                "statusMessage",
                 "additionalContextLimit",
-                "SyberMem prompt context adds bounded Codex recall and habit reminders when relevant.",
-                "SyberMem session context adds bounded Codex startup context when available.",
-                "SyberMem Stop nudge adds bounded record reminders without looping.",
-                "SyberMem PostCompact marks compact re-seed for the next SessionStart.",
             ]
             forbidden_fragments = [
                 ".codex\\config.toml",
@@ -529,13 +566,11 @@ def check_codex_user_prompt_hook_install_wiring(root: Path) -> None:
             ]
         else:
             required_fragments = [
-                ".codex", "hooks", "user_prompt.py", "session_start.py", "stop.py", "post_compact.py",
-                "sybermem_user_prompt.py", "sybermem_session_start.py", "sybermem_stop.py", "sybermem_post_compact.py",
-                "hooks.json", '"UserPromptSubmit"', '"SessionStart"', '"Stop"', '"PostCompact"', '"type": "command"',
-                "additionalContextLimit", "SyberMem prompt context adds bounded Codex recall and habit reminders when relevant.",
-                "SyberMem session context adds bounded Codex startup context when available.",
-                "SyberMem Stop nudge adds bounded record reminders without looping.",
-                "SyberMem PostCompact marks compact re-seed for the next SessionStart.",
+                ".codex", "hooks", "user_prompt.py", "session_start.py", "session_end.py", "stop.py", "post_compact.py",
+                "_codex_observability.py",
+                "sybermem_user_prompt.py", "sybermem_session_start.py", "sybermem_session_end.py", "sybermem_stop.py", "sybermem_post_compact.py",
+                "hooks.json", '"UserPromptSubmit"', '"SessionStart"', '"SessionEnd"', '"Stop"', '"PostCompact"', '"type": "command"',
+                "statusMessage", "additionalContextLimit",
             ]
             forbidden_fragments = [".codex/config.toml", '"agent"', '"startup"', '"session"', "background automation", "auto-resume"]
         missing = [fragment for fragment in required_fragments if fragment not in script_text]
@@ -570,6 +605,17 @@ def check_managed_removal_wiring(root: Path) -> None:
     missing_manifest = sorted(active_names - set(manifest.get("skills", [])))
     if missing_manifest:
         fail(f"scripts/managed-install.json is missing active skills: {', '.join(missing_manifest)}")
+    required_codex_hooks = {
+        "sybermem_user_prompt.py",
+        "sybermem_session_start.py",
+        "sybermem_session_end.py",
+        "sybermem_stop.py",
+        "sybermem_post_compact.py",
+        "_codex_observability.py",
+    }
+    missing_codex_hooks = sorted(required_codex_hooks - set(manifest.get("codex_hook_files", [])))
+    if missing_codex_hooks:
+        fail(f"scripts/managed-install.json codex_hook_files is missing: {', '.join(missing_codex_hooks)}")
     for script in MANAGED_REMOVAL_SCRIPTS:
         text = distribution_script_text(root, script)
         missing = [name for name in ("managed-install.json", "safe-managed-remove.py") if name not in text]
