@@ -25,7 +25,7 @@ def test_python_install_common_writes_codex_hook_commands(tmp_path) -> None:
 
     source_dir = tmp_path / "checkout" / ".codex" / "hooks"
     source_dir.mkdir(parents=True)
-    for name in ("user_prompt.py", "session_start.py", "stop.py", "post_compact.py"):
+    for name in ("user_prompt.py", "session_start.py", "session_end.py", "stop.py", "post_compact.py", "_codex_observability.py"):
         (source_dir / name).write_text("print('hook')\n", encoding="utf-8")
     home = tmp_path / "home"
     hooks_json = home / ".codex" / "hooks.json"
@@ -44,12 +44,15 @@ def test_python_install_common_writes_codex_hook_commands(tmp_path) -> None:
     assert {path.name for path in (home / ".codex" / "hooks").iterdir()} == {
         "sybermem_user_prompt.py",
         "sybermem_session_start.py",
+        "sybermem_session_end.py",
         "sybermem_stop.py",
         "sybermem_post_compact.py",
+        "_codex_observability.py",
     }
     assert prompt_handlers[0]["command"] == "python other.py"
     assert "sybermem_user_prompt.py" in prompt_handlers[1]["command"]
     assert "sybermem_session_start.py" in data["hooks"]["SessionStart"][0]["command"]
+    assert "sybermem_session_end.py" in data["hooks"]["SessionEnd"][0]["command"]
     assert "sybermem_stop.py" in data["hooks"]["Stop"][0]["command"]
     assert "sybermem_post_compact.py" in data["hooks"]["PostCompact"][0]["command"]
 

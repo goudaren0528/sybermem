@@ -15,8 +15,8 @@
     "managed-install.json", "safe-managed-remove.py"
   ],
   "codex_hook_files": [
-    "sybermem_user_prompt.py", "sybermem_session_start.py", "sybermem_stop.py",
-    "sybermem_post_compact.py"
+    "sybermem_user_prompt.py", "sybermem_session_start.py", "sybermem_session_end.py",
+    "sybermem_stop.py", "sybermem_post_compact.py", "_codex_observability.py"
   ],
   "opencode_plugin": ".config/opencode/plugins/sybermem.ts"
 }
