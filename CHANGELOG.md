@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.4.0 - 2026-09-01
+
+### Added
+- User Habit Memory now has read-only prompt-time diagnostics: `sybermem habit test --context <text>` explains active/evaluated/selected counts, pending candidates, and per-habit score/floor/reason decisions, while `sybermem habit explain --id <habit-id> --context <text>` focuses on a single habit.
+
+### Changed
+- Prompt-time habit reminders now reuse the same evaluator as the diagnostic commands, keeping dry-run decisions and real model-visible reminder selection aligned without lowering the conservative habit injection gate.
+
 ## 0.3.0 - 2026-09-01
 
 ### Added
