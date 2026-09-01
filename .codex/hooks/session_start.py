@@ -17,6 +17,12 @@ COMPACT_MARKER_FILE: Final = ".codex-compact-marker.json"
 DIGEST_BACKLOG_THRESHOLD: Final = 5
 MAX_LATEST_DIGEST_CONCLUSIONS: Final = 5
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+try:
+    import _codex_observability as _obs
+except Exception:  # pragma: no cover - observability is optional/fail-open
+    _obs = None  # type: ignore[assignment]
+
 
 class HookSpecificOutput(TypedDict):
     hookEventName: str
@@ -61,15 +67,17 @@ def _project_root(start: Path | None = None) -> Path | None:
         current = parent
 
 
-def _session_start_source(stdin_text: str) -> str | None:
+def _session_start_source(stdin_text: str) -> tuple[str | None, str]:
+    """Return (source, session_id). source is None when the event is not ours."""
     data: JsonValue = json.loads(stdin_text or "{}")
     if not isinstance(data, dict):
-        return None
+        return None, ""
     event_name = data.get("hookEventName") or data.get("hook_event_name")
     if event_name not in {None, HOOK_EVENT_NAME}:
-        return None
+        return None, ""
     source = data.get("source")
-    return source if isinstance(source, str) else "startup"
+    session_id = data.get("session_id") or data.get("sessionId") or ""
+    return (source if isinstance(source, str) else "startup"), (session_id if isinstance(session_id, str) else "")
 
 
 def _compact_marker(root: Path | None) -> Path | None:
@@ -270,9 +278,32 @@ def _hook_output(markdown: str) -> HookOutput | None:
     }
 
 
+def _journal_startup(root: Path | None, session_id: str, context: str) -> None:
+    """A2: record the startup lane so memory-stats sees Codex startup injection. Fail-open."""
+    if _obs is None or root is None:
+        return
+    try:
+        bullets = sum(1 for line in context.splitlines() if line.strip().startswith("- "))
+        startup_items = bullets if bullets > 0 else 1
+        _obs.append_memory_usage_turn(
+            root,
+            session_id=session_id,
+            recall_items=0,
+            recall_chars=0,
+            habit_items=0,
+            habit_chars=0,
+            norm_items=0,
+            norm_chars=0,
+            startup_items=startup_items,
+            startup_chars=len(context),
+        )
+    except Exception:
+        pass
+
+
 def main() -> int:  # noqa: BROAD_EXCEPT_OK
     try:
-        source = _session_start_source(sys.stdin.read())
+        source, session_id = _session_start_source(sys.stdin.read())
         if source is None:
             return 0
         root = _project_root()
@@ -281,12 +312,31 @@ def main() -> int:  # noqa: BROAD_EXCEPT_OK
             return 0
         output = _hook_output(_session_markdown())
         if output is not None:
-            sys.stdout.write(json.dumps(output, ensure_ascii=False))
+            _write_stdout(json.dumps(output, ensure_ascii=False))
+            context = output["hookSpecificOutput"]["additionalContext"]
+            _journal_startup(root, session_id, context)
             if source == "compact" and marker is not None:
                 marker.unlink(missing_ok=True)
     except Exception:
         return 0
     return 0
+
+
+def _write_stdout(text: str) -> None:
+    """Write UTF-8 regardless of console default encoding (Windows GBK safety).
+
+    Startup context can carry CJK (session brief, digest conclusions, constitution).
+    Without this, sys.stdout.write would raise UnicodeEncodeError on a GBK console
+    and the hook would emit nothing.
+    """
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")  # type: ignore[attr-defined]
+        sys.stdout.write(text)
+    except Exception:
+        try:
+            sys.stdout.buffer.write(text.encode("utf-8"))
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":
