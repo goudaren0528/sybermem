@@ -7,7 +7,7 @@ import json
 import os
 from pathlib import Path
 import re
-from typing import Final, TypeVar
+from typing import TYPE_CHECKING, Final, TypeVar
 from uuid import uuid4
 
 from sybermem_core.user_habit_model import (
@@ -84,6 +84,9 @@ _DURABLE_PREFERENCE_RE: Final = re.compile(
     r"每次都|默认(?:用|先|都)|一律(?:用|先|都)?|总是(?:用|先|都)?)",
     re.IGNORECASE,
 )
+
+if TYPE_CHECKING:
+    from sybermem_core.habit_diagnostics import PromptHabitEvaluation
 _NOISY_HABIT_DISCUSSION_RE: Final = re.compile(
     r"(why|debug|investigate|research|review|analy[sz]e|improve|design|logic|classifier|candidate|capture|"
     r"为什么|怎么|调研|研究|评审|审查|改进|设计|逻辑|候选|捕获|命中).{0,80}"
@@ -328,7 +331,11 @@ def render_habit_markdown(*, context: str, higher_authority_text: str = "") -> s
 
 
 def render_habit_reminder_markdown(*, context: str, higher_authority_text: str = "") -> str:
-    selected = _select_remindable(context, higher_authority_text)
+    from sybermem_core.habit_diagnostics import evaluate_prompt_habits
+
+    diagnostic = evaluate_prompt_habits(context=context, higher_authority_text=higher_authority_text)
+    habit_by_id = {habit.habit_id: habit for habit in list_habits()}
+    selected = [habit_by_id[row["habit_id"]] for row in diagnostic["habits"] if row["decision"] == "selected" and row["habit_id"] in habit_by_id]
     if selected:
         _log_injection([habit.habit_id for habit in selected], None)
         lines = ["## User Habit Reminder", ""]
@@ -349,6 +356,19 @@ def render_habit_reminder_markdown(*, context: str, higher_authority_text: str =
             "- This looks like a reusable user preference. If you want SyberMem to remember it, confirm it with `/sybermem-habit`.",
         ]
     ) + "\n"
+
+
+def evaluate_prompt_habits(*, context: str, higher_authority_text: str = "") -> "PromptHabitEvaluation":
+    """Compatibility entrypoint for prompt-time habit diagnostics."""
+    from sybermem_core.habit_diagnostics import evaluate_prompt_habits as _evaluate_prompt_habits
+
+    return _evaluate_prompt_habits(context=context, higher_authority_text=higher_authority_text)
+
+
+def _diagnostic_context_summary(context: str) -> str:
+    if _BLOCKED_INTENT_RE.search(context):
+        return "[filtered-sensitive-context]"
+    return _candidate_summary(context)
 
 
 def _select_injectable(context: str, higher_authority_text: str) -> list[Habit]:
@@ -377,26 +397,11 @@ def _select_injectable(context: str, higher_authority_text: str) -> list[Habit]:
 
 
 def _select_remindable(context: str, higher_authority_text: str) -> list[Habit]:
-    context_terms = _terms(context)
-    if not context_terms or higher_authority_text:
-        return []
-    candidates = []
-    for habit in list_habits():
-        if habit.confidence is not Confidence.HIGH or habit.injection_policy is not InjectionPolicy.PROMPT_OK_WHEN_SUPPORTED:
-            continue
-        if habit.review_after and habit.review_after < date.today().isoformat():
-            continue
-        # not_applies_to stays a HARD exclusion; higher_authority already handled above.
-        if habit.not_applies_to and context_terms.intersection(habit.not_applies_to):
-            continue
-        # applies_to is no longer a hard filter (it killed all Chinese contexts); it is
-        # now a strong boost inside the weighted relevance floor, so a directly relevant
-        # habit surfaces while an unrelated/untagged one still stays silent.
-        score = _prompt_relevance(habit, context_terms)
-        if score >= _PROMPT_RELEVANCE_FLOOR:
-            candidates.append(HabitSearchResult(habit=habit, score=score))
-    ranked = sorted(candidates, key=lambda result: (-result.score, result.habit.last_confirmed_at, result.habit.habit_id))
-    return [result.habit for result in ranked[:MAX_INJECTED_HABITS]]
+    from sybermem_core.habit_diagnostics import evaluate_prompt_habits
+
+    diagnostic = evaluate_prompt_habits(context=context, higher_authority_text=higher_authority_text)
+    habit_by_id = {habit.habit_id: habit for habit in list_habits()}
+    return [habit_by_id[row["habit_id"]] for row in diagnostic["habits"] if row["decision"] == "selected" and row["habit_id"] in habit_by_id]
 
 
 def _looks_like_habit_intent(context: str) -> bool:
@@ -615,14 +620,18 @@ def _is_strong_token(token: str) -> bool:
 
 def _prompt_relevance(habit: Habit, context_terms: set[str]) -> int:
     applies_match = bool(habit.applies_to and context_terms.intersection(habit.applies_to))
-    generic = _terms(" ".join((habit.statement, habit.habit_type.value)))
-    strong_overlap = sum(1 for token in generic.intersection(context_terms) if _is_strong_token(token))
+    strong_overlap = _prompt_strong_overlap(habit, context_terms)
     score = (_APPLIES_TO_BOOST if applies_match else 0) + min(strong_overlap, _MAX_GENERIC_OVERLAP)
     # Untagged/non-tag-matching habits must clear the floor on STRONG overlap alone;
     # a single strong token (or only weak single-char overlaps) is never enough.
     if not applies_match and strong_overlap < _MIN_STRONG_OVERLAPS:
         return 0
     return score
+
+
+def _prompt_strong_overlap(habit: Habit, context_terms: set[str]) -> int:
+    generic = _terms(" ".join((habit.statement, habit.habit_type.value)))
+    return sum(1 for token in generic.intersection(context_terms) if _is_strong_token(token))
 
 
 def _now() -> str:

@@ -9,6 +9,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from sybermem_core.habit_diagnostics import evaluate_prompt_habits
 from sybermem_core.user_habits import (
     Confidence,
     HabitStatus,
@@ -506,6 +507,120 @@ def test_prompt_reminder_not_applies_to_stays_hard_exclusion(tmp_path: Path, mon
     # When / Then: a context that hits not_applies_to is excluded even if it also matches applies_to
     assert habit.habit_id not in render_habit_reminder_markdown(context="planning quick-fix")
     assert habit.habit_id in render_habit_reminder_markdown(context="planning")
+
+
+def test_evaluate_prompt_habits_explains_selected_habit(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Given: a prompt-time eligible habit with a matching applies_to tag
+    monkeypatch.setenv("SYBERMEM_HOME", str(tmp_path))
+    habit = add_habit(statement="Prefer plans before implementation", habit_type=HabitType.WORKFLOW, applies_to=("planning",))
+
+    # When: prompt-time habit recall is evaluated without rendering injection markdown
+    diagnostic = evaluate_prompt_habits(context="planning next steps")
+
+    # Then: the selected decision is explainable and uses the production floor
+    assert diagnostic["active_habits"] == 1
+    assert diagnostic["evaluated"] == 1
+    assert diagnostic["selected"] == 1
+    assert diagnostic["pending_candidates"] == 0
+    row = diagnostic["habits"][0]
+    assert row["habit_id"] == habit.habit_id
+    assert row["decision"] == "selected"
+    assert row["score"] >= row["floor"]
+    assert "applies_to_match" in row["reasons"]
+    assert "score_met_floor" in row["reasons"]
+
+
+def test_evaluate_prompt_habits_marks_low_relevance_as_not_selected(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Given: an active prompt-ok habit with only one incidental strong overlap
+    monkeypatch.setenv("SYBERMEM_HOME", str(tmp_path))
+    habit = add_habit(statement="Prefer concise review comments", habit_type=HabitType.REVIEW)
+
+    # When: the context is related but below the prompt-time relevance floor
+    diagnostic = evaluate_prompt_habits(context="review")
+    row = diagnostic["habits"][0]
+
+    # Then: the habit is explainable as low-relevance, not as an eligibility exclusion
+    assert row["habit_id"] == habit.habit_id
+    assert row["decision"] == "not_selected"
+    assert row["score"] == 0
+    assert "score_below_floor" in row["reasons"]
+    assert diagnostic["selected"] == 0
+
+
+def test_evaluate_prompt_habits_explains_policy_confidence_and_context_exclusions(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Given: habits that fail distinct prompt-time eligibility gates
+    monkeypatch.setenv("SYBERMEM_HOME", str(tmp_path))
+    manual = add_habit(statement="Prefer manual planning", habit_type=HabitType.WORKFLOW, applies_to=("planning",), injection_policy=InjectionPolicy.MANUAL_ONLY)
+    compaction = add_habit(statement="Prefer compaction planning", habit_type=HabitType.WORKFLOW, applies_to=("planning",), injection_policy=InjectionPolicy.COMPACTION_OK)
+    excluded = add_habit(statement="Prefer detailed planning", habit_type=HabitType.WORKFLOW, applies_to=("planning",), not_applies_to=("quick-fix",))
+    low = add_habit(statement="Prefer low confidence planning", habit_type=HabitType.WORKFLOW, applies_to=("planning",))
+    event = json.loads((user_habit_home() / "habits.jsonl").read_text(encoding="utf-8").splitlines()[-1])
+    event["confidence"] = "low"
+    with (user_habit_home() / "habits.jsonl").open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(event) + "\n")
+
+    # When: prompt-time recall is diagnosed
+    diagnostic = evaluate_prompt_habits(context="planning quick-fix")
+    reasons = {row["habit_id"]: row["reasons"] for row in diagnostic["habits"]}
+
+    # Then: each non-selection carries the exact gate that blocked it
+    assert "excluded_policy_not_prompt_ok" in reasons[manual.habit_id]
+    assert "excluded_policy_not_prompt_ok" in reasons[compaction.habit_id]
+    assert "excluded_not_applies_to_match" in reasons[excluded.habit_id]
+    assert "excluded_confidence_not_high" in reasons[low.habit_id]
+    assert diagnostic["selected"] == 0
+
+
+def test_evaluate_prompt_habits_reports_empty_context_and_higher_authority(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Given: a habit that would otherwise match planning contexts
+    monkeypatch.setenv("SYBERMEM_HOME", str(tmp_path))
+    habit = add_habit(statement="Prefer plans before implementation", habit_type=HabitType.WORKFLOW, applies_to=("planning",))
+
+    # When: context is empty or higher-priority instructions are present
+    empty = evaluate_prompt_habits(context="")
+    blocked = evaluate_prompt_habits(context="planning", higher_authority_text="No planning reminders")
+
+    # Then: diagnostics explain why prompt-time selection stayed silent
+    assert empty["context_terms_count"] == 0
+    assert empty["habits"][0]["habit_id"] == habit.habit_id
+    assert "empty_context" in empty["habits"][0]["reasons"]
+    assert blocked["selected"] == 0
+    assert "blocked_by_higher_authority" in blocked["habits"][0]["reasons"]
+
+
+def test_evaluate_prompt_habits_keeps_pending_candidates_out_of_selection(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Given: a pending candidate but no confirmed active habits
+    monkeypatch.setenv("SYBERMEM_HOME", str(tmp_path))
+    capture_habit_intent("always prefer plans before implementation")
+
+    # When: habit recall is tested
+    diagnostic = evaluate_prompt_habits(context="planning")
+
+    # Then: the pending preference is visible as pending count, but never selected
+    assert diagnostic["active_habits"] == 0
+    assert diagnostic["evaluated"] == 0
+    assert diagnostic["selected"] == 0
+    assert diagnostic["pending_candidates"] == 1
+    assert diagnostic["habits"] == []
+
+
+def test_evaluate_prompt_habits_is_read_only(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Given: one confirmed habit and one pending candidate
+    monkeypatch.setenv("SYBERMEM_HOME", str(tmp_path))
+    add_habit(statement="Prefer plans before implementation", habit_type=HabitType.WORKFLOW, applies_to=("planning",))
+    capture_habit_intent("always prefer tests before commits")
+    habits_path = user_habit_home() / "habits.jsonl"
+    intent_path = tmp_path / ".habit-intent.json"
+    before_habits = habits_path.read_text(encoding="utf-8")
+    before_intent = intent_path.read_text(encoding="utf-8")
+
+    # When: diagnostics run
+    evaluate_prompt_habits(context="planning")
+
+    # Then: diagnostic evaluation does not append events, candidates, or injection logs
+    assert habits_path.read_text(encoding="utf-8") == before_habits
+    assert intent_path.read_text(encoding="utf-8") == before_intent
+    assert not (user_habit_home() / "injection-log.jsonl").exists()
 
 
 def test_classify_habit_intent_matches_preference_language_and_types(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
