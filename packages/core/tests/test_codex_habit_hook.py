@@ -166,21 +166,23 @@ def test_codex_user_prompt_hook_emits_additional_context_for_habit_reminder(tmp_
     # When: Codex invokes the hook with prompt JSON on stdin
     result = run_hook(payload, tmp_path)
 
-    # Then: stdout contains only the UserPromptSubmit additionalContext packet
+    # Then: stdout contains the UserPromptSubmit additionalContext packet with the
+    # enhanced marker (counts + record ids + restate instruction) and a systemMessage.
     assert result.returncode == 0
     output = json.loads(result.stdout)
-    assert output == {
-        "hookSpecificOutput": {
-            "hookEventName": "UserPromptSubmit",
-            "additionalContext": (
-                "## SyberMem Codex Context\n\n"
-                "SyberMem injected context for this Codex turn:\n"
-                "- [habit] User habit reminder\n\n"
-                "## User Habit Reminder\n\n"
-                "- Apply the saved workflow habit.\n"
-            ),
-        }
-    }
+    context = output["hookSpecificOutput"]["additionalContext"]
+    assert output["hookSpecificOutput"]["hookEventName"] == "UserPromptSubmit"
+    assert context == (
+        "## SyberMem Codex Context\n\n"
+        "（请在你回复的第一行原样告知用户：⭐ SyberMem 本轮参考了 0 条项目记忆 · 1 条习惯 · 0 条规范）\n\n"
+        "本轮注入摘要：recall=0, habit=1, norm=0\n"
+        "- [recall] （无）\n"
+        "- [habit] （无）\n"
+        "- [norms] （无）\n\n"
+        "## User Habit Reminder\n\n"
+        "- Apply the saved workflow habit.\n"
+    )
+    assert output["systemMessage"] == "⭐ SyberMem 本轮注入 recall=0 habit=1 norm=0"
     assert result.stderr == ""
 
 
@@ -219,14 +221,17 @@ def test_codex_user_prompt_hook_combines_recall_and_habit(tmp_path: Path) -> Non
     # When: Codex invokes the user prompt hook
     result = run_hook(payload, tmp_path)
 
-    # Then: both sections are composed into one additionalContext packet
+    # Then: both sections are composed into one additionalContext packet with the
+    # enhanced marker carrying real per-lane counts and the recall record id.
     assert result.returncode == 0
     context = json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"]
     assert context == (
         "## SyberMem Codex Context\n\n"
-        "SyberMem injected context for this Codex turn:\n"
-        "- [recall] Project recall\n"
-        "- [habit] User habit reminder\n\n"
+        "（请在你回复的第一行原样告知用户：⭐ SyberMem 本轮参考了 1 条项目记忆 · 1 条习惯 · 0 条规范）\n\n"
+        "本轮注入摘要：recall=1, habit=1, norm=0\n"
+        "- [recall] change-1\n"
+        "- [habit] （无）\n"
+        "- [norms] （无）\n\n"
         "## SyberMem Recall Hints\n\n- STAR change-1: Recall this architecture.\n\n"
         "## User Habit Reminder\n\n- Apply the saved workflow habit.\n"
     )
@@ -246,8 +251,11 @@ def test_codex_user_prompt_hook_emits_recall_without_habit(tmp_path: Path) -> No
     assert result.returncode == 0
     assert json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"] == (
         "## SyberMem Codex Context\n\n"
-        "SyberMem injected context for this Codex turn:\n"
-        "- [recall] Project recall\n\n"
+        "（请在你回复的第一行原样告知用户：⭐ SyberMem 本轮参考了 1 条项目记忆 · 0 条习惯 · 0 条规范）\n\n"
+        "本轮注入摘要：recall=1, habit=0, norm=0\n"
+        "- [recall] decision-1\n"
+        "- [habit] （无）\n"
+        "- [norms] （无）\n\n"
         f"{recall}\n"
     )
     assert result.stderr == ""
@@ -262,13 +270,17 @@ def test_codex_user_prompt_hook_marks_scoped_norms(tmp_path: Path) -> None:
     # When: Codex invokes the user prompt hook
     result = run_hook(payload, tmp_path)
 
-    # Then: the additionalContext has a visible Codex marker for project norms.
+    # Then: the additionalContext has a visible Codex marker for project norms with
+    # the enhanced counts + norm record id.
     assert result.returncode == 0
     context = json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"]
     assert context == (
         "## SyberMem Codex Context\n\n"
-        "SyberMem injected context for this Codex turn:\n"
-        "- [norms] Relevant project norms\n\n"
+        "（请在你回复的第一行原样告知用户：⭐ SyberMem 本轮参考了 0 条项目记忆 · 0 条习惯 · 1 条规范）\n\n"
+        "本轮注入摘要：recall=0, habit=0, norm=1\n"
+        "- [recall] （无）\n"
+        "- [habit] （无）\n"
+        "- [norms] norm-1\n\n"
         "## Relevant Project Norms\n"
         "- [norm-1] (path:docs/**) Document public update paths.\n"
     )
