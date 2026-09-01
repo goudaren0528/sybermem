@@ -4,7 +4,7 @@ Command-line interface for [SyberMem](https://github.com/goudaren0528/sybermem) 
 a project engineering memory system for AI workflows.
 
 Provides the `sybermem` command wrapping `sybermem-core` operations: project
-`status`/`refresh`/`memory-stats`, scoped `uninstall`, `resume`, `search`, manual `context` briefs, `portfolio`, `digest status`, workspace `index build`, project `index build`/`check`/`phase`/`coverage-hash`, user-habit `add`/`list`/`search`/`pause`/`delete`/`remind`/`inject`, and cross-project `portfolio`.
+`status`/`refresh`/`memory-stats`, scoped `uninstall`, `resume`, `search`, manual `context` briefs, `portfolio`, `digest status`, workspace `index build`, project `index build`/`check`/`phase`/`coverage-hash`, user-habit `add`/`list`/`search`/`pause`/`delete`/`remind`/`inject`/`test`/`explain`, and cross-project `portfolio`.
 
 `sybermem index build` builds the workspace SQLite search index. `sybermem project refresh --format json` deterministically creates missing SyberMem-managed project files, refreshes stale managed hooks/templates with `.bak` backups, removes any legacy SyberMem protocol block from `CLAUDE.md` / `AGENTS.md` while preserving custom instruction content, and ensures `.sybermem/project.yaml`. `sybermem uninstall --scope project` is the top-level project deactivation entrypoint, equivalent to `sybermem project uninstall`; `sybermem uninstall --scope global --yes` removes managed user-level skills/hooks/plugin/CLI while preserving project `.sybermem/` histories. `sybermem project memory-stats` prints terminal tables for 7d/30d record counts, type distribution, recall events, injected/abstained counts, recall rate, Edit Alignment, and Memory injection turns/items/chars, avg chars/turn, p95 chars/turn, plus 30d lane distribution; `sybermem project memory-stats --format json` exposes the same data for skills and automation. Recall frequency is backed by `.sybermem/.recall-debug.jsonl`. Edit Alignment and memory-injection observability are backed by OpenCode-written `.sybermem/.recall-outcomes.jsonl` and `.sybermem/.memory-usage.jsonl`, where `.memory-usage.jsonl` contains bounded per-turn rows plus bounded `session_outcome` rows for turns that actually injected model-visible memory. Those rows are metadata-only: session/host, items/chars, recall/habit/norm/startup lane totals, injected record ids, startup presence, and idle-time memory/edit/todo/tool/Edit Alignment evidence. They do not persist raw prompts or full injected memory text, and write failures stay fail-open. Edit Alignment is an edit-anchored proxy based on `related_files`, not semantic accuracy; it exposes hit, measurable, unmeasurable, and evidence availability. The `recall_health` verdict adds `low_relevance` (recall fires but injected records rarely match edited files) alongside `low_signal`. `sybermem project record-files --ids <a,b> --format json` maps record ids to their declared `related_files`. `sybermem project index build` and `sybermem project index check` manage the derived `.sybermem/INDEX.md`. `sybermem digest status` scans every phase/theme digest and reports its coverage health (current / stale / unknown), pinpointing which source records drifted; it exits non-zero when any digest is stale so scripts can gate on governance health. `sybermem project phase analyze` persists the phase index — with `--from-json <file>` it validates and atomically writes an agent semantic grouping `{phases:[{title,covered_records}]}`, or without it falls back to deterministic month+topic grouping. `sybermem project coverage-hash --phase-id phase-NNN --format json` resolves a phase's covered records to real paths (by each record's frontmatter `record_id:`, never by filename) and returns `source_records` plus the deterministic `coverage_hash`; `--source-records <relpaths>` hashes an explicit source set instead. `sybermem record id --type <change|decision|requirement|bug>` mints a canonical record id. Record creation itself remains `/sybermem-record` skill orchestration, not a CLI command.
 
@@ -15,6 +15,8 @@ sybermem habit add --type workflow --applies-to planning "Prefer plans before im
 sybermem habit list --format json
 sybermem habit remind --context planning --format markdown
 sybermem habit inject --context planning --format markdown
+sybermem habit test --context planning
+sybermem habit explain --id habit-abc --context planning --format json
 ```
 
 `pause` and `delete` keep habits out of reminders and injection. Reminder output is
@@ -22,6 +24,13 @@ visible and confirmation-first; injection emits at most three active, high-confi
 directly relevant habits. On hosts that support prompt-time reminder injection,
 the same conservative gate also requires the habit to be prompt-ok-when-supported,
 and the host should fail open if nothing qualifies.
+
+`habit test` and `habit explain` are read-only dry-run diagnostics for the same
+prompt-time selection gate. They report active/evaluated/selected counts,
+pending candidate counts, and per-habit confidence/policy/tag/score/floor/reason
+decisions without writing habit events, candidates, injection logs, or model context.
+Pending candidates are counted separately and never treated as active habits until
+confirmed through `/sybermem-habit`.
 
 Manual context helpers provide copy/paste-safe memory briefs for hosts without
 Claude Code's prompt-time hook surface:

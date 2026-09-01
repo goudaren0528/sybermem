@@ -35,6 +35,8 @@ Before running SyberMem CLI commands, resolve a command variable first. On Windo
 | Delete | `$SyberMemCli habit delete <habit-id>` / `"$SYBERMEM_CLI" habit delete <habit-id>` |
 | Visible reminder | `$SyberMemCli habit remind --context "<bounded context>" --format markdown` / `"$SYBERMEM_CLI" habit remind --context "<bounded context>" --format markdown` |
 | Manual injection | `$SyberMemCli habit inject --context "<bounded context>" --format markdown` / `"$SYBERMEM_CLI" habit inject --context "<bounded context>" --format markdown` |
+| Test prompt-time recall | `$SyberMemCli habit test --context "<bounded context>"` / `"$SYBERMEM_CLI" habit test --context "<bounded context>"` |
+| Explain one habit | `$SyberMemCli habit explain --id <habit-id> --context "<bounded context>" --format json` / `"$SYBERMEM_CLI" habit explain --id <habit-id> --context "<bounded context>" --format json` |
 | Pending candidates (list) | `$SyberMemCli habit intent-status --format json` / `"$SYBERMEM_CLI" habit intent-status --format json` |
 | Discard ONE candidate | `$SyberMemCli habit intent-discard <candidate-id>` / `"$SYBERMEM_CLI" habit intent-discard <candidate-id>` |
 | Clear ALL candidates | `$SyberMemCli habit intent-clear` / `"$SYBERMEM_CLI" habit intent-clear` |
@@ -45,6 +47,8 @@ Before running SyberMem CLI commands, resolve a command variable first. On Windo
 Types: `workflow`, `style`, `tooling`, `communication`, `review`, `avoidance`.
 
 Injection policy controls WHERE a user-confirmed habit may surface, not whether it may be remembered (confirmation-first still gates creation). The default is now `prompt_ok_when_supported`, so a confirmed habit is perceptible at prompt time (🧠) on supported hosts such as Claude Code, OpenCode, or Codex — bounded by the conservative selection gate (active, high-confidence, directly relevant, `not_applies_to`-excluded, at most 3). Pass `--injection-policy compaction_ok` when the user wants a habit carried forward only at compaction, or `--injection-policy manual_only` to keep it out of automatic injection entirely.
+
+Use `habit test` when the user asks what would recall for a given context, or why no habit appeared. Use `habit explain` when a specific habit did not appear. Both commands are dry-run diagnostics over the same prompt-time gate: they explain confidence, policy, review expiry, tag matches, score/floor, and reasons without writing habit events, candidates, injection logs, or model context. Pending candidates remain separate and never count as active habits until confirmed.
 
 ## Workflow
 
@@ -63,7 +67,7 @@ Injection policy controls WHERE a user-confirmed habit may surface, not whether 
    下一步：确认某条候选激活 / 舍弃某条候选 / 新增一个习惯 / 什么都不做？
    ```
    Render `created_at` as a relative age (e.g. "2h ago", "昨天"). If there are 0 active and 0 pending, say so and offer to add one.
-3. Classify the request: **confirm-candidate**, **discard-candidate**, add, list, search, pause, delete, remind, or inject.
+3. Classify the request: **confirm-candidate**, **discard-candidate**, add, list, search, pause, delete, remind, inject, test, or explain.
 4. For add / confirm requests, normalize the habit into ONE short statement and choose type/tags. If the user did not explicitly authorize saving, ask one confirmation question and stop (confirmation-first).
 5. Run the matching CLI command.
 6. Summarize the result with the habit id / candidate id and current status.
@@ -153,9 +157,11 @@ $SyberMemCli habit remind --context "planning implementation preference" --forma
 | Writing a habit through `/sybermem-record` | Use `$SyberMemCli habit add` or `"$SYBERMEM_CLI" habit add`; habits are user-level. |
 | Saving a habit after observing repeated behavior | Ask for confirmation first. |
 | Storing the user's raw prompt as the habit | Store a normalized statement. |
+| Treating a pending candidate as already active | Explain that candidates require confirmation; use `habit test` to show pending count and selected=0. |
+| Guessing why a habit did not appear | Run `$SyberMemCli habit explain --id <habit-id> --context "<bounded context>" --format json` and report the concrete reason codes. |
 | Claiming unsupported platform reminders | State the actual boundary: Claude Code, OpenCode, and Codex support prompt-time habit reminders on their supported prompt seams; Codex also supports bounded startup context, prompt recall, record-intent capture, Stop record nudges, and compact re-seed markers, but not hidden auto-resume or direct compaction prompt injection. Gemini/Cursor/Kimi do not have runtime reminder wiring. |
 | Forcing a habit to compaction-only without reason | Prompt-time (`prompt_ok_when_supported`) is the default so confirmed habits stay perceptible; only downgrade to `compaction_ok`/`manual_only` when the user asks for quieter delivery. |
 
 ## Completion
 
-After a successful add/list/search/pause/delete/remind operation, report only the relevant habit ids, status, and next available action. Do not create project records for habit-only work.
+After a successful add/list/search/pause/delete/remind/test/explain operation, report only the relevant habit ids, status, diagnostic reason codes, and next available action. Do not create project records for habit-only work.
