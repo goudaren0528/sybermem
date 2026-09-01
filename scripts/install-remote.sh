@@ -15,8 +15,10 @@ CODEX_SKILLS="$HOME/.agents/skills"
 CODEX_HOOK_DIR="$HOME/.codex/hooks"
 CODEX_HOOK_PATH="$CODEX_HOOK_DIR/sybermem_user_prompt.py"
 CODEX_SESSION_HOOK_PATH="$CODEX_HOOK_DIR/sybermem_session_start.py"
+CODEX_SESSION_END_HOOK_PATH="$CODEX_HOOK_DIR/sybermem_session_end.py"
 CODEX_STOP_HOOK_PATH="$CODEX_HOOK_DIR/sybermem_stop.py"
 CODEX_POST_COMPACT_HOOK_PATH="$CODEX_HOOK_DIR/sybermem_post_compact.py"
+CODEX_OBSERVABILITY_PATH="$CODEX_HOOK_DIR/_codex_observability.py"
 CODEX_HOOKS_JSON="$HOME/.codex/hooks.json"
 LAUNCHER_DIR="$HOME/.claude/sybermem"
 LAUNCHER_PATH="$LAUNCHER_DIR/launch_record_change_on_stop.py"
@@ -45,8 +47,10 @@ CORE_SOURCE="$TMPDIR/$ARCHIVE_PREFIX/packages/core"
 CLI_SOURCE="$TMPDIR/$ARCHIVE_PREFIX/packages/cli"
 CODEX_HOOK_SOURCE="$TMPDIR/$ARCHIVE_PREFIX/.codex/hooks/user_prompt.py"
 CODEX_SESSION_HOOK_SOURCE="$TMPDIR/$ARCHIVE_PREFIX/.codex/hooks/session_start.py"
+CODEX_SESSION_END_HOOK_SOURCE="$TMPDIR/$ARCHIVE_PREFIX/.codex/hooks/session_end.py"
 CODEX_STOP_HOOK_SOURCE="$TMPDIR/$ARCHIVE_PREFIX/.codex/hooks/stop.py"
 CODEX_POST_COMPACT_HOOK_SOURCE="$TMPDIR/$ARCHIVE_PREFIX/.codex/hooks/post_compact.py"
+CODEX_OBSERVABILITY_SOURCE="$TMPDIR/$ARCHIVE_PREFIX/.codex/hooks/_codex_observability.py"
 MANIFEST_SOURCE="$TMPDIR/$ARCHIVE_PREFIX/scripts/managed-install.json"
 REMOVER_SOURCE="$TMPDIR/$ARCHIVE_PREFIX/scripts/safe-managed-remove.py"
 
@@ -80,7 +84,7 @@ install_skills "$OPENCODE_SKILLS" "OpenCode"
 install_skills "$CODEX_SKILLS" "Codex"
 
 install_codex_user_prompt_hook() {
-    if [ ! -f "$CODEX_HOOK_SOURCE" ] || [ ! -f "$CODEX_SESSION_HOOK_SOURCE" ] || [ ! -f "$CODEX_STOP_HOOK_SOURCE" ] || [ ! -f "$CODEX_POST_COMPACT_HOOK_SOURCE" ]; then
+    if [ ! -f "$CODEX_HOOK_SOURCE" ] || [ ! -f "$CODEX_SESSION_HOOK_SOURCE" ] || [ ! -f "$CODEX_SESSION_END_HOOK_SOURCE" ] || [ ! -f "$CODEX_STOP_HOOK_SOURCE" ] || [ ! -f "$CODEX_POST_COMPACT_HOOK_SOURCE" ]; then
         echo "  [Codex] skipped hooks: one or more sources were not found"
         return
     fi
@@ -88,14 +92,19 @@ install_codex_user_prompt_hook() {
     mkdir -p "$CODEX_HOOK_DIR"
     cp "$CODEX_HOOK_SOURCE" "$CODEX_HOOK_PATH"
     cp "$CODEX_SESSION_HOOK_SOURCE" "$CODEX_SESSION_HOOK_PATH"
+    cp "$CODEX_SESSION_END_HOOK_SOURCE" "$CODEX_SESSION_END_HOOK_PATH"
     cp "$CODEX_STOP_HOOK_SOURCE" "$CODEX_STOP_HOOK_PATH"
     cp "$CODEX_POST_COMPACT_HOOK_SOURCE" "$CODEX_POST_COMPACT_HOOK_PATH"
+    if [ -f "$CODEX_OBSERVABILITY_SOURCE" ]; then
+        cp "$CODEX_OBSERVABILITY_SOURCE" "$CODEX_OBSERVABILITY_PATH"
+    fi
     chmod +x "$CODEX_HOOK_PATH"
     chmod +x "$CODEX_SESSION_HOOK_PATH"
+    chmod +x "$CODEX_SESSION_END_HOOK_PATH"
     chmod +x "$CODEX_STOP_HOOK_PATH"
     chmod +x "$CODEX_POST_COMPACT_HOOK_PATH"
 
-    CODEX_HOOK_PATH="$CODEX_HOOK_PATH" CODEX_SESSION_HOOK_PATH="$CODEX_SESSION_HOOK_PATH" CODEX_STOP_HOOK_PATH="$CODEX_STOP_HOOK_PATH" CODEX_POST_COMPACT_HOOK_PATH="$CODEX_POST_COMPACT_HOOK_PATH" CODEX_HOOKS_JSON="$CODEX_HOOKS_JSON" python - <<'PY'
+    CODEX_HOOK_PATH="$CODEX_HOOK_PATH" CODEX_SESSION_HOOK_PATH="$CODEX_SESSION_HOOK_PATH" CODEX_SESSION_END_HOOK_PATH="$CODEX_SESSION_END_HOOK_PATH" CODEX_STOP_HOOK_PATH="$CODEX_STOP_HOOK_PATH" CODEX_POST_COMPACT_HOOK_PATH="$CODEX_POST_COMPACT_HOOK_PATH" CODEX_HOOKS_JSON="$CODEX_HOOKS_JSON" python - <<'PY'
 from __future__ import annotations
 
 import json
@@ -104,6 +113,7 @@ from pathlib import Path
 
 hook_path = Path(os.environ["CODEX_HOOK_PATH"])
 session_hook_path = Path(os.environ["CODEX_SESSION_HOOK_PATH"])
+session_end_hook_path = Path(os.environ["CODEX_SESSION_END_HOOK_PATH"])
 stop_hook_path = Path(os.environ["CODEX_STOP_HOOK_PATH"])
 post_compact_hook_path = Path(os.environ["CODEX_POST_COMPACT_HOOK_PATH"])
 hooks_json = Path(os.environ["CODEX_HOOKS_JSON"])
@@ -111,23 +121,28 @@ prompt_managed = {
     "type": "command",
     "command": f'python "{hook_path}"',
     "additionalContextLimit": 6000,
-    "message": "SyberMem prompt context adds bounded Codex recall and habit reminders when relevant.",
+    "statusMessage": "SyberMem：召回相关项目记忆…",
 }
 session_managed = {
     "type": "command",
     "command": f'python "{session_hook_path}"',
     "additionalContextLimit": 6000,
-    "message": "SyberMem session context adds bounded Codex startup context when available.",
+    "statusMessage": "SyberMem：加载项目记忆与规范…",
+}
+session_end_managed = {
+    "type": "command",
+    "command": f'python "{session_end_hook_path}"',
+    "statusMessage": "SyberMem：结算本会话召回命中…",
 }
 stop_managed = {
     "type": "command",
     "command": f'python "{stop_hook_path}"',
-    "message": "SyberMem Stop nudge adds bounded record reminders without looping.",
+    "statusMessage": "SyberMem：检查是否需要记录本次改动…",
 }
 post_compact_managed = {
     "type": "command",
     "command": f'python "{post_compact_hook_path}"',
-    "message": "SyberMem PostCompact marks compact re-seed for the next SessionStart.",
+    "statusMessage": "SyberMem：标记 compaction 以便下次会话续接…",
 }
 
 data: dict[str, object] = {}
@@ -157,6 +172,7 @@ def without_managed(handlers: list[object], marker: str) -> list[object]:
 
 hooks["UserPromptSubmit"] = without_managed(handlers_for("UserPromptSubmit"), "sybermem_user_prompt.py") + [prompt_managed]
 hooks["SessionStart"] = without_managed(handlers_for("SessionStart"), "sybermem_session_start.py") + [session_managed]
+hooks["SessionEnd"] = without_managed(handlers_for("SessionEnd"), "sybermem_session_end.py") + [session_end_managed]
 hooks["Stop"] = without_managed(handlers_for("Stop"), "sybermem_stop.py") + [stop_managed]
 hooks["PostCompact"] = without_managed(handlers_for("PostCompact"), "sybermem_post_compact.py") + [post_compact_managed]
 hooks_json.parent.mkdir(parents=True, exist_ok=True)
@@ -164,6 +180,7 @@ hooks_json.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", enc
 PY
     echo "  [Codex] installed UserPromptSubmit hook: $CODEX_HOOK_PATH"
     echo "  [Codex] installed SessionStart hook: $CODEX_SESSION_HOOK_PATH"
+    echo "  [Codex] installed SessionEnd hook: $CODEX_SESSION_END_HOOK_PATH"
     echo "  [Codex] installed Stop hook: $CODEX_STOP_HOOK_PATH"
     echo "  [Codex] installed PostCompact hook: $CODEX_POST_COMPACT_HOOK_PATH"
     echo "  [Codex] updated hooks.json without removing unrelated hooks: $CODEX_HOOKS_JSON"
