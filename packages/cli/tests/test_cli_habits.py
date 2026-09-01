@@ -225,6 +225,102 @@ def test_cli_habit_awareness_reports_counts_and_pending(tmp_path: Path, monkeypa
     assert summary["pending_intent"] is True
 
 
+def test_cli_habit_test_json_explains_prompt_time_selection(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    # Given: one prompt-time eligible habit
+    monkeypatch.setenv("SYBERMEM_HOME", str(tmp_path))
+    assert run_cli(["habit", "add", "--type", "workflow", "--applies-to", "planning", "--format", "json", "Prefer plans before implementation"], monkeypatch) == 0
+    habit_id = json.loads(capsys.readouterr().out)["habit"]["habit_id"]
+
+    # When: dry-run habit recall is tested through the real CLI parser
+    assert run_cli(["habit", "test", "--context", "planning next steps", "--format", "json"], monkeypatch) == 0
+    payload = json.loads(capsys.readouterr().out)
+
+    # Then: the output is machine-readable and explains the selected habit
+    assert payload["delivery"] == "prompt-time"
+    assert payload["active_habits"] == 1
+    assert payload["selected"] == 1
+    assert payload["habits"][0]["habit_id"] == habit_id
+    assert payload["habits"][0]["decision"] == "selected"
+    assert "score_met_floor" in payload["habits"][0]["reasons"]
+
+
+def test_cli_habit_test_markdown_reports_pending_without_selecting_candidate(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    # Given: only a pending habit candidate exists
+    monkeypatch.setenv("SYBERMEM_HOME", str(tmp_path))
+    assert run_cli(["habit", "intent", "--prompt", "always prefer plans before implementation", "--format", "json"], monkeypatch) == 0
+    capsys.readouterr()
+
+    # When: the dry-run diagnostic is rendered as Markdown by default
+    assert run_cli(["habit", "test", "--context", "planning"], monkeypatch) == 0
+    output = capsys.readouterr().out
+
+    # Then: pending candidates are counted but never treated as active selected habits
+    assert output.startswith("## User Habit Recall Test")
+    assert "0 active, 0 evaluated, 0 selected, 1 pending candidate" in output
+    assert "Pending candidates are not active habits" in output
+
+
+def test_cli_habit_explain_json_returns_single_habit_decision(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    # Given: two habits with different relevance
+    monkeypatch.setenv("SYBERMEM_HOME", str(tmp_path))
+    assert run_cli(["habit", "add", "--type", "workflow", "--applies-to", "planning", "--format", "json", "Prefer plans before implementation"], monkeypatch) == 0
+    target_id = json.loads(capsys.readouterr().out)["habit"]["habit_id"]
+    assert run_cli(["habit", "add", "--type", "review", "--applies-to", "review", "--format", "json", "Prefer review before handoff"], monkeypatch) == 0
+    capsys.readouterr()
+
+    # When: a single habit is explained
+    assert run_cli(["habit", "explain", "--id", target_id, "--context", "planning", "--format", "json"], monkeypatch) == 0
+    payload = json.loads(capsys.readouterr().out)
+
+    # Then: only that habit diagnostic is returned
+    assert payload["status"] == "ok"
+    assert len(payload["habits"]) == 1
+    assert payload["habits"][0]["habit_id"] == target_id
+    assert payload["habits"][0]["decision"] == "selected"
+
+
+def test_cli_habit_explain_unknown_id_is_concise_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    # Given: an empty habit store
+    monkeypatch.setenv("SYBERMEM_HOME", str(tmp_path))
+
+    # When: explaining an unknown habit as JSON and Markdown
+    json_exit = run_cli(["habit", "explain", "--id", "habit-missing", "--context", "planning", "--format", "json"], monkeypatch)
+    payload = json.loads(capsys.readouterr().out)
+    markdown_exit = run_cli(["habit", "explain", "--id", "habit-missing", "--context", "planning"], monkeypatch)
+    captured = capsys.readouterr()
+
+    # Then: both surfaces fail without a traceback
+    assert json_exit == 1
+    assert payload == {"status": "unknown_habit", "habit_id": "habit-missing"}
+    assert markdown_exit == 1
+    assert "unknown habit id: habit-missing" in captured.err
+    assert "Traceback" not in captured.err
+
+
+def test_cli_habit_diagnostics_are_read_only(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    # Given: one habit and one pending candidate
+    monkeypatch.setenv("SYBERMEM_HOME", str(tmp_path))
+    assert run_cli(["habit", "add", "--type", "workflow", "--applies-to", "planning", "--format", "json", "Prefer plans before implementation"], monkeypatch) == 0
+    habit_id = json.loads(capsys.readouterr().out)["habit"]["habit_id"]
+    assert run_cli(["habit", "intent", "--prompt", "always prefer tests before commits", "--format", "json"], monkeypatch) == 0
+    capsys.readouterr()
+    habits_path = tmp_path / "user-habits" / "habits.jsonl"
+    intent_path = tmp_path / ".habit-intent.json"
+    before_habits = habits_path.read_text(encoding="utf-8")
+    before_intent = intent_path.read_text(encoding="utf-8")
+
+    # When: test and explain diagnostics run
+    assert run_cli(["habit", "test", "--context", "planning", "--format", "json"], monkeypatch) == 0
+    capsys.readouterr()
+    assert run_cli(["habit", "explain", "--id", habit_id, "--context", "planning", "--format", "json"], monkeypatch) == 0
+    capsys.readouterr()
+
+    # Then: diagnostics do not mutate habits, candidates, or injection logs
+    assert habits_path.read_text(encoding="utf-8") == before_habits
+    assert intent_path.read_text(encoding="utf-8") == before_intent
+    assert not (tmp_path / "user-habits" / "injection-log.jsonl").exists()
+
+
 def test_cli_habit_pause_unknown_id_returns_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
     # Given: an empty habit store
     monkeypatch.setenv("SYBERMEM_HOME", str(tmp_path))

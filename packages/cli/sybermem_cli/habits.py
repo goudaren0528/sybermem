@@ -4,6 +4,7 @@ import argparse
 import sys
 
 from sybermem_core.formats import dump_json
+from sybermem_cli.habit_diagnostic_cli import register_habit_diagnostic_commands
 from sybermem_core.user_habit_model import Habit, HabitSearchResult
 from sybermem_core.user_habits import (
     InvalidHabitError,
@@ -267,6 +268,8 @@ def register_habit_commands(sub) -> None:
     remind.add_argument("--higher-authority-text", default="")
     remind.add_argument("--format", choices=["text", "json", "markdown"], default="text")
     remind.set_defaults(func=cmd_habit_remind)
+
+    register_habit_diagnostic_commands(habit_sub)
 
     intent = habit_sub.add_parser("intent")
     intent.add_argument("--prompt", required=True)

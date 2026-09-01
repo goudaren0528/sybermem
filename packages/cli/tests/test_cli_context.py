@@ -151,6 +151,31 @@ def test_cli_context_habit_json_supports_prompt_time_delivery_metadata(
     assert payload["reminded"] == ["habit-xyz"]
 
 
+def test_cli_context_habit_prompt_time_markdown_stays_compact(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    # Given: the reminder renderer returns a normal prompt-time packet
+    monkeypatch.setattr(
+        context_module,
+        "render_habit_reminder_markdown",
+        lambda context, higher_authority_text="": "## User Habit Reminder\n- [habit-xyz] restate acceptance criteria\n",
+    )
+
+    # When: prompt-time habit context is requested as Markdown
+    exit_code = run_cli(
+        ["context", "habit", "--context", "planning", "--delivery", "prompt-time", "--format", "markdown"],
+        monkeypatch,
+    )
+
+    # Then: diagnostic tables remain out of model-visible prompt-time Markdown
+    output = capsys.readouterr().out
+    assert exit_code == 0
+    assert output.startswith("## User Habit Reminder")
+    assert "User Habit Recall Test" not in output
+    assert "| Habit | Decision | Score | Reason |" not in output
+
+
 def test_cli_record_intent_json_uses_core_classifier(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
