@@ -16,11 +16,16 @@ SKILLS: Final = (
     "sybermem-uninstall",
 )
 RETIRED_SKILLS: Final = ("sybermem-phase-confirm", "sybermem-team-publish", "sybermem-team-summary")
+# (event, source file, installed name, statusMessage shown in Codex UI, additionalContextLimit)
+# statusMessage is Codex's per-handler UI status line — the one visibility channel that
+# is reliably rendered in Codex Desktop, so the wording tells the user SyberMem is
+# actively injecting memory this turn (B1).
 CODEX_EVENTS: Final = (
-    ("UserPromptSubmit", "user_prompt.py", "sybermem_user_prompt.py", "SyberMem prompt context adds bounded Codex recall and habit reminders when relevant.", 6000),
-    ("SessionStart", "session_start.py", "sybermem_session_start.py", "SyberMem session context adds bounded Codex startup context when available.", 6000),
-    ("Stop", "stop.py", "sybermem_stop.py", "SyberMem Stop nudge adds bounded record reminders without looping.", None),
-    ("PostCompact", "post_compact.py", "sybermem_post_compact.py", "SyberMem PostCompact marks compact re-seed for the next SessionStart.", None),
+    ("UserPromptSubmit", "user_prompt.py", "sybermem_user_prompt.py", "SyberMem：召回相关项目记忆…", 6000),
+    ("SessionStart", "session_start.py", "sybermem_session_start.py", "SyberMem：加载项目记忆与规范…", 6000),
+    ("SessionEnd", "session_end.py", "sybermem_session_end.py", "SyberMem：结算本会话召回命中…", None),
+    ("Stop", "stop.py", "sybermem_stop.py", "SyberMem：检查是否需要记录本次改动…", None),
+    ("PostCompact", "post_compact.py", "sybermem_post_compact.py", "SyberMem：标记 compaction 以便下次会话续接…", None),
 )
 
 
@@ -55,7 +60,7 @@ def _sync_skills(source: Path, home: Path, remover: Path) -> None:
 
 def _install_codex_hooks(root: Path, home: Path) -> None:
     source_dir = root / ".codex" / "hooks"
-    names = ("user_prompt.py", "session_start.py", "stop.py", "post_compact.py")
+    names = ("user_prompt.py", "session_start.py", "session_end.py", "stop.py", "post_compact.py")
     if not all((source_dir / name).is_file() for name in names):
         print("  [Codex] skipped hooks: one or more sources were not found")
         return
@@ -64,6 +69,10 @@ def _install_codex_hooks(root: Path, home: Path) -> None:
     installed = {name: hook_dir / f"sybermem_{name}" for name in names}
     for name, target in installed.items():
         shutil.copy2(source_dir / name, target)
+    # Shared observability helper the hooks import for fail-open journaling.
+    obs_source = source_dir / "_codex_observability.py"
+    if obs_source.is_file():
+        shutil.copy2(obs_source, hook_dir / "_codex_observability.py")
 
     hooks_path = home / ".codex" / "hooks.json"
     data: dict[str, object] = {}
@@ -77,12 +86,12 @@ def _install_codex_hooks(root: Path, home: Path) -> None:
     raw_hooks = data.get("hooks")
     hooks: dict[str, object] = raw_hooks if isinstance(raw_hooks, dict) else {}
     data["hooks"] = hooks
-    for event, source_name, installed_name, message, context_limit in CODEX_EVENTS:
+    for event, source_name, installed_name, status_message, context_limit in CODEX_EVENTS:
         raw_handlers = hooks.get(event)
         handlers = raw_handlers if isinstance(raw_handlers, list) else ([] if raw_handlers is None else [raw_handlers])
         marker = installed_name
         kept = [handler for handler in handlers if not (isinstance(handler, dict) and marker in str(handler.get("command", "")))]
-        managed: dict[str, object] = {"type": "command", "command": f'python "{installed[source_name]}"', "message": message}
+        managed: dict[str, object] = {"type": "command", "command": f'python "{installed[source_name]}"', "statusMessage": status_message}
         if context_limit is not None:
             managed["additionalContextLimit"] = context_limit
         hooks[event] = [*kept, managed]
