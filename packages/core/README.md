@@ -17,6 +17,12 @@ habits without user confirmation. Passive candidate capture never persists unbou
 unfiltered prompt text: it stores only a bounded, secret/injection-filtered summary of the
 triggering prompt (mirroring the record-intent summary contract) in a user-scoped,
 bounded candidate list so the confirm step can propose a normalized statement.
+`evaluate_prompt_habits` is the read-only diagnostic source of truth for prompt-time
+habit selection: it explains confidence, policy, review expiry, applies_to /
+not_applies_to matches, relevance score, floor, and final selected/not-selected
+decisions without writing habit events, candidates, injection logs, or prompt-time
+Markdown. `render_habit_reminder_markdown` consumes the same selected result so CLI
+dry-runs and real reminder injection do not fork.
 
 ## License
 
