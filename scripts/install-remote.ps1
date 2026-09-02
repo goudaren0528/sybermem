@@ -1,4 +1,4 @@
-# SyberMem - Remote Install (no clone needed)
+﻿# SyberMem - Remote Install (no clone needed)
 # Usage: irm https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/install-remote.ps1 | iex
 
 $ErrorActionPreference = "Stop"
@@ -79,7 +79,7 @@ $RemoverSource = Join-Path $TmpDir "$ArchivePrefix\scripts\safe-managed-remove.p
                 Remove-ManagedDirectory -Root $target.Path -Target $retiredPath
             }
         }
-        foreach ($skill in @("sybermem-init-project", "sybermem-record", "sybermem-summary", "sybermem-resume", "sybermem-digest", "sybermem-phase-analyze", "using-sybermem", "sybermem-update", "sybermem-search", "sybermem-link", "sybermem-theme-digest", "sybermem-habit", "sybermem-uninstall")) {
+        foreach ($skill in @("sybermem-init-project", "sybermem-record", "sybermem-summary", "sybermem-resume", "sybermem-digest", "sybermem-phase-analyze", "using-sybermem", "sybermem-update", "sybermem-search", "sybermem-link", "sybermem-theme-digest", "sybermem-habit", "sybermem-uninstall", "sybermem-install")) {
             $src = Join-Path $SkillsSrc $skill
             $dst = Join-Path $target.Path $skill
             if (Test-Path $src) {
@@ -269,6 +269,7 @@ Write-Host "  /sybermem-theme-digest  - Create a durable topic-level digest"
 
 Write-Host "  /sybermem-habit         - Manage user-level habit memory and reminders"
 Write-Host "  /sybermem-uninstall     - Safely choose project-level or global uninstall"
+Write-Host "  /sybermem-install       - Install the complete SyberMem system from a fresh machine (new-user entrypoint)"
 Write-Host ""
 # Honest PATH guidance: the wrapper lives in $CliDir, not on PATH by default on
 # Windows. We do NOT modify persistent PATH automatically; detect and guide.

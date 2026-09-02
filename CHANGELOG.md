@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.4.1 - 2026-09-01
+
+### Added
+- New `sybermem-install` skill: a first-time installer entrypoint that lets a new user install the complete SyberMem system from inside an agent conversation. It is a thin orchestration layer that runs the official remote install script (landing skills for all three hosts, Codex hooks, Claude launchers, the CLI runtime, the OpenCode plugin, and the version marker), then verifies each host plus the shared CLI is ready, and initializes the current project via the CLI-first `sybermem project refresh` path (since freshly-installed skills are not hot-loaded in the current session). It is a fully managed skill distributed by every install/update path alongside the other SyberMem skills.
+
 ## 0.4.0 - 2026-09-01
 
 ### Added

@@ -1,4 +1,4 @@
-# SyberMem - update script (Windows)
+﻿# SyberMem - update script (Windows)
 # Sync current skills to the Claude Code, OpenCode, and Codex user directories.
 
 $ErrorActionPreference = "Stop"
@@ -58,7 +58,7 @@ foreach ($target in $Targets) {
             Remove-ManagedDirectory -Root $target.Path -Target $retiredPath
         }
     }
-    foreach ($skill in @("sybermem-init-project", "sybermem-record", "sybermem-summary", "sybermem-resume", "sybermem-digest", "sybermem-phase-analyze", "using-sybermem", "sybermem-update", "sybermem-search", "sybermem-link", "sybermem-theme-digest", "sybermem-habit", "sybermem-uninstall")) {
+    foreach ($skill in @("sybermem-init-project", "sybermem-record", "sybermem-summary", "sybermem-resume", "sybermem-digest", "sybermem-phase-analyze", "using-sybermem", "sybermem-update", "sybermem-search", "sybermem-link", "sybermem-theme-digest", "sybermem-habit", "sybermem-uninstall", "sybermem-install")) {
         $src = Join-Path $SkillSource $skill
         $dst = Join-Path $target.Path $skill
         if (Test-Path $src) {
@@ -232,6 +232,7 @@ Write-Host "  /sybermem-theme-digest  - Create a cross-phase topic digest"
 
 Write-Host "  /sybermem-habit         - Manage user-level habit memory and reminders"
 Write-Host "  /sybermem-uninstall     - Safely choose project-level or global uninstall"
+Write-Host "  /sybermem-install       - Install the complete SyberMem system from a fresh machine (new-user entrypoint)"
 Write-Host ""
 $sybermemOnPath = ($env:PATH -split ';' | Where-Object { $_.TrimEnd('\') -ieq $CliDir.TrimEnd('\') }).Count -gt 0
 if ($sybermemOnPath) {

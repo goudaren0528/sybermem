@@ -1,4 +1,4 @@
-#!/bin/bash
+﻿#!/bin/bash
 # SyberMem - Remote Install (no clone needed)
 # Usage: curl -sSL https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/install-remote.sh | bash
 
@@ -70,7 +70,7 @@ install_skills() {
     for retired in sybermem-phase-confirm sybermem-team-publish sybermem-team-summary; do
         safe_remove_managed_dir "$target" "$target/$retired"
     done
-    for skill in sybermem-init-project sybermem-record sybermem-summary sybermem-resume sybermem-digest sybermem-phase-analyze using-sybermem sybermem-update sybermem-search sybermem-link sybermem-theme-digest sybermem-habit sybermem-uninstall; do
+    for skill in sybermem-init-project sybermem-record sybermem-summary sybermem-resume sybermem-digest sybermem-phase-analyze using-sybermem sybermem-update sybermem-search sybermem-link sybermem-theme-digest sybermem-habit sybermem-uninstall sybermem-install; do
         if [ -d "$SKILLS_SRC/$skill" ]; then
             safe_remove_managed_dir "$target" "$target/$skill"
             cp -r "$SKILLS_SRC/$skill" "$target/"
@@ -269,6 +269,7 @@ echo "  /sybermem-theme-digest  — Create a durable topic-level digest that com
 
 echo "  /sybermem-habit         — Manage user-level habit memory and reminders"
 echo "  /sybermem-uninstall     — Safely choose project-level or global uninstall"
+echo "  /sybermem-install       — Install the complete SyberMem system from a fresh machine (new-user entrypoint)"
 echo ""
 if [ "$SYBERMEM_ON_PATH" = "1" ]; then
     echo "sybermem CLI is installed and on PATH. You can now run: sybermem project init --register"

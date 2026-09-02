@@ -5,7 +5,7 @@ from importlib import metadata
 # Bundled fallback, kept in sync with the repo-root VERSION file by
 # scripts/sync-version.py. importlib.metadata is the source of truth when the
 # package is installed; this constant only backstops editable/source checkouts.
-FALLBACK_VERSION = "0.4.0"
+FALLBACK_VERSION = "0.4.1"
 
 
 def get_installed_version() -> str:

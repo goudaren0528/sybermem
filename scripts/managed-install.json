@@ -4,7 +4,7 @@
     "sybermem-init-project", "sybermem-record", "sybermem-summary", "sybermem-digest",
     "sybermem-resume", "sybermem-phase-analyze", "using-sybermem", "sybermem-update",
     "sybermem-search", "sybermem-link", "sybermem-theme-digest", "sybermem-habit",
-    "sybermem-uninstall"
+    "sybermem-uninstall", "sybermem-install"
   ],
   "retired_skills": [
     "sybermem-phase-confirm", "sybermem-team-publish", "sybermem-team-summary"
