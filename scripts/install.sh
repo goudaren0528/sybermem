@@ -1,4 +1,4 @@
-#!/bin/bash
+﻿#!/bin/bash
 
 # SyberMem - 安装脚本
 # 将 skills 复制到 Claude Code、OpenCode 和 Codex 用户级目录
@@ -51,7 +51,7 @@ install_skills() {
     for retired in sybermem-phase-confirm sybermem-team-publish sybermem-team-summary; do
         safe_remove_managed_dir "$target" "$target/$retired"
     done
-    for skill in sybermem-init-project sybermem-record sybermem-summary sybermem-resume sybermem-digest sybermem-phase-analyze using-sybermem sybermem-update sybermem-search sybermem-link sybermem-theme-digest sybermem-habit sybermem-uninstall; do
+    for skill in sybermem-init-project sybermem-record sybermem-summary sybermem-resume sybermem-digest sybermem-phase-analyze using-sybermem sybermem-update sybermem-search sybermem-link sybermem-theme-digest sybermem-habit sybermem-uninstall sybermem-install; do
         if [ -d "$SKILL_SOURCE/$skill" ]; then
             safe_remove_managed_dir "$target" "$target/$skill"
             cp -r "$SKILL_SOURCE/$skill" "$target/"
@@ -246,6 +246,7 @@ echo "  /sybermem-theme-digest  — 为单个 topic 创建跨多个 phase 的持
 
 echo "  /sybermem-habit         — 管理用户级习惯记忆与提醒"
 echo "  /sybermem-uninstall     — 安全选择项目级或全局卸载"
+echo "  /sybermem-install       — 在全新机器上安装完整的 SyberMem 系统（新用户入口）"
 echo ""
 if [ "$SYBERMEM_ON_PATH" = "1" ]; then
     echo "sybermem CLI 已安装并在 PATH 中，可直接运行：sybermem project init --register"

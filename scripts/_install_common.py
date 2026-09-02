@@ -13,7 +13,7 @@ SKILLS: Final = (
     "sybermem-init-project", "sybermem-record", "sybermem-summary", "sybermem-resume",
     "sybermem-digest", "sybermem-phase-analyze", "using-sybermem", "sybermem-update",
     "sybermem-search", "sybermem-link", "sybermem-theme-digest", "sybermem-habit",
-    "sybermem-uninstall",
+    "sybermem-uninstall", "sybermem-install",
 )
 RETIRED_SKILLS: Final = ("sybermem-phase-confirm", "sybermem-team-publish", "sybermem-team-summary")
 # (event, source file, installed name, statusMessage shown in Codex UI, additionalContextLimit)

@@ -26,7 +26,7 @@ def main() -> int:
         from _install_common import install_from_checkout
 
         install_from_checkout(root)
-    print("Available Skills: /sybermem-init-project /sybermem-update /using-sybermem")
+    print("Available Skills: /sybermem-install /sybermem-init-project /sybermem-update /using-sybermem")
     print("=== Installation Complete ===")
     return 0
 
