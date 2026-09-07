@@ -30,16 +30,32 @@ describe("habit intent capture", () => {
     expect(result.suggestedScope).toBe("")
   })
 
-  it("propagates the suggested_scope from the Core candidate", async () => {
-    // Given: Core suggests this is a project-scoped convention
-    const { shell } = stubShell(JSON.stringify({ captured: true, candidate: { habit_type: "workflow", suggested_scope: "project" } }))
+  it("suppresses a single-project convention before the CLI is invoked", async () => {
+    // Given: a single-project convention. The prefilter rejects it, so Core's canned
+    // project-scope response is never consumed and no subprocess is spawned.
+    const { shell, commands } = stubShell(JSON.stringify({ captured: true, candidate: { habit_type: "workflow", suggested_scope: "project" } }))
 
     // When
     const result = await captureHabitIntentWithCli(shell, "/root", "以后这个项目的 PR 都要小")
 
-    // Then: the plugin carries the routing suggestion for a scope-aware toast
+    // Then: no capture, and the CLI was never called
+    expect(result.captured).toBe(false)
+    expect(result.suggestedScope).toBe("")
+    expect(commands).toEqual([])
+  })
+
+  it("propagates suggested_scope from Core for a prompt that passes the prefilter", async () => {
+    // Given: a genuine cross-project preference passes the prefilter, so the CLI runs
+    // and its suggested_scope is mapped straight through.
+    const { shell, commands } = stubShell(JSON.stringify({ captured: true, candidate: { habit_type: "communication", suggested_scope: "user" } }))
+
+    // When
+    const result = await captureHabitIntentWithCli(shell, "/root", "我习惯回复都用中文")
+
+    // Then: the result mapping carries the scope, and the CLI was invoked once
     expect(result.captured).toBe(true)
-    expect(result.suggestedScope).toBe("project")
+    expect(result.suggestedScope).toBe("user")
+    expect(commands.length).toBe(1)
   })
 
   it("routes through the habit intent CLI with an argparse-safe --prompt= form", async () => {
@@ -83,7 +99,7 @@ describe("habit intent capture", () => {
     expect(looksLikeHabitIntent("每次都跑测试")).toBe(true)
     expect(looksLikeHabitIntent("默认用中文")).toBe(true)
     expect(looksLikeHabitIntent("以后尽量保持 PR 小而聚焦")).toBe(true)
-    expect(looksLikeHabitIntent("以后这个仓库都遵守这个约定")).toBe(true)
+    expect(looksLikeHabitIntent("以后这个仓库都遵守这个约定")).toBe(false)
     // Still silent for ordinary work talk
     expect(looksLikeHabitIntent("重启一下服务")).toBe(false)
   })
@@ -107,6 +123,49 @@ describe("habit intent capture", () => {
     expect(looksLikeHabitIntent("请记住我偏好先看计划再改代码")).toBe(true)
     expect(looksLikeHabitIntent("always prefer concise PR summaries")).toBe(true)
     expect(looksLikeHabitIntent("Please remember that I usually want a plan before edits")).toBe(true)
+  })
+
+  it("prefilter rejects the four observed project-discussion false positives", () => {
+    const falsePositivePrompts = [
+      "总结下最近sybermem遇到的bug，看下是否可以提一些通用的tuantuanrent的规范和经验，避免以后重复发生。你先分析",
+      "不追求有 diff 的 PR，做好记录。以后规范有diff的pr就行，dev和main都是",
+      "dev 作为长期集成分支：dev 从当前 main(bbb52b7) 建出，以后走 feature → dev → main。",
+      "那以后每次更新都要这样吗，有没有通用的更新方式？太麻烦了这样",
+    ]
+
+    for (const prompt of falsePositivePrompts) expect(looksLikeHabitIntent(prompt)).toBe(false)
+  })
+
+  it("prefilter preserves explicit personal preferences across English and Chinese", () => {
+    expect(looksLikeHabitIntent("以后都用中文")).toBe(true)
+    expect(looksLikeHabitIntent("我习惯回复都用中文")).toBe(true)
+    expect(looksLikeHabitIntent("always prefer plans before implementation")).toBe(true)
+    expect(looksLikeHabitIntent("please remember that I prefer concise replies")).toBe(true)
+    expect(looksLikeHabitIntent("我希望以后每次先给计划再改代码")).toBe(true)
+  })
+
+  it("prefilter preserves polite-question preferences but still rejects real questions", () => {
+    // A durable preference that ends with a polite confirmation tail is still a preference.
+    expect(looksLikeHabitIntent("以后每次回复都用中文，可以吗？")).toBe(true)
+    expect(looksLikeHabitIntent("以后都先给计划，好吗？")).toBe(true)
+    // A genuine information-seeking / complaint prompt is not.
+    expect(looksLikeHabitIntent("那以后每次更新都要这样吗，有没有通用的更新方式？太麻烦了这样")).toBe(false)
+  })
+
+  it("prefilter preserves cross-project workflows but rejects single-project conventions", () => {
+    // First-person cross-project workflows that merely mention PR/branch/规范 are habits.
+    expect(looksLikeHabitIntent("我习惯在 PR 中遵守命名规范")).toBe(true)
+    expect(looksLikeHabitIntent("always prefer PR reviews before merging branches")).toBe(true)
+    expect(looksLikeHabitIntent("我偏好所有项目都使用同一套提交规范")).toBe(true)
+    // A single-project convention or declarative branch topology is not a user habit.
+    expect(looksLikeHabitIntent("以后这个项目的 PR 都要小而聚焦")).toBe(false)
+    expect(looksLikeHabitIntent("以后这个仓库都遵守这个约定")).toBe(false)
+  })
+
+  it("prefilter preserves explicit analysis/debug habits over generic discussion words", () => {
+    expect(looksLikeHabitIntent("我习惯先分析问题，以后再写代码")).toBe(true)
+    expect(looksLikeHabitIntent("请记住我偏好先总结 bug，再开始修复")).toBe(true)
+    expect(looksLikeHabitIntent("always prefer to analyze bugs before implementing a fix")).toBe(true)
   })
 
   it("fails open on empty text and on malformed CLI output", async () => {

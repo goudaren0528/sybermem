@@ -12,7 +12,7 @@ LANES: Final = ("recall", "habit", "norm", "startup")
 MAX_JOURNAL_BYTES: Final = 1_000_000
 # Hosts that write the memory-usage journal in this schema. OpenCode was first;
 # Codex hooks now write the same schema, so both are aggregated together.
-KNOWN_HOSTS: Final = frozenset(("opencode", "codex"))
+KNOWN_HOSTS: Final = frozenset(("opencode", "codex", "claude"))
 
 
 class LaneStats(TypedDict):

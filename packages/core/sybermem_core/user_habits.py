@@ -44,6 +44,7 @@ HABIT_CANDIDATE_EXPIRY_DAYS: Final = 10
 # confirm step can propose a normalized statement from the user's own words. Mirrors the
 # record_intent summary contract (bounded + secret/control filtered), NOT raw unbounded text.
 MAX_CANDIDATE_SUMMARY_CHARS: Final = 160
+HABIT_CLASSIFIER_VERSION: Final = 2
 HABIT_INTENT_TERMS: Final = {
     # ASCII single-word triggers (matched as tokens via _terms()).
     "always",
@@ -100,6 +101,36 @@ _AGENT_PROMPT_PREFIX_RE: Final = re.compile(r"^\s*(?:TASK|CONTEXT|AXIS|EXPECTED 
 _ONE_OFF_WORK_RE: Final = re.compile(
     r"(fix|repair|update|submit|publish|release|commit|create\s+pr|修复|更新|提交|发布|上线).{0,80}"
     r"(pr|readme|docs?|todo|ui|bug|文档|待办|规范|约定|项目|下拉|按钮)",
+    re.IGNORECASE,
+)
+# A durable-word hit is not enough when the prompt is asking for analysis, or is
+# discussing project/agent operating rules rather than stating a personal habit.
+# Keep these gates intentionally narrow: ordinary personal preferences such as
+# "always prefer plans" must still pass.
+_ANALYSIS_OR_NORM_REQUEST_RE: Final = re.compile(
+    r"(分析|总结|通用|经验|规范|约定).{0,100}(bug|问题|以后|避免|重复|习惯|偏好|要求)|"
+    r"(bug|问题|规范|约定|习惯|偏好).{0,100}(分析|总结|通用|经验|以后|避免|重复)|"
+    r"(analy[sz]e|summari[sz]e|generaliz|lessons? learned|norms?|conventions?).{0,100}(habit|preference|bug|project|memory)",
+    re.IGNORECASE,
+)
+_PROJECT_CONVENTION_RE: Final = re.compile(
+    r"(\b(?:dev|main|branch(?:es)?|diff|pull request|pr)\b|"
+    r"项目|仓库|代码库|分支|规范|约定).{0,100}(\b(?:dev|main|branch(?:es)?|diff|pull request|pr)\b|"
+    r"项目|仓库|代码库|分支|规范|约定)|"
+    r"\b(?:dev|main)\b.{0,100}\b(?:dev|main)\b|"
+    r"(?:this\s+(?:project|repo|repository|codebase)|本项目|这个项目|本仓库|这个仓库|该项目|该仓库).{0,100}"
+    r"(?:always|usually|prefer|remember|以后|每次|总是|默认|规范|约定|pr|branch|commit)",
+    re.IGNORECASE,
+)
+_INFORMATION_SEEKING_OR_COMPLAINT_RE: Final = re.compile(
+    r"(?:有没有|是否(?:可以|要)|怎么(?:办|做|更新)|为什么|有通用的|不追求|太麻烦|麻烦).{0,100}(?:方式|办法|更新|规范|约定|这样|那样|怎么)|"
+    r"(?:以后|每次).{0,100}(?:有没有通用的|太麻烦|麻烦这样)",
+    re.IGNORECASE,
+)
+_POLITE_PREFERENCE_QUESTION_RE: Final = re.compile(r"(?:可以吗|好吗|行吗|好不好)[\s？！!?。]*$", re.IGNORECASE)
+_EXPLICIT_PERSONAL_PREFERENCE_RE: Final = re.compile(
+    r"(?:我(?:习惯|偏好|喜欢|希望)|请记住我|帮我记住|remember that i|please remember that i|"
+    r"always prefer|i prefer|i usually)",
     re.IGNORECASE,
 )
 # Signals that a preference is PROJECT-specific (belongs in a decision/requirement
@@ -409,10 +440,29 @@ def _looks_like_habit_intent(context: str) -> bool:
 
 
 def _is_noisy_habit_candidate(context: str) -> bool:
+    # First-person / remember phrasing is stronger evidence than generic words
+    # such as analyze/debug. A polite confirmation question is still a preference.
+    explicit_personal = _EXPLICIT_PERSONAL_PREFERENCE_RE.search(context) is not None
+    if explicit_personal and (_POLITE_PREFERENCE_QUESTION_RE.search(context) or _ANALYSIS_OR_NORM_REQUEST_RE.search(context)):
+        return False
+    # A first-person cross-project preference that merely MENTIONS project terms
+    # (PR/branch/规范) is a durable user habit — unless it explicitly scopes to a
+    # single project ("这个项目"/"this repo"), which stays a project convention.
+    if explicit_personal and _PROJECT_CONVENTION_RE.search(context) is not None and not _hint_hit(context, PROJECT_SCOPE_HINTS):
+        # A first-person standing preference is not one-off work even when it names
+        # commit/PR "规范"; only agent-prompt/discussion/info-seeking noise still bars it.
+        return (
+            _AGENT_PROMPT_PREFIX_RE.search(context) is not None
+            or _NOISY_HABIT_DISCUSSION_RE.search(context) is not None
+            or _INFORMATION_SEEKING_OR_COMPLAINT_RE.search(context) is not None
+        )
     return (
         _AGENT_PROMPT_PREFIX_RE.search(context) is not None
         or _NOISY_HABIT_DISCUSSION_RE.search(context) is not None
         or _ONE_OFF_WORK_RE.search(context) is not None
+        or _ANALYSIS_OR_NORM_REQUEST_RE.search(context) is not None
+        or _PROJECT_CONVENTION_RE.search(context) is not None
+        or _INFORMATION_SEEKING_OR_COMPLAINT_RE.search(context) is not None
     )
 
 
@@ -701,6 +751,7 @@ def classify_habit_intent(text: str) -> dict | None:
     return {
         "habit_intent": True,
         "candidate_only": True,
+        "classifier_version": HABIT_CLASSIFIER_VERSION,
         "action": "/sybermem-habit",
         # Stable id so a specific candidate can be selected/discarded from the list.
         "candidate_id": f"cand-{uuid4().hex[:8]}",
@@ -769,7 +820,36 @@ def _read_candidate_list() -> list[dict]:
     else:
         return []
     now = datetime.now(timezone.utc)
-    return [c for c in raw_candidates if isinstance(c, dict) and not _is_expired_candidate(c, now)]
+    candidates = []
+    for candidate in raw_candidates:
+        if not isinstance(candidate, dict) or _is_expired_candidate(candidate, now):
+            continue
+        # Never run the full classifier over a lossy summary. Only the narrow,
+        # deterministic known-false-positive detector may prune old candidates.
+        # Legacy entries without a summary are retained.
+        summary = candidate.get("summary")
+        if isinstance(summary, str) and summary and _is_known_false_positive_summary(summary):
+            continue
+        candidates.append(candidate)
+    return candidates
+
+
+def _is_known_false_positive_summary(summary: str) -> bool:
+    """Match only upgrade-targeted false-positive shapes, never a valid preference.
+
+    Prune a persisted candidate ONLY when its summary both (a) matches one of the
+    narrow false-positive shapes we shipped this fix for AND (b) would NOT be
+    accepted by the current classifier. Condition (b) makes pruning non-lossy: a
+    summary that still classifies as a durable preference (e.g. an explicit
+    first-person "我习惯在 PR 中遵守命名规范") is never treated as a false positive,
+    even though it mentions project terms.
+    """
+    fp_shaped = (
+        _ANALYSIS_OR_NORM_REQUEST_RE.search(summary) is not None
+        or _PROJECT_CONVENTION_RE.search(summary) is not None
+        or _INFORMATION_SEEKING_OR_COMPLAINT_RE.search(summary) is not None
+    )
+    return fp_shaped and not _looks_like_habit_intent(summary)
 
 
 def _write_candidate_list(candidates: list[dict]) -> bool:

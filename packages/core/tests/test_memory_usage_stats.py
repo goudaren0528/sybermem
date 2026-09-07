@@ -66,9 +66,9 @@ def test_memory_usage_journal_skips_malformed_unknown_and_outcome_rows(tmp_path:
     # When: the journal is parsed
     turns, outcomes, status = read_memory_usage_journal(tmp_path)
 
-    # Then: only valid OpenCode turn/outcome variants survive parsing
+    # Then: valid OpenCode and Claude turn variants survive parsing
     assert status == "available"
-    assert len(turns) == 1
+    assert len(turns) == 2
     assert len(outcomes) == 1
     assert turns[0].digest_items == 0
 

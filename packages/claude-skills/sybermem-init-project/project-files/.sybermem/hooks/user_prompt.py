@@ -27,14 +27,49 @@ import detect_record_intent as intent_hook  # noqa: E402
 import task_recall as recall_hook  # noqa: E402
 
 
-def _read_payload(raw: bytes) -> str:
+def _read_payload(raw: bytes) -> tuple[str, str]:
     try:
         payload = json.loads(raw.decode("utf-8", errors="replace"))
     except json.JSONDecodeError:
-        return ""
+        return "", ""
     if not isinstance(payload, dict):
-        return ""
-    return payload.get("prompt", "") or payload.get("userPrompt", "") or ""
+        return "", ""
+    session_id = payload.get("session_id") or payload.get("sessionId") or ""
+    return payload.get("prompt", "") or payload.get("userPrompt", "") or "", session_id if isinstance(session_id, str) else ""
+
+
+def _journal_memory_usage(root: Path, session_id: str, record_ids: list[str], chars: int) -> None:
+    """Write the Claude per-turn input journal consumed by the Stop collector."""
+    if not record_ids:
+        return
+    try:
+        from datetime import datetime, timezone
+
+        path = root / ".sybermem" / ".memory-usage.jsonl"
+        rows = path.read_text(encoding="utf-8").splitlines() if path.is_file() else []
+        rows.append(json.dumps({
+            "schema_version": 1,
+            "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            "host": "claude",
+            "session_id": session_id[:80],
+            "total_items": len(record_ids),
+            "total_chars": chars,
+            "digest_items": sum(1 for rid in record_ids if rid.startswith("digest-")),
+            "recall_items": len(record_ids),
+            "recall_chars": chars,
+            "habit_items": 0,
+            "habit_chars": 0,
+            "norm_items": 0,
+            "norm_chars": 0,
+            "startup_items": 0,
+            "startup_chars": 0,
+            "injected_ids": record_ids,
+            "startup_present": False,
+        }, ensure_ascii=False))
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("\n".join(rows[-200:]) + "\n", encoding="utf-8")
+    except Exception:
+        return
 
 
 def _run_intent_capture(root: Path, prompt: str) -> None:
@@ -70,7 +105,7 @@ def _run_intent_capture(root: Path, prompt: str) -> None:
         return
 
 
-def _run_recall(root: Path, prompt: str) -> None:
+def _run_recall(root: Path, prompt: str, session_id: str) -> str:
     """Replicate task_recall behavior and return additionalContext on success.
 
     Routes through the SAME high-signal gate (E1) and inject/abstain logging (E6) as
@@ -92,7 +127,9 @@ def _run_recall(root: Path, prompt: str) -> None:
             for row in rows[:3]
         ]
         recall_hook.log_recall_event(root, "inject", records=injected)
-        return recall_hook.render_packet(prompt, rows)
+        packet = recall_hook.render_packet(prompt, rows)
+        _journal_memory_usage(root, session_id, [item["record_id"] for item in injected], len(packet))
+        return packet
     except Exception:  # noqa: BROAD_EXCEPT_OK - hook boundary must fail open.
         return ""
 
@@ -153,14 +190,14 @@ def main() -> int:
         from sybermem_core.project import resolve_project_root
 
         raw = sys.stdin.buffer.read()
-        prompt = _read_payload(raw)
+        prompt, session_id = _read_payload(raw)
 
         root = resolve_project_root()
         if root is None:
             return 0
 
         _run_intent_capture(root, prompt)
-        _write_additional_context([_run_recall(root, prompt), _run_habit_reminder(prompt), _run_scoped_norms(root, prompt)])
+        _write_additional_context([_run_recall(root, prompt, session_id), _run_habit_reminder(prompt), _run_scoped_norms(root, prompt)])
         return 0
     except Exception:  # noqa: BROAD_EXCEPT_OK - fail open, never block a prompt.
         return 0

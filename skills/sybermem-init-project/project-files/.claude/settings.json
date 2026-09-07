@@ -35,6 +35,12 @@
             "command": "python .sybermem/hooks/record_change_on_stop.py",
             "timeout": 60,
             "statusMessage": "SyberMem checking whether to record a change..."
+          },
+          {
+            "type": "command",
+            "command": "python .sybermem/hooks/recall_outcome_on_stop.py",
+            "timeout": 10,
+            "statusMessage": "SyberMem measuring recall relevance..."
           }
         ]
       }

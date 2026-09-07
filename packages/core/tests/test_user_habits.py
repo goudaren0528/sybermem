@@ -11,11 +11,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from sybermem_core.habit_diagnostics import evaluate_prompt_habits
 from sybermem_core.user_habits import (
+    MAX_CANDIDATE_SUMMARY_CHARS,
     Confidence,
     HabitStatus,
     HabitType,
     InjectionPolicy,
     InvalidHabitError,
+    _is_known_false_positive_summary,
     add_habit,
     capture_habit_intent,
     classify_habit_intent,
@@ -674,6 +676,96 @@ def test_classify_habit_intent_rejects_noisy_system_and_task_prompts(tmp_path: P
         assert classify_habit_intent(prompt) is None
 
 
+def test_classify_habit_intent_rejects_observed_project_discussion_false_positives(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("SYBERMEM_HOME", str(tmp_path))
+    observed_false_positives = [
+        "总结下最近sybermem遇到的bug，看下是否可以提一些通用的tuantuanrent的规范和经验，避免以后重复发生。你先分析",
+        "不追求有 diff 的 PR，做好记录。以后规范有diff的pr就行，dev和main都是",
+        "dev 作为长期集成分支：dev 从当前 main(bbb52b7) 建出，以后走 feature → dev → main。",
+        "那以后每次更新都要这样吗，有没有通用的更新方式？太麻烦了这样",
+    ]
+
+    for prompt in observed_false_positives:
+        assert classify_habit_intent(prompt) is None
+        assert capture_habit_intent(prompt) is None
+    assert list_habit_candidates() == []
+
+
+def test_read_prunes_revalidated_stale_false_positive_but_keeps_legacy_unknown_candidate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("SYBERMEM_HOME", str(tmp_path))
+    from datetime import datetime, timezone
+    # Derive from now() so the test never drifts into the expiry window (oracle Low #5).
+    recent = datetime.now(timezone.utc).isoformat()
+    path = tmp_path / ".habit-intent.json"
+    path.write_text(json.dumps({"candidates": [
+        {"habit_intent": True, "candidate_only": True, "candidate_id": "cand-false",
+         "summary": "以后每次更新都要这样吗，有没有通用的更新方式？太麻烦了这样",
+         "created_at": recent},
+        {"habit_intent": True, "candidate_only": True, "candidate_id": "cand-legacy",
+         "created_at": recent},
+    ]}), encoding="utf-8")
+
+    candidates = list_habit_candidates()
+    assert [candidate["candidate_id"] for candidate in candidates] == ["cand-legacy"]
+
+
+def test_read_keeps_candidate_whose_marker_falls_after_summary_truncation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Oracle High: a valid preference whose durable marker lands past the 160-char
+    # summary boundary must NOT be pruned on read (revalidation is positive-only,
+    # never "the truncated summary failed the full classifier").
+    monkeypatch.setenv("SYBERMEM_HOME", str(tmp_path))
+    from datetime import datetime, timezone
+    recent = datetime.now(timezone.utc).isoformat()
+    filler = "背景说明 " * 40  # long enough to push the marker past truncation
+    truncated_summary = (filler + "always prefer concise replies")[:MAX_CANDIDATE_SUMMARY_CHARS]
+    assert classify_habit_intent(truncated_summary) is None  # summary alone no longer classifies
+    assert not _is_known_false_positive_summary(truncated_summary)  # but it is NOT a known FP either
+    path = tmp_path / ".habit-intent.json"
+    path.write_text(json.dumps({"candidates": [
+        {"habit_intent": True, "candidate_only": True, "candidate_id": "cand-long",
+         "summary": truncated_summary, "created_at": recent},
+    ]}), encoding="utf-8")
+
+    candidates = list_habit_candidates()
+    assert [candidate["candidate_id"] for candidate in candidates] == ["cand-long"]
+
+
+def test_capture_then_read_then_rewrite_retains_valid_candidate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Oracle High: read must not silently drop a valid candidate, and a subsequent
+    # write (capture of another candidate) must not physically delete the first.
+    monkeypatch.setenv("SYBERMEM_HOME", str(tmp_path))
+    first = capture_habit_intent("我习惯在 PR 中遵守命名规范")
+    assert first is not None
+    assert [c["candidate_id"] for c in list_habit_candidates()] == [first["candidate_id"]]
+    second = capture_habit_intent("以后都用中文")
+    assert second is not None
+    ids = {c["candidate_id"] for c in list_habit_candidates()}
+    assert first["candidate_id"] in ids and second["candidate_id"] in ids
+
+
+def test_classify_habit_intent_preserves_more_explicit_user_preferences(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("SYBERMEM_HOME", str(tmp_path))
+    true_positives = [
+        "以后都用中文",
+        "我习惯回复都用中文",
+        "always prefer plans before implementation",
+        "please remember that I prefer concise replies",
+        "我希望以后每次先给计划再改代码",
+    ]
+    for prompt in true_positives:
+        assert classify_habit_intent(prompt) is not None
+
+
 def test_classify_habit_intent_preserves_explicit_durable_preferences(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     # Given: explicit durable preference phrasing
     monkeypatch.setenv("SYBERMEM_HOME", str(tmp_path))
@@ -712,7 +804,7 @@ def test_classify_habit_intent_suggests_scope(tmp_path: Path, monkeypatch: pytes
 
     # Project-scoped phrasing suggests a project record instead of a user habit
     project_scope = classify_habit_intent("以后这个项目的 PR 都要小而聚焦")
-    assert project_scope is not None and project_scope["suggested_scope"] == "project"
+    assert project_scope is None
 
     # Mixed / unclear phrasing stays ambiguous so the confirm step asks
     ambiguous = classify_habit_intent("以后先出方案再写代码")
@@ -720,7 +812,7 @@ def test_classify_habit_intent_suggests_scope(tmp_path: Path, monkeypatch: pytes
 
     # English project scope is recognized too
     english_project = classify_habit_intent("always keep this repo's commits small")
-    assert english_project is not None and english_project["suggested_scope"] == "project"
+    assert english_project is None
 
 
 def test_capture_habit_intent_writes_candidate_without_creating_a_habit(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -941,7 +1033,8 @@ def test_clear_removes_all_candidates(tmp_path: Path, monkeypatch: pytest.Monkey
 def test_read_habit_intent_backward_compatible_with_legacy_single_object(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("SYBERMEM_HOME", str(tmp_path))
     # Legacy single-object format (pre-list). read_habit_intent + list must still see it.
-    legacy = {"habit_intent": True, "candidate_only": True, "habit_type": "avoidance", "suggested_scope": "user", "created_at": "2026-08-25T10:00:00+00:00"}
+    from datetime import datetime, timezone
+    legacy = {"habit_intent": True, "candidate_only": True, "habit_type": "avoidance", "suggested_scope": "user", "created_at": datetime.now(timezone.utc).isoformat()}
     (tmp_path / ".habit-intent.json").write_text(json.dumps(legacy), encoding="utf-8")
     candidates = list_habit_candidates()
     assert len(candidates) == 1
