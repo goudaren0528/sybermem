@@ -1,0 +1,26 @@
+schema_version: 1
+
+name: sybermem-install
+version: 1.0.0
+description: Install the complete SyberMem system from inside an agent conversation on a fresh machine
+entrypoint: SKILL.md
+
+author: team-platform
+license: internal
+
+tags:
+  - sybermem
+  - install
+  - onboarding
+
+compatibility:
+  opencode: ">=1.0.0"
+
+tools:
+  - name: shell
+    required: true
+
+permissions:
+  network: true
+  shell: true
+  write_files: true
