@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+import subprocess
 import sys
 
 import pytest
@@ -10,6 +11,22 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from sybermem_core.project_refresh import refresh_project
+
+
+def git(project_root: Path, *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["git", "-C", str(project_root), *args],
+        check=check,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+
+
+def init_git_project(project_root: Path) -> None:
+    git(project_root, "init")
+    git(project_root, "config", "user.email", "tests@example.com")
+    git(project_root, "config", "user.name", "SyberMem Tests")
 
 
 def write_template(template_root: Path, relative_path: str, content: str) -> None:
@@ -56,6 +73,8 @@ def test_refresh_project_is_idempotent_when_project_is_fresh(tmp_path: Path) -> 
     assert second["overall"] == "fresh"
     assert second["actions_applied"] == []
     assert second["actions_needed"] == []
+    assert second["actions_skipped"] == []
+    assert second["files"][".sybermem/INDEX.md:git-tracking"]["status"] == "skipped"
 
 
 def test_refresh_project_creates_missing_managed_file_from_template(tmp_path: Path) -> None:
@@ -305,7 +324,8 @@ def test_refresh_project_adds_gitignore_block_for_git_repo(tmp_path: Path) -> No
     template_root = tmp_path / "templates"
     project_root = tmp_path / "project"
     seed_templates(template_root)
-    (project_root / ".git").mkdir(parents=True, exist_ok=True)
+    project_root.mkdir()
+    init_git_project(project_root)
 
     # When: the project is refreshed
     report = refresh_project(project_root, template_roots=(template_root,))
@@ -319,7 +339,7 @@ def test_refresh_project_adds_gitignore_block_for_git_repo(tmp_path: Path) -> No
     assert "/.sybermem/.recall-debug.jsonl" in content
     assert "/.claude/settings.json" in content
     assert "/.sybermem/changes" not in content
-    assert "/.sybermem/INDEX.md" not in content
+    assert "/.sybermem/INDEX.md" in content
     assert report["files"][".gitignore"]["status"] == "created"
     assert "create .gitignore with SyberMem ignore block" in report["actions_applied"]
 
@@ -343,7 +363,8 @@ def test_refresh_project_gitignore_is_idempotent(tmp_path: Path) -> None:
     template_root = tmp_path / "templates"
     project_root = tmp_path / "project"
     seed_templates(template_root)
-    (project_root / ".git").mkdir(parents=True, exist_ok=True)
+    project_root.mkdir()
+    init_git_project(project_root)
     refresh_project(project_root, template_roots=(template_root,))
 
     # When: refreshed again
@@ -358,7 +379,8 @@ def test_refresh_project_gitignore_preserves_user_content(tmp_path: Path) -> Non
     template_root = tmp_path / "templates"
     project_root = tmp_path / "project"
     seed_templates(template_root)
-    (project_root / ".git").mkdir(parents=True, exist_ok=True)
+    project_root.mkdir()
+    init_git_project(project_root)
     gitignore = project_root / ".gitignore"
     gitignore.write_text("node_modules/\n*.log\n", encoding="utf-8")
 
@@ -370,4 +392,91 @@ def test_refresh_project_gitignore_preserves_user_content(tmp_path: Path) -> Non
     assert "node_modules/" in content
     assert "*.log" in content
     assert "# >>> SyberMem >>>" in content
+    assert "/.sybermem/INDEX.md" in content
     assert report["files"][".gitignore"]["status"] == "updated"
+
+
+def test_refresh_project_untracks_tracked_index_without_touching_records_or_commit(tmp_path: Path) -> None:
+    template_root = tmp_path / "templates"
+    project_root = tmp_path / "project"
+    seed_templates(template_root)
+    project_root.mkdir()
+    init_git_project(project_root)
+    records = {
+        ".sybermem/changes/one.md": "---\nrecord_id: one\n---\nOne\n",
+        ".sybermem/decisions/two.md": "---\nrecord_id: two\n---\nTwo\n",
+    }
+    for relative, content in records.items():
+        target = project_root / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(content, encoding="utf-8")
+    index = project_root / ".sybermem" / "INDEX.md"
+    index.parent.mkdir(parents=True, exist_ok=True)
+    index_bytes = b"# Existing local index\n\nKeep these bytes.\n"
+    index.write_bytes(index_bytes)
+    git(project_root, "add", ".")
+    git(project_root, "commit", "-m", "seed")
+    head_before = git(project_root, "rev-parse", "HEAD").stdout.strip()
+    record_bytes = {path: (project_root / path).read_bytes() for path in records}
+
+    report = refresh_project(project_root, template_roots=(template_root,))
+
+    assert git(project_root, "check-ignore", ".sybermem/INDEX.md").returncode == 0
+    assert git(project_root, "ls-files", "--error-unmatch", ".sybermem/INDEX.md", check=False).returncode != 0
+    assert index.exists()
+    assert index.read_bytes() == index_bytes
+    assert {path: (project_root / path).read_bytes() for path in records} == record_bytes
+    assert git(project_root, "rev-parse", "HEAD").stdout.strip() == head_before
+    assert report["files"][".sybermem/INDEX.md:git-tracking"]["status"] == "untracked"
+    assert "untrack .sybermem/INDEX.md from Git index (working file preserved)" in report["actions_applied"]
+
+
+def test_refresh_project_skips_untracked_index_in_git_repo(tmp_path: Path) -> None:
+    template_root = tmp_path / "templates"
+    project_root = tmp_path / "project"
+    seed_templates(template_root)
+    project_root.mkdir()
+    init_git_project(project_root)
+    index = project_root / ".sybermem" / "INDEX.md"
+    index.parent.mkdir(parents=True)
+    original = b"# Untracked index\n"
+    index.write_bytes(original)
+
+    report = refresh_project(project_root, template_roots=(template_root,))
+
+    assert index.read_bytes() == original
+    assert report["files"][".sybermem/INDEX.md:git-tracking"]["status"] == "skipped"
+
+
+def test_refresh_project_skips_index_migration_for_non_git_project(tmp_path: Path) -> None:
+    template_root = tmp_path / "templates"
+    project_root = tmp_path / "project"
+    seed_templates(template_root)
+    index = project_root / ".sybermem" / "INDEX.md"
+    index.parent.mkdir(parents=True)
+    original = b"# Non-git index\n"
+    index.write_bytes(original)
+
+    report = refresh_project(project_root, template_roots=(template_root,))
+
+    assert index.read_bytes() == original
+    assert report["files"][".sybermem/INDEX.md:git-tracking"]["status"] == "skipped"
+
+
+def test_refresh_project_index_untracking_is_idempotent(tmp_path: Path) -> None:
+    template_root = tmp_path / "templates"
+    project_root = tmp_path / "project"
+    seed_templates(template_root)
+    project_root.mkdir()
+    init_git_project(project_root)
+    index = project_root / ".sybermem" / "INDEX.md"
+    index.parent.mkdir(parents=True)
+    index.write_bytes(b"# Stable index\n")
+    git(project_root, "add", ".sybermem/INDEX.md")
+    git(project_root, "commit", "-m", "seed index")
+
+    refresh_project(project_root, template_roots=(template_root,))
+    second = refresh_project(project_root, template_roots=(template_root,))
+
+    assert second["files"][".sybermem/INDEX.md:git-tracking"]["status"] == "skipped"
+    assert index.exists()

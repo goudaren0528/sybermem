@@ -10,8 +10,8 @@ def resolve_sybermem_root() -> Path | None:
     """Walk up from cwd to find the nearest SyberMem project root.
 
     A directory qualifies if it contains .sybermem/ and at least one of:
+      - .sybermem/project.yaml
       - .claude/settings.json
-      - .sybermem/INDEX.md
 
     Stops at the git repository root or filesystem root, whichever comes first.
     Returns the resolved root, or None if no SyberMem root is found.
@@ -32,9 +32,9 @@ def resolve_sybermem_root() -> Path | None:
 
     while True:
         has_sybermem = (current / ".sybermem").is_dir()
+        has_project_yaml = (current / ".sybermem" / "project.yaml").is_file()
         has_settings = (current / ".claude" / "settings.json").is_file()
-        has_index = (current / ".sybermem" / "INDEX.md").is_file()
-        if has_sybermem and (has_settings or has_index):
+        if has_sybermem and (has_project_yaml or has_settings):
             return current
         if git_root and current == git_root:
             break

@@ -27,15 +27,14 @@ If any of these is false, STOP. Do not write the digest file.
 
 ## Directory Resolution
 
-Resolve project root by walking up from cwd to find `.sybermem/` + `.claude/settings.json`.
+Resolve project root by walking up from cwd to find `.sybermem/` + (`.sybermem/project.yaml` OR `.claude/settings.json`).
 
 ## Preconditions
 
 Before creating a digest, verify all of the following:
 
 - `.sybermem/digests/` exists
-- `.sybermem/INDEX.md` contains a `## Phase Digests` section
-- `.sybermem/INDEX.md` contains the exact insertion anchor `<!-- add new digest records here -->` within that section
+- `.sybermem/INDEX.md` can be regenerated with `sybermem project index build`; its Phase Digests section and insertion anchor are derived navigation, not durable state
 - `.sybermem/templates/digest-template.md` exists
 
 If any of these are missing, explain that digest support has not been enabled in this project yet and ask the user to run `/sybermem-update`.
@@ -45,7 +44,7 @@ If any of these are missing, explain that digest support has not been enabled in
 You MUST complete these steps in order:
 
 1. **Resolve project root** — apply Step 0 directory resolution rules above
-2. **Verify preconditions** — `.sybermem/digests/` exists, `INDEX.md` has `## Phase Digests` with `<!-- add new digest records here -->`, `.sybermem/templates/digest-template.md` exists. If any missing, ask user to run `/sybermem-update`.
+2. **Verify preconditions** — `.sybermem/digests/` exists and `.sybermem/templates/digest-template.md` exists. Run `sybermem project index build` to (re)generate local navigation before using it; if the digest structure is missing, ask the user to run `/sybermem-update`.
 3. **Determine digest input mode**:
    - If explicit source records specified → use them directly, skip phase-index dependency
    - If no explicit source records:
@@ -74,9 +73,9 @@ For each phase, run Steps 4–10 independently. This is the normal batch path �
    - If your `source_records` differ from the phase's covered set (e.g. explicit sources), pass them directly: `sybermem project coverage-hash --source-records "changes/x.md,bugs/y.md" --format json`.
    - If the CLI is unavailable, fall back to core semantics: for each project-relative path in `source_records`, sorted ascending, take the file's current bytes' SHA-256 hex (literal `<missing>` if absent), build `"{rel_path}:{sha256}"` lines, join with `\n`, and SHA-256 the UTF-8 bytes — but **prefer the CLI** so the value always matches `sybermem_core.digest_coverage.compute_coverage_hash`.
 8. **Write the digest file** — path: `.sybermem/digests/{YYYY-MM-DD}-{NNN}-{title}.md`. Use `.sybermem/templates/digest-template.md`. Fill `coverage_hash` with the value from Step 7a (never leave the `{{coverage_hash}}` placeholder). Write `## Core Conclusions` as concise, standalone, source-aware durable facts. They are the compressed hot-path signal and may be injected into model-visible startup or compaction context, so each conclusion should still make sense when read alone.
-9. **Update INDEX.md** — insert row above `<!-- add new digest records here -->` in `## Phase Digests` table: `| NNN | YYYY-MM-DD | Title | <status> | X records | [link](digests/file.md) |`
+9. **Rebuild derived INDEX navigation** — run `sybermem project index build`. The Phase Digests row is deterministically derived from the digest file; do not hand-edit `INDEX.md`.
 10. **Preserve Key Conclusions signal quality** — do not add to `## Key Conclusions` by default. Only add if the digest introduces a truly global project conclusion.
-11. **Archive source record conclusions** — after writing the digest, move the Key Conclusions of the source records to `## Archived Conclusions` in INDEX.md. Append `[compressed in digest-NNN]` to each archived line. This keeps Key Conclusions focused on current undigested work. Only move conclusions whose record ID is in the `source_records` list; leave other conclusions untouched.
+11. **Preserve durable source state** — the digest file and source record front-matter remain the durable inputs. Rebuild `INDEX.md` with `sybermem project index build`; its digest and archived-conclusions navigation is derived from digest files and record lifecycle, not hand-edited rows.
 
 ## Error Handling
 

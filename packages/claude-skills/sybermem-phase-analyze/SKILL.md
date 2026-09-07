@@ -55,13 +55,14 @@ If any of these is false, the analysis is incomplete. Go back and finish it.
 
 ## Directory Resolution
 
-Resolve project root by walking up from cwd to find `.sybermem/` + `.claude/settings.json`.
+Resolve project root by walking up from cwd to find `.sybermem/` + (`.sybermem/project.yaml` OR `.claude/settings.json`).
 
 ## Preconditions
 
 Before analysis, verify all of the following:
-- `.sybermem/INDEX.md` exists
 - at least one raw record exists in `changes/`, `decisions/`, `requirements/`, or `bugs/`
+
+Missing `.sybermem/INDEX.md` must not block analysis; advise `sybermem project index build` if derived navigation is needed. Treat initialization as based on `project.yaml` and/or records, not `INDEX.md`.
 
 If `.sybermem/analysis/phase-index.md` does not exist, create it from the starter template (create the `analysis/` directory first if needed). The starter template should contain empty `## Analysis Progress`, `## Phase Candidates`, `## Confirmed Phases`, and `## Coverage Map` sections with `status: not_yet_analyzed`. This is the normal first-run path — do not ask the user to run `/sybermem-update` just because the phase index has never been created.
 
@@ -70,7 +71,7 @@ If `.sybermem/analysis/phase-index.md` does not exist, create it from the starte
 Use this only when the CLI-first path is unavailable, broken, or emits invalid JSON. You MUST complete these steps in order:
 
 1. **Resolve project root** — apply Step 0 directory resolution rules above
-2. **Verify preconditions** — `.sybermem/INDEX.md` exists, at least one raw record exists. If `.sybermem/analysis/phase-index.md` does not exist, create it from the starter template with `status: not_yet_analyzed`.
+2. **Verify preconditions** — at least one raw record exists. A missing `INDEX.md` must not block analysis; advise `sybermem project index build` if derived navigation is needed. If `.sybermem/analysis/phase-index.md` does not exist, create it from the starter template with `status: not_yet_analyzed`.
 3. **Read current phase index** — extract analysis progress, existing phase candidates, existing confirmed phases, current coverage map
 4. **Determine analysis scope** — default to full `.sybermem/` record set plus relevant git history context. If phase index has a usable boundary, determine which records were added since the last analyzed record boundary.
 5. **Build or refresh candidate groups** — use lightweight heuristics: time proximity, file/path proximity, title/topic similarity, sequential implementation relationship.

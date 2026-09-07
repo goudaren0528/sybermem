@@ -13,9 +13,9 @@ export function resolveRoot(cwd: string): string | null {
   let current = resolve(cwd)
   while (true) {
     const hasSybermem = existsSync(join(current, ".sybermem"))
+    const hasProjectYaml = existsSync(join(current, ".sybermem", "project.yaml"))
     const hasSettings = existsSync(join(current, ".claude", "settings.json"))
-    const hasIndex = existsSync(join(current, ".sybermem", "INDEX.md"))
-    if (hasSybermem && (hasSettings || hasIndex)) return current
+    if (hasSybermem && (hasProjectYaml || hasSettings)) return current
     const parent = resolve(current, "..")
     if (parent === current) break
     current = parent

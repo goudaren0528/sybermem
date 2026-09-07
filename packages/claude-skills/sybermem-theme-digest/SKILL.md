@@ -26,15 +26,14 @@ If any of these is false, STOP. Do not write the theme digest file.
 
 ## Directory Resolution
 
-Resolve project root by walking up from cwd to find `.sybermem/` + `.claude/settings.json`.
+Resolve project root by walking up from cwd to find `.sybermem/` + (`.sybermem/project.yaml` OR `.claude/settings.json`).
 
 ## Preconditions
 
 Before creating a theme digest, verify all of the following:
 - `.sybermem/theme-digests/` exists
 - `.sybermem/templates/theme-digest-template.md` exists
-- `.sybermem/INDEX.md` contains a `## Theme Digests` section
-- `.sybermem/INDEX.md` contains the exact insertion anchor `<!-- add new theme digest records here -->` within that section
+- `.sybermem/INDEX.md` can be regenerated with `sybermem project index build`; its Theme Digests section and insertion anchor are derived navigation, not durable state
 
 If any are missing, explain that theme-digest capability has not been enabled in this project yet and ask the user to run `/sybermem-update`.
 
@@ -51,15 +50,15 @@ First version supports one topic slug only.
 You MUST complete these steps in order:
 
 1. **Resolve project root** — apply directory resolution rules above.
-2. **Verify preconditions** — `.sybermem/theme-digests/` exists, `theme-digest-template.md` exists, `INDEX.md` has `## Theme Digests` with `<!-- add new theme digest records here -->`. If any missing, ask the user to run `/sybermem-update`.
+2. **Verify preconditions** — `.sybermem/theme-digests/` exists and `theme-digest-template.md` exists. If derived navigation is absent, run `sybermem project index build`; it regenerates the Theme Digests section. Do not require pre-existing INDEX sections or anchors.
 3. **Identify the topic scope** — the user provides one topic slug (e.g. `hooks`). Do not merge topics in this first version.
-4. **Collect candidate records** — read `## Topic Index` in `.sybermem/INDEX.md` for that topic. If the topic is missing, refuse and explain.
+4. **Collect candidate records** — read `## Topic Index` in `.sybermem/INDEX.md` for that topic, rebuilding it first with `sybermem project index build` when absent. If the topic is missing from the derived index and record front-matter, refuse and explain.
 5. **Enrich with phase coverage** — read `.sybermem/analysis/phase-index.md` coverage map and determine which confirmed phases cover those records.
 6. **Prefer phase digests first** — if any of those phases already have digests listed in `## Phase Digests`, use them as primary compressed sources.
 7. **Fill gaps with raw records** — for records not covered by any existing phase digest, include the raw record file as a direct source.
 8. **Deduplicate** — deduplicate `source_phases`, `source_digests`, and `source_records` by ID or path.
 9. **Write the theme digest file** — path: `.sybermem/theme-digests/{YYYY-MM-DD}-{NNN}-{topic}.md`. Use `.sybermem/templates/theme-digest-template.md`. Set `coverage_strategy: phase-digests-first-then-records`.
-10. **Update INDEX.md** — insert a row above `<!-- add new theme digest records here -->` in `## Theme Digests`: `| NNN | YYYY-MM-DD | topic | completed | X phases, Y digests, Z records | [link](theme-digests/file.md) |`
+10. **Rebuild derived INDEX navigation** — run `sybermem project index build`. The Theme Digests row is deterministically derived from the theme digest file; do not hand-edit `INDEX.md`.
 
 ## Output Shape
 

@@ -46,7 +46,7 @@ Do NOT leave the old direct-hook command in `.claude/settings.json` when the lau
 
 ## Directory Resolution
 
-Resolve project root by walking up from cwd to find `.sybermem/` + `.claude/settings.json`.
+Resolve project root by walking up from cwd to find `.sybermem/` + (`.sybermem/project.yaml` OR `.claude/settings.json`).
 
 ## Flow
 
@@ -103,7 +103,7 @@ The command is the primary project-local update path. It is responsible for:
 - creating missing project-managed files from templates
 - refreshing stale SyberMem-managed hooks/templates with backups
 - removing any legacy SyberMem protocol block from `CLAUDE.md` / `AGENTS.md` (whole file when purely SyberMem-managed, otherwise only the block) without overwriting custom content
-- adding or refreshing the marker-bounded SyberMem `.gitignore` block for git projects (ignores machine-local runtime/scripts; keeps records committable; skipped for non-git projects) without overwriting unrelated ignore rules
+- adding or refreshing the marker-bounded SyberMem `.gitignore` block for git projects (ignores machine-local runtime/scripts and local derived `.sybermem/INDEX.md`; keeps records committable; skipped for non-git projects) without overwriting unrelated ignore rules
 - surgically repairing `.claude/settings.json` SyberMem hook/env entries while preserving unrelated custom hooks, env, and instructions
 - creating `.sybermem/project.yaml` when missing
 - emitting valid JSON with `overall`, `files`, `actions_needed`, `actions_applied`, `actions_skipped`, and `preserved_custom`

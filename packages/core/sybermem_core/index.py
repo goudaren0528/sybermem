@@ -11,6 +11,19 @@ from .registry import load_registry, update_registry_index_metadata
 from .identity import now_iso
 
 
+CANONICAL_RECORD_DIRECTORIES = (
+    "changes", "decisions", "requirements", "bugs", "norms", "digests", "theme-digests",
+)
+
+
+def _is_indexable_project(root: Path) -> bool:
+    """Check project identity without requiring the local derived INDEX."""
+    sybermem = root / ".sybermem"
+    if (sybermem / "project.yaml").is_file():
+        return True
+    return any((sybermem / name).is_dir() for name in CANONICAL_RECORD_DIRECTORIES)
+
+
 def index_db_path() -> Path:
     return Path.home() / ".sybermem" / "index" / "sybermem.db"
 
@@ -118,7 +131,7 @@ def rebuild_index(project_filter: str | None = None) -> dict[str, int]:
             if project_filter and p.get("slug") != project_filter:
                 continue
             root = Path(p["path"])
-            if not (root / ".sybermem" / "INDEX.md").is_file():
+            if not root.is_dir() or not _is_indexable_project(root):
                 update_registry_index_metadata(p["project_id"], commit="", indexed_at=now_iso(), status="missing")
                 continue
 

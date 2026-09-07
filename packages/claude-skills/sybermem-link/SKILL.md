@@ -11,7 +11,7 @@ Add a forward relation between two existing SyberMem records by editing the SOUR
 
 ## Core Invariant
 
-- **Only the source-side state is modified. The target record is never touched. For `superseded-by`, this may also move the source conclusion in `.sybermem/INDEX.md` from `## Key Conclusions` to `## Archived Conclusions`.**
+- **Only the source-side state is modified. The target record is never touched. For `superseded-by`, update the source front-matter; rebuild the local derived `INDEX.md` so its archival navigation reflects that state.**
 
 <HARD-GATE>
 Do NOT modify the target record. Relations are stored forward-only on the source.
@@ -21,7 +21,7 @@ Do NOT add a relation type other than implements, fixes, related, or superseded-
 
 ## Directory Resolution
 
-Resolve project root by walking up from cwd to find `.sybermem/` + `.claude/settings.json`.
+Resolve project root by walking up from cwd to find `.sybermem/` + (`.sybermem/project.yaml` OR `.claude/settings.json`).
 
 ## Usage
 
@@ -45,8 +45,8 @@ You MUST complete these steps in order:
 5. **Apply the relation behavior**
    - For `implements`/`fixes`/`related`/`crystallized-from`, append `<target-id>` to the matching frontmatter list field (`crystallized_from` for `crystallized-from`). If the field does not exist, create it as a list. If `<target-id>` is already present, skip (no duplicate). `crystallized-from` is used on a `norm` record to point at the decision/requirement it was crystallized from.
    - For `superseded-by`, write `superseded_by: <target-id>` in the source frontmatter. If the field already exists with the same value, skip. If it exists with a different value, warn and ask before overwriting.
-6. **Apply the archive side-effect for `superseded-by`** — move the source conclusion from `## Key Conclusions` to `## Archived Conclusions`, appending `[superseded by <target-id>]`. If it is already archived with the same suffix, skip.
-7. **Write the source-side updates only** — save the source file and any required source-side conclusion move in `.sybermem/INDEX.md`. Do NOT modify the target record.
+6. **Apply the archive side-effect for `superseded-by`** — the `superseded_by` frontmatter is the durable archive signal. Do not move or edit conclusions in `INDEX.md`.
+7. **Write the source-side updates only** — save the source file, then run `sybermem project index build` to regenerate local navigation. Do NOT modify the target record or hand-edit `INDEX.md`.
 8. **Report** — tell the user which source record fields were updated and whether the source conclusion was archived.
 
 ## Relation Semantics

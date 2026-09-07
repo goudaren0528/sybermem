@@ -51,7 +51,7 @@ def test_portfolio_enriches_projects_with_local_attention_signals(tmp_path: Path
 
 
 def test_portfolio_shows_existing_but_uninitialized_project(tmp_path: Path, monkeypatch) -> None:
-    # Given: a registry entry whose PATH EXISTS but has no .sybermem/INDEX.md yet
+    # Given: a registry entry whose PATH EXISTS but has no SyberMem identity
     proj = tmp_path / "raw"
     proj.mkdir()  # exists, but not a SyberMem project
     registry = [{"project_id": "raw-id", "slug": "raw", "path": str(proj)}]
@@ -65,7 +65,29 @@ def test_portfolio_shows_existing_but_uninitialized_project(tmp_path: Path, monk
     entry = result["projects"][0]
     assert entry["slug"] == "raw"
     assert entry["status"] == "uninitialized"
-    assert "INDEX.md" in entry["reason"]
+    assert "project.yaml" in entry["reason"]
+
+
+def test_portfolio_computes_metrics_without_index(tmp_path: Path, monkeypatch) -> None:
+    # Given: a real project with records but without its local derived INDEX
+    proj = tmp_path / "proj"
+    proj.mkdir()
+    _make_project(proj, "demo")
+    (proj / ".sybermem" / "INDEX.md").unlink()
+    monkeypatch.setattr(portfolio_module, "load_registry", lambda: [{
+        "project_id": "demo-id", "slug": "demo", "path": str(proj),
+    }])
+
+    # When
+    entry = build_portfolio()["projects"][0]
+
+    # Then: missing INDEX is advisory only; record-driven metrics remain available
+    assert entry["status"] == "active"
+    assert entry["index_status"] == "missing"
+    assert "project index build" in entry["reason"]
+    assert entry["open_bugs"] == 1
+    assert entry["digest_uncovered"] == 2
+    assert entry["latest_record_date"] == "2026-08-22"
 
 
 def test_portfolio_is_read_only(tmp_path: Path, monkeypatch) -> None:

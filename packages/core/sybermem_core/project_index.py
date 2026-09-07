@@ -11,12 +11,16 @@ from .project_index_render import InvalidRecordMetadataError, LegacyTableOverlay
 
 DERIVED_SECTIONS: Final[tuple[str, ...]] = (
     "Key Conclusions",
+    "Archived Conclusions",
+    "Phase Digests",
+    "Theme Digests",
     "Feature Changes",
     "Technical Decisions",
     "Requirements / Discussions",
     "Bug Fix Records",
     "Project Norms",
     "Topic Index",
+    "Usage",
 )
 CANONICAL_RECORD_DIRECTORIES: Final[Mapping[str, str]] = {
     "change": "changes",
@@ -63,7 +67,10 @@ def build_project_index(root: Path) -> str:
     overlay = _parse_legacy_overlay(existing)
     records = _load_records(root, overlay)
     generated = generated_sections(root, records)
-    base = existing if existing else minimal_skeleton()
+    # INDEX is a local derived artifact.  The existing file is deliberately used
+    # only as a best-effort legacy overlay source; it must never be the template
+    # or source of current-format output.
+    base = minimal_skeleton()
     return _replace_derived_sections(base, generated)
 
 
@@ -139,6 +146,8 @@ def _record_from_row(row: Mapping[str, str], path: Path, overlay: LegacyOverlay)
         key_conclusion=key_conclusion,
         topics=topics,
         path=path,
+        lifecycle=row["lifecycle"],
+        superseded_by=row["superseded_by"],
     )
 
 

@@ -88,7 +88,7 @@ implements: [requirement-002]
 
 - structured records: `change` / `decision` / `requirement` / `bug` / `norm`
 - UUID-backed `record_id` values, with legacy numeric record IDs still readable
-- derived `.sybermem/INDEX.md` from canonical records
+- local derived `.sybermem/INDEX.md` from canonical records; it is Git-ignored, rebuilt per machine, and never committed
 - phase digests and theme digests for phase/topic compression
 - record relations: `implements` / `fixes` / `related` / `superseded_by` / `crystallized_from`
 - read-only resume: `/sybermem-resume` and `sybermem resume`
@@ -231,7 +231,7 @@ If a project already has custom `.claude/settings.json` content, SyberMem patche
 
 ## Indexing and Search
 
-- `.sybermem/INDEX.md` is a derived project navigation file rebuilt by `sybermem project index build` and checked by `sybermem project index check`.
+- `.sybermem/INDEX.md` is a local derived project navigation file, ignored by Git, rebuilt by `sybermem project index build`, and checked by `sybermem project index check`; do not commit or review it.
 - `sybermem project phase analyze` deterministically groups records and atomically rewrites `.sybermem/analysis/phase-index.md` (confirmed phases + coverage map + `status: analyzed`), so phase analysis is never silently lost to a hand-written Markdown step. Phase grouping is an agent judgement: the agent reads the full record history and produces a semantic grouping, persisted with `sybermem project phase analyze --from-json <file>` (`{ "phases": [ { "title": "...", "covered_records": [...] } ] }`) after coverage validation; mechanical grouping (without `--from-json`, month+topic buckets) is only a fallback when the agent cannot produce a semantic grouping. `/sybermem-phase-analyze` prefers this CLI and falls back to agent orchestration only when the CLI is missing, broken, or emits invalid JSON.
 - `sybermem project coverage-hash --phase-id phase-NNN --format json` resolves a phase's covered records to real file paths (by each record's frontmatter `record_id:`, never by filename) and returns `source_records` plus a deterministic `coverage_hash`, which `/sybermem-digest` uses to fill the digest `coverage_hash` field; `--source-records <relpaths>` hashes an explicit source set instead.
 - `sybermem project memory-stats` renders 7d/30d tables for record counts, type distribution, recall events, injected/abstained counts, recall rate, Edit Alignment, and Memory injection turns/items/chars, avg chars/turn, p95 chars/turn, plus 30d lane distribution; `--format json` is available for skills and automation. Recall frequency comes from `.sybermem/.recall-debug.jsonl`, while Edit Alignment and memory-injection observability come from the OpenCode/Codex-written `.sybermem/.recall-outcomes.jsonl` and `.sybermem/.memory-usage.jsonl`. A missing log means stats are unavailable, not that recall activity was zero. Edit Alignment is an edit-anchored proxy based on `related_files`, not semantic accuracy, and it exposes hit, measurable, unmeasurable, and evidence availability. Codex Edit Alignment comes from a `SessionEnd` git-diff approximation, not OpenCode's per-event edit telemetry. The `recall_health` `low_relevance` verdict fires only when injected samples are sufficient and this proxy is below the floor, distinct from frequency-based `low_signal`; `low_measurability` separately flags projects where recall fires but too many records lack verifiable `related_files` anchors.
@@ -291,7 +291,7 @@ Global uninstall removes user-level skills, CLI, launchers, and the OpenCode plu
 
 ## Compatibility
 
-- `.sybermem/` is the canonical project data directory, shareable via Git.
+- `.sybermem/` is the canonical project data directory, shareable via Git; `.sybermem/INDEX.md` itself is a machine-local ignored derived artifact rebuilt on each machine, not shared or committed.
 - Per-host prompt-time recall and injection differences are covered in [Platform Support](#platform-support); implementation details live in each platform's INSTALL.
 - For more installation, upgrade, and compatibility details, see [INSTALL.md](INSTALL.md).
 

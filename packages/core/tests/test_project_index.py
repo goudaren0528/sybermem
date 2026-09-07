@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from pathlib import Path
+import hashlib
+import shutil
 import sys
 
 import pytest
@@ -245,19 +247,20 @@ def test_build_project_index_backfills_missing_title_and_date_from_legacy_genera
     assert "| bug-004 | 2026-08-05 | Legacy bug title | critical | [link](bugs/2026-08-05-004-old.md) |" in index
 
 
-def test_build_project_index_preserves_static_sections_and_replaces_derived_sections(tmp_path: Path) -> None:
-    # Given: an existing INDEX with static prose, digest sections, and stale derived content
+def test_build_project_index_regenerates_static_prose_and_derived_sections(tmp_path: Path) -> None:
+    # Given: an existing INDEX with machine-local prose, stale digest rows, and stale derived content
     write_index(tmp_path, ["# Custom Memory Index", "", "Static introduction that must stay.", "", "## Key Conclusions", "", "- [change-999] #stale — stale content (2026-01-01)", "", "## Phase Digests", "", "| Number | Date | Title | Status | Coverage | Link |", "|--------|------|-------|--------|----------|------|", "| 001 | 2026-01-02 | Keep this digest | completed | 1 record | [link](digests/one.md) |", "", "## Feature Changes", "", "stale table", "", "## Usage", "", "Keep usage instructions intact."])
     write_record(tmp_path, "changes", "2026-08-07-001-fresh.md", ["type: change", "date: 2026-08-07", "title: Fresh change", "status: implemented", "key_conclusion: Fresh derived content replaces stale generated content.", "topics: [fresh]"])
 
     # When: the INDEX is rebuilt
     index = build_project_index(tmp_path)
 
-    # Then: static sections stay while derived sections are regenerated
-    assert "# Custom Memory Index" in index
-    assert "Static introduction that must stay." in index
-    assert "| 001 | 2026-01-02 | Keep this digest | completed | 1 record | [link](digests/one.md) |" in index
-    assert "Keep usage instructions intact." in index
+    # Then: normal output is deterministic and does not inherit machine-local prose or stale rows
+    assert "# SyberMem Index" in index
+    assert "# Custom Memory Index" not in index
+    assert "Static introduction that must stay." not in index
+    assert "| 001 | 2026-01-02 | Keep this digest | completed | 1 record | [link](digests/one.md) |" not in index
+    assert "Keep usage instructions intact." not in index
     assert "change-999" not in index
     assert "stale table" not in index
     assert "| change-001 | 2026-08-07 | Fresh change | implemented | [link](changes/2026-08-07-001-fresh.md) |" in index
@@ -285,6 +288,129 @@ def test_build_project_index_output_is_deterministic(tmp_path: Path) -> None:
     # Then: output is byte-stable and sorted by generated record id within derived topic rows
     assert first == second
     assert "- stability: bug-002, change-001" in first
+
+
+def test_complete_index_rebuild_is_byte_identical_without_existing_index(tmp_path: Path) -> None:
+    # Given: all canonical record types, digest artifacts, and lifecycle variants
+    for folder, filename, metadata in [
+        ("changes", "2026-08-01-001-active.md", ["type: change", "date: 2026-08-01", "title: Active change", "status: active", "lifecycle: active", "key_conclusion: Active conclusion", "topics: [core]"]),
+        ("decisions", "2026-08-02-001-superseded.md", ["type: decision", "date: 2026-08-02", "title: Old decision", "status: superseded", "lifecycle: superseded", "superseded_by: decision-002", "key_conclusion: Superseded conclusion", "topics: [core]"]),
+        ("requirements", "2026-08-03-001-requirement.md", ["type: requirement", "date: 2026-08-03", "title: Requirement", "status: open", "topics: [planning]"]),
+        ("bugs", "2026-08-04-001-bug.md", ["type: bug", "date: 2026-08-04", "title: Bug", "status: fixed", "topics: [quality]"]),
+        ("norms", "2026-08-05-001-norm.md", ["type: norm", "date: 2026-08-05", "title: Norm", "status: active", "topics: [quality]"]),
+    ]:
+        write_record(tmp_path, folder, filename, metadata)
+    write_record(tmp_path, "digests", "2026-08-06-001-phase.md", ["type: digest", "record_id: digest-001", "date: 2026-08-06", "title: Phase one", "status: completed", "number: 001", "source_records:", "  - changes/2026-08-01-001-active.md"])
+    write_record(tmp_path, "theme-digests", "2026-08-07-001-core.md", ["type: theme-digest", "record_id: theme-digest-001", "date: 2026-08-07", "title: Core theme", "theme: core", "status: completed", "number: 001", "source_records:", "  - changes/2026-08-01-001-active.md"])
+
+    # When: build, remove INDEX, and build again; then build in a second directory
+    first = build_project_index(tmp_path)
+    index_path = tmp_path / ".sybermem" / "INDEX.md"
+    index_path.write_text(first, encoding="utf-8")
+    index_path.unlink()
+    second = build_project_index(tmp_path)
+    twin = tmp_path.parent / f"{tmp_path.name}-twin"
+    shutil.copytree(tmp_path / ".sybermem", twin / ".sybermem")
+    third = build_project_index(twin)
+
+    # Then: every complete rebuild is byte-identical and contains derived lifecycle/digest sections
+    assert hashlib.sha256(first.encode()).hexdigest() == hashlib.sha256(second.encode()).hexdigest()
+    assert second == third
+    assert "## Phase Digests" in second and "phase.md" in second
+    assert "## Theme Digests" in second and "core.md" in second
+    assert "[superseded by decision-002]" in second
+
+
+def test_digest_covered_active_conclusion_is_archived(tmp_path: Path) -> None:
+    write_record(
+        tmp_path,
+        "changes",
+        "2026-08-01-001-covered.md",
+        [
+            "type: change",
+            "record_id: change-001",
+            "date: 2026-08-01",
+            "title: Covered change",
+            "status: active",
+            "lifecycle: active",
+            "key_conclusion: Covered conclusion",
+        ],
+    )
+    write_record(
+        tmp_path,
+        "digests",
+        "2026-08-06-001-phase.md",
+        [
+            "type: digest",
+            "record_id: digest-001",
+            "number: 001",
+            "source_records:",
+            "  - changes/2026-08-01-001-covered.md",
+        ],
+    )
+
+    index = build_project_index(tmp_path)
+
+    key_section = index.split("## Key Conclusions", 1)[1].split("## Archived Conclusions", 1)[0]
+    archived_section = index.split("## Archived Conclusions", 1)[1].split("## Phase Digests", 1)[0]
+    assert "Covered conclusion" not in key_section
+    assert "Covered conclusion" in archived_section
+    assert "[compressed in 001]" in archived_section
+
+
+def test_digest_covered_conclusion_archived_with_inline_flow_list(tmp_path: Path) -> None:
+    # Regression: a digest may declare source_records as an INLINE YAML flow list
+    # (`source_records: [change-001]`) rather than a multi-line block list. The
+    # coverage parser must treat both identically, else digest-covered conclusions
+    # leak back into active Key Conclusions.
+    write_record(
+        tmp_path,
+        "changes",
+        "2026-08-01-001-covered.md",
+        [
+            "type: change",
+            "record_id: change-001",
+            "date: 2026-08-01",
+            "title: Covered change",
+            "status: active",
+            "lifecycle: active",
+            "key_conclusion: Inline covered conclusion",
+        ],
+    )
+    write_record(
+        tmp_path,
+        "changes",
+        "2026-08-02-002-active.md",
+        [
+            "type: change",
+            "record_id: change-002",
+            "date: 2026-08-02",
+            "title: Still active",
+            "status: active",
+            "key_conclusion: Still active conclusion",
+        ],
+    )
+    write_record(
+        tmp_path,
+        "digests",
+        "2026-08-06-001-phase.md",
+        [
+            "type: digest",
+            "record_id: digest-001",
+            "number: 001",
+            "source_records: [change-001]",
+        ],
+    )
+
+    index = build_project_index(tmp_path)
+
+    key_section = index.split("## Key Conclusions", 1)[1].split("## Archived Conclusions", 1)[0]
+    archived_section = index.split("## Archived Conclusions", 1)[1].split("## Phase Digests", 1)[0]
+    assert "Inline covered conclusion" not in key_section
+    assert "Inline covered conclusion" in archived_section
+    assert "[compressed in 001]" in archived_section
+    # The uncovered record stays active.
+    assert "Still active conclusion" in key_section
 
 
 def test_duplicate_record_id_error_renders_safe_relative_paths(tmp_path: Path) -> None:

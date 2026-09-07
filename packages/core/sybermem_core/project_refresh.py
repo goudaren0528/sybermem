@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import os
+import subprocess
 import tempfile
 from pathlib import Path
 from typing import Final, TypedDict
@@ -25,14 +26,14 @@ GITIGNORE_BLOCK_RE: Final = re.compile(
     rf"{re.escape(GITIGNORE_START)}.*?{re.escape(GITIGNORE_END)}\n?",
     re.DOTALL,
 )
-# Machine-local runtime state, hooks/scripts, and per-machine hook wiring. These
-# are not shareable project memory, so they are ignored. Canonical records
-# (changes/decisions/requirements/bugs), digests, analysis, templates, INDEX.md,
-# and project.yaml are intentionally NOT ignored so teams can commit memory.
+# Machine-local runtime state, hooks/scripts, per-machine hook wiring, and the
+# locally derived INDEX are ignored. Canonical records (changes/decisions/
+# requirements/bugs), digests, analysis, templates, and project.yaml remain
+# shareable and committable.
 GITIGNORE_BODY: Final = "\n".join(
     (
         GITIGNORE_START,
-        "# SyberMem machine-local runtime, scripts, and hook wiring (not shareable memory).",
+        "# SyberMem machine-local runtime, scripts, hook wiring, and derived INDEX (not shareable memory).",
         "/.sybermem/hooks/",
         "/.sybermem/.recall-debug.jsonl",
         "/.sybermem/.recall-outcomes.jsonl",
@@ -43,6 +44,7 @@ GITIGNORE_BODY: Final = "\n".join(
         "/.sybermem/.record-intent.json",
         "/.sybermem/.auto-change-state.json",
         "/.sybermem/.codex-compact-marker.json",
+        "/.sybermem/INDEX.md",
         "/.claude/settings.json",
         GITIGNORE_END,
     )
@@ -132,19 +134,25 @@ def refresh_project(root: Path, template_roots: tuple[Path, ...] | None = None) 
         actions_needed.append(yaml_action)
         actions_applied.append(yaml_action)
 
-    # Ignore machine-local SyberMem runtime/scripts in the user's .gitignore.
-    # Skipped for non-git projects. Keeps shareable memory (records/digests/INDEX)
-    # committable while excluding hooks, runtime logs, and per-machine hook wiring.
+    # Ignore machine-local SyberMem runtime/scripts and the locally derived INDEX
+    # in the user's .gitignore. Skipped for non-git projects. Records and other
+    # canonical memory remain shareable and committable.
     gitignore_outcome = _ensure_gitignore(resolved_root)
     files[".gitignore"] = gitignore_outcome
     _collect_actions(gitignore_outcome, actions_needed, actions_applied, actions_skipped)
+
+    # Migrate an already-tracked derived INDEX after the ignore rule is present,
+    # but before the version stamp completion marker is written.
+    index_tracking_outcome = _untrack_derived_index(resolved_root)
+    files[".sybermem/INDEX.md:git-tracking"] = index_tracking_outcome
+    _collect_actions(index_tracking_outcome, actions_needed, actions_applied, actions_skipped)
 
     # Stamp the version LAST so it doubles as a completion marker: session-start
     # clears the /sybermem-update nudge only once every earlier migration step
     # (protocol-block removal, settings/hook refresh, gitignore) has succeeded.
     # If any earlier step raises, the stamp is not written and the next session
     # still nudges — the refresh is retry-safe.
-    if not yaml_created:
+    if not yaml_created and index_tracking_outcome["status"] != "failed":
         version_outcome = _stamp_project_version(resolved_root)
         files[".sybermem/project.yaml"] = version_outcome
         _collect_actions(version_outcome, actions_needed, actions_applied, actions_skipped)
@@ -247,7 +255,7 @@ def _ensure_gitignore(root: Path) -> FileRefresh:
     - Block present and current: leave untouched (fresh).
     Content outside the marker block is always preserved verbatim.
     """
-    if not (root / ".git").exists():
+    if not _git_worktree_available(root):
         return {"status": "fresh"}
 
     target = _guard_project_path(root, ".gitignore")
@@ -269,6 +277,73 @@ def _ensure_gitignore(root: Path) -> FileRefresh:
     updated = GITIGNORE_BLOCK_RE.sub(GITIGNORE_BODY + "\n", current, count=1)
     _write_text(target, updated)
     return {"status": "updated", "action": "refresh SyberMem ignore block in .gitignore (preserve content outside block)"}
+
+
+def _untrack_derived_index(root: Path) -> FileRefresh:
+    """Safely remove a tracked derived INDEX from Git's index, retaining its file."""
+    command_prefix = f"git -C {root}"
+    try:
+        worktree = _run_git(root, ["rev-parse", "--is-inside-work-tree"])
+    except (OSError, subprocess.SubprocessError):
+        return {"status": "failed", "action": f"untrack INDEX failed; run `git -C {root} rev-parse --is-inside-work-tree` manually"}
+    if worktree.returncode != 0:
+        if "not a git repository" in worktree.stderr.lower() or "outside a repository" in worktree.stderr.lower():
+            return {"status": "skipped", "reason": "not a Git work-tree"}
+        return {"status": "failed", "action": f"untrack INDEX failed; run `git -C {root} rev-parse --is-inside-work-tree` manually"}
+    if worktree.stdout.strip().lower() != "true":
+        return {"status": "skipped", "reason": "not a Git work-tree"}
+
+    try:
+        tracked = _run_git(root, ["ls-files", "--error-unmatch", "--", ".sybermem/INDEX.md"])
+    except (OSError, subprocess.SubprocessError):
+        return {"status": "failed", "action": "check INDEX tracking failed; run `git ls-files --error-unmatch -- .sybermem/INDEX.md` manually"}
+    if tracked.returncode != 0:
+        if tracked.stderr.strip() and "did not match any files" not in tracked.stderr.lower() and "pathspec" not in tracked.stderr.lower():
+            return {"status": "failed", "action": "check INDEX tracking failed; run `git ls-files --error-unmatch -- .sybermem/INDEX.md` manually"}
+        return {"status": "skipped", "reason": "INDEX is not tracked"}
+
+    manual = "git rm --cached -- .sybermem/INDEX.md"
+    try:
+        removed = _run_git(root, ["rm", "--cached", "--", ".sybermem/INDEX.md"])
+    except (OSError, subprocess.SubprocessError) as exc:
+        return {"status": "failed", "action": f"untrack INDEX failed; run `{manual}` manually ({exc})"}
+    if removed.returncode != 0:
+        detail = (removed.stderr or removed.stdout).strip()
+        suffix = f" ({detail})" if detail else ""
+        return {"status": "failed", "action": f"untrack INDEX failed; run `{manual}` manually{suffix}"}
+
+    index_path = root / ".sybermem" / "INDEX.md"
+    if not index_path.is_file():
+        return {"status": "failed", "action": f"untrack INDEX failed; working file missing, restore it and run `{manual}`"}
+    return {"status": "untracked", "action": "untrack .sybermem/INDEX.md from Git index (working file preserved)"}
+
+
+def _run_git(root: Path, args: list[str]) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["git", "-C", str(root), *args],
+        capture_output=True,
+        timeout=10,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+    )
+
+
+def _git_worktree_status(root: Path) -> str:
+    try:
+        result = _run_git(root, ["rev-parse", "--is-inside-work-tree"])
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    return result.stdout.strip().lower() if result.returncode == 0 else ""
+
+
+def _git_worktree_available(root: Path) -> bool:
+    try:
+        result = _run_git(root, ["rev-parse", "--is-inside-work-tree"])
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return result.returncode == 0 and result.stdout.strip().lower() == "true"
 
 
 def _remove_instruction_protocol(root: Path, rel_path: str) -> FileRefresh:
@@ -420,7 +495,9 @@ def _collect_actions(
     if action is None:
         return
     actions_needed.append(action)
-    if outcome["status"] == "custom_preserved" and action.startswith("preserve custom "):
+    if outcome["status"] in ("skipped", "failed") or (
+        outcome["status"] == "custom_preserved" and action.startswith("preserve custom ")
+    ):
         actions_skipped.append(action)
     else:
         actions_applied.append(action)

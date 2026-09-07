@@ -46,9 +46,9 @@ def resolve_sybermem_root() -> Path | None:
 
     while True:
         has_sybermem = (current / ".sybermem").is_dir()
+        has_project_yaml = (current / ".sybermem" / "project.yaml").is_file()
         has_settings = (current / ".claude" / "settings.json").is_file()
-        has_index = (current / ".sybermem" / "INDEX.md").is_file()
-        if has_sybermem and (has_settings or has_index):
+        if has_sybermem and (has_project_yaml or has_settings):
             return current
         if git_root and current == git_root:
             break
@@ -332,21 +332,32 @@ def check_gitignore(root: Path) -> dict:
     content = read_text(root / ".gitignore")
     if content is None:
         return {"status": "missing", "applicable": True}
-    has_block = "# >>> SyberMem >>>" in content and "# <<< SyberMem <<<" in content
+    start_marker = "# >>> SyberMem >>>"
+    end_marker = "# <<< SyberMem <<<"
+    start = content.find(start_marker)
+    end = content.find(end_marker, start + len(start_marker)) if start >= 0 else -1
+    managed_block = content[start:end + len(end_marker)] if start >= 0 and end >= 0 else ""
+    has_block = bool(managed_block)
     if not has_block:
         return {"status": "missing", "applicable": True}
-    # Content-check a couple of load-bearing lines so old blocks get refreshed.
-    is_current = "/.sybermem/hooks/" in content and "/.claude/settings.json" in content
+    # Content-check load-bearing lines so old blocks get refreshed. INDEX.md is a
+    # local derived artifact and must be covered by the managed ignore block.
+    is_current = (
+        "/.sybermem/hooks/" in managed_block
+        and "/.claude/settings.json" in managed_block
+        and "/.sybermem/INDEX.md" in managed_block
+    )
     return {"status": "fresh" if is_current else "stale", "applicable": True}
 
 
 def check_index_md(root: Path) -> dict:
-    """Check .sybermem/INDEX.md status."""
+    """Check .sybermem/INDEX.md as a derived artifact, not initialization state."""
     path = root / ".sybermem" / "INDEX.md"
     content = read_text(path)
     if content is None:
         return {
             "status": "missing",
+            "derived_missing": True,
             "has_conclusions_anchor": False,
             "has_digest_anchor": False,
             "has_records_anchors": False,
@@ -365,6 +376,7 @@ def check_index_md(root: Path) -> dict:
     all_present = has_conclusions and has_digest and has_records and has_topic_index and has_theme_digests and has_theme_digest_anchor and has_archived_conclusions and has_archived_anchor
     return {
         "status": "fresh" if all_present else "stale",
+        "derived_missing": False,
         "has_conclusions_anchor": has_conclusions,
         "has_digest_anchor": has_digest,
         "has_records_anchors": has_records,
@@ -452,17 +464,11 @@ def generate_actions(files: dict) -> list[str]:
     elif uph.get("status") == "stale":
         actions.append("replace .sybermem/hooks/user_prompt.py from template")
 
-    # INDEX.md — insert missing sections only
+    # INDEX.md is derived from canonical records; rebuild it rather than patching
+    # individual sections, whether it is absent or structurally stale.
     idx = files.get(".sybermem/INDEX.md", {})
-    if idx.get("status") == "stale":
-        if not idx.get("has_digest_anchor"):
-            actions.append("insert Phase Digests section into INDEX.md (preserve existing content)")
-        if not idx.get("has_theme_digests") or not idx.get("has_theme_digest_anchor"):
-            actions.append("insert Theme Digests section into INDEX.md (preserve existing content)")
-        if not idx.get("has_archived_conclusions") or not idx.get("has_archived_anchor"):
-            actions.append("insert Archived Conclusions section into INDEX.md (preserve existing content)")
-        if not idx.get("has_topic_index"):
-            actions.append("insert Topic Index section into INDEX.md (preserve existing content)")
+    if idx.get("status") in ("missing", "stale"):
+        actions.append("rebuild derived .sybermem/INDEX.md with `sybermem project index build`")
 
     # Record templates — create if missing, replace if stale
     for template_path in (
@@ -558,10 +564,7 @@ def main() -> int:
     files[".gitignore"] = check_gitignore(root)
 
     # Determine overall status
-    index_status = files[".sybermem/INDEX.md"]["status"]
-    if index_status == "missing":
-        overall = "not_initialized"
-    elif all(
+    if all(
         f.get("status") in ("fresh", "present")
         for f in files.values()
     ):

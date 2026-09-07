@@ -7,7 +7,10 @@ from .identity import derive_slug, generate_project_id, render_project_yaml
 def resolve_project_root(start: Path | None = None) -> Path | None:
     current = (start or Path.cwd()).resolve()
     while True:
-        if (current / ".sybermem").is_dir() and (current / ".claude" / "settings.json").is_file():
+        if (current / ".sybermem").is_dir() and (
+            (current / ".sybermem" / "project.yaml").is_file()
+            or (current / ".claude" / "settings.json").is_file()
+        ):
             return current
         parent = current.parent
         if parent == current:

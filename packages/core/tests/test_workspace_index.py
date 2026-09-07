@@ -5,7 +5,8 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from sybermem_core import workspace_search as workspace_search_module
-from sybermem_core.index import init_schema
+from sybermem_core import index as index_module
+from sybermem_core.index import init_schema, rebuild_index
 from sybermem_core.search import search_workspace
 
 
@@ -60,6 +61,38 @@ def test_init_schema_rebuilds_old_records_table_without_relation_columns() -> No
 
     # Then: the derived cache is rebuilt with relation columns
     assert {"fixes", "implements", "related"}.issubset(record_columns(conn))
+
+
+def test_rebuild_index_indexes_registered_project_without_index(tmp_path: Path, monkeypatch) -> None:
+    # Given: a registered project with canonical records but no local INDEX.md
+    root = tmp_path / "project"
+    records = root / ".sybermem" / "changes"
+    records.mkdir(parents=True)
+    (root / ".sybermem" / "project.yaml").write_text(
+        "project_id: project-1\nslug: demo\n", encoding="utf-8"
+    )
+    (records / "2026-08-01-001-searchable.md").write_text(
+        "---\ntype: change\nrecord_id: change-001\ndate: 2026-08-01\n"
+        "title: Searchable no index record\nstatus: implemented\n---\n\nneedle\n",
+        encoding="utf-8",
+    )
+    db_path = tmp_path / "sybermem.db"
+    state_path = tmp_path / "index-state.json"
+    monkeypatch.setattr(index_module, "index_db_path", lambda: db_path)
+    monkeypatch.setattr(index_module, "index_state_path", lambda: state_path)
+    monkeypatch.setattr(index_module, "load_registry", lambda: [{
+        "project_id": "project-1", "slug": "demo", "path": str(root),
+    }])
+    monkeypatch.setattr(index_module, "update_registry_index_metadata", lambda *args, **kwargs: None)
+
+    # When
+    result = rebuild_index()
+
+    # Then: records remain in the workspace cache and are searchable
+    assert result == {"projects": 1, "records": 1}
+    monkeypatch.setattr(workspace_search_module, "index_db_path", lambda: db_path)
+    rows = search_workspace("needle searchable")
+    assert rows[0]["record_id"] == "change-001"
 
 
 def test_search_workspace_returns_relation_metadata(tmp_path: Path, monkeypatch) -> None:

@@ -19,9 +19,9 @@ def _project_root(start: Path | None = None) -> Path | None:
     current = (start or Path.cwd()).resolve()
     while True:
         has_sybermem = (current / ".sybermem").is_dir()
+        has_project_yaml = (current / ".sybermem" / "project.yaml").is_file()
         has_settings = (current / ".claude" / "settings.json").is_file()
-        has_index = (current / ".sybermem" / "INDEX.md").is_file()
-        if has_sybermem and (has_settings or has_index):
+        if has_sybermem and (has_project_yaml or has_settings):
             return current
         parent = current.parent
         if parent == current:

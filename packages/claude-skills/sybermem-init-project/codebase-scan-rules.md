@@ -11,7 +11,7 @@ For existing codebases only:
 3. Detect special code markers (TODO, FIXME, HACK, workaround)
 4. Present findings to the user and suggest creating corresponding records
 
-Write key findings into `.sybermem/INDEX.md` `## Key Conclusions` in concise bullet form.
+Write durable findings into `.sybermem/` record files, using front matter such as `key_conclusion` and `topics`. The derived `INDEX.md` is regenerated from records and digests; never write findings directly into it.
 
 ## Step 6: Detect existing record files
 
@@ -27,5 +27,5 @@ Scan for common record/documentation files:
 When found, ask the user whether to:
 
 1. **Import and organize** — rewrite content into `.sybermem/` records and keep backups
-2. **Index only** — add links from `.sybermem/INDEX.md`
+2. **Index only** — preserve the source and let `sybermem project index build` regenerate derived links from records/front matter
 3. **Skip** — leave them untouched

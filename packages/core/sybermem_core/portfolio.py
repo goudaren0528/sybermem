@@ -9,7 +9,8 @@ from .status import project_status
 
 # Read-only cross-project portfolio built from the Hub registry. This is the sanctioned
 # cross-project view now that Team publication is removed: it reads each registered
-# project's committed .sybermem/ (INDEX, status, digest coverage, latest record) WITHOUT
+# project's local .sybermem/ data (including ignored derived INDEX, status, digest
+# coverage, and latest record) WITHOUT
 # writing any Git state, project files, or a second aggregation repository.
 
 
@@ -21,6 +22,20 @@ def _latest_record_date(root: Path) -> str:
         if created and created > latest:
             latest = created
     return latest
+
+
+def _is_sybermem_project(root: Path) -> bool:
+    """Return whether *root* has the canonical project identity.
+
+    INDEX.md is a local derived artifact and therefore must not participate in
+    deciding whether a registered path is a SyberMem project.
+    """
+    sybermem = root / ".sybermem"
+    if (sybermem / "project.yaml").is_file():
+        return True
+    return any((sybermem / name).is_dir() for name in (
+        "changes", "decisions", "requirements", "bugs", "norms", "digests", "theme-digests",
+    ))
 
 
 def build_portfolio() -> dict:
@@ -41,11 +56,7 @@ def build_portfolio() -> dict:
             })
             continue
 
-        if not (path / ".sybermem" / "INDEX.md").is_file():
-            # Path exists but the project has no derived INDEX yet (uninitialized or the
-            # index is temporarily absent/stale). Represent it explicitly rather than
-            # silently dropping the registry entry — the portfolio must show EVERY
-            # registered project.
+        if not _is_sybermem_project(path):
             projects.append({
                 "project_id": entry["project_id"],
                 "slug": entry["slug"],
@@ -55,7 +66,7 @@ def build_portfolio() -> dict:
                 "open_requirements": 0,
                 "digest_uncovered": 0,
                 "latest_record_date": "",
-                "reason": "no .sybermem/INDEX.md (run /sybermem-init-project or project index build)",
+                "reason": "no .sybermem/project.yaml or canonical record directories",
             })
             continue
 
@@ -72,7 +83,8 @@ def build_portfolio() -> dict:
             "open_requirements": len(status.get("open_requirements", [])),
             "digest_uncovered": backlog.get("uncovered", 0),
             "latest_record_date": _latest_record_date(path),
-            "reason": "",
+            "index_status": "present" if (path / ".sybermem" / "INDEX.md").is_file() else "missing",
+            "reason": "" if (path / ".sybermem" / "INDEX.md").is_file() else "INDEX.md missing; run sybermem project index build",
         })
 
     return {"projects": projects}

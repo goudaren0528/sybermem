@@ -163,9 +163,9 @@ function resolveRoot(cwd) {
   let current = resolve(cwd);
   while (true) {
     const hasSybermem = existsSync2(join2(current, ".sybermem"));
+    const hasProjectYaml = existsSync2(join2(current, ".sybermem", "project.yaml"));
     const hasSettings = existsSync2(join2(current, ".claude", "settings.json"));
-    const hasIndex = existsSync2(join2(current, ".sybermem", "INDEX.md"));
-    if (hasSybermem && (hasSettings || hasIndex))
+    if (hasSybermem && (hasProjectYaml || hasSettings))
       return current;
     const parent = resolve(current, "..");
     if (parent === current)

@@ -100,3 +100,28 @@ def test_project_search_ignores_low_signal_substring_query(tmp_path: Path, monke
 
     # Then: explicit search does not return substring-noise hits
     assert rows == []
+
+
+def test_project_search_without_index_uses_record_lifecycle(tmp_path: Path, monkeypatch) -> None:
+    # Given: a project and an archived record, with no derived INDEX.md
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    write_project(project_root)
+    (project_root / ".sybermem" / "INDEX.md").unlink()
+    write_record(
+        project_root,
+        "decisions",
+        "2026-08-06-001-archived.md",
+        ["type: decision", "record_id: decision-001", "date: 2026-08-06", "title: Archived local policy", "lifecycle: archived"],
+        "archived-search-token",
+    )
+    monkeypatch.chdir(project_root)
+
+    # When
+    rows = search_project("archived-search-token")
+
+    # Then: search still returns the record, and lifecycle comes from front-matter
+    assert rows
+    row = next(row for row in rows if row["record_id"] == "decision-001")
+    assert row["lifecycle"] == "archived"
+    assert row["freshness"] == "historical"

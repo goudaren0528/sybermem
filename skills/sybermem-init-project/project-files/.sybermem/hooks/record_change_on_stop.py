@@ -14,8 +14,8 @@ def resolve_sybermem_root() -> Path:
 
     A directory is considered a SyberMem root if it contains .sybermem/ and
     at least one of:
-      - .claude/settings.json  (normal project checkout)
-      - .sybermem/INDEX.md     (worktree or checkout where settings.json is untracked)
+      - .sybermem/project.yaml (fresh checkout identity marker)
+      - .claude/settings.json  (compatibility marker)
 
     Stops at the git repository root or filesystem root, whichever comes first.
     Returns the resolved project root, or falls back to cwd if no SyberMem root is found.
@@ -34,9 +34,9 @@ def resolve_sybermem_root() -> Path:
 
     while True:
         has_sybermem = (current / ".sybermem").is_dir()
+        has_project_yaml = (current / ".sybermem" / "project.yaml").is_file()
         has_settings = (current / ".claude" / "settings.json").is_file()
-        has_index = (current / ".sybermem" / "INDEX.md").is_file()
-        if has_sybermem and (has_settings or has_index):
+        if has_sybermem and (has_project_yaml or has_settings):
             return current
         # Stop at git root boundary
         if git_root and current == git_root:

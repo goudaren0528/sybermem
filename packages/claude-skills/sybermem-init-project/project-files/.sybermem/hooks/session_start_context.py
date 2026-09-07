@@ -28,9 +28,9 @@ def resolve_sybermem_root() -> Path | None:
 
     while True:
         has_sybermem = (current / ".sybermem").is_dir()
+        has_project_yaml = (current / ".sybermem" / "project.yaml").is_file()
         has_settings = (current / ".claude" / "settings.json").is_file()
-        has_index = (current / ".sybermem" / "INDEX.md").is_file()
-        if has_sybermem and (has_settings or has_index):
+        if has_sybermem and (has_project_yaml or has_settings):
             return current
         if git_root and current == git_root:
             break
@@ -449,30 +449,31 @@ def build_context(root: Path) -> str:
     """Build the additionalContext string for Claude Code."""
     index_path = root / ".sybermem" / "INDEX.md"
     version_line = _version_nudge_line(root)
-    if not index_path.is_file():
+    index_exists = index_path.is_file()
+    index_text = index_path.read_text(encoding="utf-8") if index_exists else ""
+
+    # A resolved project can legitimately lack the derived INDEX cache. Continue
+    # loading independent sources so a missing cache does not hide useful context.
+    # Keep the initialization wording only for a genuinely uninitialized project.
+    project_yaml_exists = (root / ".sybermem" / "project.yaml").is_file()
+    has_records = any(
+        (root / ".sybermem" / subdir).is_dir()
+        and any((root / ".sybermem" / subdir).glob("*.md"))
+        for subdir in ("changes", "decisions", "requirements", "bugs")
+    )
+    if not index_exists and not project_yaml_exists and not has_records:
         base = "SyberMem startup context:\nNo .sybermem/INDEX.md found. Run /sybermem-init-project to initialize."
-        # Norms live under .sybermem/norms/ independent of INDEX.md, so the binding
-        # constitution must still govern a norm-only / partially-initialized project.
-        constitution = detect_constitution(root)
-        if constitution:
-            base += "\nProject Norms (binding — follow unless the user explicitly overrides):"
-            for norm in constitution:
-                statement = str(norm.get("statement", "")).strip()
-                record_id = str(norm.get("record_id", "")).strip()
-                if statement:
-                    base += f"\n- [{record_id}] {statement}"
-        pending_habit = detect_pending_habit(root)
-        if pending_habit:
-            base += f"\n{pending_habit}"
         return f"{base}\n{version_line}" if version_line else base
 
-    index_text = index_path.read_text(encoding="utf-8")
     conclusions = parse_conclusions(index_text)
     topics = parse_topic_index(index_text)
     phase_info = parse_phase_index(root)
     project_info = parse_project_identity(root)
 
     lines: list[str] = ["SyberMem startup context:"]
+
+    if not index_exists:
+        lines.append("Derived INDEX is absent — run `sybermem project index build`.")
 
     if version_line:
         lines.append(version_line)

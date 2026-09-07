@@ -37,7 +37,7 @@ Do NOT report a record without verifying it exists with a file-system tool.
 
 ## Directory Resolution
 
-Resolve project root by walking up from cwd to find `.sybermem/` + `.claude/settings.json`.
+Resolve project root by walking up from cwd to find `.sybermem/` + (`.sybermem/project.yaml` OR `.claude/settings.json`).
 
 ## CLI Resolution
 
@@ -58,7 +58,7 @@ Before running SyberMem CLI commands, resolve a command variable first. On Windo
 
 You MUST complete these steps in order:
 
-1. **Resolve project root** — apply directory resolution rules above. If `.sybermem/INDEX.md` does not exist, tell the user to run `/sybermem-init-project` and stop.
+1. **Resolve project root** — apply directory resolution rules above. If `.sybermem/INDEX.md` is absent, do not stop or treat the project as uninitialized: advise `sybermem project index build` and use record files/front-matter as the fallback source for retrieval. Only a project with no `.sybermem/project.yaml` and no records is uninitialized.
 2. **Parse the query type** — classify the query as topic (`#tag`), phase range (`phaseN..phaseM`), date range (`date..date`), record ID (`type-NNN`), or free keyword.
 3. **Run the matching retrieval path:**
    - **topic** → read `## Topic Index` in `.sybermem/INDEX.md`, collect the record IDs listed for that topic, and inspect any optional suffix on the topic line: `[active]`, `[low]`, or `[deprecated → <new-topic>]`.
@@ -160,7 +160,7 @@ Do not silently edit historical truth away just to make search look current. If 
 
 ## Error Handling
 
-- `.sybermem/INDEX.md` missing → prompt `/sybermem-init-project`, stop.
+- `.sybermem/INDEX.md` missing → advise `sybermem project index build`; continue by scanning record files and front-matter topics where possible. Only no `.sybermem/project.yaml` and no records is uninitialized.
 - No matches → say so plainly; do not invent results.
 - Phase-index missing → skip phase enrichment, still return keyword/topic/date results.
 - Deprecated topic → still return legacy results, but show a warning suggesting the replacement topic.

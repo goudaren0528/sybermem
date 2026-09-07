@@ -91,7 +91,7 @@ python scripts/check-plugin-package.py
 
 ## Project INDEX workflow (`.sybermem/INDEX.md`)
 
-`.sybermem/INDEX.md` is a derived file, not a canonical source file for normal record work.
+`.sybermem/INDEX.md` is a machine-local, Git-ignored derived file, not a canonical source file for normal record work. Rebuild it with `sybermem project index build`; never commit or review it.
 
 - Canonical record content lives in the record markdown files under `.sybermem/changes/`, `.sybermem/decisions/`, `.sybermem/requirements/`, and `.sybermem/bugs/`.
 - New records should use generated UUID-backed `record_id` values. Legacy numeric records remain readable.

@@ -22,7 +22,7 @@ MAX_JOURNAL_LINES = 200
 def _root() -> Path | None:
     current = Path.cwd().resolve()
     while True:
-        if (current / ".sybermem").is_dir() and ((current / ".claude" / "settings.json").is_file() or (current / ".sybermem" / "INDEX.md").is_file()):
+        if (current / ".sybermem").is_dir() and ((current / ".sybermem" / "project.yaml").is_file() or (current / ".claude" / "settings.json").is_file()):
             return current
         parent = current.parent
         if parent == current:
