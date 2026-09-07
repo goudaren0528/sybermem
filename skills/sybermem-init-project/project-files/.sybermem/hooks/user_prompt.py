@@ -39,11 +39,33 @@ def _read_payload(raw: bytes) -> tuple[str, str]:
 
 
 def _journal_memory_usage(root: Path, session_id: str, record_ids: list[str], chars: int) -> None:
+    """Write the Claude per-turn input journal consumed by the Stop collector."""
+    if not record_ids:
+        return
     try:
         from datetime import datetime, timezone
+
         path = root / ".sybermem" / ".memory-usage.jsonl"
         rows = path.read_text(encoding="utf-8").splitlines() if path.is_file() else []
-        rows.append(json.dumps({"schema_version": 1, "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"), "host": "claude", "session_id": session_id[:80], "total_items": len(record_ids), "total_chars": chars, "digest_items": sum(1 for rid in record_ids if rid.startswith("digest-")), "recall_items": len(record_ids), "recall_chars": chars, "habit_items": 0, "habit_chars": 0, "norm_items": 0, "norm_chars": 0, "startup_items": 0, "startup_chars": 0, "injected_ids": record_ids, "startup_present": False}, ensure_ascii=False))
+        rows.append(json.dumps({
+            "schema_version": 1,
+            "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            "host": "claude",
+            "session_id": session_id[:80],
+            "total_items": len(record_ids),
+            "total_chars": chars,
+            "digest_items": sum(1 for rid in record_ids if rid.startswith("digest-")),
+            "recall_items": len(record_ids),
+            "recall_chars": chars,
+            "habit_items": 0,
+            "habit_chars": 0,
+            "norm_items": 0,
+            "norm_chars": 0,
+            "startup_items": 0,
+            "startup_chars": 0,
+            "injected_ids": record_ids,
+            "startup_present": False,
+        }, ensure_ascii=False))
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("\n".join(rows[-200:]) + "\n", encoding="utf-8")
     except Exception:

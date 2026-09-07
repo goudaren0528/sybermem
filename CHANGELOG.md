@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.4.2 - 2026-09-07
+
 ### Added
 - Claude Code now produces recall-outcome evidence: a fail-open `Stop` hook (`recall_outcome_on_stop.py`) reconciles the record IDs injected during a session against the files actually edited (via `git diff`), and writes the same `.recall-outcomes.jsonl` and `.memory-usage.jsonl` `session_outcome` rows that `sybermem project memory-stats` already reads from Codex and OpenCode. Claude also now journals per-turn injected record IDs (previously missing), so recall relevance/precision can populate on Claude-Code-driven projects instead of staying permanently null.
 

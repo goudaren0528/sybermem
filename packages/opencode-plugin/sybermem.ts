@@ -1251,11 +1251,23 @@ var DURABLE_PREFERENCE_RE = /(\b(always\s+(?:prefer|use|reply|respond|run|keep|w
 var NOISY_HABIT_DISCUSSION_RE = /(why|debug|investigate|research|review|analy[sz]e|improve|design|logic|classifier|candidate|capture|\u4E3A\u4EC0\u4E48|\u600E\u4E48|\u8C03\u7814|\u7814\u7A76|\u8BC4\u5BA1|\u5BA1\u67E5|\u6539\u8FDB|\u8BBE\u8BA1|\u903B\u8F91|\u5019\u9009|\u6355\u83B7|\u547D\u4E2D).{0,80}(habit|preference|memory|norm|\u4E60\u60EF|\u504F\u597D|\u8BB0\u5FC6|\u89C4\u8303|\u7EA6\u5B9A)|(habit|preference|memory|norm|\u4E60\u60EF|\u504F\u597D|\u8BB0\u5FC6|\u89C4\u8303|\u7EA6\u5B9A).{0,80}(why|debug|investigate|research|review|analy[sz]e|improve|design|logic|classifier|candidate|capture|\u4E3A\u4EC0\u4E48|\u600E\u4E48|\u8C03\u7814|\u7814\u7A76|\u8BC4\u5BA1|\u5BA1\u67E5|\u6539\u8FDB|\u8BBE\u8BA1|\u903B\u8F91|\u5019\u9009|\u6355\u83B7|\u547D\u4E2D)/i;
 var AGENT_PROMPT_PREFIX_RE = /^\s*(?:TASK|CONTEXT|AXIS|EXPECTED OUTCOME|MUST DO|MUST NOT DO|REQUEST):/i;
 var ONE_OFF_WORK_RE = /(fix|repair|update|submit|publish|release|commit|create\s+pr|\u4FEE\u590D|\u66F4\u65B0|\u63D0\u4EA4|\u53D1\u5E03|\u4E0A\u7EBF).{0,80}(pr|readme|docs?|todo|ui|bug|\u6587\u6863|\u5F85\u529E|\u89C4\u8303|\u7EA6\u5B9A|\u9879\u76EE|\u4E0B\u62C9|\u6309\u94AE)/i;
+var ANALYSIS_OR_NORM_REQUEST_RE = /(\u5206\u6790|\u603B\u7ED3|\u901A\u7528|\u7ECF\u9A8C|\u89C4\u8303|\u7EA6\u5B9A).{0,100}(bug|\u95EE\u9898|\u4EE5\u540E|\u907F\u514D|\u91CD\u590D|\u4E60\u60EF|\u504F\u597D|\u8981\u6C42)|(bug|\u95EE\u9898|\u89C4\u8303|\u7EA6\u5B9A|\u4E60\u60EF|\u504F\u597D).{0,100}(\u5206\u6790|\u603B\u7ED3|\u901A\u7528|\u7ECF\u9A8C|\u4EE5\u540E|\u907F\u514D|\u91CD\u590D)|(analy[sz]e|summari[sz]e|generaliz|lessons? learned|norms?|conventions?).{0,100}(habit|preference|bug|project|memory)/i;
+var PROJECT_CONVENTION_RE = /(\b(?:dev|main|branch(?:es)?|diff|pull request|pr)\b|\u9879\u76EE|\u4ED3\u5E93|\u4EE3\u7801\u5E93|\u5206\u652F|\u89C4\u8303|\u7EA6\u5B9A).{0,100}(\b(?:dev|main|branch(?:es)?|diff|pull request|pr)\b|\u9879\u76EE|\u4ED3\u5E93|\u4EE3\u7801\u5E93|\u5206\u652F|\u89C4\u8303|\u7EA6\u5B9A)|\b(?:dev|main)\b.{0,100}\b(?:dev|main)\b|(?:this\s+(?:project|repo|repository|codebase)|\u672C\u9879\u76EE|\u8FD9\u4E2A\u9879\u76EE|\u672C\u4ED3\u5E93|\u8FD9\u4E2A\u4ED3\u5E93|\u8BE5\u9879\u76EE|\u8BE5\u4ED3\u5E93).{0,100}(?:always|usually|prefer|remember|\u4EE5\u540E|\u6BCF\u6B21|\u603B\u662F|\u9ED8\u8BA4|\u89C4\u8303|\u7EA6\u5B9A|pr|branch|commit)/i;
+var INFORMATION_SEEKING_OR_COMPLAINT_RE = /(?:\u6709\u6CA1\u6709|\u662F\u5426(?:\u53EF\u4EE5|\u8981)|\u600E\u4E48(?:\u529E|\u505A|\u66F4\u65B0)|\u4E3A\u4EC0\u4E48|\u6709\u901A\u7528\u7684|\u4E0D\u8FFD\u6C42|\u592A\u9EBB\u70E6|\u9EBB\u70E6).{0,100}(?:\u65B9\u5F0F|\u529E\u6CD5|\u66F4\u65B0|\u89C4\u8303|\u7EA6\u5B9A|\u8FD9\u6837|\u90A3\u6837|\u600E\u4E48)|(?:\u4EE5\u540E|\u6BCF\u6B21).{0,100}(?:\u6709\u6CA1\u6709\u901A\u7528\u7684|\u592A\u9EBB\u70E6|\u9EBB\u70E6\u8FD9\u6837)/i;
+var POLITE_PREFERENCE_QUESTION_RE = /(?:\u53EF\u4EE5\u5417|\u597D\u5417|\u884C\u5417|\u597D\u4E0D\u597D)[\s\uFF1F\uFF01!?\u3002]*$/i;
+var EXPLICIT_PERSONAL_PREFERENCE_RE = /(?:\u6211(?:\u4E60\u60EF|\u504F\u597D|\u559C\u6B22|\u5E0C\u671B)|\u8BF7\u8BB0\u4F4F\u6211|\u5E2E\u6211\u8BB0\u4F4F|remember that i|please remember that i|always prefer|i prefer|i usually)/i;
+var SINGLE_PROJECT_SCOPE_RE = /(?:this\s+(?:project|repo|repository|codebase)|in\s+this\s+repo|\u672C\u9879\u76EE|\u8FD9\u4E2A\u9879\u76EE|\u672C\u4ED3\u5E93|\u8FD9\u4E2A\u4ED3\u5E93|\u8BE5\u9879\u76EE|\u8BE5\u4ED3\u5E93|\u8FD9\u4E2A\u4EE3\u7801\u5E93)/i;
 function looksLikeHabitIntent(text) {
   return DURABLE_PREFERENCE_RE.test(text) && !isNoisyHabitCandidate(text);
 }
 function isNoisyHabitCandidate(text) {
-  return AGENT_PROMPT_PREFIX_RE.test(text) || NOISY_HABIT_DISCUSSION_RE.test(text) || ONE_OFF_WORK_RE.test(text);
+  const explicitPersonal = EXPLICIT_PERSONAL_PREFERENCE_RE.test(text);
+  if (explicitPersonal && (POLITE_PREFERENCE_QUESTION_RE.test(text) || ANALYSIS_OR_NORM_REQUEST_RE.test(text)))
+    return false;
+  if (explicitPersonal && PROJECT_CONVENTION_RE.test(text) && !SINGLE_PROJECT_SCOPE_RE.test(text)) {
+    return AGENT_PROMPT_PREFIX_RE.test(text) || NOISY_HABIT_DISCUSSION_RE.test(text) || INFORMATION_SEEKING_OR_COMPLAINT_RE.test(text);
+  }
+  return AGENT_PROMPT_PREFIX_RE.test(text) || NOISY_HABIT_DISCUSSION_RE.test(text) || ONE_OFF_WORK_RE.test(text) || ANALYSIS_OR_NORM_REQUEST_RE.test(text) || PROJECT_CONVENTION_RE.test(text) || INFORMATION_SEEKING_OR_COMPLAINT_RE.test(text);
 }
 async function captureHabitIntentWithCli($, root, text) {
   if (!text || !looksLikeHabitIntent(text))
