@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## 0.5.0 - 2026-09-07
+
+### Added
+- Project INDEX generation is now complete and deterministic from canonical records and digests: `sybermem project index build` regenerates Key Conclusions, Archived Conclusions, phase/theme digest navigation, record tables, Usage, and Topic Index without depending on a previously committed INDEX. Digest-covered conclusions are derived into Archived Conclusions, including both block-list and inline `source_records` formats.
+
+### Changed
+- `.sybermem/INDEX.md` is now a machine-local, Git-ignored derived artifact for every project. Teams share canonical record and digest files only; each machine rebuilds INDEX locally, eliminating derived-file diff and merge-conflict noise.
+- Project identity now uses `.sybermem/project.yaml` (with `.claude/settings.json` compatibility) instead of INDEX existence across Core, OpenCode, Claude Code, Codex, and global launchers. Portfolio, workspace indexing, search, startup context, and health checks continue to work when INDEX is absent.
+- `sybermem project refresh` automatically migrates an already-tracked INDEX with a guarded `git rm --cached`: the working file is preserved, no commit or force operation is performed, failures remain retryable, and repeated refreshes are idempotent.
+
 ## 0.4.2 - 2026-09-07
 
 ### Added
