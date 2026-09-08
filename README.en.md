@@ -207,17 +207,32 @@ If a project already has custom `.claude/settings.json` content, SyberMem patche
 
 ## Daily Usage
 
-### Project Owner
+Start with the Core entrypoints. The advanced/lifecycle tier stays directly
+invocable — it is just less frequent, never deprecated. `docs/feature_map.md`
+holds the canonical classification.
 
-- `/sybermem-resume`: get a bounded read-only resume view
-- `/sybermem-record`: record a meaningful round of work; at closeout, crystallize a binding project rule into a `norm`
-- `/sybermem-search`: search historical records
-- `/sybermem-habit`: add, review, pause, delete, or remind user-level habits
-- `/sybermem-uninstall`: natural-language uninstall entrypoint; asks project vs global scope when unclear, and requires explicit confirmation for global uninstall
-- `/sybermem-summary`: inspect current project state
-- `sybermem norms list/nominate/doctor`: view the project-norm constitution, nominate recurring constraints, detect same-scope conflicts
-- `/sybermem-digest`: capture a stable phase conclusion
-- `/sybermem-theme-digest`: capture a cross-phase topic conclusion
+### Core entrypoints
+
+- `using-sybermem`: read-only orientation — resolve the project, report compact installation/project state, and present the one canonical next command.
+- `sybermem-init-project`: initialize or re-scaffold SyberMem in a project.
+- `sybermem-record`: record a completed unit of work as a canonical record, and crystallize binding project rules into norms.
+- `sybermem-resume`: bounded read-only continuity brief for restarting work in an existing project.
+- `sybermem-search`: find historical records, decisions, and digests inside the project.
+- `sybermem-digest`: compress a settled phase into durable phase-level conclusions.
+- `sybermem-habit`: manage user-level habits and pending habit candidates across projects.
+
+### Advanced / lifecycle
+
+- `sybermem-install`: first-time installation of the SyberMem system on a machine.
+- `sybermem-update`: refresh an existing project's managed SyberMem files after a version upgrade.
+- `sybermem-uninstall`: natural-language uninstall router for project-scope or global-scope removal.
+- `sybermem-summary`: project status and memory/recall health panel for weekly or monthly review.
+- `sybermem-phase-analyze`: build or refresh the structural phase index from full record history.
+- `sybermem-theme-digest`: synthesize a cross-phase, topic-level conclusion from related records and phases.
+
+Related CLI, not a Skill: `sybermem norms list/nominate/doctor` views the
+project-norm constitution, nominates recurring constraints, and detects
+same-scope conflicts.
 
 ### Cross-Project View
 

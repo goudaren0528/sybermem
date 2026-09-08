@@ -190,6 +190,36 @@ For existing projects, `/sybermem-update` should now deliver the visible `/using
 - **`sybermem habit` is missing**
   Re-run the global install/update command. Habit commands are part of the CLI/Core runtime refresh, not project-local templates.
 
+## What gets installed: Skill discovery tiers
+
+Installation delivers all 13 Skills to every supported host. For finding your way
+around, they are presented in two tiers — the same classification used by
+`docs/feature_map.md`, `README.md`, and `README.en.md`. Start at the Core tier;
+reach the advanced/lifecycle tier when you hit the specific moment it serves.
+"Advanced / lifecycle" means specialized or less frequent, never unsupported.
+
+### Core entrypoints
+
+- `using-sybermem`: read-only orientation — resolve the project, report compact installation/project state, and present the one canonical next command.
+- `sybermem-init-project`: initialize or re-scaffold SyberMem in a project.
+- `sybermem-record`: record a completed unit of work as a canonical record, and crystallize binding project rules into norms.
+- `sybermem-resume`: bounded read-only continuity brief for restarting work in an existing project.
+- `sybermem-search`: find historical records, decisions, and digests inside the project.
+- `sybermem-digest`: compress a settled phase into durable phase-level conclusions.
+- `sybermem-habit`: manage user-level habits and pending habit candidates across projects.
+
+### Advanced / lifecycle
+
+- `sybermem-install`: first-time installation of the SyberMem system on a machine.
+- `sybermem-update`: refresh an existing project's managed SyberMem files after a version upgrade.
+- `sybermem-uninstall`: natural-language uninstall router for project-scope or global-scope removal.
+- `sybermem-summary`: project status and memory/recall health panel for weekly or monthly review.
+- `sybermem-phase-analyze`: build or refresh the structural phase index from full record history.
+- `sybermem-theme-digest`: synthesize a cross-phase, topic-level conclusion from related records and phases.
+
+This section documents discovery order only. It does not change what the
+installers copy, and the installers' own emitted skill catalog is unchanged.
+
 ## Verify Installation
 
 Type `/sybermem-init-project` or `/sybermem-update` in Claude Code, OpenCode, or Codex. If the project gets the `.sybermem/` directory structure or removes a legacy SyberMem protocol block from `AGENTS.md` / `CLAUDE.md`, the installation was successful.

@@ -6,6 +6,37 @@ This is the source-of-truth feature map for SyberMem project capabilities and
 platform support claims. Public READMEs and platform install docs should stay
 consistent with this file.
 
+## Skill Discovery Tiers
+
+This catalog is the canonical Core/Advanced classification for every active
+SyberMem Skill. `README.md`, `README.en.md`, and `INSTALL.md` present the same
+two tiers in the same order, so a beginner meets the small Core set first and
+reaches the rest through progressive disclosure.
+
+"Advanced / lifecycle" means specialized or less frequent — a Skill you reach for
+at a specific moment (installing, upgrading, compressing a phase, synthesizing a
+topic) rather than in every session. Every Skill in the second tier is fully
+supported and directly invocable; the tier is about frequency, never about status.
+
+### Core entrypoints
+
+- `using-sybermem`: read-only orientation — resolve the project, report compact installation/project state, and present the one canonical next command.
+- `sybermem-init-project`: initialize or re-scaffold SyberMem in a project.
+- `sybermem-record`: record a completed unit of work as a canonical record, and crystallize binding project rules into norms.
+- `sybermem-resume`: bounded read-only continuity brief for restarting work in an existing project.
+- `sybermem-search`: find historical records, decisions, and digests inside the project.
+- `sybermem-digest`: compress a settled phase into durable phase-level conclusions.
+- `sybermem-habit`: manage user-level habits and pending habit candidates across projects.
+
+### Advanced / lifecycle
+
+- `sybermem-install`: first-time installation of the SyberMem system on a machine.
+- `sybermem-update`: refresh an existing project's managed SyberMem files after a version upgrade.
+- `sybermem-uninstall`: natural-language uninstall router for project-scope or global-scope removal.
+- `sybermem-summary`: project status and memory/recall health panel for weekly or monthly review.
+- `sybermem-phase-analyze`: build or refresh the structural phase index from full record history.
+- `sybermem-theme-digest`: synthesize a cross-phase, topic-level conclusion from related records and phases.
+
 ## Support Legend
 
 | Label | Meaning |

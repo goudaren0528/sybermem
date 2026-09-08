@@ -208,17 +208,30 @@ SyberMem 有两类执行路径，可靠性不同：
 
 ## 日常使用
 
-### 项目 owner
+先用 Core entrypoints 这一小组命令；advanced / lifecycle 一层仍然可以直接调用，
+只是使用频率更低，并不代表被弃用。规范分类以 `docs/feature_map.md` 为准。
 
-- `/sybermem-resume`：获取只读续接视图
-- `/sybermem-record`：记录一轮有价值的工作；收尾时可把绑定的项目规则固化为 `norm`
-- `/sybermem-search`：查找历史 records
-- `/sybermem-habit`：记录、查看、暂停、删除用户级习惯，或触发可见提醒
-- `/sybermem-uninstall`：自然语言卸载入口；不明确时询问项目级或全局，且全局卸载需显式确认
-- `/sybermem-summary`：查看当前项目状态
-- `sybermem norms list/nominate/doctor`：查看项目规范宪法、提名重复约束、检测同 scope 冲突
-- `/sybermem-digest`：沉淀稳定阶段结论
-- `/sybermem-theme-digest`：沉淀跨阶段主题结论
+### Core entrypoints
+
+- `using-sybermem`: read-only orientation — resolve the project, report compact installation/project state, and present the one canonical next command.
+- `sybermem-init-project`: initialize or re-scaffold SyberMem in a project.
+- `sybermem-record`: record a completed unit of work as a canonical record, and crystallize binding project rules into norms.
+- `sybermem-resume`: bounded read-only continuity brief for restarting work in an existing project.
+- `sybermem-search`: find historical records, decisions, and digests inside the project.
+- `sybermem-digest`: compress a settled phase into durable phase-level conclusions.
+- `sybermem-habit`: manage user-level habits and pending habit candidates across projects.
+
+### Advanced / lifecycle
+
+- `sybermem-install`: first-time installation of the SyberMem system on a machine.
+- `sybermem-update`: refresh an existing project's managed SyberMem files after a version upgrade.
+- `sybermem-uninstall`: natural-language uninstall router for project-scope or global-scope removal.
+- `sybermem-summary`: project status and memory/recall health panel for weekly or monthly review.
+- `sybermem-phase-analyze`: build or refresh the structural phase index from full record history.
+- `sybermem-theme-digest`: synthesize a cross-phase, topic-level conclusion from related records and phases.
+
+相关 CLI（不是 Skill）：`sybermem norms list/nominate/doctor` 查看项目规范宪法、
+提名重复约束、检测同 scope 冲突。
 
 ### 跨项目视图
 
