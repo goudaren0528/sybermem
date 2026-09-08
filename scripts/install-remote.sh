@@ -67,10 +67,10 @@ install_skills() {
     local target="$1"
     local label="$2"
     mkdir -p "$target"
-    for retired in sybermem-phase-confirm sybermem-team-publish sybermem-team-summary; do
+    for retired in sybermem-phase-confirm sybermem-team-publish sybermem-team-summary sybermem-link; do
         safe_remove_managed_dir "$target" "$target/$retired"
     done
-    for skill in sybermem-init-project sybermem-record sybermem-summary sybermem-resume sybermem-digest sybermem-phase-analyze using-sybermem sybermem-update sybermem-search sybermem-link sybermem-theme-digest sybermem-habit sybermem-uninstall sybermem-install; do
+    for skill in sybermem-init-project sybermem-record sybermem-summary sybermem-resume sybermem-digest sybermem-phase-analyze using-sybermem sybermem-update sybermem-search sybermem-theme-digest sybermem-habit sybermem-uninstall sybermem-install; do
         if [ -d "$SKILLS_SRC/$skill" ]; then
             safe_remove_managed_dir "$target" "$target/$skill"
             cp -r "$SKILLS_SRC/$skill" "$target/"
@@ -264,7 +264,6 @@ echo "  /sybermem-phase-analyze — Build or refresh the persistent phase index 
 echo "  /using-sybermem         — Show current SyberMem status and the recommended next command"
 echo "  /sybermem-update        — Refresh global skills, then re-check the current project"
 echo "  /sybermem-search        — Search/query records by keyword, topic, phase range, date range, or record ID"
-echo "  /sybermem-link          — Add a forward relation between two existing records (implements / fixes / related / superseded-by)"
 echo "  /sybermem-theme-digest  — Create a durable topic-level digest that compresses one theme across multiple related phases or records"
 
 echo "  /sybermem-habit         — Manage user-level habit memory and reminders"

@@ -12,7 +12,7 @@ def main() -> int:
     print("=== SyberMem Python Update ===")
     install_from_checkout(root)
     print("Available Skills:")
-    for name in ("sybermem-init-project", "sybermem-record", "sybermem-summary", "sybermem-resume", "sybermem-digest", "sybermem-phase-analyze", "using-sybermem", "sybermem-update", "sybermem-search", "sybermem-link", "sybermem-theme-digest", "sybermem-habit", "sybermem-uninstall"):
+    for name in ("sybermem-init-project", "sybermem-record", "sybermem-summary", "sybermem-resume", "sybermem-digest", "sybermem-phase-analyze", "using-sybermem", "sybermem-update", "sybermem-search", "sybermem-theme-digest", "sybermem-habit", "sybermem-uninstall"):
         print(f"  /{name}")
     print("=== Update Complete ===")
     return 0

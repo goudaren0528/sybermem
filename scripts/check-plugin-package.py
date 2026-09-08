@@ -28,7 +28,7 @@ DISTRIBUTION_SCRIPTS: Final = [
 # install-remote, update, uninstall) MUST clean these from existing user installs so a
 # user upgrading to a newer version never ends up with a stale retired skill. Keeping this
 # list forces us to remember retirement when we delete a skill.
-RETIRED_SKILL_NAMES: Final = ["sybermem-phase-confirm", "sybermem-team-publish", "sybermem-team-summary"]
+RETIRED_SKILL_NAMES: Final = ["sybermem-phase-confirm", "sybermem-team-publish", "sybermem-team-summary", "sybermem-link"]
 VISIBLE_SKILL_SCRIPTS: Final = [
     Path("scripts/install.sh"),
     Path("scripts/install.ps1"),

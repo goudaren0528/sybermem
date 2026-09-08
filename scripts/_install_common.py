@@ -12,10 +12,10 @@ from typing import Final
 SKILLS: Final = (
     "sybermem-init-project", "sybermem-record", "sybermem-summary", "sybermem-resume",
     "sybermem-digest", "sybermem-phase-analyze", "using-sybermem", "sybermem-update",
-    "sybermem-search", "sybermem-link", "sybermem-theme-digest", "sybermem-habit",
+    "sybermem-search", "sybermem-theme-digest", "sybermem-habit",
     "sybermem-uninstall", "sybermem-install",
 )
-RETIRED_SKILLS: Final = ("sybermem-phase-confirm", "sybermem-team-publish", "sybermem-team-summary")
+RETIRED_SKILLS: Final = ("sybermem-phase-confirm", "sybermem-team-publish", "sybermem-team-summary", "sybermem-link")
 # (event, source file, installed name, statusMessage shown in Codex UI, additionalContextLimit)
 # statusMessage is Codex's per-handler UI status line — the one visibility channel that
 # is reliably rendered in Codex Desktop, so the wording tells the user SyberMem is

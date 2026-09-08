@@ -18,6 +18,8 @@ If the same source records have already been compressed into an existing digest,
 
 If an older project still contains project-local copies such as `.claude/skills/sybermem-*`, Claude may load both the local and global copies and show duplicates in the `/` list. Once you have switched to the global-install model, those old project-local copies can be deleted.
 
+`/sybermem-link` is retired. Re-run the global installer or updater to remove old copies from Claude Code, OpenCode, and Codex skill homes. Use `/sybermem-record` to add, correct, or confirm relations between existing records; stored relation fields and search behavior require no data migration.
+
 ## Install
 
 ### Claude Code 插件安装（推荐）

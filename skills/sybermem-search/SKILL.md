@@ -156,7 +156,7 @@ Historical records are durable evidence. When a search result is outdated or wro
 2. Link the old record to the successor with `superseded_by: <new-record-id>` or link the fixing/current record with `fixes: <old-record-id>` where appropriate.
 3. Present both sides in search: the old record remains visible as historical evidence, and the successor/current record is the guidance to follow.
 
-Do not silently edit historical truth away just to make search look current. If the user asks to correct memory, route them to `/sybermem-record` and `/sybermem-link` after showing the evidence.
+Do not silently edit historical truth away just to make search look current. If the user asks to correct memory or its relations, route them to `/sybermem-record` after showing the evidence.
 
 ## Error Handling
 
@@ -202,6 +202,5 @@ This skill is complete when:
 ## Integration
 
 **Related skills:**
-- **sybermem-record** — creates the records this skill searches
-- **sybermem-link** — adds the relations this skill surfaces
+- **sybermem-record** — creates the records and maintains the relations this skill searches
 - **sybermem-phase-analyze** — produces the phase coverage used for enrichment

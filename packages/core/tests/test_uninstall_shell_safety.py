@@ -10,7 +10,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[3]
 ACTIVE = ("sybermem-record", "sybermem-uninstall")
-RETIRED = ("sybermem-phase-confirm", "sybermem-team-publish", "sybermem-team-summary")
+RETIRED = ("sybermem-phase-confirm", "sybermem-team-publish", "sybermem-team-summary", "sybermem-link")
 CODEX_HOOKS = ("sybermem_user_prompt.py", "sybermem_session_start.py", "sybermem_stop.py", "sybermem_post_compact.py")
 
 

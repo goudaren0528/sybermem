@@ -315,6 +315,7 @@ def test_package_integrity_requires_distribution_scripts_clean_retired_skills() 
         "sybermem-phase-confirm",
         "sybermem-team-publish",
         "sybermem-team-summary",
+        "sybermem-link",
     ]
     assert callable(checker["check_retired_skill_cleanup"])
     script_text = CHECK_SCRIPT.read_text(encoding="utf-8")

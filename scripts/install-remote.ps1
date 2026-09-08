@@ -73,13 +73,13 @@ $RemoverSource = Join-Path $TmpDir "$ArchivePrefix\scripts\safe-managed-remove.p
         if (-not (Test-Path $target.Path)) {
             New-Item -ItemType Directory -Path $target.Path -Force | Out-Null
         }
-        foreach ($retiredSkill in @("sybermem-phase-confirm", "sybermem-team-publish", "sybermem-team-summary")) {
+        foreach ($retiredSkill in @("sybermem-phase-confirm", "sybermem-team-publish", "sybermem-team-summary", "sybermem-link")) {
             $retiredPath = Join-Path $target.Path $retiredSkill
             if (Test-Path $retiredPath) {
                 Remove-ManagedDirectory -Root $target.Path -Target $retiredPath
             }
         }
-        foreach ($skill in @("sybermem-init-project", "sybermem-record", "sybermem-summary", "sybermem-resume", "sybermem-digest", "sybermem-phase-analyze", "using-sybermem", "sybermem-update", "sybermem-search", "sybermem-link", "sybermem-theme-digest", "sybermem-habit", "sybermem-uninstall", "sybermem-install")) {
+        foreach ($skill in @("sybermem-init-project", "sybermem-record", "sybermem-summary", "sybermem-resume", "sybermem-digest", "sybermem-phase-analyze", "using-sybermem", "sybermem-update", "sybermem-search", "sybermem-theme-digest", "sybermem-habit", "sybermem-uninstall", "sybermem-install")) {
             $src = Join-Path $SkillsSrc $skill
             $dst = Join-Path $target.Path $skill
             if (Test-Path $src) {
@@ -264,7 +264,6 @@ Write-Host "  /sybermem-phase-analyze - Build or refresh the persistent phase in
 Write-Host "  /using-sybermem         - Show current SyberMem status and the recommended next command"
 Write-Host "  /sybermem-update        - Refresh global skills, then re-check the current project"
 Write-Host "  /sybermem-search        - Search/query records by keyword, topic, phase range, date range, or record ID"
-Write-Host "  /sybermem-link          - Add a forward relation between two existing records"
 Write-Host "  /sybermem-theme-digest  - Create a durable topic-level digest"
 
 Write-Host "  /sybermem-habit         - Manage user-level habit memory and reminders"

@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Changed
+- `/sybermem-record` is now the single entry point for creating, supplementing, or correcting project memory. It can update the five supported relations on existing records with source-only, idempotent, conflict-safe behavior while preserving the existing create-record and norm-crystallization paths.
+
+### Removed
+- Retired the redundant top-level `/sybermem-link` skill. Existing relation frontmatter and search behavior remain compatible; global install/update removes old copies from Claude Code, OpenCode, and Codex skill homes, and relation updates now use `/sybermem-record`.
+
 ## 0.5.0 - 2026-09-07
 
 ### Added

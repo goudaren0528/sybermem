@@ -48,10 +48,10 @@ sync_skills() {
     local target="$1"
     local label="$2"
     mkdir -p "$target"
-    for retired in sybermem-phase-confirm sybermem-team-publish sybermem-team-summary; do
+    for retired in sybermem-phase-confirm sybermem-team-publish sybermem-team-summary sybermem-link; do
         safe_remove_managed_dir "$target" "$target/$retired"
     done
-    for skill in sybermem-init-project sybermem-record sybermem-summary sybermem-resume sybermem-digest sybermem-phase-analyze using-sybermem sybermem-update sybermem-search sybermem-link sybermem-theme-digest sybermem-habit sybermem-uninstall sybermem-install; do
+    for skill in sybermem-init-project sybermem-record sybermem-summary sybermem-resume sybermem-digest sybermem-phase-analyze using-sybermem sybermem-update sybermem-search sybermem-theme-digest sybermem-habit sybermem-uninstall sybermem-install; do
         if [ -d "$SKILL_SOURCE/$skill" ]; then
             safe_remove_managed_dir "$target" "$target/$skill"
             cp -r "$SKILL_SOURCE/$skill" "$target/"
@@ -226,7 +226,6 @@ echo "  /sybermem-phase-analyze — 从项目历史构建或刷新持久化阶�
 echo "  /using-sybermem         — 显示当前 SyberMem 状态和建议的下一步命令"
 echo "  /sybermem-update        — 更新全局 Skills 并重新检查当前项目"
 echo "  /sybermem-search        — 按关键词、topic、phase 范围、日期范围或记录 ID 检索记录"
-echo "  /sybermem-link          — 在两条已有记录间建立正向关系（implements / fixes / related / superseded-by）"
 echo "  /sybermem-theme-digest  — 为单个 topic 创建跨多个 phase 的持久化高阶摘要"
 
 echo "  /sybermem-habit         — 管理用户级习惯记忆与提醒"

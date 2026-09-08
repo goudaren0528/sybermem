@@ -143,7 +143,7 @@ SyberMem has two execution paths with different reliability properties:
 | Path | Representative capabilities | Notes |
 |---|---|---|
 | CLI / Core | `sybermem resume`, `search`, `next-step`, `portfolio`, `index build`, `project index build/check`, `project memory-stats`, `record id`, `habit add/list/search/pause/delete/remind/inject`, `digest status/latest`, `norms list/nominate/doctor`, `uninstall --scope project|global`, `project uninstall` | Programmatic and scriptable; best for deterministic queries |
-| Skill orchestration | `/sybermem-record`, `/sybermem-habit`, `/sybermem-link`, `/sybermem-digest`, `/sybermem-theme-digest`, `/sybermem-phase-analyze`, `/sybermem-uninstall` | AI edits `.sybermem/` Markdown, invokes user-level habit CLI, or asks/confirms project vs global uninstall scope; best for work that requires judgment and synthesis |
+| Skill orchestration | `/sybermem-record`, `/sybermem-habit`, `/sybermem-digest`, `/sybermem-theme-digest`, `/sybermem-phase-analyze`, `/sybermem-uninstall` | AI creates or corrects `.sybermem/` records and relations, invokes user-level habit CLI, or asks/confirms project vs global uninstall scope; best for work that requires judgment and synthesis |
 
 `sybermem record id --type <change|decision|requirement|bug>` only mints a canonical record ID. Full record creation still happens through `/sybermem-record`.
 
