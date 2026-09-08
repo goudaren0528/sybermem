@@ -2,8 +2,12 @@
 
 ## Unreleased
 
+## 0.6.0 - 2026-09-08
+
 ### Changed
 - `/sybermem-record` is now the single entry point for creating, supplementing, or correcting project memory. It can update the five supported relations on existing records with source-only, idempotent, conflict-safe behavior while preserving the existing create-record and norm-crystallization paths.
+- `/using-sybermem` now has a thin default orientation path: it resolves the project root, reports a compact installation/project state, routes through the canonical `sybermem next-step --format json`, and presents exactly one recommended command without running any downstream action. The hook/anchor/legacy-protocol health checklist and the CLI-unavailable fallback decision graph are retained in full, but moved into an explicitly read-only "Advanced diagnostics" section used only when CLI routing is unavailable or a health signal is unhealthy.
+- Skill discovery is now tiered for progressive disclosure instead of presenting a flat surface: `README.md`, `README.en.md`, `INSTALL.md`, and `docs/feature_map.md` lead with seven Core entrypoints (`using-sybermem`, `sybermem-init-project`, `sybermem-record`, `sybermem-resume`, `sybermem-search`, `sybermem-digest`, `sybermem-habit`) and then present six advanced/lifecycle entrypoints (`sybermem-install`, `sybermem-update`, `sybermem-uninstall`, `sybermem-summary`, `sybermem-phase-analyze`, `sybermem-theme-digest`). Every Skill stays fully supported and directly invocable — the tier reflects frequency, never deprecation — and no Skill was merged or retired to achieve it.
 
 ### Removed
 - Retired the redundant top-level `/sybermem-link` skill. Existing relation frontmatter and search behavior remain compatible; global install/update removes old copies from Claude Code, OpenCode, and Codex skill homes, and relation updates now use `/sybermem-record`.
