@@ -191,6 +191,88 @@ def test_parse_skill_catalog_rejects_retired_language(tmp_path: Path) -> None:
         parse_skill_catalog(doc)
 
 
+def test_parse_skill_catalog_rejects_wrapped_continuation(tmp_path: Path) -> None:
+    # Given: a catalog row wrapped onto an indented continuation line
+    doc = tmp_path / "catalog.md"
+    doc.write_text(
+        VALID_CATALOG.replace(
+            "- `sybermem-init-project`: initialize project memory.",
+            "- `sybermem-init-project`: initialize project memory\n  and quietly do something else.",
+        ),
+        encoding="utf-8",
+    )
+
+    # When / Then: one row per line is enforced, so hidden continuations fail
+    with pytest.raises(AssertionError, match="indented continuation"):
+        parse_skill_catalog(doc)
+
+
+def test_parse_skill_catalog_rejects_nested_sub_bullet(tmp_path: Path) -> None:
+    # Given: a nested sub-bullet smuggling an extra entry into a tier
+    doc = tmp_path / "catalog.md"
+    doc.write_text(
+        VALID_CATALOG.replace(
+            "- `sybermem-init-project`: initialize project memory.",
+            "- `sybermem-init-project`: initialize project memory.\n  - `hidden-skill`: nested row.",
+        ),
+        encoding="utf-8",
+    )
+
+    # When / Then: nested rows are rejected rather than silently skipped
+    with pytest.raises(AssertionError, match="indented continuation"):
+        parse_skill_catalog(doc)
+
+
+def test_parse_skill_catalog_ignores_headings_inside_fences(tmp_path: Path) -> None:
+    # Given: a document whose fenced example block mimics the catalog headings
+    doc = tmp_path / "catalog.md"
+    doc.write_text(
+        "# Doc\n\nExample rendering:\n\n"
+        "```md\n"
+        "### Core entrypoints\n\n- `fake`: not real.\n\n"
+        "### Advanced / lifecycle\n\n- `fake2`: not real.\n"
+        "```\n\n" + VALID_CATALOG.split("# Doc\n", 1)[1],
+        encoding="utf-8",
+    )
+
+    # When: the catalog is parsed
+    catalog = parse_skill_catalog(doc)
+
+    # Then: only the real prose headings are used, never fenced examples
+    assert catalog == {
+        "core": ("using-sybermem", "sybermem-init-project"),
+        "advanced": ("sybermem-summary", "sybermem-install"),
+    }
+
+
+def test_parse_skill_catalog_rejects_later_duplicate_heading(tmp_path: Path) -> None:
+    # Given: a second, conflicting catalog heading later in the same document
+    doc = tmp_path / "catalog.md"
+    doc.write_text(
+        VALID_CATALOG + "\n### Core entrypoints\n\n- `sybermem-record`: conflicting catalog.\n",
+        encoding="utf-8",
+    )
+
+    # When / Then: ambiguity is reported instead of silently taking the first
+    with pytest.raises(AssertionError, match="ambiguous heading"):
+        parse_skill_catalog(doc)
+
+
+def test_parse_skill_catalog_allows_trailing_paragraph(tmp_path: Path) -> None:
+    # Given: an explanatory paragraph after a blank line following the rows
+    doc = tmp_path / "catalog.md"
+    doc.write_text(
+        VALID_CATALOG.replace(
+            "- `sybermem-install`: install runtime.",
+            "- `sybermem-install`: install runtime.\n\nThis tier is specialized and fully supported.",
+        ),
+        encoding="utf-8",
+    )
+
+    # When / Then: separated trailing prose stays legal
+    assert parse_skill_catalog(doc)["advanced"] == ("sybermem-summary", "sybermem-install")
+
+
 def test_validate_taxonomy_rejects_incomplete_membership(tmp_path: Path) -> None:
     # Given: a catalog that does not cover the full manifest inventory
     doc = tmp_path / "catalog.md"

@@ -92,36 +92,73 @@ def _heading_level(line: str) -> int | None:
     return len(match.group(1))
 
 
+def _prose_lines(text: str) -> list[str | None]:
+    """Return document lines with fenced-code-block lines replaced by ``None``.
+
+    Markdown fences legitimately contain example headings and bullets (the
+    orientation Skill's Output Style block shows a rendered report). Fenced
+    content must never be mistaken for real document structure.
+    """
+
+    rendered: list[str | None] = []
+    fence: str | None = None
+    for line in text.splitlines():
+        marker = re.match(r"^\s*(`{3,}|~{3,})", line)
+        if fence is None:
+            if marker is not None:
+                fence = marker.group(1)[0]
+                rendered.append(None)
+                continue
+            rendered.append(line)
+            continue
+        rendered.append(None)
+        if marker is not None and marker.group(1)[0] == fence:
+            fence = None
+    if fence is not None:
+        raise AssertionError("unterminated fenced code block")
+    return rendered
+
+
+def _heading_indexes(text: str, heading: str) -> list[int]:
+    return [
+        index
+        for index, line in enumerate(_prose_lines(text))
+        if line is not None and line.strip() == heading
+    ]
+
+
+def _heading_index(text: str, heading: str) -> int:
+    indexes = _heading_indexes(text, heading)
+    if not indexes:
+        raise AssertionError(f"missing heading: {heading!r}")
+    if len(indexes) > 1:
+        raise AssertionError(
+            f"ambiguous heading {heading!r}: found {len(indexes)} occurrences at lines "
+            f"{[index + 1 for index in indexes]}"
+        )
+    return indexes[0]
+
+
 def _section_lines(text: str, heading: str) -> list[str]:
     """Return the lines under ``heading`` up to the next equal/higher heading."""
 
-    level = _heading_level(heading + " ")
+    level = _heading_level(heading.strip() + " ")
     if level is None:
         raise AssertionError(f"not a heading: {heading!r}")
 
-    lines = text.splitlines()
-    start: int | None = None
-    for index, line in enumerate(lines):
-        if line.strip() == heading:
-            start = index + 1
-            break
-    if start is None:
-        raise AssertionError(f"missing heading: {heading!r}")
+    lines = _prose_lines(text)
+    start = _heading_index(text, heading) + 1
 
     collected: list[str] = []
     for line in lines[start:]:
+        if line is None:
+            collected.append("")
+            continue
         current = _heading_level(line)
         if current is not None and current <= level:
             break
         collected.append(line)
     return collected
-
-
-def _heading_index(text: str, heading: str) -> int:
-    for index, line in enumerate(text.splitlines()):
-        if line.strip() == heading:
-            return index
-    raise AssertionError(f"missing heading: {heading!r}")
 
 
 def validate_using_skill(path: Path) -> None:
@@ -161,9 +198,25 @@ def parse_skill_catalog(path: Path) -> dict[str, tuple[str, ...]]:
     catalog: dict[str, tuple[str, ...]] = {}
     for key, heading in (("core", CORE_HEADING), ("advanced", ADVANCED_HEADING)):
         names: list[str] = []
+        in_list = False
         for line in _section_lines(text, heading):
             stripped = line.strip()
+            if not stripped:
+                in_list = False
+                continue
+            indented = line[:1].isspace()
+            if indented:
+                # A wrapped continuation or nested sub-bullet would silently hide
+                # or distort a catalog entry; the catalog grammar is one row per line.
+                raise AssertionError(
+                    f"{path}: indented continuation under {heading!r}: {stripped!r}"
+                )
             if not stripped.startswith("- "):
+                if in_list:
+                    raise AssertionError(
+                        f"{path}: unseparated prose inside catalog under {heading!r}: {stripped!r}"
+                    )
+                # Trailing explanatory paragraph after a blank line is allowed.
                 continue
             match = CATALOG_ROW.match(stripped)
             if match is None:
@@ -174,6 +227,7 @@ def parse_skill_catalog(path: Path) -> dict[str, tuple[str, ...]]:
             if name in names:
                 raise AssertionError(f"{path}: duplicate catalog entry {name!r} under {heading!r}")
             names.append(name)
+            in_list = True
         if not names:
             raise AssertionError(f"{path}: no catalog rows under {heading!r}")
         catalog[key] = tuple(names)
