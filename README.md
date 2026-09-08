@@ -213,22 +213,22 @@ SyberMem 有两类执行路径，可靠性不同：
 
 ### Core entrypoints
 
-- `using-sybermem`: read-only orientation — resolve the project, report compact installation/project state, and present the one canonical next command.
-- `sybermem-init-project`: initialize or re-scaffold SyberMem in a project.
-- `sybermem-record`: record a completed unit of work as a canonical record, and crystallize binding project rules into norms.
-- `sybermem-resume`: bounded read-only continuity brief for restarting work in an existing project.
-- `sybermem-search`: find historical records, decisions, and digests inside the project.
-- `sybermem-digest`: compress a settled phase into durable phase-level conclusions.
-- `sybermem-habit`: manage user-level habits and pending habit candidates across projects.
+- `using-sybermem`: 只读定位入口——解析项目根、报告精简的安装/项目状态，并给出唯一一条规范的下一步命令；不执行任何下游动作。
+- `sybermem-init-project`: 初始化或重新脚手架项目内的 SyberMem 目录、模板与受管配置。
+- `sybermem-record`: 记录一轮有价值的工作为 canonical record；收尾时可把绑定的项目规则固化为 `norm`（带 `crystallized_from` 溯源），也可补充或修正既有 record 之间的关系。
+- `sybermem-resume`: 只读续接视图——当前阶段、最近进展、风险、建议下一步、置信度与信息新鲜度。
+- `sybermem-search`: 在项目内查找历史 records、decisions 与 digest。
+- `sybermem-digest`: 把已稳定的阶段压缩为持久的阶段级结论。
+- `sybermem-habit`: 记录、查看、暂停、删除用户级习惯与待确认候选，或触发可见提醒。
 
 ### Advanced / lifecycle
 
-- `sybermem-install`: first-time installation of the SyberMem system on a machine.
-- `sybermem-update`: refresh an existing project's managed SyberMem files after a version upgrade.
-- `sybermem-uninstall`: natural-language uninstall router for project-scope or global-scope removal.
-- `sybermem-summary`: project status and memory/recall health panel for weekly or monthly review.
-- `sybermem-phase-analyze`: build or refresh the structural phase index from full record history.
-- `sybermem-theme-digest`: synthesize a cross-phase, topic-level conclusion from related records and phases.
+- `sybermem-install`: 首次在一台机器上安装整套 SyberMem 系统。
+- `sybermem-update`: 全局升级后刷新某个既有项目内的受管 SyberMem 文件。
+- `sybermem-uninstall`: 自然语言卸载入口；scope 不明确时会先询问项目级还是全局，且全局卸载必须显式确认，项目级卸载保留 `.sybermem/` 历史。
+- `sybermem-summary`: 查看当前项目状态与记忆/召回健康面板，适合周期性复盘。
+- `sybermem-phase-analyze`: 依据完整 record 历史构建或刷新结构化阶段索引。
+- `sybermem-theme-digest`: 把相关 records 与多个阶段综合为跨阶段的主题级结论。
 
 相关 CLI（不是 Skill）：`sybermem norms list/nominate/doctor` 查看项目规范宪法、
 提名重复约束、检测同 scope 冲突。

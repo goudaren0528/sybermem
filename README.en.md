@@ -215,17 +215,17 @@ holds the canonical classification.
 
 - `using-sybermem`: read-only orientation — resolve the project, report compact installation/project state, and present the one canonical next command.
 - `sybermem-init-project`: initialize or re-scaffold SyberMem in a project.
-- `sybermem-record`: record a completed unit of work as a canonical record, and crystallize binding project rules into norms.
-- `sybermem-resume`: bounded read-only continuity brief for restarting work in an existing project.
+- `sybermem-record`: record a meaningful round of work as a canonical record; at closeout, crystallize a binding project rule into a `norm` (with `crystallized_from` provenance), and add or correct relations between existing records.
+- `sybermem-resume`: bounded read-only continuity brief — current phase, recent progress, risks, suggested next step, confidence, and freshness.
 - `sybermem-search`: find historical records, decisions, and digests inside the project.
 - `sybermem-digest`: compress a settled phase into durable phase-level conclusions.
-- `sybermem-habit`: manage user-level habits and pending habit candidates across projects.
+- `sybermem-habit`: add, review, pause, or delete user-level habits and pending candidates, or trigger a visible reminder.
 
 ### Advanced / lifecycle
 
 - `sybermem-install`: first-time installation of the SyberMem system on a machine.
 - `sybermem-update`: refresh an existing project's managed SyberMem files after a version upgrade.
-- `sybermem-uninstall`: natural-language uninstall router for project-scope or global-scope removal.
+- `sybermem-uninstall`: natural-language uninstall entrypoint; it asks project vs global scope when unclear, requires explicit confirmation for global uninstall, and project scope preserves `.sybermem/` history.
 - `sybermem-summary`: project status and memory/recall health panel for weekly or monthly review.
 - `sybermem-phase-analyze`: build or refresh the structural phase index from full record history.
 - `sybermem-theme-digest`: synthesize a cross-phase, topic-level conclusion from related records and phases.

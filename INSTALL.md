@@ -196,7 +196,8 @@ Installation delivers all 13 Skills to every supported host. For finding your wa
 around, they are presented in two tiers — the same classification used by
 `docs/feature_map.md`, `README.md`, and `README.en.md`. Start at the Core tier;
 reach the advanced/lifecycle tier when you hit the specific moment it serves.
-"Advanced / lifecycle" means specialized or less frequent, never unsupported.
+"Advanced / lifecycle" means specialized or less frequent, never deprecated;
+every Skill in that tier is fully supported and directly invocable.
 
 ### Core entrypoints
 
@@ -212,7 +213,7 @@ reach the advanced/lifecycle tier when you hit the specific moment it serves.
 
 - `sybermem-install`: first-time installation of the SyberMem system on a machine.
 - `sybermem-update`: refresh an existing project's managed SyberMem files after a version upgrade.
-- `sybermem-uninstall`: natural-language uninstall router for project-scope or global-scope removal.
+- `sybermem-uninstall`: natural-language uninstall entrypoint; it asks project vs global scope when unclear, requires explicit confirmation for global uninstall, and project scope preserves `.sybermem/` history.
 - `sybermem-summary`: project status and memory/recall health panel for weekly or monthly review.
 - `sybermem-phase-analyze`: build or refresh the structural phase index from full record history.
 - `sybermem-theme-digest`: synthesize a cross-phase, topic-level conclusion from related records and phases.
