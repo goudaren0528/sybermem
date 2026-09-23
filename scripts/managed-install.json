@@ -11,7 +11,8 @@
   ],
   "runtime_dirs": ["cli"],
   "runtime_files": [
-    "launch_record_change_on_stop.py", "launch_session_start_context.py", "VERSION",
+    "launch_hook.py", "launch_record_change_on_stop.py", "launch_session_start_context.py",
+    "launch_user_prompt.py", "launch_recall_outcome_on_stop.py", "VERSION",
     "managed-install.json", "safe-managed-remove.py", "opencode-install.py"
   ],
   "codex_hook_files": [

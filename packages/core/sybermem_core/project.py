@@ -18,7 +18,7 @@ def resolve_project_root(start: Path | None = None) -> Path | None:
         current = parent
 
 
-def ensure_project_yaml(root: Path) -> tuple[str, str, str]:
+def ensure_project_yaml(root: Path, *, stamp_version: bool = True) -> tuple[str, str, str]:
     proj = root / ".sybermem" / "project.yaml"
     if proj.is_file():
         text = proj.read_text(encoding="utf-8")
@@ -27,7 +27,11 @@ def ensure_project_yaml(root: Path) -> tuple[str, str, str]:
         return ("existing", project_id, slug)
     project_id = generate_project_id()
     slug = derive_slug(root)
-    proj.write_text(render_project_yaml(project_id, slug, root), encoding="utf-8")
+    content = render_project_yaml(project_id, slug, root)
+    if not stamp_version:
+        content = "\n".join(line for line in content.splitlines()
+                            if not line.startswith("sybermem_version:")) + "\n"
+    proj.write_text(content, encoding="utf-8")
     return ("created", project_id, slug)
 
 

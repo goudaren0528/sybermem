@@ -524,7 +524,11 @@ def cmd_project_refresh(args: argparse.Namespace) -> int:
             f"skipped {len(report['actions_skipped'])}, "
             f"preserved custom {len(report['preserved_custom'])}"
         )
-    return 0
+        if report["overall"] == "failed":
+            for action in report["actions_skipped"]:
+                if "disabled_requires_upgrade" in action or "error_unsafe_state" in action or "hook health failed" in action:
+                    print(action)
+    return 1 if report["overall"] == "failed" else 0
 
 
 def cmd_project_record_files(args: argparse.Namespace) -> int:

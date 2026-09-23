@@ -8,7 +8,9 @@ from pathlib import Path
 from typing import Final, TypedDict
 
 from .project import ensure_project_yaml
-from .project_refresh_settings import merge_settings_file
+from .project_refresh_settings import migrate_settings_file
+from .claude_hook_health import check_managed_claude_hooks
+from . import claude_hook_contract
 from .version import get_installed_version
 
 
@@ -78,6 +80,8 @@ class ProjectRefreshReport(TypedDict):
     actions_applied: list[str]
     actions_skipped: list[str]
     preserved_custom: list[str]
+    claude_hooks: str
+    claude_hook_health: dict
 
 
 def discover_template_roots() -> tuple[Path, ...]:
@@ -99,6 +103,9 @@ def refresh_project(root: Path, template_roots: tuple[Path, ...] | None = None) 
     actions_applied: list[str] = []
     actions_skipped: list[str] = []
     preserved_custom: list[str] = []
+    claude_hooks = "not_configured"
+    claude_hook_health: dict = {"status": "not_configured", "errors": []}
+    claude_version = (claude_hook_contract.probe_claude_version() or ()) if ".claude/settings.json" in templates else None
 
     _ensure_known_dirs(resolved_root)
     for rel_path, template_text in templates.items():
@@ -107,10 +114,12 @@ def refresh_project(root: Path, template_roots: tuple[Path, ...] | None = None) 
             # Legacy protocol blocks are removed by the migration below.
             continue
         if rel_path == ".claude/settings.json":
-            outcome = _refresh_settings_file(resolved_root, template_text)
+            outcome = _refresh_settings_file(resolved_root, template_text, version=claude_version)
         else:
             outcome = _refresh_managed_file(resolved_root, rel_path, template_text)
         files[rel_path] = outcome
+        if rel_path == ".claude/settings.json":
+            claude_hooks = outcome.get("claude_hooks", "error_unsafe_state")
         _collect_actions(outcome, actions_needed, actions_applied, actions_skipped)
         if outcome["status"] in ("custom_preserved", "fresh_custom"):
             preserved_custom.append(rel_path)
@@ -124,12 +133,10 @@ def refresh_project(root: Path, template_roots: tuple[Path, ...] | None = None) 
         files[name] = outcome
         _collect_actions(outcome, actions_needed, actions_applied, actions_skipped)
 
-    yaml_status, _project_id, _slug = ensure_project_yaml(resolved_root)
+    yaml_status, _project_id, _slug = ensure_project_yaml(resolved_root, stamp_version=False)
     yaml_action = "create .sybermem/project.yaml with project identity"
     yaml_created = yaml_status == "created"
     if yaml_created:
-        # New project.yaml already carries the current sybermem_version via
-        # render_project_yaml, so no separate stamp is needed.
         files[".sybermem/project.yaml"] = {"status": "created", "action": yaml_action}
         actions_needed.append(yaml_action)
         actions_applied.append(yaml_action)
@@ -152,12 +159,23 @@ def refresh_project(root: Path, template_roots: tuple[Path, ...] | None = None) 
     # (protocol-block removal, settings/hook refresh, gitignore) has succeeded.
     # If any earlier step raises, the stamp is not written and the next session
     # still nudges — the refresh is retry-safe.
-    if not yaml_created and index_tracking_outcome["status"] != "failed":
+    failed = any(outcome["status"] == "failed" for outcome in files.values())
+    if not failed and claude_hooks == "enabled":
+        claude_hook_health = check_managed_claude_hooks(resolved_root, version=claude_version)
+        if claude_hook_health["status"] != "fresh":
+            failed = True
+            claude_hooks = "error_unsafe_state"
+            action = "Claude managed hook health failed: " + "; ".join(claude_hook_health["errors"])
+            files[".claude/settings.json:health"] = {"status": "failed", "action": action}
+            _collect_actions(files[".claude/settings.json:health"], actions_needed, actions_applied, actions_skipped)
+    if not failed:
         version_outcome = _stamp_project_version(resolved_root)
-        files[".sybermem/project.yaml"] = version_outcome
-        _collect_actions(version_outcome, actions_needed, actions_applied, actions_skipped)
+        if not yaml_created:
+            files[".sybermem/project.yaml"] = version_outcome
+            _collect_actions(version_outcome, actions_needed, actions_applied, actions_skipped)
 
-    overall = "fresh" if not actions_applied and not actions_skipped else "updated"
+    overall = "failed" if any(outcome["status"] == "failed" for outcome in files.values()) else (
+        "fresh" if not actions_applied and not actions_skipped else "updated")
     return {
         "root": str(resolved_root).replace("\\", "/"),
         "overall": overall,
@@ -166,6 +184,8 @@ def refresh_project(root: Path, template_roots: tuple[Path, ...] | None = None) 
         "actions_applied": actions_applied,
         "actions_skipped": actions_skipped,
         "preserved_custom": preserved_custom,
+        "claude_hooks": claude_hooks,
+        "claude_hook_health": claude_hook_health,
     }
 
 
@@ -176,8 +196,10 @@ def _load_templates(template_roots: tuple[Path, ...]) -> dict[str, str]:
             continue
         for path in sorted(item for item in root.rglob("*") if item.is_file()):
             rel_path = path.relative_to(root).as_posix()
+            if "__pycache__" in path.parts or path.suffix == ".pyc":
+                continue
             if rel_path not in templates:
-                templates[rel_path] = path.read_text(encoding="utf-8")
+                templates[rel_path] = path.read_text(encoding="utf-8-sig")
     return templates
 
 
@@ -208,15 +230,21 @@ def _refresh_managed_file(root: Path, rel_path: str, template_text: str) -> File
     return {"status": "custom_preserved", "action": f"preserve custom {rel_path}"}
 
 
-def _refresh_settings_file(root: Path, template_text: str) -> FileRefresh:
+def _refresh_settings_file(root: Path, template_text: str, *, version: tuple[int, ...] | None = None) -> FileRefresh:
     target = _guard_project_path(root, ".claude/settings.json")
     existed = target.exists()
-    changed = merge_settings_file(root, template_text)
-    if not changed:
-        return {"status": "fresh"}
+    result = migrate_settings_file(root, template_text, version=version)
+    if result == "error_unsafe_state":
+        return {"status": "failed", "claude_hooks": result,
+                "action": "Claude settings error_unsafe_state; repair Python/launcher path and managed hooks before continuing"}
+    if result == "disabled_requires_upgrade":
+        return {"status": "failed", "claude_hooks": result,
+                "action": "Claude hooks disabled_requires_upgrade; upgrade Claude Code to 2.1.139 or newer"}
+    if result == "fresh":
+        return {"status": "fresh", "claude_hooks": "enabled"}
     if existed:
-        return {"status": "updated", "action": "merge .claude/settings.json from template"}
-    return {"status": "created", "action": "create .claude/settings.json from template"}
+        return {"status": "updated", "claude_hooks": "enabled", "action": "merge .claude/settings.json from template"}
+    return {"status": "created", "claude_hooks": "enabled", "action": "create .claude/settings.json from template"}
 
 
 def _stamp_project_version(root: Path) -> FileRefresh:

@@ -55,6 +55,8 @@ def _seed_home(home: Path) -> Path:
 
 @pytest.mark.skipif(shutil.which("bash") is None, reason="bash is unavailable")
 def test_uninstall_sh_preserves_unknown_files_and_cleans_all_skill_roots(tmp_path: Path) -> None:
+    # Execute the actual distributed script, never a newline-rewritten test copy.
+    assert b"\r" not in (ROOT / "scripts" / "uninstall.sh").read_bytes()
     sentinel = _seed_home(tmp_path)
     result = subprocess.run(
         [shutil.which("bash") or "bash", str(ROOT / "scripts" / "uninstall.sh")],

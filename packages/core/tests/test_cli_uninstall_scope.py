@@ -50,7 +50,8 @@ def _seed_global_install(home: Path) -> None:
 
     plugin = home / ".config" / "opencode" / "plugins" / "sybermem.ts"
     plugin.parent.mkdir(parents=True)
-    plugin.write_text("managed\n", encoding="utf-8")
+    # Only an actual generated legacy bundle is managed without OpenCode state.
+    plugin.write_text("// SyberMem OpenCode Plugin (generated bundle)\nmanaged\n", encoding="utf-8")
 
     codex = home / ".codex" / "hooks"
     codex.mkdir(parents=True)
@@ -123,3 +124,15 @@ def test_global_scope_uninstall_cleans_tools_hooks_and_keeps_project_records(tmp
     hooks_json = (home / ".codex" / "hooks.json").read_text(encoding="utf-8")
     assert "sybermem_session_start.py" not in hooks_json
     assert "other.py" in hooks_json
+
+
+def test_global_scope_uninstall_preserves_unmanaged_legacy_plugin(tmp_path: Path) -> None:
+    home = tmp_path / "home"
+    _seed_global_install(home)
+    plugin = home / ".config" / "opencode" / "plugins" / "sybermem.ts"
+    plugin.write_text("// unrelated user plugin\n", encoding="utf-8")
+
+    result = _run_cli(["uninstall", "--scope", "global", "--yes", "--format", "json"], cwd=tmp_path, home=home)
+
+    assert result.returncode == 0, result.stderr
+    assert plugin.read_text(encoding="utf-8") == "// unrelated user plugin\n"

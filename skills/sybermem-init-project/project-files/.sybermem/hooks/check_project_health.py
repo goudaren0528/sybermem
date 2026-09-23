@@ -7,8 +7,10 @@ Used by init-project fast-path to skip unnecessary work.
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
+import sys
 from pathlib import Path
 from typing import Final, TypedDict
 
@@ -159,13 +161,77 @@ def _is_sybermem_only_instruction(stripped_text: str) -> bool:
     )
 
 
+HOOK_TARGETS = {
+    "UserPromptSubmit": {"user_prompt": "user_prompt.py"},
+    "SessionStart": {"session_start_context": "session_start_context.py"},
+    "Stop": {"record_change_on_stop": "record_change_on_stop.py", "recall_outcome_on_stop": "recall_outcome_on_stop.py"},
+}
+
+
+def _contract():
+    try:
+        from sybermem_core import claude_hook_contract
+        return claude_hook_contract
+    except ImportError:
+        return None
+
+
+def _managed(hook: object, event: str, contract: object | None) -> str | None:
+    """Recognize only SyberMem-owned entries, never classify arbitrary third-party hooks."""
+    if not isinstance(hook, dict) or not isinstance(hook.get("command"), str):
+        return None
+    if hook.get("type") == "exec":
+        args = hook.get("args")
+        if (not isinstance(args, list) or len(args) != 4 or
+                not all(isinstance(a, str) for a in args) or
+                args[2] != "--timeout-seconds"):
+            return None
+        # Match the migrator's ownership boundary: a same-named launcher in
+        # another directory may belong to somebody else and is never replaced.
+        managed_launcher = (contract.LAUNCHER_PATH if contract is not None else
+                            Path.home() / ".claude" / "sybermem" / "launch_hook.py")
+        launcher = Path(args[0])
+        return args[1] if (args[1] in HOOK_TARGETS[event] and
+                          launcher.name == "launch_hook.py" and
+                          launcher.parent.as_posix().replace("\\", "/").lower() ==
+                          managed_launcher.parent.as_posix().lower()) else None
+    if hook.get("type") not in ("command", "sybermem-template"):
+        return None
+    import shlex
+    try:
+        tokens = shlex.split(hook["command"])
+    except ValueError:
+        return None
+    if len(tokens) != 2 or not re.fullmatch(r"(?:python(?:3(?:\.\d+)?)?|py)(?:\.exe)?", Path(tokens[0]).name, re.I):
+        return None
+    script = tokens[1].replace("\\", "/")
+    for identity, filename in HOOK_TARGETS[event].items():
+        if script == f".sybermem/hooks/{filename}" or (
+            contract is not None and script == str(contract.LAUNCHER_PATH.parent / f"launch_{identity}.py").replace("\\", "/")
+        ):
+            return identity
+    return None
+
+
 def check_settings_json(root: Path) -> dict:
-    """Check .claude/settings.json status."""
+    """Read-only validation of all four managed hook entries and deployment prerequisites."""
     path = root / ".claude" / "settings.json"
     content = read_text(path)
+    errors: list[str] = []
+    contract = _contract()
+    if contract is None:
+        errors.append("SyberMem core hook contract unavailable; install/update SyberMem core, then run `sybermem project refresh`.")
+    else:
+        version = contract.probe_claude_version()
+        if not contract.supports_exec(version):
+            errors.append("Claude Code version unknown or too old for exec hooks; upgrade Claude Code, then run `sybermem project refresh`.")
+        launcher = contract.LAUNCHER_PATH
+        if not launcher.is_absolute() or not launcher.is_file():
+            errors.append("SyberMem launch_hook.py missing; reinstall/update SyberMem, then run `sybermem project refresh`.")
     if content is None:
         return {
             "status": "missing",
+            "errors": errors + ["Claude settings missing; run `sybermem project refresh`."],
             "has_session_start_hook": False,
             "has_stop_hook": False,
             "has_relative_session_start_hook": False,
@@ -176,27 +242,86 @@ def check_settings_json(root: Path) -> dict:
             "has_auto_mode": False,
         }
 
+    try:
+        settings = json.loads(content)
+        if not isinstance(settings, dict):
+            raise ValueError("settings must be an object")
+    except (ValueError, TypeError):
+        return {"status": "error", "errors": errors + ["Invalid Claude settings JSON; repair the file, then run `sybermem project refresh`."]}
+    hooks = settings.get("hooks", {})
+    hooks = hooks if isinstance(hooks, dict) else {}
+    present: set[str] = set()
+    warnings: list[str] = []
+    for event, targets in HOOK_TARGETS.items():
+        groups = hooks.get(event, [])
+        for group in groups if isinstance(groups, list) else []:
+            if not isinstance(group, dict) or not isinstance(group.get("hooks"), list):
+                continue
+            for hook in group["hooks"]:
+                identity = _managed(hook, event, contract)
+                if identity is None:
+                    if (isinstance(hook, dict) and hook.get("type") == "exec" and
+                            isinstance(hook.get("args"), list) and len(hook["args"]) == 4 and
+                            all(isinstance(arg, str) for arg in hook["args"]) and
+                            hook["args"][1] in targets and hook["args"][2] == "--timeout-seconds" and
+                            Path(hook["args"][0]).name == "launch_hook.py"):
+                        warnings.append(
+                            f"{event}/{hook['args'][1]}: same-named launcher outside the managed path; "
+                            "ownership cannot be confirmed. Inspect this hook manually and remove it only "
+                            "if you confirm it is unwanted; project refresh preserves it."
+                        )
+                    continue  # third-party hook: never inspect or modify it
+                present.add(identity)
+                if hook.get("type") != "exec":
+                    errors.append(f"{event}/{identity}: relative or legacy managed hook; run `sybermem project refresh`.")
+                    continue
+                command = Path(hook["command"])
+                args = hook["args"]
+                target = root / ".sybermem" / "hooks" / targets[identity]
+                if not command.is_absolute() or not command.is_file() or not os.access(command, os.X_OK):
+                    errors.append(f"{event}/{identity}: Python executable missing/not executable; install Python and run `sybermem project refresh`.")
+                if not Path(args[0]).is_absolute() or not Path(args[0]).is_file():
+                    errors.append(f"{event}/{identity}: launcher missing; reinstall SyberMem and run `sybermem project refresh`.")
+                elif contract is not None and Path(args[0]) != contract.LAUNCHER_PATH:
+                    errors.append(f"{event}/{identity}: launcher path not managed; run `sybermem project refresh`.")
+                if not target.is_file() or not os.access(target, os.R_OK):
+                    errors.append(f"{event}/{identity}: target hook missing/unreadable; run `sybermem project refresh`.")
+                if contract is not None:
+                    try:
+                        host = hook["timeout"]
+                        child = int(args[3])
+                        if not isinstance(host, int) or isinstance(host, bool) or child != contract.safe_child_timeout(host):
+                            raise ValueError("unsafe timeout")
+                    except (KeyError, ValueError, TypeError):
+                        errors.append(f"{event}/{identity}: unsafe timeout; run `sybermem project refresh`.")
+    for event, targets in HOOK_TARGETS.items():
+        for identity in targets:
+            if identity not in present:
+                errors.append(f"{event}/{identity}: managed hook missing; run `sybermem project refresh`.")
+
     # Operational target state: SessionStart/Stop call the machine-specific global
     # launcher (launch_*). The shipped template ships a portable *relative* seed
     # (.sybermem/hooks/session_start_context.py) that init/update must rewrite to the
     # launcher path — so a relative-only settings.json is a valid seed but NOT fresh,
     # because Python opens the relative hook path against the cwd before any root
     # resolution runs and can fail when Claude invokes the hook from a subdirectory.
-    has_session_start = "launch_session_start_context" in content
-    has_stop = "launch_record_change_on_stop" in content
+    has_session_start = "session_start_context" in present
+    has_stop = "record_change_on_stop" in present
     has_relative_session_start = ".sybermem/hooks/session_start_context.py" in content
     has_relative_stop = ".sybermem/hooks/record_change_on_stop.py" in content
     # Merged UserPromptSubmit hook (batch A): a single user_prompt.py entry is the
     # target state. The legacy detect_record_intent.py + task_recall.py pair is
     # still recognized so we can offer a non-destructive migration.
-    has_user_prompt_hook = "user_prompt.py" in content
+    has_user_prompt_hook = "user_prompt" in present
     has_record_intent_hook = "detect_record_intent.py" in content
     has_task_recall_hook = "task_recall.py" in content
-    has_auto_mode = "SYBERMEM_RECORD_MODE" in content
+    has_auto_mode = "SYBERMEM_RECORD_MODE" in settings.get("env", {}) if isinstance(settings.get("env"), dict) else False
 
-    all_present = has_session_start and has_stop and has_user_prompt_hook and has_auto_mode
+    all_present = not errors and has_auto_mode
     return {
-        "status": "fresh" if all_present else "stale",
+        "status": "error" if errors else ("fresh" if all_present else "stale"),
+        "errors": errors,
+        "warnings": warnings,
         "has_session_start_hook": has_session_start,
         "has_stop_hook": has_stop,
         "has_relative_session_start_hook": has_relative_session_start,
@@ -413,6 +538,8 @@ def generate_actions(files: dict) -> list[str]:
 
     # settings.json — surgical patch only
     sj = files.get(".claude/settings.json", {})
+    for error in sj.get("errors", []):
+        actions.append(error)
     if sj.get("status") == "missing":
         actions.append("create .claude/settings.json from template")
     else:
@@ -510,7 +637,7 @@ def generate_actions(files: dict) -> list[str]:
     return actions
 
 
-def main() -> int:
+def main(*, read_only: bool = False) -> int:
     root = resolve_sybermem_root()
     if root is None:
         print(json.dumps({"root": None, "overall": "not_initialized", "files": {}, "capabilities": {}, "actions_needed": []}))
@@ -520,7 +647,7 @@ def main() -> int:
     # This ensures the health check always knows about the latest managed-file requirements,
     # even when the project was initialized with an older version of SyberMem.
     me = Path(__file__).resolve()
-    for project_files in GLOBAL_TEMPLATE_PROJECT_FILES:
+    for project_files in (() if read_only else GLOBAL_TEMPLATE_PROJECT_FILES):
         skill_base = project_files / ".sybermem" / "hooks"
         template_health = skill_base / "check_project_health.py"
         if template_health.is_file():
@@ -596,4 +723,6 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    if len(sys.argv) > 2 or (len(sys.argv) == 2 and sys.argv[1] != "--read-only"):
+        raise SystemExit("usage: check_project_health.py [--read-only]")
+    raise SystemExit(main(read_only="--read-only" in sys.argv))

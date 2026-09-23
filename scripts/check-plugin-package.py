@@ -268,6 +268,8 @@ def distribution_script_text(root: Path, script: Path) -> str:
     text = (root / script).read_text(encoding="utf-8")
     if script.suffix == ".py":
         text += (root / "scripts" / "_install_common.py").read_text(encoding="utf-8")
+    if script.name in {"install.sh", "install.ps1", "update.sh", "update.ps1", "install-remote.sh", "install-remote.ps1", "install-remote.py", "update.py"}:
+        text += (root / "scripts" / "claude-runtime-deploy.py").read_text(encoding="utf-8")
     return text
 
 
@@ -607,6 +609,26 @@ def check_managed_removal_wiring(root: Path) -> None:
         if not (root / required).is_file():
             fail(f"Missing managed removal source: {required.as_posix()}")
     manifest = json.loads((root / "scripts/managed-install.json").read_text(encoding="utf-8"))
+    claude_runtime = {
+        "launch_hook.py", "launch_record_change_on_stop.py", "launch_session_start_context.py",
+        "launch_user_prompt.py", "launch_recall_outcome_on_stop.py",
+    }
+    missing_runtime = sorted(claude_runtime - set(manifest.get("runtime_files", [])))
+    if missing_runtime:
+        fail(f"scripts/managed-install.json missing Claude runtime: {', '.join(missing_runtime)}")
+    for source in ("global-hook-launcher.py", "claude-runtime-deploy.py"):
+        if not (root / "scripts" / source).is_file():
+            fail(f"Missing Claude hook runtime source: {source}")
+    for script in (Path("scripts/install.sh"), Path("scripts/update.sh"), Path("scripts/install-remote.sh"),
+                   Path("scripts/install.ps1"), Path("scripts/update.ps1"), Path("scripts/install-remote.ps1")):
+        text = distribution_script_text(root, script)
+        for marker in ("claude-runtime-deploy.py",):
+            if marker not in text:
+                fail(f"{script.as_posix()} missing Claude runtime marker: {marker}")
+    common = (root / "scripts/_install_common.py").read_text(encoding="utf-8")
+    for marker in ("claude-runtime-deploy.py",):
+        if marker not in common:
+            fail(f"scripts/_install_common.py missing Claude runtime marker: {marker}")
     active_names = set(skill_names(root / "packages" / "claude-skills"))
     missing_manifest = sorted(active_names - set(manifest.get("skills", [])))
     if missing_manifest:
@@ -637,7 +659,8 @@ def check_cli_wrapper_wiring(root: Path) -> None:
         required = [
             ".claude\\sybermem\\cli",
             "sybermem.cmd",
-            "python -m venv $CliVenv",
+            "& $ClaudePython -m venv $CliVenv",
+            "Scripts\\python.exe",
             "venv\\Scripts\\sybermem.exe",
             "Set-Content -Path $CliWrapper -Encoding ASCII",
         ]
@@ -650,6 +673,8 @@ def check_cli_wrapper_wiring(root: Path) -> None:
             '.claude/sybermem/cli',
             'CLI_WRAPPER="$CLI_DIR/sybermem"',
             'python -m venv "$CLI_VENV"',
+            'python() { "$CLAUDE_PYTHON" "$@"; }',
+            '"$CLI_VENV/bin/python" -m pip',
             'venv/bin/sybermem',
             'cat > "$CLI_WRAPPER"',
         ]

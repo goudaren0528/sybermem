@@ -102,13 +102,8 @@ def _install_codex_hooks(root: Path, home: Path) -> None:
 
 def _install_runtime(root: Path, home: Path) -> None:
     launcher_dir = home / ".claude" / "sybermem"
-    launcher_dir.mkdir(parents=True, exist_ok=True)
-    for name in ("managed-install.json", "safe-managed-remove.py", "opencode-install.py"):
-        shutil.copy2(root / "scripts" / name, launcher_dir / name)
-    shutil.copy2(root / "scripts" / "global-stop-hook-launcher.py", launcher_dir / "launch_record_change_on_stop.py")
-    session_launcher = root / "scripts" / "global-session-start-launcher.py"
-    if session_launcher.is_file():
-        shutil.copy2(session_launcher, launcher_dir / "launch_session_start_context.py")
+    subprocess.run([sys.executable, str(root / "scripts" / "claude-runtime-deploy.py"),
+                    "--root", str(root), "--home", str(home)], check=True)
 
     cli_dir = launcher_dir / "cli"
     cli_dir.mkdir(parents=True, exist_ok=True)
@@ -132,9 +127,6 @@ def _install_runtime(root: Path, home: Path) -> None:
         wrapper = cli_dir / "sybermem"
         wrapper.write_text('#!/bin/sh\nexec "$HOME/.claude/sybermem/cli/venv/bin/sybermem" "$@"\n', encoding="utf-8")
         wrapper.chmod(0o755)
-    version = root / "VERSION"
-    if version.is_file():
-        shutil.copy2(version, launcher_dir / "VERSION")
 
 
 def install_from_checkout(root: Path, opencode_major: str | None = None) -> None:
@@ -145,3 +137,5 @@ def install_from_checkout(root: Path, opencode_major: str | None = None) -> None
     _install_codex_hooks(root, home)
     _install_runtime(root, home)
     subprocess.run([sys.executable, str(root / "scripts" / "opencode-install.py"), "install", "--root", str(root), "--home", str(home), *(["--opencode-major", opencode_major] if opencode_major else [])], check=True)
+    print("  [Claude Code] Global hook runtime deployed; project settings NOT migrated. "
+          "Run `sybermem project refresh` inside each project. Host acceptance remains unverified.")

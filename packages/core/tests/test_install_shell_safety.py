@@ -16,6 +16,6 @@ def test_shell_installers_use_central_managed_remover_and_manifest() -> None:
         assert "safe-managed-remove.py" in text
         assert "managed-install.json" in text
         assert 'python "$REMOVER_SOURCE" child' in text
-        assert 'cp "$MANIFEST_SOURCE" "$MANIFEST_PATH"' in text
-        assert 'cp "$REMOVER_SOURCE" "$REMOVER_PATH"' in text
+        assert 'scripts/claude-runtime-deploy.py' in text
+        assert 'python "$REMOVER_SOURCE" child' in text
         assert 'rm -rf "$target/' not in text

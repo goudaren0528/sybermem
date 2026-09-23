@@ -8,10 +8,10 @@ import json
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 ROOT = Path(__file__).resolve().parents[3]
-ROOT_HOOK = ROOT / ".sybermem" / "hooks" / "task_recall.py"
-HEALTH_CHECK = ROOT / ".sybermem" / "hooks" / "check_project_health.py"
+CANONICAL_HOOKS = ROOT / "packages" / "claude-skills" / "sybermem-init-project" / "project-files" / ".sybermem" / "hooks"
+ROOT_HOOK = CANONICAL_HOOKS / "task_recall.py"
+HEALTH_CHECK = CANONICAL_HOOKS / "check_project_health.py"
 TEMPLATE_HOOKS = [
-    ROOT / "packages" / "claude-skills" / "sybermem-init-project" / "project-files" / ".sybermem" / "hooks" / "task_recall.py",
     ROOT / "skills" / "sybermem-init-project" / "project-files" / ".sybermem" / "hooks" / "task_recall.py",
 ]
 
@@ -90,7 +90,7 @@ def install_hook_project(tmp_path: Path) -> Path:
 
 
 def test_distributed_task_recall_templates_keep_identical_production_behavior() -> None:
-    # Given: the root hook source used for local project installs
+    # Given: the tracked canonical hook template used for project installs
     root_text = ROOT_HOOK.read_text(encoding="utf-8")
 
     # When/Then: every distributed template carries the same production behavior
@@ -106,7 +106,7 @@ def test_project_health_accepts_current_task_recall_contract() -> None:
     module = util.module_from_spec(spec)
     spec.loader.exec_module(module)
 
-    result = module.check_task_recall_hook(ROOT)
+    result = module.check_task_recall_hook(CANONICAL_HOOKS.parents[1])
 
     assert result == {"status": "fresh"}
 

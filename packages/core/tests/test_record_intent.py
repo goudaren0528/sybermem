@@ -17,7 +17,8 @@ from sybermem_core.user_habit_model import HabitType, InjectionPolicy
 from sybermem_core.user_habits import add_habit
 
 
-HOOKS_DIR = Path(__file__).resolve().parents[3] / ".sybermem" / "hooks"
+# Tracked project template, not the developer checkout's private .sybermem memory.
+HOOKS_DIR = Path(__file__).resolve().parents[3] / "packages" / "claude-skills" / "sybermem-init-project" / "project-files" / ".sybermem" / "hooks"
 
 
 def load_hook_module(name: str):
@@ -44,6 +45,28 @@ def write_hook_project(root: Path) -> None:
     (root / ".claude").mkdir()
     (root / ".claude" / "settings.json").write_text("{}\n", encoding="utf-8")
     (root / ".sybermem" / "hooks").mkdir()
+
+
+def run_installed_intent_hook(root: Path, home: Path, prompt: str) -> subprocess.CompletedProcess[bytes]:
+    """Install a tracked hook and a local core source into a disposable project.
+
+    The canonical loader only tries directories that exist in supported layouts;
+    importing the template directly does not simulate an installed project.
+    """
+    hook_dir = root / ".sybermem" / "hooks"
+    hook_dir.mkdir(exist_ok=True)
+    installed = hook_dir / "detect_record_intent.py"
+    shutil.copy2(HOOKS_DIR / installed.name, installed)
+    core = root / "packages" / "core" / "sybermem_core"
+    shutil.copytree(Path(__file__).resolve().parents[1] / "sybermem_core", core, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+    return subprocess.run(
+        [sys.executable, str(installed)],
+        cwd=root,
+        input=json.dumps({"prompt": prompt}).encode("utf-8"),
+        env=isolated_hook_env(home),
+        capture_output=True,
+        check=False,
+    )
 
 
 def isolated_hook_env(tmp_path: Path) -> dict[str, str]:
@@ -127,21 +150,17 @@ def test_duplicate_record_intent_routes_to_summary_without_new_record(tmp_path: 
     assert "duplicate" in result.get("reason", "")
 
 
-def test_detect_record_intent_hook_captures_only_safe_write_intent(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_detect_record_intent_hook_captures_only_safe_write_intent(tmp_path: Path) -> None:
     # Given: the user prompt hook is running inside a SyberMem project
     project_root = tmp_path / "project"
     project_root.mkdir()
-    write_project(project_root)
-    hook = load_hook_module("detect_record_intent")
-    monkeypatch.chdir(project_root)
-
+    write_hook_project(project_root)
     # When: a safe explicit record intent is submitted
-    monkeypatch.setattr(hook.sys, "stdin", _BytesStdin({"prompt": "记录一下这轮实现的 intent routing"}))
-    exit_code = hook.main()
+    result = run_installed_intent_hook(project_root, tmp_path, "记录一下这轮实现的 intent routing")
 
     # Then: only bounded safe metadata is captured for the stop hook
     intent = json.loads((project_root / ".sybermem" / ".record-intent.json").read_text(encoding="utf-8"))
-    assert exit_code == 0
+    assert result.returncode == 0, result.stderr
     assert intent["record_intent"] is True
     assert intent["classification"] == "change"
     assert intent["phrase"] == ""
@@ -152,21 +171,17 @@ def test_detect_record_intent_hook_captures_only_safe_write_intent(tmp_path: Pat
     assert "这轮实现" not in serialized
 
 
-def test_detect_record_intent_hook_omits_unique_prompt_substrings_and_secrets(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_detect_record_intent_hook_omits_unique_prompt_substrings_and_secrets(tmp_path: Path) -> None:
     # Given: a safe record prompt with a unique user payload and secret-like text elsewhere
     project_root = tmp_path / "project"
     project_root.mkdir()
     write_project(project_root)
-    hook = load_hook_module("detect_record_intent")
-    monkeypatch.chdir(project_root)
-
     # When: the classifier captures intent metadata
-    monkeypatch.setattr(hook.sys, "stdin", _BytesStdin({"prompt": "记录一下这轮完成的 unicorn-unique-8472 behavior without password=hunter2"}))
-    exit_code = hook.main()
+    result = run_installed_intent_hook(project_root, tmp_path, "记录一下这轮完成的 unicorn-unique-8472 behavior without password=hunter2")
 
     # Then: no raw prompt-derived substrings or secrets are persisted
     intent_path = project_root / ".sybermem" / ".record-intent.json"
-    assert exit_code == 0
+    assert result.returncode == 0, result.stderr
     if intent_path.exists():
         serialized = intent_path.read_text(encoding="utf-8")
         assert "unicorn-unique-8472" not in serialized
@@ -174,20 +189,16 @@ def test_detect_record_intent_hook_omits_unique_prompt_substrings_and_secrets(tm
         assert "password" not in serialized.lower()
 
 
-def test_detect_record_intent_hook_does_not_persist_no_write_or_blocked_payload(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_detect_record_intent_hook_does_not_persist_no_write_or_blocked_payload(tmp_path: Path) -> None:
     # Given: the prompt contains explicit no-record language and sensitive content
     project_root = tmp_path / "project"
     project_root.mkdir()
     write_project(project_root)
-    hook = load_hook_module("detect_record_intent")
-    monkeypatch.chdir(project_root)
-
     # When: the hook evaluates the unsafe prompt
-    monkeypatch.setattr(hook.sys, "stdin", _BytesStdin({"prompt": "Do not record this password=hunter2"}))
-    exit_code = hook.main()
+    result = run_installed_intent_hook(project_root, tmp_path, "Do not record this password=hunter2")
 
     # Then: it exits successfully without persisting raw payloads
-    assert exit_code == 0
+    assert result.returncode == 0, result.stderr
     assert not (project_root / ".sybermem" / ".record-intent.json").exists()
 
 

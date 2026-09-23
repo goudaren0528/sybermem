@@ -1,49 +1,49 @@
-{
-  "env": {
-    "SYBERMEM_RECORD_MODE": "remind"
-  },
-  "hooks": {
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python .sybermem/hooks/user_prompt.py",
-            "timeout": 10,
-            "statusMessage": "SyberMem checking record intent and gathering task context..."
-          }
-        ]
-      }
-    ],
-    "SessionStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python .sybermem/hooks/session_start_context.py",
-            "timeout": 15,
-            "statusMessage": "SyberMem loading project memory..."
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python .sybermem/hooks/record_change_on_stop.py",
-            "timeout": 60,
-            "statusMessage": "SyberMem checking whether to record a change..."
-          },
-          {
-            "type": "command",
-            "command": "python .sybermem/hooks/recall_outcome_on_stop.py",
-            "timeout": 10,
-            "statusMessage": "SyberMem measuring recall relevance..."
-          }
-        ]
-      }
-    ]
-  }
+﻿{
+    "env":  {
+                "SYBERMEM_RECORD_MODE":  "remind"
+            },
+    "hooks":  {
+                  "UserPromptSubmit":  [
+                                           {
+                                               "hooks":  [
+                                                             {
+                                                                 "type":  "sybermem-template",
+                                                                 "command":  "python .sybermem/hooks/user_prompt.py",
+                                                                 "timeout":  10,
+                                                                 "statusMessage":  "SyberMem checking record intent and gathering task context..."
+                                                             }
+                                                         ]
+                                           }
+                                       ],
+                  "SessionStart":  [
+                                       {
+                                           "hooks":  [
+                                                         {
+                                                             "type":  "sybermem-template",
+                                                             "command":  "python .sybermem/hooks/session_start_context.py",
+                                                             "timeout":  15,
+                                                             "statusMessage":  "SyberMem loading project memory..."
+                                                         }
+                                                     ]
+                                       }
+                                   ],
+                  "Stop":  [
+                               {
+                                   "hooks":  [
+                                                 {
+                                                     "type":  "sybermem-template",
+                                                     "command":  "python .sybermem/hooks/record_change_on_stop.py",
+                                                     "timeout":  60,
+                                                     "statusMessage":  "SyberMem checking whether to record a change..."
+                                                 },
+                                                 {
+                                                     "type":  "sybermem-template",
+                                                     "command":  "python .sybermem/hooks/recall_outcome_on_stop.py",
+                                                     "timeout":  10,
+                                                     "statusMessage":  "SyberMem measuring recall relevance..."
+                                                 }
+                                             ]
+                               }
+                           ]
+              }
 }

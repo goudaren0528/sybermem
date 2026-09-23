@@ -110,3 +110,26 @@ def test_cli_project_refresh_returns_clean_error_for_refresh_failure(tmp_path: P
     assert captured.out == ""
     assert captured.err == "managed path is a symlink: AGENTS.md\n"
     assert "Traceback" not in captured.err
+
+
+def test_cli_refresh_reports_disabled_and_unsafe_failure_in_both_formats(tmp_path: Path, monkeypatch, capsys) -> None:
+    root = tmp_path / "project"
+    root.mkdir()
+    monkeypatch.setattr(main_module, "resolve_project_root", lambda: root)
+    for status, guidance in (("disabled_requires_upgrade", "upgrade Claude Code"),
+                             ("error_unsafe_state", "repair Python/launcher path")):
+        action = f"Claude hooks {status}; {guidance}"
+        payload = {"root": str(root), "overall": "failed", "claude_hooks": status,
+                   "files": {".claude/settings.json": {"status": "failed", "action": action}},
+                   "actions_needed": [action], "actions_applied": [], "actions_skipped": [action],
+                   "preserved_custom": []}
+        monkeypatch.setattr(main_module, "refresh_project", lambda _: payload)
+        for format in ("json", "text"):
+            monkeypatch.setattr(sys, "argv", ["sybermem", "project", "refresh", "--format", format])
+            assert main_module.main() == 1
+            output = capsys.readouterr().out
+            if format == "json":
+                assert json.loads(output)["claude_hooks"] == status
+                assert guidance in json.loads(output)["actions_skipped"][0]
+            else:
+                assert status in output and guidance in output

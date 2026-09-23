@@ -9,6 +9,21 @@ $ZipUrl = "https://github.com/$Repo/archive/$Branch.zip"
 $ArchivePrefix = "sybermem-$Branch"
 $LauncherDir = Join-Path $env:USERPROFILE ".claude\sybermem"
 $LauncherPath = Join-Path $LauncherDir "launch_record_change_on_stop.py"
+$UnifiedLauncherPath = Join-Path $LauncherDir "launch_hook.py"
+$ClaudePython = $null
+foreach ($candidate in @("python", "python3")) {
+    $found = Get-Command $candidate -ErrorAction SilentlyContinue
+    if (-not $found) { continue }
+    try {
+        $reported = & $candidate -c 'import os,sys; p=os.path.realpath(sys.executable); assert os.path.isabs(p) and os.path.isfile(p) and p.lower().endswith(chr(46)+chr(101)+chr(120)+chr(101)); print(p)' 2>$null
+        if ($LASTEXITCODE -ne 0) { continue }
+        $exe = [string]($reported | Select-Object -Last 1)
+        if (-not [System.IO.Path]::IsPathRooted($exe) -or -not $exe.EndsWith(".exe", [System.StringComparison]::OrdinalIgnoreCase) -or -not (Test-Path -LiteralPath $exe -PathType Leaf)) { continue }
+        & $exe -c 'import sys; sys.exit(0)' 2>$null | Out-Null
+        if ($LASTEXITCODE -eq 0) { $ClaudePython = $exe; break }
+    } catch { continue }
+}
+if (-not $ClaudePython) { throw "No working real Python executable (python/python3); Claude runtime not verified" }
 $SessionLauncherPath = Join-Path $LauncherDir "launch_session_start_context.py"
 $ManifestPath = Join-Path $LauncherDir "managed-install.json"
 $RemoverPath = Join-Path $LauncherDir "safe-managed-remove.py"
@@ -47,6 +62,7 @@ try {
     $ArchiveRoot = Join-Path $TmpDir $ArchivePrefix
     $SkillsSrc = Join-Path $TmpDir "$ArchivePrefix\packages\claude-skills"
     $LauncherSource = Join-Path $TmpDir "$ArchivePrefix\scripts\global-stop-hook-launcher.py"
+    $UnifiedLauncherSource = Join-Path $TmpDir "$ArchivePrefix\scripts\global-hook-launcher.py"
     $SessionLauncherSource = Join-Path $TmpDir "$ArchivePrefix\scripts\global-session-start-launcher.py"
     $PluginSource = Join-Path $TmpDir "$ArchivePrefix\packages\opencode-plugin\sybermem.ts"
     $CoreSource = Join-Path $TmpDir "$ArchivePrefix\packages\core"
@@ -66,7 +82,7 @@ $RemoverSource = Join-Path $TmpDir "$ArchivePrefix\scripts\safe-managed-remove.p
 
     function Remove-ManagedDirectory {
         param([string]$Root, [string]$Target)
-        & python $RemoverSource child --root $Root --name (Split-Path -Leaf $Target)
+        & $ClaudePython $RemoverSource child --root $Root --name (Split-Path -Leaf $Target)
         if ($LASTEXITCODE -ne 0) { throw "Managed removal failed: $Target" }
     }
 
@@ -195,29 +211,14 @@ $RemoverSource = Join-Path $TmpDir "$ArchivePrefix\scripts\safe-managed-remove.p
     Install-CodexUserPromptHook
 
     # Global launchers: only needed by the Claude Code lifecycle hooks.
-    if (Test-Path (Join-Path $env:USERPROFILE ".claude")) {
-        if (-not (Test-Path $LauncherDir)) {
-            New-Item -ItemType Directory -Path $LauncherDir -Force | Out-Null
-        }
-        Copy-Item -Path $ManifestSource -Destination $ManifestPath -Force
-        Copy-Item -Path $RemoverSource -Destination $RemoverPath -Force
-    Copy-Item -Path (Join-Path $ArchiveRoot "scripts\opencode-install.py") -Destination (Join-Path $LauncherDir "opencode-install.py") -Force
-        Copy-Item -Path $LauncherSource -Destination $LauncherPath -Force
-        Write-Host "  [Claude Code] installed stop hook launcher: $LauncherPath"
-        if (Test-Path $SessionLauncherSource) {
-            Copy-Item -Path $SessionLauncherSource -Destination $SessionLauncherPath -Force
-            Write-Host "  [Claude Code] installed session start launcher: $SessionLauncherPath"
-        }
-    }
+        & $ClaudePython (Join-Path $ArchiveRoot "scripts\claude-runtime-deploy.py") --root $ArchiveRoot --home $env:USERPROFILE
+    if ($LASTEXITCODE -ne 0) { throw "Claude runtime deployment refused" }
 
-    # sybermem CLI/runtime: install unconditionally. OpenCode skills (search/record/
-    # using-sybermem) call the `sybermem` CLI, so gating this on ~/.claude would leave
-    # OpenCode-only machines with skills that invoke a runtime that was never installed.
-    if (-not (Test-Path $CliDir)) {
+if (-not (Test-Path $CliDir)) {
         New-Item -ItemType Directory -Path $CliDir -Force | Out-Null
     }
     $pipExe = Join-Path $CliVenv "Scripts\pip.exe"
-    python -m venv $CliVenv
+    & $ClaudePython -m venv $CliVenv
     & (Join-Path $CliVenv "Scripts\python.exe") -m pip install --upgrade pip
     & $pipExe install --upgrade --force-reinstall $CoreSource $CliSource
     # Do NOT export SYBERMEM_HOME: it used to split the user-habit store away from the
@@ -229,20 +230,9 @@ $RemoverSource = Join-Path $TmpDir "$ArchivePrefix\scripts\safe-managed-remove.p
 '@ | Set-Content -Path $CliWrapper -Encoding ASCII
     Write-Host "  [Global] installed sybermem CLI: $CliWrapper"
 
-    # Installed-version marker: session-start checks this against each project's
-    # .sybermem/project.yaml sybermem_version to nudge /sybermem-update when behind.
-    $VersionSource = Join-Path $TmpDir "$ArchivePrefix\VERSION"
-    if (Test-Path $VersionSource) {
-        New-Item -ItemType Directory -Force -Path $LauncherDir | Out-Null
-        Copy-Item -Path $VersionSource -Destination (Join-Path $LauncherDir "VERSION") -Force
-        Write-Host "  [Global] recorded installed version marker: $(Join-Path $LauncherDir 'VERSION')"
-    }
-
-
     # Shared transactional OpenCode deployment.
-    & python (Join-Path $ArchiveRoot "scripts\opencode-install.py") install --root $ArchiveRoot --home $env:USERPROFILE
+    & $ClaudePython (Join-Path $ArchiveRoot "scripts\opencode-install.py") install --root $ArchiveRoot --home $env:USERPROFILE
     if ($LASTEXITCODE -ne 0) { throw "OpenCode deployment failed" }
-
 } finally {
     Remove-Item -Path $TmpDir -Recurse -Force -ErrorAction SilentlyContinue
 }
@@ -283,4 +273,4 @@ Write-Host "Next: open your project and run /sybermem-update"
 Write-Host "If you only want the local project refresh check, run /sybermem-init-project"
 Write-Host ""
 Write-Host "Note: updating global skills does not automatically refresh project managed files; run /sybermem-update in the project (it removes legacy AGENTS.md / CLAUDE.md protocol blocks)"
-Write-Host "Stop hook subdirectory compatibility is now provided by the global launcher at ~/.claude/sybermem/launch_record_change_on_stop.py"
+Write-Host "Global Claude hook runtime deployed; project settings NOT migrated. Run sybermem project refresh inside each project. Host behavior is unverified."

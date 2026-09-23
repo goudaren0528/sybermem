@@ -36,7 +36,7 @@ def _project(tmp_path: Path) -> Path:
 
 
 def _launcher(home: Path, records: dict[str, list[str]]) -> None:
-    launcher = home / ".claude" / "sybermem" / "cli" / "sybermem.cmd"
+    launcher = home / ".claude" / "sybermem" / "cli" / ("sybermem.cmd" if os.name == "nt" else "sybermem")
     launcher.parent.mkdir(parents=True)
     script = home / "record_files.py"
     script.write_text(
@@ -46,7 +46,11 @@ def _launcher(home: Path, records: dict[str, list[str]]) -> None:
         "    print(json.dumps({'records': records}))\n",
         encoding="utf-8",
     )
-    launcher.write_text(f'@echo off\r\n"{sys.executable}" "{script}" %*\r\n', encoding="utf-8")
+    if os.name == "nt":
+        launcher.write_text(f'@echo off\r\n"{sys.executable}" "{script}" %*\r\n', encoding="utf-8")
+    else:
+        launcher.write_text(f'#!/bin/sh\nexec "{sys.executable}" "{script}" "$@"\n', encoding="utf-8")
+        launcher.chmod(0o755)
 
 
 def _run(project: Path, home: Path, session_id: str = "claude-session") -> subprocess.CompletedProcess[str]:

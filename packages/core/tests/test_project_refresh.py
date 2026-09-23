@@ -11,6 +11,16 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from sybermem_core.project_refresh import refresh_project
+from sybermem_core import claude_hook_contract
+
+
+@pytest.fixture(autouse=True)
+def isolated_claude_runtime(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    launcher = tmp_path / ".claude" / "sybermem" / "launch_hook.py"
+    launcher.parent.mkdir(parents=True, exist_ok=True)
+    launcher.touch()
+    monkeypatch.setattr(claude_hook_contract, "LAUNCHER_PATH", launcher)
+    monkeypatch.setattr(claude_hook_contract, "probe_claude_version", lambda: (2, 1, 280))
 
 
 def git(project_root: Path, *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
@@ -43,9 +53,9 @@ def seed_templates(template_root: Path) -> None:
             {
                 "env": {"SYBERMEM_RECORD_MODE": "remind"},
                 "hooks": {
-                    "UserPromptSubmit": [{"hooks": [{"type": "command", "command": "python .sybermem/hooks/user_prompt.py", "timeout": 10}]}],
-                    "SessionStart": [{"hooks": [{"type": "command", "command": "python .sybermem/hooks/session_start_context.py", "timeout": 15}]}],
-                    "Stop": [{"hooks": [{"type": "command", "command": "python .sybermem/hooks/record_change_on_stop.py", "timeout": 60}]}],
+                    "UserPromptSubmit": [{"hooks": [{"type": "command", "command": "python .sybermem/hooks/user_prompt.py", "timeout": 30}]}],
+                    "SessionStart": [{"hooks": [{"type": "command", "command": "python .sybermem/hooks/session_start_context.py", "timeout": 30}]}],
+                    "Stop": [{"hooks": [{"type": "command", "command": "python .sybermem/hooks/record_change_on_stop.py", "timeout": 60}, {"type": "command", "command": "python .sybermem/hooks/recall_outcome_on_stop.py", "timeout": 30}]}],
                 },
             },
             indent=2,
@@ -53,9 +63,57 @@ def seed_templates(template_root: Path) -> None:
         + "\n",
     )
     write_template(template_root, ".sybermem/hooks/user_prompt.py", "# current user prompt hook\n")
+    for name in ("session_start_context.py", "record_change_on_stop.py", "recall_outcome_on_stop.py"):
+        write_template(template_root, f".sybermem/hooks/{name}", "# harmless managed fixture\n")
     write_template(template_root, ".sybermem/templates/change-template.md", "record_id:\nkey_conclusion:\ntopics:\n")
     write_template(template_root, ".sybermem/templates/digest-template.md", "coverage_hash:\n")
     write_template(template_root, ".sybermem/analysis/phase-index.md", "# Phase Index\n")
+
+
+def test_refresh_final_health_gates_stamp_and_ignores_third_party(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    template = tmp_path / "templates"
+    root = tmp_path / "project"
+    seed_templates(template)
+    first = refresh_project(root, template_roots=(template,))
+    assert first["claude_hook_health"]["status"] == "fresh"
+    settings_path = root / ".claude" / "settings.json"
+    settings = json.loads(settings_path.read_text(encoding="utf-8"))
+    marker = tmp_path / "thirdparty-ran"
+    settings["hooks"]["Stop"].append({"hooks": [{"type": "command", "command": f"python {marker}"}]})
+    settings_path.write_text(json.dumps(settings), encoding="utf-8")
+    assert refresh_project(root, template_roots=(template,))["claude_hook_health"]["status"] == "fresh"
+    assert not marker.exists()
+    stamp = root / ".sybermem" / "project.yaml"
+    stamp.write_text(stamp.read_text(encoding="utf-8").replace("sybermem_version:", "old_version:"), encoding="utf-8")
+    from sybermem_core import project_refresh as refresh_module
+    original = refresh_module._refresh_managed_file
+    monkeypatch.setattr(refresh_module, "_refresh_managed_file", lambda r, p, t: ({"status": "fresh"} if p.endswith("recall_outcome_on_stop.py") else original(r, p, t)))
+    (root / ".sybermem" / "hooks" / "recall_outcome_on_stop.py").unlink()
+    report = refresh_project(root, template_roots=(template,))
+    assert report["overall"] == "failed"
+    assert report["claude_hook_health"]["status"] == "error"
+    assert "sybermem_version:" not in stamp.read_text(encoding="utf-8")
+    assert not marker.exists()
+
+
+def test_refresh_health_rejects_missing_launcher_after_migration(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    template = tmp_path / "templates"
+    root = tmp_path / "project"
+    seed_templates(template)
+    from sybermem_core import project_refresh as refresh_module
+    original = refresh_module._refresh_settings_file
+
+    def remove_launcher_after_migration(project: Path, text: str, **kwargs: object) -> dict:
+        outcome = original(project, text, **kwargs)
+        claude_hook_contract.LAUNCHER_PATH.unlink()
+        return outcome
+
+    monkeypatch.setattr(refresh_module, "_refresh_settings_file", remove_launcher_after_migration)
+    report = refresh_project(root, template_roots=(template,))
+    assert report["overall"] == "failed"
+    assert report["claude_hook_health"]["status"] == "error"
+    assert any("launcher" in error for error in report["claude_hook_health"]["errors"])
+    assert "sybermem_version:" not in (root / ".sybermem" / "project.yaml").read_text(encoding="utf-8")
 
 
 def test_refresh_project_is_idempotent_when_project_is_fresh(tmp_path: Path) -> None:
@@ -200,12 +258,14 @@ def test_refresh_project_creates_missing_claude_settings_from_template(tmp_path:
     # Then: settings.json is created from the operational template with global launchers
     settings_path = project_root / ".claude" / "settings.json"
     settings = json.loads(settings_path.read_text(encoding="utf-8"))
-    session_command = settings["hooks"]["SessionStart"][0]["hooks"][0]["command"]
-    stop_command = settings["hooks"]["Stop"][0]["hooks"][0]["command"]
-    assert session_command.endswith('/.claude/sybermem/launch_session_start_context.py"')
-    assert stop_command.endswith('/.claude/sybermem/launch_record_change_on_stop.py"')
-    assert session_command.startswith('python "')
-    assert stop_command.startswith('python "')
+    hooks = [hook for event in ("UserPromptSubmit", "SessionStart", "Stop")
+             for group in settings["hooks"][event] for hook in group["hooks"]]
+    assert [hook["args"][1] for hook in hooks] == [
+        "user_prompt", "session_start_context", "record_change_on_stop", "recall_outcome_on_stop"
+    ]
+    assert all(hook["type"] == "exec" and Path(hook["command"]).is_absolute()
+               and Path(hook["args"][0]) == claude_hook_contract.LAUNCHER_PATH for hook in hooks)
+    assert all(hook["args"][2:] == ["--timeout-seconds", "20"] for hook in hooks)
     assert report["files"][".claude/settings.json"]["status"] == "created"
     assert "create .claude/settings.json from template" in report["actions_applied"]
 
@@ -231,11 +291,12 @@ def test_refresh_project_surgically_merges_custom_claude_settings(tmp_path: Path
                     ],
                     "SessionStart": [
                         {"hooks": [{"type": "command", "command": "python custom_session.py"}]},
-                        {"hooks": [{"type": "command", "command": "python .sybermem/hooks/session_start_context.py", "timeout": 1}]},
+                        {"hooks": [{"type": "command", "command": "python .sybermem/hooks/session_start_context.py", "timeout": 30}]},
                     ],
                     "Stop": [
                         {"hooks": [{"type": "command", "command": "python custom_stop.py"}]},
-                        {"hooks": [{"type": "command", "command": "python .sybermem/hooks/record_change_on_stop.py", "timeout": 1}]},
+                        {"hooks": [{"type": "command", "command": "python .sybermem/hooks/record_change_on_stop.py", "timeout": 60}]},
+                        {"hooks": [{"type": "command", "command": "python .sybermem/hooks/recall_outcome_on_stop.py", "timeout": 30}]},
                     ],
                 },
             },
@@ -252,22 +313,22 @@ def test_refresh_project_surgically_merges_custom_claude_settings(tmp_path: Path
     settings = json.loads(settings_path.read_text(encoding="utf-8"))
     assert settings["permissions"] == {"allow": ["Bash(pytest:*)"]}
     assert settings["env"]["CUSTOM_ENV"] == "keep"
-    assert settings["env"]["SYBERMEM_RECORD_MODE"] == "remind"
+    assert settings["env"]["SYBERMEM_RECORD_MODE"] == "auto"
     assert settings["hooks"]["PreToolUse"] == [{"hooks": [{"type": "command", "command": "python custom_pre.py"}]}]
 
     user_prompt_commands = [hook["command"] for group in settings["hooks"]["UserPromptSubmit"] for hook in group["hooks"]]
     session_commands = [hook["command"] for group in settings["hooks"]["SessionStart"] for hook in group["hooks"]]
     stop_commands = [hook["command"] for group in settings["hooks"]["Stop"] for hook in group["hooks"]]
     assert "python custom_prompt.py" in user_prompt_commands
-    assert "python .sybermem/hooks/user_prompt.py" in user_prompt_commands
+    assert len(user_prompt_commands) == 2
     assert "python .sybermem/hooks/detect_record_intent.py" not in user_prompt_commands
     assert "python .sybermem/hooks/task_recall.py" not in user_prompt_commands
     assert session_commands[0] == "python custom_session.py"
-    assert session_commands[1].startswith('python "')
-    assert session_commands[1].endswith('/.claude/sybermem/launch_session_start_context.py"')
+    assert session_commands[1] == str(claude_hook_contract.executable_python())
     assert stop_commands[0] == "python custom_stop.py"
-    assert stop_commands[1].startswith('python "')
-    assert stop_commands[1].endswith('/.claude/sybermem/launch_record_change_on_stop.py"')
+    assert stop_commands[1:] == [str(claude_hook_contract.executable_python())] * 2
+    assert [hook["args"][1] for group in settings["hooks"]["Stop"] for hook in group["hooks"]
+            if hook["type"] == "exec"] == ["record_change_on_stop", "recall_outcome_on_stop"]
     assert report["files"][".claude/settings.json"]["status"] == "updated"
     assert "merge .claude/settings.json from template" in report["actions_applied"]
 
@@ -297,6 +358,29 @@ def test_refresh_project_json_payload_contains_required_summary_keys(tmp_path: P
     assert isinstance(report["actions_applied"], list)
     assert isinstance(report["actions_skipped"], list)
     assert isinstance(report["preserved_custom"], list)
+
+
+def test_failed_claude_migration_never_stamps_new_or_existing_project(tmp_path: Path, monkeypatch) -> None:
+    template_root = tmp_path / "templates"
+    seed_templates(template_root)
+    monkeypatch.setattr(claude_hook_contract, "probe_claude_version", lambda: (2, 1, 138))
+    for existing in (False, True):
+        project = tmp_path / ("existing" if existing else "new")
+        if existing:
+            yaml = project / ".sybermem" / "project.yaml"
+            yaml.parent.mkdir(parents=True)
+            yaml.write_text("project_id: fixed\nslug: existing\nsybermem_version: 0.1.0\n")
+        report = refresh_project(project, template_roots=(template_root,))
+        assert report["overall"] == "failed"
+        assert report["claude_hooks"] == "disabled_requires_upgrade"
+        text = (project / ".sybermem" / "project.yaml").read_text()
+        assert ("sybermem_version: 0.1.0" in text) if existing else ("sybermem_version:" not in text)
+        monkeypatch.setattr(claude_hook_contract, "probe_claude_version", lambda: (2, 1, 280))
+        repaired = refresh_project(project, template_roots=(template_root,))
+        assert repaired["overall"] != "failed"
+        assert "sybermem_version:" in (project / ".sybermem" / "project.yaml").read_text()
+        assert refresh_project(project, template_roots=(template_root,))["overall"] == "fresh"
+        monkeypatch.setattr(claude_hook_contract, "probe_claude_version", lambda: (2, 1, 138))
 
 
 def test_refresh_project_rejects_managed_symlink_targets(tmp_path: Path) -> None:

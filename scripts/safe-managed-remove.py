@@ -151,6 +151,15 @@ def uninstall(home: Path, manifest_path: Path) -> None:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     if manifest.get("schema_version") != 1:
         raise RuntimeError("unsupported managed-install manifest version")
+    allowed_runtime = {
+        "launch_hook.py", "launch_record_change_on_stop.py", "launch_session_start_context.py",
+        "launch_user_prompt.py", "launch_recall_outcome_on_stop.py", "VERSION",
+        "managed-install.json", "safe-managed-remove.py", "opencode-install.py",
+    }
+    if not isinstance(manifest.get("runtime_files"), list) or any(
+        not isinstance(name, str) or name not in allowed_runtime for name in manifest["runtime_files"]
+    ):
+        raise RuntimeError("managed manifest contains an invalid runtime file")
     skill_names = [*manifest["skills"], *manifest.get("retired_skills", [])]
     for root in (home / ".claude" / "skills", home / ".config" / "opencode" / "skills", home / ".agents" / "skills"):
         for name in skill_names:

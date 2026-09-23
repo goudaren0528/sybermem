@@ -15,6 +15,6 @@ def test_powershell_installers_use_central_managed_remover_and_manifest() -> Non
         text = (ROOT / relative_path).read_text(encoding="utf-8")
         assert "safe-managed-remove.py" in text
         assert "managed-install.json" in text
-        assert "& python $RemoverSource child" in text
-        assert "Copy-Item -Path $ManifestSource" in text
-        assert "Copy-Item -Path $RemoverSource" in text
+        assert "& $ClaudePython $RemoverSource child" in text
+        assert 'scripts\\claude-runtime-deploy.py' in text
+        assert "if ($LASTEXITCODE -ne 0)" in text

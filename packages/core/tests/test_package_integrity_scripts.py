@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import runpy
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 
@@ -66,8 +67,10 @@ def test_python_install_runtime_reuses_existing_venv(monkeypatch, tmp_path) -> N
     root = tmp_path / "checkout"
     scripts = root / "scripts"
     scripts.mkdir(parents=True)
-    for name in ("managed-install.json", "safe-managed-remove.py", "opencode-install.py", "global-stop-hook-launcher.py", "global-session-start-launcher.py"):
-        (scripts / name).write_text(name, encoding="utf-8")
+    # Fake subprocess below covers only venv/pip. Deploy the tracked, inert
+    # runtime sources first so the mocked deployment call has a real outcome.
+    for name in ("managed-install.json", "safe-managed-remove.py", "opencode-install.py", "global-hook-launcher.py", "claude-runtime-deploy.py"):
+        shutil.copy2(ROOT / "scripts" / name, scripts / name)
     (root / "VERSION").write_text("test", encoding="utf-8")
     (root / "packages" / "core").mkdir(parents=True)
     (root / "packages" / "cli").mkdir(parents=True)
@@ -77,6 +80,7 @@ def test_python_install_runtime_reuses_existing_venv(monkeypatch, tmp_path) -> N
     venv_scripts.mkdir(parents=True)
     (venv_scripts / "python").write_text("python", encoding="utf-8")
     (venv_scripts / "pip").write_text("pip", encoding="utf-8")
+    runpy.run_path(str(scripts / "claude-runtime-deploy.py"))["deploy"](root, home)
 
     def fake_run(command: list[str], *, check: bool) -> subprocess.CompletedProcess[str]:
         commands.append(command)
@@ -89,8 +93,10 @@ def test_python_install_runtime_reuses_existing_venv(monkeypatch, tmp_path) -> N
     install_runtime(root, home)
 
     # Then: it does not recreate the venv and still runs pip refresh commands.
-    assert (home / ".claude" / "sybermem" / "opencode-install.py").read_text(encoding="utf-8") == "opencode-install.py"
-    assert [sys.executable, "-m", "venv", str(home / ".claude" / "sybermem" / "cli" / "venv")] not in commands
+    assert (home / ".claude" / "sybermem" / "opencode-install.py").read_bytes() == (scripts / "opencode-install.py").read_bytes()
+    assert not any(command[1:3] == ["-m", "venv"] for command in commands)
+    assert commands[0][:2] == [sys.executable, str(scripts / "claude-runtime-deploy.py")]
+    assert [command[0] for command in commands[1:]] == [str(venv_scripts / "python"), str(venv_scripts / "pip")]
     assert any(command[1:5] == ["-m", "pip", "install", "--upgrade"] for command in commands)
     assert any("--force-reinstall" in command for command in commands)
 
@@ -491,7 +497,8 @@ def test_distribution_scripts_install_fixed_sybermem_cli_wrappers() -> None:
         text = script.read_text(encoding="utf-8")
         assert ".claude\\sybermem\\cli" in text
         assert "sybermem.cmd" in text
-        assert "python -m venv $CliVenv" in text
+        assert "& $ClaudePython -m venv $CliVenv" in text
+        assert "Scripts\\python.exe" in text
         assert "venv\\Scripts\\sybermem.exe" in text
         assert "Set-Content -Path $CliWrapper -Encoding ASCII" in text
         assert "sys.stdout.write(" not in text
@@ -503,6 +510,8 @@ def test_distribution_scripts_install_fixed_sybermem_cli_wrappers() -> None:
         assert ".claude/sybermem/cli" in text
         assert 'CLI_WRAPPER="$CLI_DIR/sybermem"' in text
         assert 'python -m venv "$CLI_VENV"' in text
+        assert 'python() { "$CLAUDE_PYTHON" "$@"; }' in text
+        assert '"$CLI_VENV/bin/python" -m pip' in text
         assert "venv/bin/sybermem" in text
         assert 'cat > "$CLI_WRAPPER"' in text
         assert "sys.stdout.write(" not in text

@@ -23,6 +23,8 @@ CODEX_POST_COMPACT_HOOK_PATH="$CODEX_HOOK_DIR/sybermem_post_compact.py"
 CODEX_OBSERVABILITY_PATH="$CODEX_HOOK_DIR/_codex_observability.py"
 CODEX_HOOKS_JSON="$HOME/.codex/hooks.json"
 LAUNCHER_DIR="$HOME/.claude/sybermem"
+UNIFIED_LAUNCHER_SOURCE="$ADR_PATH/scripts/global-hook-launcher.py"
+UNIFIED_LAUNCHER_PATH="$LAUNCHER_DIR/launch_hook.py"
 LAUNCHER_PATH="$LAUNCHER_DIR/launch_record_change_on_stop.py"
 LAUNCHER_SOURCE="$ADR_PATH/scripts/global-stop-hook-launcher.py"
 SESSION_LAUNCHER_SOURCE="$ADR_PATH/scripts/global-session-start-launcher.py"
@@ -37,6 +39,21 @@ CLI_WRAPPER="$CLI_DIR/sybermem"
 PLUGIN_SOURCE="$ADR_PATH/packages/opencode-plugin/sybermem.ts"
 OPENCODE_PLUGIN_DIR="$HOME/.config/opencode/plugins"
 LEGACY_LOCAL_SKILLS="$ADR_PATH/.claude/skills"
+
+# Probe without importing SyberMem or executing a hook. Reject PATH shims which
+# report success as a file but fail when invoked (including python.cmd exit 2).
+CLAUDE_PYTHON=""
+for candidate in python python3; do
+    command -v "$candidate" >/dev/null 2>&1 || continue
+    executable="$("$candidate" -c 'import os,sys; p=os.path.realpath(sys.executable); assert os.path.isabs(p) and os.path.isfile(p) and os.access(p,os.X_OK) and (os.name != "nt" or p.lower().endswith(".exe")); print(p)' 2>/dev/null)" || continue
+    [ -n "$executable" ] || continue
+    if command -v cygpath >/dev/null 2>&1; then executable="$(cygpath -u "$executable")" || continue; fi
+    [ -f "$executable" ] && [ -x "$executable" ] && "$executable" -c 'import sys; sys.exit(0)' >/dev/null 2>&1 || continue
+    CLAUDE_PYTHON="$executable"
+    break
+done
+[ -n "$CLAUDE_PYTHON" ] || { echo "Error: no working real Python executable (python/python3); Claude runtime not verified" >&2; exit 1; }
+python() { "$CLAUDE_PYTHON" "$@"; }
 
 echo "=== SyberMem 安装 ==="
 
@@ -170,18 +187,7 @@ PY
 install_codex_user_prompt_hook
 
 # Global launchers: only needed by the Claude Code lifecycle hooks.
-if [ -d "$HOME/.claude" ]; then
-mkdir -p "$LAUNCHER_DIR"
-cp "$MANIFEST_SOURCE" "$MANIFEST_PATH"
-cp "$REMOVER_SOURCE" "$REMOVER_PATH"
-cp "$ADR_PATH/scripts/opencode-install.py" "$LAUNCHER_DIR/opencode-install.py"
-    cp "$LAUNCHER_SOURCE" "$LAUNCHER_PATH"
-    chmod +x "$LAUNCHER_PATH"
-    echo "  [Claude Code] 已安装 stop hook launcher: $LAUNCHER_PATH"
-    cp "$SESSION_LAUNCHER_SOURCE" "$SESSION_LAUNCHER_PATH"
-    chmod +x "$SESSION_LAUNCHER_PATH"
-    echo "  [Claude Code] 已安装 session start launcher: $SESSION_LAUNCHER_PATH"
-fi
+    python "$ADR_PATH/scripts/claude-runtime-deploy.py" --root "$ADR_PATH" --home "$HOME" || exit 1
 
 # sybermem CLI/runtime: install unconditionally. OpenCode skills (search/record/
 # using-sybermem) call the `sybermem` CLI, so gating this on ~/.claude would leave
@@ -200,13 +206,7 @@ EOF
 chmod +x "$CLI_WRAPPER"
 echo "  [Global] 已安装 sybermem CLI: $CLI_WRAPPER"
 
-# Installed-version marker: session-start checks this against each project's
-# .sybermem/project.yaml sybermem_version to nudge /sybermem-update when behind.
-if [ -f "$ADR_PATH/VERSION" ]; then
-    mkdir -p "$LAUNCHER_DIR"
-    cp "$ADR_PATH/VERSION" "$LAUNCHER_DIR/VERSION"
-    echo "  [Global] 已记录已安装版本标记: $LAUNCHER_DIR/VERSION"
-fi
+
 
 # Make `sybermem` resolvable without editing the user's shell rc: symlink the
 # wrapper into ~/.local/bin (a conventional per-user bin dir that is on PATH on
@@ -256,7 +256,7 @@ echo "下一步：进入你的项目目录后执行 /sybermem-update"
 echo "如果你只想初始化或刷新当前项目，可执行 /sybermem-init-project"
 echo ""
 echo "注意：更新全局 Skills 不会自动刷新项目里的受管文件；请在项目内运行 /sybermem-update 或 /sybermem-init-project（会移除旧版遗留的 AGENTS.md / CLAUDE.md 协议块）"
-echo "注意：stop hook 的子目录兼容现在由全局 launcher 提供：~/.claude/sybermem/launch_record_change_on_stop.py"
+echo "注意：全局 Claude hook runtime 已部署；当前项目 settings 未迁移。请在项目内执行 sybermem project refresh；宿主行为未验收。"
 
 if [ -d "$LEGACY_LOCAL_SKILLS/sybermem-init-project" ] || [ -d "$LEGACY_LOCAL_SKILLS/sybermem-record" ] || [ -d "$LEGACY_LOCAL_SKILLS/sybermem-summary" ] || [ -d "$LEGACY_LOCAL_SKILLS/sybermem-update" ]; then
     echo ""
