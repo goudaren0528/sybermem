@@ -66,7 +66,7 @@ def test_python_install_runtime_reuses_existing_venv(monkeypatch, tmp_path) -> N
     root = tmp_path / "checkout"
     scripts = root / "scripts"
     scripts.mkdir(parents=True)
-    for name in ("managed-install.json", "safe-managed-remove.py", "global-stop-hook-launcher.py", "global-session-start-launcher.py"):
+    for name in ("managed-install.json", "safe-managed-remove.py", "opencode-install.py", "global-stop-hook-launcher.py", "global-session-start-launcher.py"):
         (scripts / name).write_text(name, encoding="utf-8")
     (root / "VERSION").write_text("test", encoding="utf-8")
     (root / "packages" / "core").mkdir(parents=True)
@@ -89,6 +89,7 @@ def test_python_install_runtime_reuses_existing_venv(monkeypatch, tmp_path) -> N
     install_runtime(root, home)
 
     # Then: it does not recreate the venv and still runs pip refresh commands.
+    assert (home / ".claude" / "sybermem" / "opencode-install.py").read_text(encoding="utf-8") == "opencode-install.py"
     assert [sys.executable, "-m", "venv", str(home / ".claude" / "sybermem" / "cli" / "venv")] not in commands
     assert any(command[1:5] == ["-m", "pip", "install", "--upgrade"] for command in commands)
     assert any("--force-reinstall" in command for command in commands)
@@ -435,8 +436,10 @@ def test_package_integrity_guards_memory_observability_upgrade_contract() -> Non
         # When / Then: the update skill distinguishes global runtime/plugin refresh
         # from project-local refresh and explicitly names the new runtime log.
         assert ".memory-usage.jsonl" in text
-        assert "prompt-memory-injected" in text
-        assert "global opencode plugin" in lowered
+        assert "run a real matching prompt and confirm recall/usage" in text
+        assert "File/hash checks alone cannot prove model injection" in text
+        assert "Migration must not dual-load both" in text
+        assert "opencode plugin selected by the host major" in lowered
         assert "global cli/core" in lowered
         assert "do not create, refresh, or migrate any project-local managed files" in lowered
         assert "runtime log" in lowered
@@ -616,6 +619,10 @@ def test_package_integrity_exposes_opencode_source_bundle_and_privacy_guards() -
     # When / Then: package integrity checks track the source split and prompt-free metadata guards
     assert checker["OPENCODE_PLUGIN_SOURCE_MODULES"] == [
         Path("packages/opencode-plugin/src/index.ts"),
+        Path("packages/opencode-plugin/src/v1.ts"),
+        Path("packages/opencode-plugin/src/v2.ts"),
+        Path("packages/opencode-plugin/src/tui.ts"),
+        Path("packages/opencode-plugin/src/v2_feedback.ts"),
         Path("packages/opencode-plugin/src/plugin.ts"),
         Path("packages/opencode-plugin/src/injection_toast.ts"),
         Path("packages/opencode-plugin/src/runtime.ts"),

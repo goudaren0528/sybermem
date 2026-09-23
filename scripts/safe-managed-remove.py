@@ -135,7 +135,16 @@ def _remove_fixed_plugin(home: Path, manifest: dict[str, object]) -> None:
     expected = ".config/opencode/plugins/sybermem.ts"
     if manifest.get("opencode_plugin") != expected:
         raise RuntimeError("managed manifest contains an invalid OpenCode plugin path")
-    remove_child(home / ".config" / "opencode" / "plugins", "sybermem.ts")
+    import subprocess
+    import sys
+    installer = Path(__file__).with_name("opencode-install.py")
+    if installer.is_file():
+        subprocess.run([sys.executable, str(installer), "uninstall", "--home", str(home)], check=True)
+    else:
+        legacy = home / ".config" / "opencode" / "plugins" / "sybermem.ts"
+        _assert_no_linked_ancestor(legacy)
+        if legacy.is_file() and "SyberMem OpenCode Plugin (generated bundle)" in legacy.read_text(encoding="utf-8", errors="replace")[:400]:
+            remove_child(legacy.parent, legacy.name)
 
 
 def uninstall(home: Path, manifest_path: Path) -> None:
@@ -150,7 +159,7 @@ def uninstall(home: Path, manifest_path: Path) -> None:
     for name in manifest["runtime_dirs"]:
         remove_child(runtime, name)
     # Remove the helper and manifest last so this process can finish from installed files.
-    runtime_files = [name for name in manifest["runtime_files"] if name not in {"managed-install.json", "safe-managed-remove.py"}]
+    runtime_files = [name for name in manifest["runtime_files"] if name not in {"managed-install.json", "safe-managed-remove.py", "opencode-install.py"}]
     for name in runtime_files:
         remove_child(runtime, name)
     _remove_fixed_plugin(home, manifest)
@@ -158,7 +167,7 @@ def uninstall(home: Path, manifest_path: Path) -> None:
     for name in manifest["codex_hook_files"]:
         remove_child(codex_hooks, name)
     _remove_codex_handlers(home / ".codex" / "hooks.json", set(manifest["codex_hook_files"]))
-    for name in ("managed-install.json", "safe-managed-remove.py"):
+    for name in ("managed-install.json", "safe-managed-remove.py", "opencode-install.py"):
         remove_child(runtime, name)
     try:
         runtime.rmdir()

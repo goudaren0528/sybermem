@@ -50,6 +50,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -63,6 +64,8 @@ jobs:
           git diff --exit-code -- skills/
       - name: Plugin package integrity check
         run: python scripts/check-plugin-package.py
+      - name: Isolated OpenCode V1/V2 install regression
+        run: python -m unittest scripts/test_opencode_install.py -v
 
   install-smoke:
     name: install smoke (${{ matrix.os }})

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import sys
+import argparse
 
 from _install_common import install_from_checkout
 
@@ -10,7 +11,10 @@ def main() -> int:
     """Refresh the global install from the current SyberMem checkout."""
     root = Path(__file__).resolve().parent.parent
     print("=== SyberMem Python Update ===")
-    install_from_checkout(root)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--opencode-major", choices=("1", "2"))
+    args = parser.parse_args()
+    install_from_checkout(root, args.opencode_major)
     print("Available Skills:")
     for name in ("sybermem-init-project", "sybermem-record", "sybermem-summary", "sybermem-resume", "sybermem-digest", "sybermem-phase-analyze", "using-sybermem", "sybermem-update", "sybermem-search", "sybermem-theme-digest", "sybermem-habit", "sybermem-uninstall"):
         print(f"  /{name}")

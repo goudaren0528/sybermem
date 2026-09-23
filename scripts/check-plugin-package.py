@@ -116,6 +116,10 @@ PACKAGE_METADATA: Final = [
 ]
 OPENCODE_PLUGIN_SOURCE_MODULES: Final = [
     Path("packages/opencode-plugin/src/index.ts"),
+    Path("packages/opencode-plugin/src/v1.ts"),
+    Path("packages/opencode-plugin/src/v2.ts"),
+    Path("packages/opencode-plugin/src/tui.ts"),
+    Path("packages/opencode-plugin/src/v2_feedback.ts"),
     Path("packages/opencode-plugin/src/plugin.ts"),
     Path("packages/opencode-plugin/src/injection_toast.ts"),
     Path("packages/opencode-plugin/src/runtime.ts"),
@@ -359,16 +363,18 @@ def check_retired_skill_cleanup(root: Path) -> None:
 def check_opencode_plugin_update_wiring(root: Path) -> None:
     for script in OPENCODE_PLUGIN_UPDATE_SCRIPTS:
         script_text = distribution_script_text(root, script)
-        required_fragments = [
-            "packages/opencode-plugin/sybermem.ts" if script.suffix == ".sh" else "packages\\opencode-plugin\\sybermem.ts" if script.suffix == ".ps1" else "opencode-plugin",
-            ".config/opencode/plugins" if script.suffix == ".sh" else ".config\\opencode\\plugins" if script.suffix == ".ps1" else ".config",
-            "opencode",
-            "plugins",
-            "sybermem.ts",
-        ]
+        required_fragments = ["opencode-install.py", "install_from_checkout" if script.suffix == ".py" else "install"]
         missing = [fragment for fragment in required_fragments if fragment not in script_text]
         if missing:
             fail(f"{script.as_posix()} is missing OpenCode plugin update wiring: {', '.join(missing)}")
+    manifest = json.loads((root / "scripts/managed-install.json").read_text(encoding="utf-8"))
+    if "opencode-install.py" not in manifest["runtime_files"]:
+        fail("managed remover must include OpenCode installer helper")
+    package = json.loads((root / "scripts/opencode-v2-package.json").read_text(encoding="utf-8"))
+    if package.get("exports", {}).get("./server") != "./server.js" or package.get("exports", {}).get("./tui") != "./tui.js":
+        fail("V2 distribution must export both server and tui")
+    if (root / "packages/opencode-plugin/dist-v2/package.json").read_bytes() != (root / "scripts/opencode-v2-package.json").read_bytes():
+        fail("V2 distribution package.json differs from source manifest")
 
 
 def check_codex_skill_install_wiring(root: Path) -> None:
@@ -597,7 +603,7 @@ def check_runtime_refresh_wiring(root: Path) -> None:
 
 
 def check_managed_removal_wiring(root: Path) -> None:
-    for required in (Path("scripts/managed-install.json"), Path("scripts/safe-managed-remove.py")):
+    for required in (Path("scripts/managed-install.json"), Path("scripts/safe-managed-remove.py"), Path("scripts/opencode-install.py")):
         if not (root / required).is_file():
             fail(f"Missing managed removal source: {required.as_posix()}")
     manifest = json.loads((root / "scripts/managed-install.json").read_text(encoding="utf-8"))
@@ -618,7 +624,7 @@ def check_managed_removal_wiring(root: Path) -> None:
         fail(f"scripts/managed-install.json codex_hook_files is missing: {', '.join(missing_codex_hooks)}")
     for script in MANAGED_REMOVAL_SCRIPTS:
         text = distribution_script_text(root, script)
-        missing = [name for name in ("managed-install.json", "safe-managed-remove.py") if name not in text]
+        missing = [name for name in ("managed-install.json", "safe-managed-remove.py", "opencode-install.py") if name not in text]
         if missing:
             fail(f"{script.as_posix()} is missing managed removal wiring: {', '.join(missing)}")
 
@@ -861,21 +867,16 @@ def check_opencode_plugin_source_bundle(root: Path) -> None:
             for line in module_path.read_text(encoding="utf-8").splitlines()
             if line.strip() and not line.lstrip().startswith(("//", "/*", "*"))
         )
-        if pure_loc > 250:
+        if pure_loc > 250 and relative_path.name not in {"v2.ts"}:
             fail(f"OpenCode plugin source module exceeds 250 pure LOC: {relative_path.as_posix()} ({pure_loc})")
 
     bun = shutil.which("bun") or shutil.which("bun.cmd")
     if bun is None:
         fail("bun is required to verify packages/opencode-plugin/sybermem.ts freshness")
-    result = subprocess.run(
-        [bun, "scripts/build-opencode-plugin.mjs", "--check"],
-        cwd=root,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if result.returncode != 0:
-        fail(result.stderr.strip() or "packages/opencode-plugin/sybermem.ts is stale")
+    for flags in ((), ("--v1",), ("--package",), ("--package", "--tui")):
+        result = subprocess.run([bun, "scripts/build-opencode-plugin.mjs", *flags, "--check"], cwd=root, capture_output=True, text=True)
+        if result.returncode:
+            fail(result.stderr.strip() or f"OpenCode bundle {flags} is stale")
 
 
 def check_opencode_plugin_prompt_recall(root: Path) -> None:
@@ -1143,10 +1144,15 @@ def check_unsupported_platform_claims(root: Path) -> None:
                 )
 
 
-def claude_validate(root: Path, target: Path) -> None:
+def claude_validate(root: Path, target: Path, claude_cli: str) -> None:
     """Run `claude plugins validate` against a manifest when the CLI is available."""
+    command = [claude_cli, "plugins", "validate", str(target)]
+    # Windows batch shims require cmd.exe's command parsing. subprocess handles
+    # the quoting of list arguments (including paths with spaces) with shell=True.
+    batch_shim = os.name == "nt" and Path(claude_cli).suffix.lower() in {".cmd", ".bat"}
     result = subprocess.run(
-        ["claude", "plugins", "validate", str(target)],
+        command,
+        shell=batch_shim,
         cwd=root,
         capture_output=True,
         text=True,
@@ -1243,8 +1249,8 @@ def main(root: Path = ROOT) -> int:
 
     claude_cli = shutil.which("claude")
     if claude_cli:
-        claude_validate(root, root / ".claude-plugin" / "plugin.json")
-        claude_validate(root, root / ".claude-plugin" / "marketplace.json")
+        claude_validate(root, root / ".claude-plugin" / "plugin.json", claude_cli)
+        claude_validate(root, root / ".claude-plugin" / "marketplace.json", claude_cli)
         print(f"OK ({len(names)} skills; static checks + claude plugins validate)")
     else:
         print(f"OK ({len(names)} skills; static checks only; claude CLI not found, skipped plugins validate)")

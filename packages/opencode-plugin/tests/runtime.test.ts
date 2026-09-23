@@ -42,11 +42,13 @@ describe("runtime", () => {
 
   it("does not resolve an empty .sybermem directory", () => {
     root = makeTempProject("empty")
-    expect(resolveRoot(root)).toBe(null)
+    // An ambient managed home may contain tmpdir; invalid child markers must
+    // fall through to that ancestor rather than becoming a project themselves.
+    expect(resolveRoot(root)).toBe(resolveRoot(tmpdir()))
   })
 
   it("does not resolve INDEX.md without a current marker", () => {
     root = makeTempProject("index")
-    expect(resolveRoot(root)).toBe(null)
+    expect(resolveRoot(root)).toBe(resolveRoot(tmpdir()))
   })
 })

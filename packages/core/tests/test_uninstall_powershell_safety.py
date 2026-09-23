@@ -44,7 +44,7 @@ def _seed_home(home: Path) -> Path:
     )
     plugin = home / ".config" / "opencode" / "plugins" / "sybermem.ts"
     plugin.parent.mkdir(parents=True)
-    plugin.write_text("managed\n", encoding="utf-8")
+    plugin.write_text("// SyberMem OpenCode Plugin (generated bundle)\nmanaged\n", encoding="utf-8")
     sentinel = runtime / "user-notes.txt"
     sentinel.write_text("preserve me\n", encoding="utf-8")
     return sentinel

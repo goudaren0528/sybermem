@@ -12,11 +12,12 @@
   "runtime_dirs": ["cli"],
   "runtime_files": [
     "launch_record_change_on_stop.py", "launch_session_start_context.py", "VERSION",
-    "managed-install.json", "safe-managed-remove.py"
+    "managed-install.json", "safe-managed-remove.py", "opencode-install.py"
   ],
   "codex_hook_files": [
     "sybermem_user_prompt.py", "sybermem_session_start.py", "sybermem_session_end.py",
     "sybermem_stop.py", "sybermem_post_compact.py", "_codex_observability.py"
   ],
-  "opencode_plugin": ".config/opencode/plugins/sybermem.ts"
+  "opencode_plugin": ".config/opencode/plugins/sybermem.ts",
+  "opencode_installer": "opencode-install.py"
 }

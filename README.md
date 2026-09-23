@@ -172,7 +172,7 @@ SyberMem 有两类执行路径，可靠性不同：
 
 各平台验证方式不同：
 
-- **OpenCode**：重跑安装器（或 checkout 内 `python scripts/update.py`）刷新 `~/.config/opencode/plugins/sybermem.ts`，然后在会话里发一个命中记忆的 prompt，看是否弹出 `⭐`/`🧠`/`💡` toast。
+- **OpenCode**：重跑安装器（或 checkout 内 `python scripts/update.py`），分三阶段验收：① 检查安装器输出及已部署文件的 SHA-256 与源码构建产物一致；② 重启/重载宿主并检查 plugin loader；③ 用真实 prompt 验证召回和可见反馈。仅有文件不能证明 toast 或模型实际使用。V1 使用独立 `sybermem-v1.ts` 单文件入口；V2 是含 `package.json`、`server.js`、`tui.js` 的完整目录包，迁移不得同时加载旧入口。详见 [OpenCode 安装说明](.opencode/INSTALL.md)。
 - **Claude Code**：`claude --plugin-dir .` 直接从 checkout 加载插件、hooks 与 skills。
 - **Codex**：重跑安装器，确认 `~/.agents/skills` 下的 skills 与 `~/.codex/hooks/*.py`（及 `~/.codex/hooks.json` 合并项）已就位。
 
@@ -184,7 +184,7 @@ SyberMem 有两类执行路径，可靠性不同：
 
 安装器会把已安装版本写入 `~/.claude/sybermem/VERSION`；`sybermem project refresh` 会在项目 `.sybermem/project.yaml` 写入 `sybermem_version`。当某个项目落后于已安装版本时，会话启动会给出一条节流、fail-open 的 `⭐ 运行 /sybermem-update` 提醒（OpenCode `session.created` toast；Claude/Codex `SessionStart` 上下文）。随时可用 `sybermem doctor` 查看已安装版本与当前项目版本。
 
-全局刷新只更新用户级 runtime、Claude/OpenCode/Codex skills、OpenCode plugin 和 Codex 用户级 hooks；项目内的 `.sybermem/`、hooks、模板和说明文件需要 `/sybermem-update` 才会刷新。`/sybermem-update` 会优先调用 `sybermem project refresh --format json` 做可脚本化的项目内刷新，只有 CLI 缺失、执行失败或输出非 JSON 时才回退到 agent 编排的 `/sybermem-init-project`。Codex 的健康检查会把 `~/.agents/skills/sybermem-init-project/project-files` 作为模板来源之一，因此 Codex 安装路径也能参与项目 freshness 检查。老用户要拿到 OpenCode/Codex 新的 habit reminder、record-intent metadata、recall debug logging、actual-injection observability、`.memory-usage.jsonl`、Codex `SessionEnd` outcome 或 OpenCode `prompt-memory-injected` summary toast 链路，先重跑全局安装/更新以刷新 CLI/Core、`~/.config/opencode/plugins/sybermem.ts` 与 `~/.codex/hooks/*.py`，再进项目跑 `/sybermem-update`；`project refresh` 不会脚手架创建 `.memory-usage.jsonl` 这类 runtime log。若修复的是 CLI launcher、OpenCode plugin、Codex hook 或 skill 指令链路，也按这个顺序生效。
+全局刷新只更新用户级 runtime、Claude/OpenCode/Codex skills、按宿主版本选定的 OpenCode plugin 和 Codex 用户级 hooks；项目内的 `.sybermem/`、hooks、模板和说明文件需要 `/sybermem-update` 才会刷新。`/sybermem-update` 会优先调用 `sybermem project refresh --format json` 做可脚本化的项目内刷新，只有 CLI 缺失、执行失败或输出非 JSON 时才回退到 agent 编排的 `/sybermem-init-project`。Codex 的健康检查会把 `~/.agents/skills/sybermem-init-project/project-files` 作为模板来源之一，因此 Codex 安装路径也能参与项目 freshness 检查。老用户要拿到 OpenCode/Codex 新的 habit reminder、record-intent metadata、recall debug logging、`.memory-usage.jsonl`、Codex `SessionEnd` outcome 或 OpenCode 反馈链路，先重跑全局安装/更新以刷新 CLI/Core、OpenCode plugin 与 `~/.codex/hooks/*.py`，再进项目跑 `/sybermem-update`；`project refresh` 不会脚手架创建 `.memory-usage.jsonl` 这类 runtime log。V2 尚未恢复 V1 的远程版本后台刷新；不能把本地版本提醒当成远程刷新。若修复的是 CLI launcher、OpenCode plugin、Codex hook 或 skill 指令链路，也按这个顺序生效。
 
 ## 初始化项目
 

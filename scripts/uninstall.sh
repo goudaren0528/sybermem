@@ -7,6 +7,8 @@ MANIFEST="$CLAUDE_SYBERMEM/managed-install.json"
 REMOVER="$CLAUDE_SYBERMEM/safe-managed-remove.py"
 [ -f "$MANIFEST" ] || MANIFEST="$SCRIPT_DIR/managed-install.json"
 [ -f "$REMOVER" ] || REMOVER="$SCRIPT_DIR/safe-managed-remove.py"
+# Older installed removers do not know about the V2 package; use checkout helper.
+python "$SCRIPT_DIR/opencode-install.py" uninstall --home "$HOME"
 python "$REMOVER" uninstall --home "$HOME" --manifest "$MANIFEST"
 
 # Remove the ~/.local/bin/sybermem symlink if it points at our (now removed) wrapper.

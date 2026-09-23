@@ -6,6 +6,8 @@ $manifest = Join-Path $claudeSybermem "managed-install.json"
 $remover = Join-Path $claudeSybermem "safe-managed-remove.py"
 if (-not (Test-Path -LiteralPath $manifest)) { $manifest = Join-Path $scriptDir "managed-install.json" }
 if (-not (Test-Path -LiteralPath $remover)) { $remover = Join-Path $scriptDir "safe-managed-remove.py" }
+& python (Join-Path $scriptDir "opencode-install.py") uninstall --home $env:USERPROFILE
+if ($LASTEXITCODE -ne 0) { throw "OpenCode managed uninstall failed" }
 & python $remover uninstall --home $env:USERPROFILE --manifest $manifest
 if ($LASTEXITCODE -ne 0) { throw "SyberMem managed uninstall failed" }
 

@@ -1,0 +1,10 @@
+{
+  "name": "sybermem-opencode-v2",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./server.js",
+    "./server": "./server.js",
+    "./tui": "./tui.js"
+  }
+}

@@ -29,7 +29,14 @@ def _seed_home(home: Path) -> Path:
     shutil.copy2(ROOT / "scripts" / "safe-managed-remove.py", runtime / "safe-managed-remove.py")
     local_link = home / ".local" / "bin" / "sybermem"
     local_link.parent.mkdir(parents=True)
-    local_link.symlink_to(runtime / "cli" / "sybermem")
+    try:
+        local_link.symlink_to(runtime / "cli" / "sybermem")
+    except NotImplementedError:
+        pytest.skip("filesystem does not support creating symlinks")
+    except OSError as exc:
+        if os.name == "nt" and getattr(exc, "winerror", None) == 1314:
+            pytest.skip("Windows account lacks symlink creation privilege (WinError 1314)")
+        raise
     codex = home / ".codex" / "hooks"
     codex.mkdir(parents=True)
     for name in CODEX_HOOKS:
@@ -40,7 +47,7 @@ def _seed_home(home: Path) -> Path:
     )
     plugin = home / ".config" / "opencode" / "plugins" / "sybermem.ts"
     plugin.parent.mkdir(parents=True)
-    plugin.write_text("managed\n", encoding="utf-8")
+    plugin.write_text("// SyberMem OpenCode Plugin (generated bundle)\nmanaged\n", encoding="utf-8")
     sentinel = runtime / "user-notes.txt"
     sentinel.write_text("preserve me\n", encoding="utf-8")
     return sentinel

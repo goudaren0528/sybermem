@@ -2,6 +2,8 @@ import type { MemoryUsageEntry } from "./memory_usage"
 import type { InjectionSummary } from "./prompt_context"
 
 export interface ToastClient {
+  // Server-only V2 diagnostics have no on-screen replacement/gap semantics.
+  readonly diagnostic?: (message: string) => void
   readonly tui: {
     readonly showToast: (input: {
       readonly body: {
@@ -62,6 +64,7 @@ async function drainToastQueue(): Promise<void> {
 // Enqueue a toast for serial delivery. Fire-and-forget: never blocks the caller,
 // and drain errors are swallowed so toasts stay optional UX.
 export function enqueueToast(client: ToastClient, message: string): void {
+  if (client.diagnostic) { client.diagnostic(message); return }
   TOAST_QUEUE.push({ client, message })
   void drainToastQueue().catch(() => {})
 }

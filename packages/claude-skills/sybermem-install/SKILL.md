@@ -11,7 +11,7 @@ First-time installer entrypoint for a **fresh machine**. This skill assumes the 
 SyberMem asset present is this skill itself — no CLI, no plugin, no hooks, no other
 SyberMem skills. It is a **thin orchestration layer**: it runs the official remote
 install script (which lands the full system, including every other SyberMem skill),
-then verifies each host is ready and initializes the current project.
+then verifies each host's staged readiness and initializes the current project.
 
 ## Quick guide (for humans)
 
@@ -33,14 +33,16 @@ instead; to set up only the current project after install, use `/sybermem-init-p
 **What you get:** an honest per-host readiness report (ready / host not present, skipped
 / error), the installed version, and — inside a project — a project initialized through
 the CLI. If anything fails, it tells you exactly what failed and gives the one-line
-fallback command; it never claims a partial install succeeded.
+fallback command; it never claims a partial install succeeded. OpenCode install/hash,
+loader and functionality are separate verdicts; V2 background remote-version refresh
+has not been restored.
 
 ## Core Invariant
 
 - **This skill installs the complete SyberMem system by running the official remote install script, then it does not report success until it has verified each host's readiness and (inside a project) completed project initialization through the CLI-first path. It never fabricates success: a download, environment, CLI, or init failure is reported as a partial/failed install with the exact failing stage and a fallback command.**
 
 <HARD-GATE>
-Do NOT claim installation succeeded without running the readiness verification for all three hosts and the shared CLI.
+Do NOT claim installation succeeded without checking the shared CLI and reporting each host separately; distinguish OpenCode install/hash, loader and functionality.
 Do NOT rely on `/sybermem-init-project` (a skill) for in-session project init: skills just landed on disk are typically NOT hot-loaded in the current session. Use the CLI-first path (`sybermem project refresh --format json`); only offer `/sybermem-init-project` as a NEXT-session fallback.
 Do NOT report success when the download, venv/pip, or CLI readiness step failed. Report which stage failed and stop honestly.
 Do NOT run any destructive action. This skill only installs; it never deletes user data or project `.sybermem/` records.
@@ -123,9 +125,9 @@ The installer banner then prints generic next-step guidance mentioning
 of this skill** — it targets terminal users; continue with the CLI-first Step 6 instead
 (those slash skills are not hot-loaded in the current session anyway).
 
-### Step 5: Verify all three hosts + the shared CLI are ready
+### Step 5: Verify all three hosts + the shared CLI in stages
 
-Verify each host explicitly and report an honest per-host verdict: **ready** / **error**.
+Verify each host explicitly and report an honest per-host verdict. For OpenCode, separate **installed/hash-checked**, **loader-verified** and **function-verified**; never call the latter two ready from files alone.
 Note: the installer itself *creates* the user-level integration directories for all
 three hosts (skills dirs, and — when the corresponding app root exists — the plugin /
 hooks / launchers). So after install, base-dir existence is expected and is **not**
@@ -135,12 +137,13 @@ actually landed: all present → **ready**; some app-conditional components miss
 the Claude launchers or OpenCode plugin were skipped because that app's root did not
 exist) → report that host's integration as **partial** and name what is missing; a
 required file that should have landed but did not → **error** with a remedy (re-run the
-install command).
+ install command). An unknown OpenCode host major without an explicit override is a
+ reported plugin **skip**, not a successful OpenCode plugin install.
 
 | Host | Ready when (verify each path on disk) |
 |---|---|
 | Claude Code | `~/.claude/skills/sybermem-*` present; `~/.claude/sybermem/launch_record_change_on_stop.py`, `launch_session_start_context.py`, `managed-install.json`, `safe-managed-remove.py`, `VERSION` present |
-| OpenCode | `~/.config/opencode/skills/sybermem-*` present; `~/.config/opencode/plugins/sybermem.ts` present |
+| OpenCode | Check `~/.config/opencode/skills/sybermem-*`, the installer-specific OpenCode result and deployed SHA-256 vs built distribution. Detected V1: standalone `~/.config/opencode/plugins/sybermem.ts` sourced from separate `sybermem-v1.ts`. Detected V2: complete `~/.config/opencode/sybermem-v2/` (`package.json`, `server.js`, `tui.js`) and one directory config entry, no V1 dual-load. Unknown host major without `--opencode-major 1|2` / `SYBERMEM_OPENCODE_MAJOR` means OpenCode plugin **skipped**, not ready. Reload and check the loader separately; test real recall and (V2) TUI toast separately. File presence/hash cannot establish either. |
 | Codex | `~/.agents/skills/sybermem-*` present; all five hook files present — `sybermem_user_prompt.py`, `sybermem_session_start.py`, `sybermem_session_end.py`, `sybermem_stop.py`, `sybermem_post_compact.py` — plus `_codex_observability.py`; `~/.codex/hooks.json` contains the managed handlers |
 
 **Shared CLI (required — gates project init and every CLI-backed skill):** resolve the
@@ -203,7 +206,7 @@ run `/sybermem-init-project` (or re-invoke and let Step 6 run) there.
 Report, concisely:
 
 - Installed version (from `~/.claude/sybermem/VERSION`).
-- Per-host readiness: Claude Code / OpenCode / Codex each as ready / skipped / error.
+- Per-host readiness: Claude Code / OpenCode / Codex each as ready / skipped / error; OpenCode reports installed/hash, loader and functionality independently (unverified where not tested).
 - CLI readiness.
 - Project init result (CLI-refreshed / deferred to next session / skipped — not in a project).
 - Next steps: `/sybermem-record` after meaningful work, `/sybermem-resume` to restore
@@ -236,6 +239,7 @@ project's `.sybermem/` records.
 If you catch yourself doing any of these, STOP:
 
 - Reporting installation success without verifying all three hosts and the shared CLI
+- Reporting OpenCode toast/model readiness from file presence alone, or loading V1 and V2 together
 - Trying to trigger `/sybermem-init-project` in the current session for project init instead of using the CLI-first path
 - Reporting success when the download, venv/pip, or CLI readiness step failed
 - Wrapping a specific failure (download / python / pip / CLI) as a generic "install failed" without naming the stage

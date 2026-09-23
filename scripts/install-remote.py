@@ -6,6 +6,7 @@ import sys
 import tempfile
 import urllib.request
 import zipfile
+import argparse
 
 
 REPO_ZIP = "https://github.com/goudaren0528/sybermem/archive/main.zip"
@@ -13,6 +14,9 @@ REPO_ZIP = "https://github.com/goudaren0528/sybermem/archive/main.zip"
 
 def main() -> int:
     """Download and install SyberMem without spawning PowerShell."""
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--opencode-major", choices=("1", "2"))
+    args = parser.parse_args()
     print("=== SyberMem Remote Python Install ===")
     with urllib.request.urlopen(REPO_ZIP) as response:
         archive = response.read()
@@ -25,7 +29,7 @@ def main() -> int:
         sys.path.insert(0, str(root / "scripts"))
         from _install_common import install_from_checkout
 
-        install_from_checkout(root)
+        install_from_checkout(root, args.opencode_major)
     print("Available Skills: /sybermem-install /sybermem-init-project /sybermem-update /using-sybermem")
     print("=== Installation Complete ===")
     return 0

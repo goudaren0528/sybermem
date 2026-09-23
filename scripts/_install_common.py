@@ -103,7 +103,7 @@ def _install_codex_hooks(root: Path, home: Path) -> None:
 def _install_runtime(root: Path, home: Path) -> None:
     launcher_dir = home / ".claude" / "sybermem"
     launcher_dir.mkdir(parents=True, exist_ok=True)
-    for name in ("managed-install.json", "safe-managed-remove.py"):
+    for name in ("managed-install.json", "safe-managed-remove.py", "opencode-install.py"):
         shutil.copy2(root / "scripts" / name, launcher_dir / name)
     shutil.copy2(root / "scripts" / "global-stop-hook-launcher.py", launcher_dir / "launch_record_change_on_stop.py")
     session_launcher = root / "scripts" / "global-session-start-launcher.py"
@@ -137,16 +137,11 @@ def _install_runtime(root: Path, home: Path) -> None:
         shutil.copy2(version, launcher_dir / "VERSION")
 
 
-def install_from_checkout(root: Path) -> None:
+def install_from_checkout(root: Path, opencode_major: str | None = None) -> None:
     """Install a checkout into all supported user-level SyberMem locations."""
     home = Path.home()
     remover = root / "scripts" / "safe-managed-remove.py"
     _sync_skills(root / "packages" / "claude-skills", home, remover)
     _install_codex_hooks(root, home)
     _install_runtime(root, home)
-    plugin_dir = home / ".config" / "opencode"
-    plugin_source = root / "packages" / "opencode-plugin" / "sybermem.ts"
-    if plugin_dir.exists() and plugin_source.is_file():
-        (plugin_dir / "plugins").mkdir(parents=True, exist_ok=True)
-        shutil.copy2(plugin_source, plugin_dir / "plugins" / "sybermem.ts")
-        print(f"  [OpenCode] updated plugin: {plugin_dir / 'plugins' / 'sybermem.ts'}")
+    subprocess.run([sys.executable, str(root / "scripts" / "opencode-install.py"), "install", "--root", str(root), "--home", str(home), *(["--opencode-major", opencode_major] if opencode_major else [])], check=True)

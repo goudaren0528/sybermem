@@ -44,6 +44,7 @@ try {
 
     Expand-Archive -Path $ZipFile -DestinationPath $TmpDir -Force
 
+    $ArchiveRoot = Join-Path $TmpDir $ArchivePrefix
     $SkillsSrc = Join-Path $TmpDir "$ArchivePrefix\packages\claude-skills"
     $LauncherSource = Join-Path $TmpDir "$ArchivePrefix\scripts\global-stop-hook-launcher.py"
     $SessionLauncherSource = Join-Path $TmpDir "$ArchivePrefix\scripts\global-session-start-launcher.py"
@@ -200,6 +201,7 @@ $RemoverSource = Join-Path $TmpDir "$ArchivePrefix\scripts\safe-managed-remove.p
         }
         Copy-Item -Path $ManifestSource -Destination $ManifestPath -Force
         Copy-Item -Path $RemoverSource -Destination $RemoverPath -Force
+    Copy-Item -Path (Join-Path $ArchiveRoot "scripts\opencode-install.py") -Destination (Join-Path $LauncherDir "opencode-install.py") -Force
         Copy-Item -Path $LauncherSource -Destination $LauncherPath -Force
         Write-Host "  [Claude Code] installed stop hook launcher: $LauncherPath"
         if (Test-Path $SessionLauncherSource) {
@@ -237,16 +239,10 @@ $RemoverSource = Join-Path $TmpDir "$ArchivePrefix\scripts\safe-managed-remove.p
     }
 
 
-    # OpenCode: install plugin
-    if (Test-Path (Join-Path $env:USERPROFILE ".config\opencode")) {
-        if (-not (Test-Path $OpenCodePluginDir)) {
-            New-Item -ItemType Directory -Path $OpenCodePluginDir -Force | Out-Null
-        }
-        if (Test-Path $PluginSource) {
-            Copy-Item -Path $PluginSource -Destination (Join-Path $OpenCodePluginDir "sybermem.ts") -Force
-            Write-Host "  [OpenCode] installed plugin: $OpenCodePluginDir\sybermem.ts"
-        }
-    }
+    # Shared transactional OpenCode deployment.
+    & python (Join-Path $ArchiveRoot "scripts\opencode-install.py") install --root $ArchiveRoot --home $env:USERPROFILE
+    if ($LASTEXITCODE -ne 0) { throw "OpenCode deployment failed" }
+
 } finally {
     Remove-Item -Path $TmpDir -Recurse -Force -ErrorAction SilentlyContinue
 }

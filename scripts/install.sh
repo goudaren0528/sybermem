@@ -174,6 +174,7 @@ if [ -d "$HOME/.claude" ]; then
 mkdir -p "$LAUNCHER_DIR"
 cp "$MANIFEST_SOURCE" "$MANIFEST_PATH"
 cp "$REMOVER_SOURCE" "$REMOVER_PATH"
+cp "$ADR_PATH/scripts/opencode-install.py" "$LAUNCHER_DIR/opencode-install.py"
     cp "$LAUNCHER_SOURCE" "$LAUNCHER_PATH"
     chmod +x "$LAUNCHER_PATH"
     echo "  [Claude Code] 已安装 stop hook launcher: $LAUNCHER_PATH"
@@ -221,12 +222,8 @@ if ln -sf "$CLI_WRAPPER" "$LOCAL_BIN/sybermem" 2>/dev/null; then
     esac
 fi
 
-# OpenCode: install plugin
-if [ -d "$HOME/.config/opencode" ]; then
-    mkdir -p "$OPENCODE_PLUGIN_DIR"
-    cp "$PLUGIN_SOURCE" "$OPENCODE_PLUGIN_DIR/sybermem.ts"
-    echo "  [OpenCode] 已安装 plugin: $OPENCODE_PLUGIN_DIR/sybermem.ts"
-fi
+# OpenCode deployment is shared with Python and Windows entrypoints.
+python "$ADR_PATH"/scripts/opencode-install.py install --root "$ADR_PATH"
 
 echo ""
 echo "=== 安装完成 ==="

@@ -58,7 +58,7 @@ async function handleSessionCreated(args: PluginArgs, root: string, sessionID: s
   enqueueToast(args.client, `${ahaMarker}SyberMem: loaded ${parsed.conclusions.length} key conclusions${staleNote}${recordNote}`)
 }
 
-async function maybeToastRecallHealth(args: PluginArgs, root: string): Promise<void> {
+export async function maybeToastRecallHealth(args: PluginArgs, root: string): Promise<void> {
   try {
     const health = parseRecallHealth(await memoryStatsText(args.$, root))
     if (!health) return
@@ -73,7 +73,7 @@ async function maybeToastRecallHealth(args: PluginArgs, root: string): Promise<v
 // the compaction/startup stale-digest check uses (single source of truth in core), so
 // there is no duplicated coverage logic here. Fires only above the backlog threshold,
 // throttled, and fail-open so it never blocks idle handling.
-async function maybeToastDigestBacklog(args: PluginArgs, root: string): Promise<void> {
+export async function maybeToastDigestBacklog(args: PluginArgs, root: string): Promise<void> {
   try {
     const backlog = parseDigestBacklog(await digestStatusText(args.$, root))
     if (!backlog) return
@@ -87,7 +87,7 @@ async function maybeToastDigestBacklog(args: PluginArgs, root: string): Promise<
 // At idle, turn this session's accumulated recall injections + edits into one
 // bounded recall-outcome journal entry, then reset the session accumulator.
 // Fail-open: relevance evidence is advisory and must never block idle handling.
-async function flushSessionRelevance(args: PluginArgs, root: string, sessionID: string): Promise<void> {
+export async function flushSessionRelevance(args: PluginArgs, root: string, sessionID: string): Promise<void> {
   if (!sessionID) return
   try {
     const activity = getSessionActivity(sessionID)
@@ -116,7 +116,7 @@ function deriveActivitySignal(sessionID: string): { toolSignal: "tests_passed" |
   return { toolSignal: activity.lastToolSignal, todoCompletedBatches: activity.todoCompletedBatches, editFocus }
 }
 
-async function handleSessionIdle(args: PluginArgs, root: string, sessionID: string): Promise<void> {
+export async function handleSessionIdle(args: PluginArgs, root: string, sessionID: string): Promise<void> {
   const trail = trailFiles(await getChangedFiles(args.$, root))
   if (trail.length === 0) return
   const fingerprint = JSON.stringify(trail)

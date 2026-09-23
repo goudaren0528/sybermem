@@ -1,9 +1,11 @@
 # OpenCode Installation Notes
 
-SyberMem currently installs into OpenCode in two parts:
+SyberMem installs into OpenCode in two parts, with the plugin selected by the detected `opencode --version` major (or explicit `--opencode-major 1|2` / `SYBERMEM_OPENCODE_MAJOR` override). If detection is unknown and no override is supplied, OpenCode plugin deployment is skipped; do not read a global installer completion banner as plugin readiness:
 
 - Skills are copied to `~/.config/opencode/skills/`
-- The plugin file is copied to `~/.config/opencode/plugins/sybermem.ts`
+- V1: separate compatibility source `packages/opencode-plugin/sybermem-v1.ts` is copied to `~/.config/opencode/plugins/sybermem.ts`. V2: the complete `dist-v2` package (`package.json`, `server.js`, `tui.js`) is copied to `~/.config/opencode/sybermem-v2/` and that **directory** is added as one plugin entry to the selected `opencode.jsonc` or `opencode.json`. Migrating majors removes known old entries/files; do not dual-load V1 and V2. Modified managed or unmanaged targets are refused. The installer checks managed SHA-256 hashes and backs up prior files/config bytes for rollback on failure (reporting incomplete rollback explicitly).
+
+The V1 hook details below apply only to the separate V1 entrypoint. V2 instead uses persisted-message `prompt`/`context` injection, `compaction` and server RPC plus companion TUI toasts; see [V2 migration and acceptance](../packages/opencode-plugin/V2-MIGRATION.md). V2 has no sidebar or deterministic assistant-body marker, and has **not restored V1's background remote-version refresh**; local nudges do not replace it.
 
 The current OpenCode plugin implements these hooks:
 
@@ -13,7 +15,7 @@ The current OpenCode plugin implements these hooks:
 - `experimental.chat.system.transform` — injects those hints plus bounded User Habit Memory reminder markdown into the same turn's system prompt
 - `experimental.session.compacting`
 
-## Capability parity with Claude Code
+## V1 capability parity with Claude Code
 
 Across the OpenCode seams above, the plugin mirrors the Claude Code
 lifecycle-hook and prompt-time recall behavior:
@@ -128,17 +130,17 @@ From a SyberMem checkout, use `python scripts/update.py`. The PowerShell and
 shell installers remain supported alternatives.
 
 - global install or global update refreshes `~/.config/opencode/skills/`
-- global install or global update refreshes `~/.config/opencode/plugins/sybermem.ts`
+- global install or global update deploys the major-specific V1 file or complete V2 directory package, unless host version detection is unknown without an override
 - global install or global update refreshes the fixed SyberMem CLI launcher at `$HOME/.claude/sybermem/cli/sybermem` on macOS / Linux or `%USERPROFILE%\.claude\sybermem\cli\sybermem.cmd` on Windows
-- re-running the remote install command is a real refresh path for the OpenCode plugin and skills
+- re-running the remote install command refreshes OpenCode skills and the selected plugin when its major is known; an unknown major skips plugin deployment
 
 The OpenCode plugin and CLI-using skills prefer that fixed launcher when an OpenCode or agent subprocess cannot resolve bare `sybermem` from PATH. SyberMem does not modify persistent PATH automatically; adding the launcher directory to PATH remains an optional user choice.
 
 That global refresh does not replace project-local SyberMem files. Existing
 projects still need `/sybermem-update` when you want refreshed managed hooks,
 templates, or instruction files inside the project. Older users should re-run
-the global install or update first to get the new bundled OpenCode plugin
-(`~/.config/opencode/plugins/sybermem.ts`) with prompt-time record-intent and
+ the global install or update first to get the major-specific OpenCode plugin
+ (V1 `~/.config/opencode/plugins/sybermem.ts`, V2 `~/.config/opencode/sybermem-v2/`) with prompt-time record-intent and
 recall debug support, then run `/sybermem-update` so project-managed files stay fresh.
 `/sybermem-update` now uses the deterministic `sybermem project refresh --format json`
 CLI path first for project-local files. It falls back to agent-orchestrated
@@ -154,7 +156,13 @@ or `/sybermem-update` can create or refresh `.sybermem/`,
 any legacy SyberMem protocol block from `AGENTS.md` / `CLAUDE.md`. That does
 not change the OpenCode recall path above: OpenCode uses its own `chat.message` +
 `experimental.chat.system.transform` hooks for per-prompt recall, which the plugin
-refresh delivers regardless of project-local Claude hooks.
+ refresh delivers regardless of project-local Claude hooks (the hook names above describe V1; V2 uses `prompt`/`context`).
+
+### OpenCode readiness is three separate stages
+
+1. **Install/hash:** inspect the OpenCode-specific installer result and compare deployed SHA-256 with built distribution (V1 file or all three V2 package files); check the sole V2 directory entry and absence of competing old entry. Unknown major without override means skipped, not ready.
+2. **Loader:** restart/reload the host and inspect its plugin listing for the intended location. Disk files alone do not prove a running process reloaded them.
+3. **Function:** use a real memory-matching prompt and inspect recall/usage plus V2 companion TUI feedback. A file or hash alone does **not** prove toast visibility or provider acceptance. First V2 target is 2.0.15; real-model TUI and final joint acceptance remain outstanding.
 
 Use this workflow:
 
@@ -164,11 +172,11 @@ Use this workflow:
 
 The OpenCode plugin does not replace project `.sybermem/` files. It complements the project-managed `.sybermem/` and `.claude/settings.json` setup.
 
-### Optional: reply marker (default OFF)
+### V1 only: optional reply marker (default OFF)
 
-By default, SyberMem signals recall/habit injection with throttled TUI toasts
+In V1, SyberMem signals recall/habit injection with throttled TUI toasts
 (`⭐`/`🧠`/`💡`). If you want a guaranteed, model-independent signal in the reply
-itself, set `SYBERMEM_REPLY_MARKER=1` in the OpenCode environment. When enabled,
+ itself, set `SYBERMEM_REPLY_MARKER=1` in the V1 OpenCode environment. When enabled,
 the plugin prepends ONE line to the first assistant text part of any turn that
 actually received injected recall/habit context (e.g. `> SyberMem: 本轮参考了 ⭐2 条记忆`).
 It is OFF by default because it uses the experimental `experimental.text.complete`

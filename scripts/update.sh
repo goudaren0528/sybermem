@@ -172,6 +172,7 @@ install_codex_user_prompt_hook
 mkdir -p "$LAUNCHER_DIR"
 cp "$MANIFEST_SOURCE" "$MANIFEST_PATH"
 cp "$REMOVER_SOURCE" "$REMOVER_PATH"
+cp "$ADR_PATH/scripts/opencode-install.py" "$LAUNCHER_DIR/opencode-install.py"
 cp "$LAUNCHER_SOURCE" "$LAUNCHER_PATH"
 chmod +x "$LAUNCHER_PATH"
 echo "  [Global] 已安装 stop hook launcher: $LAUNCHER_PATH"
@@ -207,11 +208,8 @@ if ln -sf "$CLI_WRAPPER" "$LOCAL_BIN/sybermem" 2>/dev/null; then
     echo "  [Global] 已链接 sybermem 到 PATH 目录: $LOCAL_BIN/sybermem"
 fi
 
-if [ -d "$HOME/.config/opencode" ]; then
-    mkdir -p "$OPENCODE_PLUGIN_DIR"
-    cp "$PLUGIN_SOURCE" "$OPENCODE_PLUGIN_DIR/sybermem.ts"
-    echo "  [OpenCode] 已更新 plugin: $OPENCODE_PLUGIN_DIR/sybermem.ts"
-fi
+# OpenCode deployment is shared with Python and Windows entrypoints.
+python "$ADR_PATH"/scripts/opencode-install.py install --root "$ADR_PATH"
 
 echo ""
 echo "=== 更新完成 ==="

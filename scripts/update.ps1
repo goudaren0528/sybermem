@@ -177,6 +177,7 @@ Install-CodexUserPromptHook
     }
     Copy-Item -Path $ManifestSource -Destination $ManifestPath -Force
     Copy-Item -Path $RemoverSource -Destination $RemoverPath -Force
+    Copy-Item -Path (Join-Path $AdrPath "scripts\opencode-install.py") -Destination (Join-Path $LauncherDir "opencode-install.py") -Force
 Copy-Item -Path $LauncherSource -Destination $LauncherPath -Force
 Write-Host "  [Global] installed stop hook launcher: $LauncherPath"
 Copy-Item -Path $SessionLauncherSource -Destination $SessionLauncherPath -Force
@@ -206,13 +207,9 @@ if (Test-Path $VersionSource) {
 }
 
 
-if (Test-Path (Join-Path $env:USERPROFILE ".config\opencode")) {
-    if (-not (Test-Path $OpenCodePluginDir)) {
-        New-Item -ItemType Directory -Path $OpenCodePluginDir -Force | Out-Null
-    }
-    Copy-Item -Path $PluginSource -Destination (Join-Path $OpenCodePluginDir "sybermem.ts") -Force
-    Write-Host "  [OpenCode] updated plugin: $OpenCodePluginDir\sybermem.ts"
-}
+    # Shared transactional OpenCode deployment.
+    & python (Join-Path $AdrPath "scripts\opencode-install.py") install --root $AdrPath --home $env:USERPROFILE
+    if ($LASTEXITCODE -ne 0) { throw "OpenCode deployment failed" }
 
 Write-Host ""
 Write-Host "=== Update Complete ==="
