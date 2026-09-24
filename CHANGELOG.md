@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+## 0.8.0 - 2026-09-24
+
+### Added
+- `sybermem doctor --runtime` provides on-demand installation, host-loading, and current-turn injection diagnostics. CLI/core availability is reported separately; live host state remains `unknown` without matching evidence. This is not real-time monitoring.
+- `sybermem project refresh --root <existing-directory>` targets an explicitly confirmed existing directory, with path, Git-boundary, and environment-override checks that reject ambiguous or unsafe targets instead of falling back to another project.
+
+### Changed
+- English and Chinese onboarding guidance and the init, using, install, and update skills now share one journey, including CLI-first initialization, target confirmation, older-CLI handling, and partial-failure recovery.
+
+### Fixed
+- Explicit-root initialization no longer resolves upward to an ancestor project. Existing calls without `--root` retain their previous behavior.
+
+### Privacy and history migration
+- Approved internal process material and confirmed personal paths have been removed from the prepared public tree/history while local originals are retained. After the rewritten history is published, contributors should clone again and carefully transplant unpublished changes rather than merge or push the old history. This does not claim that all personal information, external clones, or caches have been cleared.
+
+### Known limitations
+- Windows junction/ACL-specific product behavior and live-host consumption have not been verified; diagnostic `unknown` results are not evidence of live delivery or model use.
+
 ## 0.7.0 - 2026-09-24
 
 ### Added
@@ -139,4 +157,3 @@
 - Public install docs now describe OpenCode and Codex prompt-time support accurately: OpenCode supports project recall plus habit reminders through its chat transform hooks, while Codex supports startup context through `SessionStart` and prompt recall/habit reminders through `UserPromptSubmit` `additionalContext`.
 - OpenCode plugin source is split under `packages/opencode-plugin/src/` and bundled back to `packages/opencode-plugin/sybermem.ts` for installer compatibility.
 - Managed uninstall manifest now separates active `skills` from `retired_skills`, while the remover still cleans both so old users shed retired Team skills on update/uninstall.
-
