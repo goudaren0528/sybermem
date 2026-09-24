@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+## 0.7.0 - 2026-09-24
+
+### Added
+- OpenCode V2 ships separate server and TUI companion bundles alongside an independent V1 compatibility plugin; upgrades transactionally replace managed artifacts to prevent double loading.
+
+### Changed
+- Claude Code's four hooks now dispatch through one absolute, fail-open launcher with safer migration and health diagnostics; Claude Code 2.1.139 is the minimum for these managed exec hooks.
+
+### Known limitations
+- V2 cannot append legacy reply-body markers; feedback uses TUI toasts and read-only summaries instead. Background remote-version refresh has not been restored. Real-model and TUI end-to-end acceptance was not exercised for this release.
+
 ## 0.6.0 - 2026-09-08
 
 ### Changed

@@ -6,7 +6,7 @@ distributed package on `main` can never drift from the source or the version:
 
     1. write VERSION = X.Y.Z (single source of truth)
     2. scripts/sync-version.py         -> fan the version into all 9 manifests
-    3. bun scripts/build-opencode-plugin.mjs -> rebundle the OpenCode plugin
+    3. bun scripts/build-opencode-plugin.mjs -> build all five OpenCode targets
     4. cut CHANGELOG.md: "## Unreleased" -> "## X.Y.Z - YYYY-MM-DD", open a fresh
        empty "## Unreleased" on top
     5. scripts/check-plugin-package.py  -> consistency guard (version + bundle)
@@ -153,7 +153,9 @@ def main() -> int:
 
         _log(write_version(args.version, dry_run=args.dry_run))
         _log(run([sys.executable, "scripts/sync-version.py"], dry_run=args.dry_run, label="sync-version"))
-        _log(run(["bun", "scripts/build-opencode-plugin.mjs"], dry_run=args.dry_run, label="build-bundle"))
+        for flags in ((), ("--v1",), ("--tui",), ("--package",), ("--package", "--tui")):
+            _log(run(["bun", "scripts/build-opencode-plugin.mjs", *flags],
+                     dry_run=args.dry_run, label=f"build-bundle {' '.join(flags) or 'default'}"))
         _log(cut_changelog(args.version, today=today, dry_run=args.dry_run))
         _log(run([sys.executable, "scripts/check-plugin-package.py"], dry_run=args.dry_run, label="guard"))
 
