@@ -7,7 +7,7 @@ description: Use when refreshing installed SyberMem skills in an existing projec
 
 **Announce at start:** "I'm using the sybermem-update skill to refresh global skills and re-check this project."
 
-Refresh the installed SyberMem skills, then re-check the current project with the deterministic `sybermem project refresh --format json` CLI path. Fall back to `/sybermem-init-project` orchestration only when the CLI is unavailable, broken, or does not emit valid JSON.
+Refresh the installed SyberMem skills, then re-check the explicitly confirmed project with `sybermem project refresh --root "<confirmed-target>" --format json`. If the CLI is unusable, stop and offer separately authorized recovery.
 
 ## Quick guide (for humans)
 
@@ -25,16 +25,16 @@ managed files.
 **What you get:** up-to-date global skills plus a JSON-backed project re-check
 that creates, refreshes, or migrates only the local files that actually need to
 change (and says so explicitly when nothing needs changing). If the CLI path is
-unhealthy, the skill uses the older agent-guided `/sybermem-init-project` path
-as a recovery fallback.
+unhealthy, stop to inspect state and offer `/sybermem-init-project` in a new session
+as a recovery option.
 
 ## Core Invariant
 
-- **No behavior change is complete unless `/sybermem-update` can carry an existing managed project to that behavior in operational terms: by running `sybermem project refresh --format json` first, parsing its managed-file report, and then creating, refreshing, or migrating only the files that actually need a project-local change. If the CLI path is unavailable or invalid, fall back to `/sybermem-init-project`; if the new behavior is classification-only or otherwise requires no project-local file change, the update flow must say so explicitly.**
+- **No behavior change is complete unless `/sybermem-update` can propagate it to the confirmed project through explicit-root CLI refresh and a verified report. If the CLI is unusable, stop and explain recovery; if the behavior needs no project-local file change, say so explicitly.**
 
 <HARD-GATE>
 Do NOT declare the upgrade complete without running the managed-file propagation check.
-Do NOT skip the project-local follow-up after updating global skills: run CLI refresh first, or run `/sybermem-init-project` only as fallback.
+Do NOT skip the project-local follow-up after updating global skills: run explicit-root CLI refresh after scope confirmation, or report why setup is deferred.
 Do NOT leave the old direct-hook command in `.claude/settings.json` when the launcher should have replaced it.
 </HARD-GATE>
 
@@ -46,7 +46,32 @@ Do NOT leave the old direct-hook command in `.claude/settings.json` when the lau
 
 ## Directory Resolution
 
+Nested-project approval does not bypass CLI safety checks: `--root` rejects target
+or ancestor symlink/reparse points, a target inside an ancestor Git worktree unless
+it has its own independent repository, and an unconfirmed Git boundary. Core may
+otherwise run `git rm --cached` against an ancestor index. On rejection, stop;
+never fall back to no-argument refresh. Not every nested directory is supported.
+The explicit branch rejects nonempty `GIT_*` environment overrides and unavailable
+Git or an unknown boundary; Git probes use a fixed locale (`C`) and strictly recognize
+non-repository results. An independent repository at the target is allowed, an
+ancestor-worktree subdirectory is rejected. `--root` is a static exact-target check,
+not an OS sandbox or a race-safety/full-chain-redaction guarantee. Real refresh
+validation requires VM/OS isolation and has not yet been performed.
+Normalize the user-confirmed target to an absolute path before running the command;
+show that normalized path and reconfirm if it differs from the intended scope.
+Compare returned `root` using that same normalized target. These checks do not prove
+model consumption. Only `doctor --runtime` and `project refresh --root` are
+authorized interface additions in this change.
+
 Resolve project root by walking up from cwd to find `.sybermem/` + (`.sybermem/project.yaml` OR `.claude/settings.json`).
+First confirm the target existing directory with the user; cwd alone is not authorization.
+If a SyberMem ancestor exists, ask whether the user wants an independent nested
+project or the parent. Do not silently choose either. Explicit `--root` uses exactly
+that existing directory: no upward resolution, implicit mkdir, or fallback.
+Legacy `sybermem project refresh --format json` keeps ancestor resolution and exits 1
+if no root resolves; changing HOME does not prevent the physical ancestor search.
+Legacy `sybermem project init` provides identity for an existing resolved root,
+not a full fresh-project initialization.
 
 ## Flow
 
@@ -79,23 +104,21 @@ The remote install path is also the update path for globally installed skills.
 
 After the global refresh completes, resolve a SyberMem CLI command and run project refresh. Before running SyberMem CLI commands, resolve a command variable first. On Windows `cmd.exe` or OpenCode, prefer `%USERPROFILE%\.claude\sybermem\cli\sybermem.cmd`; in Windows PowerShell prefer `$env:USERPROFILE\.claude\sybermem\cli\sybermem.cmd` and store the chosen command in `$SyberMemCli`; on Unix, prefer `$HOME/.claude/sybermem/cli/sybermem` and store the chosen command in `"$SYBERMEM_CLI"`. If the fixed launcher is unavailable, fall back to bare `sybermem`. Do not modify persistent PATH automatically. Command examples below use `$SyberMemCli` / `"$SYBERMEM_CLI"`.
 
-1. Prefer bare `sybermem`.
-2. If bare `sybermem` is unavailable, try the fixed launcher:
-   - Windows PowerShell: `$env:USERPROFILE\.claude\sybermem\cli\sybermem.cmd`
-   - Windows `cmd.exe`: `%USERPROFILE%\.claude\sybermem\cli\sybermem.cmd`
-   - macOS / Linux: `$HOME/.claude/sybermem/cli/sybermem`
-3. Run:
+Verify the resolved launcher with `project refresh --help` and confirm `--root`
+support. If an older CLI rejects `--root`, stop and recommend upgrading or using the
+skill in a new session; never downgrade to a no-argument refresh. Skills installed
+in this session are not hot-loaded. With scope confirmed, run:
 
 ```bash
-$SYBERMEM_CLI project refresh --format json
+"$SYBERMEM_CLI" project refresh --root "<confirmed-target>" --format json
 ```
 
 ```powershell
-& $SyberMemCli project refresh --format json
+& $SyberMemCli project refresh --root "<confirmed-target>" --format json
 ```
 
 ```cmd
-"%USERPROFILE%\.claude\sybermem\cli\sybermem.cmd" project refresh --format json
+"%USERPROFILE%\.claude\sybermem\cli\sybermem.cmd" project refresh --root "<confirmed-target>" --format json
 ```
 
 The command is the primary project-local update path. It is responsible for:
@@ -108,15 +131,21 @@ The command is the primary project-local update path. It is responsible for:
 - creating `.sybermem/project.yaml` when missing
 - emitting valid JSON with `overall`, `files`, `actions_needed`, `actions_applied`, `actions_skipped`, and `preserved_custom`
 
-If the CLI exits successfully and emits valid JSON, summarize that JSON and **do not** run `/sybermem-init-project`. The project-local refresh is complete when the report is `fresh` or `updated` and any applied/skipped/preserved actions are reported to the user.
+Require exit 0, valid JSON, returned `root` matching the authorized target, and
+`overall` equal to `fresh` or `updated`. Summarize actual applied/skipped/preserved
+actions and **do not** run `/sybermem-init-project` after success. Failure may leave
+partial writes; do not blindly retry. A wrong root or failed overall is not success.
 
 ### Step 3: Fall back only when CLI refresh is unavailable or invalid
 
-**REQUIRED FALLBACK SUB-SKILL:** Run `/sybermem-init-project` only if the CLI path is unusable.
+**RECOVERY BOUNDARY:** Stop on an unusable CLI or failed report; explain possible
+partial writes and inspect the confirmed scope before any separately authorized
+recovery. Offer `/sybermem-init-project` in a new session when necessary; newly
+installed skills are not hot-loaded. Never silently retry with no `--root`.
 
 Fallback triggers are limited to:
 - bare `sybermem` and the fixed launcher are both missing or not executable
-- `sybermem project refresh --format json` exits nonzero
+- explicit-root project refresh exits nonzero or returns a wrong root/failed overall
 - stdout is empty, non-JSON, or missing the required report keys
 - CLI refresh is missing, broken, or emits invalid JSON
 
@@ -170,7 +199,7 @@ If you catch yourself doing any of these, STOP:
 - Leaving the old direct-hook command in `.claude/settings.json` when the launcher should have replaced it
 - Claiming a behavior change is shipped when project-local files have not been created or refreshed
 
-**All of these mean: go back to Step 2 and re-run the init-project flow.**
+**All of these mean: stop, inspect state and reconfirm scope before recovery.**
 
 ## Common Rationalizations
 
@@ -184,7 +213,7 @@ If you catch yourself doing any of these, STOP:
 
 This skill is complete when:
 - global skills have been refreshed
-- `sybermem project refresh --format json` succeeded with valid JSON, or `/sybermem-init-project` fallback ran because CLI refresh was unavailable or invalid
+- explicit-root refresh succeeded with verified root/overall, or the failure/deferred recovery was honestly reported
 - all managed files are classified, created, refreshed, or preserved as appropriate
 - the user has been told what was updated
 

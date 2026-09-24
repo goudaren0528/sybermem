@@ -26,7 +26,7 @@ from sybermem_core.norms import constitution, nominate_norm_candidates, norm_con
 from sybermem_core.portfolio import build_portfolio
 from sybermem_core.uninstall import deactivate_project_sybermem
 from sybermem_core.version import get_installed_version
-from sybermem_core.doctor import version_report
+from sybermem_core.doctor import runtime_report, version_report
 from sybermem_cli.habits import register_habit_commands
 from sybermem_cli.context import register_context_commands
 from sybermem_cli.memory_stats_render import render_project_memory_stats_text
@@ -310,8 +310,9 @@ def cmd_version(args: argparse.Namespace) -> int:
 def cmd_doctor(args: argparse.Namespace) -> int:
     root = resolve_project_root()
     report = version_report(root)
+    runtime = runtime_report(root, report) if args.runtime else None
     if args.format == "json":
-        print(dump_json(report))
+        print(dump_json({**report, "runtime": runtime} if args.runtime else report))
         return 0
     installed = report["installed"]
     project = report["project"] or "(not stamped)"
@@ -321,6 +322,16 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         print(f"⭐ This project trails the installed SyberMem — run {report['recommendation']} to apply updates.")
     else:
         print("This project is current with the installed SyberMem.")
+    if runtime is not None:
+        print("Runtime evidence (this CLI invocation only):")
+        for title, key in (("CLI/core available", "installation"),
+                           ("Project stamp", "project_stamp"),
+                           ("Current host loaded", "host_loaded"),
+                           ("Current turn context delivery", "current_turn_delivery")):
+            layer = runtime[key]
+            print(f"  {title}: {layer['status']} — {layer['reason']}")
+            if "next_check" in layer:
+                print(f"    Next check: {layer['next_check']}")
     return 0
 
 
@@ -506,13 +517,59 @@ def cmd_project_index_check(args: argparse.Namespace) -> int:
 
 
 def cmd_project_refresh(args: argparse.Namespace) -> int:
-    root = resolve_project_root()
+    if args.root is not None:
+        if not args.root.strip():
+            print("--root must name an existing directory.", file=sys.stderr)
+            return 1
+        if any(key.upper().startswith("GIT_") and value for key, value in os.environ.items()):
+            print("--root cannot run with Git environment overrides.", file=sys.stderr)
+            return 1
+        git_env = {key: value for key, value in os.environ.items() if not key.upper().startswith("GIT_")}
+        git_env.update(LC_ALL="C", LANG="C", LANGUAGE="C")
+        # Search across mount boundaries so an ancestor worktree cannot be
+        # misclassified as non-Git at a tmpfs boundary. User GIT_* remains banned.
+        git_env["GIT_DISCOVERY_ACROSS_FILESYSTEM"] = "1"
+        try:
+            candidate = Path(os.path.abspath(args.root))
+            # Reject any alias/reparse hop before resolving: confirmation of an
+            # alias must never silently authorize writes to its target.
+            for component in (candidate, *candidate.parents):
+                attributes = getattr(component.lstat(), "st_file_attributes", 0)
+                if attributes & 0x400 or component.is_symlink():  # FILE_ATTRIBUTE_REPARSE_POINT
+                    print("--root cannot contain a symlink or reparse point.", file=sys.stderr)
+                    return 1
+            root = candidate.resolve(strict=True)
+            if not root.is_dir():
+                print("--root must name an existing directory.", file=sys.stderr)
+                return 1
+            # Core's refresh can untrack a derived INDEX via git -C root. A
+            # child of an ancestor worktree must not mutate that ancestor index.
+            worktree = subprocess.run(
+                ["git", "-C", str(root), "rev-parse", "--show-toplevel"],
+                capture_output=True, text=True, timeout=10, check=False,
+                encoding="utf-8", errors="replace", env=git_env,
+            )
+            if worktree.returncode == 0:
+                if not worktree.stdout.strip() or Path(worktree.stdout.strip()).resolve() != root:
+                    print("--root must be its own Git worktree root or outside a Git worktree.", file=sys.stderr)
+                    return 1
+            elif not (worktree.returncode == 128 and not worktree.stdout and
+                      worktree.stderr in (
+                          "fatal: not a git repository (or any of the parent directories): .git\n",
+                          "fatal: not a git repository (or any of the parent directories): .git\r\n")):
+                print("--root Git worktree boundary could not be verified.", file=sys.stderr)
+                return 1
+        except (OSError, RuntimeError, ValueError, subprocess.SubprocessError):
+            print("--root could not be validated; no refresh was attempted.", file=sys.stderr)
+            return 1
+    else:
+        root = resolve_project_root()
     if root is None:
         print("No SyberMem project root found.", file=sys.stderr)
         return 1
 
     try:
-        report = refresh_project(root)
+        report = refresh_project(root, git_env=git_env) if args.root is not None else refresh_project(root)
     except ValueError as exc:
         print(str(exc), file=sys.stderr)
         return 1
@@ -684,6 +741,7 @@ def main() -> int:
 
     refresh_cmd = project_sub.add_parser("refresh")
     refresh_cmd.add_argument("--format", choices=["text", "json"], default="text")
+    refresh_cmd.add_argument("--root", help="Exact existing directory to refresh (not an ancestor search starting point).")
     refresh_cmd.set_defaults(func=cmd_project_refresh)
 
     record_files_cmd = project_sub.add_parser("record-files")
@@ -797,6 +855,7 @@ def main() -> int:
 
     doctor_cmd = sub.add_parser("doctor")
     doctor_cmd.add_argument("--format", choices=["text", "json"], default="text")
+    doctor_cmd.add_argument("--runtime", action="store_true", help="Show bounded runtime evidence and unknown live-host states.")
     doctor_cmd.set_defaults(func=cmd_doctor)
 
     register_context_commands(sub)

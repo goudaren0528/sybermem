@@ -45,15 +45,38 @@ irm https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/install
 python -c "import urllib.request; exec(urllib.request.urlopen('https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/install-remote.py').read())"
 ```
 
-Then open a target project:
+Open the target project and choose the entrypoint for your task:
+
+| Task | Entrypoint |
+|---|---|
+| Initialize a new project | `/sybermem-init-project` |
+| Unsure what to do next | `/using-sybermem`: read-only orientation using the existing `sybermem next-step --format json` router |
+| Resume existing work | `/sybermem-resume` |
+| Record meaningful work at closeout | `/sybermem-record` |
+
+**Just installed in this session?** Newly installed skills are not hot-loaded. First confirm the target existing directory with the user; cwd alone is not authorization. If a SyberMem ancestor exists, ask whether the user wants an independent nested project. Verify the [fixed launcher](#one-line-install) and `--root` support in `project refresh --help`, then the authorized install flow can run `sybermem project refresh --root "<confirmed-target>" --format json`. Using only recommends it; use the slash skill in a new session. If the CLI is missing, recover installation first; doctor cannot run without it.
+
+PowerShell: `& $SyberMemCli project refresh --root "<confirmed-target>" --format json`; Bash: `"$SYBERMEM_CLI" project refresh --root "<confirmed-target>" --format json` (resolve the launcher variable for that shell first and replace the quoted placeholder). Explicit `--root` uses exactly that existing directory: no upward resolution, implicit mkdir, or fallback. Require exit 0, valid JSON, returned `root` matching the authorized target, and `overall` equal to `fresh` or `updated`. Failure may leave partial writes; stop to inspect, do not blindly retry. If an older CLI rejects `--root`, stop and recommend upgrading or using the skill in a new session; never downgrade to a no-argument refresh.
+
+Legacy `sybermem project refresh --format json` is unchanged: it searches physical ancestors for project markers and exits 1 when no root resolves; it does not initialize cwd. Changing HOME does not prevent that search. `project init` only provides identity for an existing resolved root, not a full fresh-project initialization.
+
+These are task choices, not an automatic execution chain. `using` does not initialize, write records, or execute downstream actions; an empty project is reported honestly as having no records. Existing entrypoints remain available without forced reinitialization or re-recording. Legacy `sybermem project init` is not a full managed-project refresh. The usual loop is init → work → record, then resume next time for phase, progress, risks, confidence, and freshness.
+
+### Inspect Runtime Evidence on Demand
 
 ```text
-/sybermem-init-project
-/sybermem-record
-/sybermem-resume
+sybermem doctor --runtime --format json
 ```
 
-The usual loop is: initialize the project, record meaningful work after a session, then start the next session with `/sybermem-resume` to see the current phase, recent progress, risks, recommended next action, confidence, and freshness.
+This displays three evidence layers and their limits on demand; it does not automatically detect the current host and need not run every turn. Plain `sybermem doctor` retains its existing behavior.
+
+| Layer | What it can establish |
+|---|---|
+| Installed | Current CLI/core installation evidence, not a general claim of plugin installation |
+| Loaded in the current host | Ordinary CLI has no live host/session identity; reports `unknown` with the reason |
+| Actually injected this turn | Ordinary CLI has no live turn association; reports `unknown`; files or the latest log cannot substitute |
+
+`unknown` means missing evidence; `unsupported` requires an explicit capability boundary; `unmatched` requires affirmative evidence of no match in that turn. Empty results/packets alone do not establish unmatched. Even delivery to host context does not prove model consumption or adoption. Updating disk files does not update a running session: open a new session to verify loading. If the CLI rejects the option, follow the existing global upgrade → project update → new-session sequence; if the CLI is missing, recover installation first.
 
 ## What a Memory Record Looks Like
 
@@ -94,7 +117,7 @@ implements: [requirement-002]
 - read-only resume: `/sybermem-resume` and `sybermem resume`
 - memory stats: `sybermem project memory-stats` prints 7d/30d terminal tables (record counts, type distribution, recall, Edit Alignment, digest/norm coverage, memory-injection lane distribution); `--format json` feeds `/sybermem-summary` and automation. See [Indexing and Search](#indexing-and-search)
 - recall relevance feedback: at `session.idle`, OpenCode matches injected records against edited files; Codex does the same best-effort at `SessionEnd`. Both write bounded `.sybermem/.recall-outcomes.jsonl` / `.memory-usage.jsonl` rows via `related_files`, yielding precision-based `low_relevance` and anchor-coverage-based `low_measurability` verdicts distinct from frequency. See the [Feature Map](docs/feature_map.md)
-- injection observability: OpenCode and Codex write memory that actually reached the model to the metadata-only `.sybermem/.memory-usage.jsonl` (lane totals, injected record ids, `session_outcome` summaries; no raw prompts or full injected text; write failures stay fail-open). See the [Feature Map](docs/feature_map.md)
+- injection observability: OpenCode and Codex write metadata about memory delivered to host context to `.sybermem/.memory-usage.jsonl` (lane totals, injected record ids, `session_outcome` summaries; no raw prompts or full injected text; write failures stay fail-open). This does not prove model consumption or adoption, and the latest log alone cannot establish the current turn. See the [Feature Map](docs/feature_map.md)
 - project search: `/sybermem-search` and `sybermem search`
 - next-step guidance: `/using-sybermem` and `sybermem next-step`
 
@@ -183,9 +206,15 @@ Validation differs per platform:
 
 Installers write the installed version to `~/.claude/sybermem/VERSION`, and `sybermem project refresh` stamps `sybermem_version` into the project's `.sybermem/project.yaml`. When a project trails the installed SyberMem, session-start surfaces a throttled, fail-open `⭐ run /sybermem-update` nudge (OpenCode `session.created` toast; Claude/Codex `SessionStart` context). Run `sybermem doctor` any time to see installed vs project version.
 
-The global refresh updates user-level runtime, Claude/OpenCode/Codex skills, the OpenCode plugin selected for the detected host major, and Codex user-level hooks. Project-local `.sybermem/`, hooks, templates, and instruction files are refreshed by `/sybermem-update`. It calls `sybermem project refresh --format json` first, falling back to agent-orchestrated `/sybermem-init-project` only when CLI execution fails or emits invalid JSON. Codex health checks also recognize installed project templates. To receive OpenCode/Codex habit reminders, record-intent metadata, recall logging, `.memory-usage.jsonl`, Codex `SessionEnd` outcomes, or OpenCode feedback, refresh CLI/Core, the OpenCode plugin and Codex hooks globally first, then run `/sybermem-update` in each project; project refresh does not scaffold runtime logs. V2 has **not** restored V1's background remote-version refresh; local version nudges are not remote refresh. Follow the same order for launcher, plugin, hook or skill fixes.
+Global refresh updates user-level runtime, skills, the host-major-specific OpenCode plugin, and Codex hooks. Project-local files require `/sybermem-update`, which confirms scope and uses explicit `project refresh --root "<confirmed-target>" --format json` with the result checks above. On failure, stop and inspect possible partial writes before separately authorized recovery; offer `/sybermem-init-project` in a new session when needed. Codex health checks also recognize installed project templates. Refresh global components first, then each project. Project refresh does not scaffold runtime logs. V2 has **not** restored V1's background remote-version refresh; local version nudges are not remote refresh.
 
 ## Initialize a Project
+
+Normalize the user-confirmed target to an absolute path and show it before execution; reconfirm if it differs from the intended scope. Compare returned `root` with that normalized target and retain the ancestor/nested-project approval check. The fixed Git locale is `C`. Only `doctor --runtime` and `project refresh --root` are authorized interface additions in this change; these checks do not prove model consumption.
+
+The explicit branch rejects nonempty `GIT_*` environment overrides, uses a fixed Git locale and strictly recognizes non-repository results. Unavailable Git or an unknown boundary is rejected. An independent repository at the target is allowed; an ancestor-worktree subdirectory is rejected. Stop on rejection, never fall back to a no-argument call. `--root` is a static exact-target check, not an OS sandbox or a race-safety/full-chain-redaction guarantee. Real refresh still requires VM/OS-isolated validation and remains unverified.
+
+Explicit `--root` rejects target or ancestor symlink/reparse points, targets inside an ancestor Git worktree without their own independent repository, and an unconfirmed Git boundary: Core's `git rm --cached` could affect the ancestor index. Nested-project approval does not bypass these checks. Stop on rejection; never fall back to no-argument refresh. Not every nested directory is supported.
 
 Run this in the target project:
 

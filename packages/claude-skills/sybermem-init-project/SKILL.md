@@ -53,29 +53,75 @@ Run `/sybermem-init-project` in the target project directory.
 
 ### Step 0: Resolve project root (with anti-nesting guard)
 
-Before any other operation, walk up from the current working directory to find the nearest ancestor directory (including cwd itself) that contains **both** `.sybermem/` **and** `.claude/settings.json`.
+Before any other operation, inspect the target and its physical ancestors for `.sybermem/` plus either `.sybermem/project.yaml` or `.claude/settings.json`; this is scope discovery, not write authorization.
 
 **If a parent SyberMem root is found above cwd:**
 - Do NOT create a new `.sybermem/` in the current subdirectory.
-- Inform the user: "A SyberMem project root already exists at `<parent-path>`. Operating on that root instead."
-- Ask whether they want to operate on the parent root (default) or create a separate nested project (rare).
+- Inform the user: "A SyberMem project root already exists at `<parent-path>`. Confirm which target to use."
+- Ask whether they want to operate on the parent root or create an independent nested project; neither is silently authorized.
 - Only create a nested `.sybermem/` if the user explicitly confirms.
 
 **If no SyberMem root is found:**
-- Treat the current directory as the new project root and proceed with initialization.
+- First confirm the target existing directory with the user; cwd alone is not authorization.
 
 **If cwd itself is the SyberMem root:**
-- Proceed normally (this is the common case for existing projects).
+- Confirm that this is the intended target before proceeding.
 
-After resolving the project root:
-1. If the resolved root has `.sybermem/`, use it.
-2. Otherwise, create `.sybermem/`.
+Before any writes, confirm the target existing directory, including independent nested
+project approval when a SyberMem ancestor exists. Do not create the target directory.
 
 ## CLI Resolution
 
 Before running SyberMem CLI commands, resolve a command variable first. On Windows PowerShell, prefer `$env:USERPROFILE\.claude\sybermem\cli\sybermem.cmd` and store the chosen command in `$SyberMemCli`; on Unix, prefer `$HOME/.claude/sybermem/cli/sybermem` and store the chosen command in `"$SYBERMEM_CLI"`. If the fixed launcher is unavailable, fall back to bare `sybermem`. Do not modify persistent PATH automatically. Command examples below use `$SyberMemCli` / `"$SYBERMEM_CLI"`.
 
 ## Flow
+
+### Explicit-target CLI gate (before any managed-file writes)
+
+Nested-project approval does not bypass CLI safety checks: `--root` rejects target
+or ancestor symlink/reparse points, a target inside an ancestor Git worktree unless
+it has its own independent repository, and an unconfirmed Git boundary. Core may
+otherwise run `git rm --cached` against an ancestor index. On rejection, stop;
+never fall back to no-argument refresh. Not every nested directory is supported.
+The explicit branch rejects nonempty `GIT_*` environment overrides and unavailable
+Git or an unknown boundary; Git probes use a fixed locale (`C`) and strictly recognize
+non-repository results. An independent repository at the target is allowed, an
+ancestor-worktree subdirectory is rejected. `--root` is a static exact-target check,
+not an OS sandbox or a race-safety/full-chain-redaction guarantee. Real refresh
+validation requires VM/OS isolation and has not yet been performed.
+Normalize the user-confirmed target to an absolute path before running the command;
+show that normalized path and reconfirm if it differs from the intended scope.
+Compare returned `root` using that same normalized target. These checks do not prove
+model consumption. Only `doctor --runtime` and `project refresh --root` are
+authorized interface additions in this change.
+
+Verify the chosen launcher with `project refresh --help`, including support for
+`--root`. Use `sybermem project refresh --root "<confirmed-target>" --format json`:
+
+```powershell
+& $SyberMemCli project refresh --root "<confirmed-target>" --format json
+```
+
+```bash
+"$SYBERMEM_CLI" project refresh --root "<confirmed-target>" --format json
+```
+
+Explicit `--root` uses exactly that existing directory: no upward resolution,
+implicit mkdir, or fallback. Require exit 0, valid JSON, returned `root` matching
+the authorized target and `overall` equal to `fresh` or `updated`. Report actual
+actions and any preserved/skipped files. Failure may leave partial writes; do not
+blindly retry. Stop to inspect state and explain recovery instead.
+If an older CLI rejects `--root`, stop and recommend upgrading or using the skill in
+a new session; never downgrade to a no-argument refresh. Newly installed skills are
+not hot-loaded. Legacy `sybermem project refresh --format json` walks physical
+ancestors for markers and exits 1 if no root resolves; changing HOME does not prevent
+that search. Legacy `sybermem project init` provides identity for an existing
+resolved root, not a full fresh-project initialization.
+
+The following managed-file details describe expected behavior and authorized recovery,
+not extra writes to run after a successful CLI report. On success, go to the optional
+sample-record offer and summary; on failure, stop rather than automatically applying
+the manual flow. Any separately authorized recovery uses the same confirmed scope.
 
 ### Step 0.5: Fast-path health check (existing projects only)
 
@@ -188,7 +234,7 @@ silently write — to create one small illustrative `change` record that capture
 
 - Ask once: "Want a sample record so you can see the format and try `/sybermem-resume`? (y/n)"
 - Only if the user agrees, create it via the normal `/sybermem-record` fast path
-  (generated `record_id`/`key_conclusion`/`topics`, then `$SyberMemCli project index build` / `"$SYBERMEM_CLI" project index build` + `check`).
+   (generated `record_id`/`key_conclusion`/`topics`, then `& $SyberMemCli project index build` in PowerShell / `"$SYBERMEM_CLI" project index build` in Bash + `check`).
 - Never create a sample record on an existing-codebase init or on a refresh, and never
   without explicit opt-in — this preserves the "scan but don't auto-create records" invariant.
 

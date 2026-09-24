@@ -45,15 +45,38 @@ irm https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/install
 python -c "import urllib.request; exec(urllib.request.urlopen('https://raw.githubusercontent.com/goudaren0528/sybermem/main/scripts/install-remote.py').read())"
 ```
 
-安装后进入目标项目：
+安装后进入目标项目，按任务选择入口：
+
+| 你要做什么 | 入口 |
+|---|---|
+| 初始化新项目 | `/sybermem-init-project` |
+| 不知道下一步 | `/using-sybermem`：只读定位，通过现有 `sybermem next-step --format json` 给建议 |
+| 续接已有工作 | `/sybermem-resume` |
+| 收尾记录有价值的工作 | `/sybermem-record` |
+
+**当前会话刚安装：** 新落盘的 skill 不会热加载。先确认用户授权的目标是已存在目录；若目标位于已有 SyberMem 祖先下，先询问是否要创建独立嵌套项目，不能从 cwd 静默推定授权。验证下文[固定 launcher](#一行式安装)可用且 `project refresh --help` 支持 `--root` 后，由已授权安装流程执行 `sybermem project refresh --root "<confirmed-target>" --format json`；using 只能推荐，slash skill 留到新会话使用。CLI 缺失先恢复安装，不能运行 doctor。
+
+PowerShell 调用为 `& $SyberMemCli project refresh --root "<confirmed-target>" --format json`；Bash 为 `"$SYBERMEM_CLI" project refresh --root "<confirmed-target>" --format json`（命令变量先按对应 shell 解析，替换引号内占位符）。显式 `--root` 精确写入该已存在目录，不向上查找、不隐式 mkdir、不 fallback。必须核对退出码 0、有效 JSON、返回 `root` 与授权目标一致且 `overall` 为 `fresh` 或 `updated`；失败可能已有部分写入，停止检查，不盲目重试。旧 CLI 不识别 `--root` 时停止并提示升级或新会话 skill，不能降级到无参数调用。
+
+旧 `sybermem project refresh --format json` 行为不变：向上查找物理祖先的项目 markers，无 root 时退出 1，并非 cwd 初始化；修改 HOME 不会阻止祖先查找。`project init` 仅为已有可解析 root 提供身份，不是完整 fresh 初始化。
+
+这些是按任务选择的入口，不是自动执行链。`using` 不初始化、不写记录、不执行下游动作；空项目如实显示无记录。旧入口继续可用，已有项目无需强制重新初始化或记录；legacy `sybermem project init` 不等同完整的受管项目 refresh。典型节奏是 init → 工作 → record，下次用 resume 恢复阶段、进展、风险与信息新鲜度。
+
+### 按需查看运行证据
 
 ```text
-/sybermem-init-project
-/sybermem-record
-/sybermem-resume
+sybermem doctor --runtime --format json
 ```
 
-典型节奏是：初始化项目，完成一轮有价值的工作后记录它，下次打开项目先用 `/sybermem-resume` 获取当前阶段、最近进展、风险、建议下一步、置信度和信息新鲜度。
+这是三层证据及局限的按需展示，不是自动检测当前宿主的功能，不需每轮运行。未传 `--runtime` 的 `sybermem doctor` 保留既有行为。
+
+| 层级 | 可以说明什么 |
+|---|---|
+| 已安装 | 当前 CLI/core 的安装证据，不能泛称 plugin 已安装 |
+| 当前宿主已加载 | 普通 CLI 没有 live host/session 身份，显示 `unknown` 并解释原因 |
+| 本轮实际注入 | 普通 CLI 没有本轮关联，显示 `unknown`；文件存在或最新日志不能代证 |
+
+`unknown` 是缺证据；“未支持”须有明确能力边界；“未匹配”须有本轮确实无匹配的证据，空结果/空 packets 不能推出未匹配。即使有宿主上下文交付证据，也不证明模型消费或采用。升级磁盘文件不代表运行中会话已加载新版本，须开新会话验证。CLI 不支持该参数时，按既有全局升级 → 项目更新 → 新会话顺序处理；CLI 缺失则先恢复安装。
 
 ## 一条记忆长什么样
 
@@ -94,7 +117,7 @@ implements: [requirement-002]
 - 只读续接：`/sybermem-resume` 与 `sybermem resume`
 - 记忆统计：`sybermem project memory-stats` 打印 7 天 / 30 天终端表格（record 计数、类型分布、recall、Edit Alignment、digest / norm 覆盖、memory injection lane 分布）；`--format json` 供 `/sybermem-summary` 与自动化消费。详见[索引与检索](#索引与检索)
 - 召回相关性反馈：OpenCode 在 `session.idle`、Codex 在 `SessionEnd`（best-effort）把召回注入过的记录与实际编辑文件（按 `related_files`）比对，写入有界 `.sybermem/.recall-outcomes.jsonl` / `.memory-usage.jsonl`，得出频率之外的 `low_relevance`（精准度）与 `low_measurability`（锚点不足）判定。详见 [Feature Map](docs/feature_map.md)
-- 注入可观测性：OpenCode 与 Codex 会把实际进入模型的记忆写入 metadata-only 的 `.sybermem/.memory-usage.jsonl`（含 lane totals、注入 record ids 与 `session_outcome` 汇总，不保存原始 prompt / 完整注入文本，写入失败 fail-open）。详见 [Feature Map](docs/feature_map.md)
+- 注入可观测性：OpenCode 与 Codex 会把交付至宿主上下文边界的记忆元数据写入 `.sybermem/.memory-usage.jsonl`（含 lane totals、注入 record ids 与 `session_outcome` 汇总，不保存原始 prompt / 完整注入文本，写入失败 fail-open）；这不证明模型消费或采用，也不能仅凭最新日志认定是当前轮。详见 [Feature Map](docs/feature_map.md)
 - 项目内检索：`/sybermem-search` 与 `sybermem search`
 - 下一步建议：`/using-sybermem` 与 `sybermem next-step`
 
@@ -184,9 +207,15 @@ SyberMem 有两类执行路径，可靠性不同：
 
 安装器会把已安装版本写入 `~/.claude/sybermem/VERSION`；`sybermem project refresh` 会在项目 `.sybermem/project.yaml` 写入 `sybermem_version`。当某个项目落后于已安装版本时，会话启动会给出一条节流、fail-open 的 `⭐ 运行 /sybermem-update` 提醒（OpenCode `session.created` toast；Claude/Codex `SessionStart` 上下文）。随时可用 `sybermem doctor` 查看已安装版本与当前项目版本。
 
-全局刷新只更新用户级 runtime、Claude/OpenCode/Codex skills、按宿主版本选定的 OpenCode plugin 和 Codex 用户级 hooks；项目内的 `.sybermem/`、hooks、模板和说明文件需要 `/sybermem-update` 才会刷新。`/sybermem-update` 会优先调用 `sybermem project refresh --format json` 做可脚本化的项目内刷新，只有 CLI 缺失、执行失败或输出非 JSON 时才回退到 agent 编排的 `/sybermem-init-project`。Codex 的健康检查会把 `~/.agents/skills/sybermem-init-project/project-files` 作为模板来源之一，因此 Codex 安装路径也能参与项目 freshness 检查。老用户要拿到 OpenCode/Codex 新的 habit reminder、record-intent metadata、recall debug logging、`.memory-usage.jsonl`、Codex `SessionEnd` outcome 或 OpenCode 反馈链路，先重跑全局安装/更新以刷新 CLI/Core、OpenCode plugin 与 `~/.codex/hooks/*.py`，再进项目跑 `/sybermem-update`；`project refresh` 不会脚手架创建 `.memory-usage.jsonl` 这类 runtime log。V2 尚未恢复 V1 的远程版本后台刷新；不能把本地版本提醒当成远程刷新。若修复的是 CLI launcher、OpenCode plugin、Codex hook 或 skill 指令链路，也按这个顺序生效。
+全局刷新更新用户级 runtime、skills、按宿主版本选定的 OpenCode plugin 和 Codex hooks。项目内文件需 `/sybermem-update`：先确认作用域，再使用显式 `project refresh --root "<confirmed-target>" --format json` 并按上文核对结果。失败时停止检查可能的部分写入，再另行授权恢复；必要时推荐新会话 `/sybermem-init-project`。Codex 健康检查也识别已安装项目模板。先更新全局组件，再逐项目更新；project refresh 不创建 runtime logs。V2 尚未恢复 V1 的远程版本后台刷新，不能把本地版本提醒当成远程刷新。
 
 ## 初始化项目
+
+先将用户确认的目标规范化为绝对路径并展示；若与预期作用域不同，重新确认。以同一规范化目标核对返回 `root`，并保留祖先嵌套授权检查。Git 探测的固定 locale 为 `C`。本次仅批准 `doctor --runtime` 与 `project refresh --root` 两处接口扩展；这些检查不证明模型消费。
+
+显式分支拒绝非空 `GIT_*` 环境覆盖；Git 探测固定 locale，严格识别非仓库结果，Git 不可用或边界未知即拒绝。目标自有独立 repo 可用，祖先 worktree 子目录拒绝；拒绝后停止，不回退无参数调用。`--root` 是静态精确目标检查，不是 OS 沙箱，不保证竞态安全或全链路脱敏。真实 refresh 仍需 VM/OS 隔离验证，目前未验。
+
+显式 `--root` 会拒绝目标或祖先中的 symlink/reparse point、处于祖先 Git 工作树内但没有自有独立仓库的目标，以及无法确认 Git 边界的情况：Core 的 `git rm --cached` 可能影响祖先 index。用户确认嵌套项目不绕过这些检查；拒绝后停止，不回退无参数 refresh，不能保证任意嵌套目录均可初始化。
 
 在目标项目中运行：
 

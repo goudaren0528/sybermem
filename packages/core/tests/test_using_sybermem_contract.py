@@ -20,6 +20,7 @@ from skill_discovery_contract_helpers import (  # noqa: E402
     validate_reassessment,
     validate_taxonomy,
     validate_using_skill,
+    validate_refresh_scope,
 )
 
 CANONICAL_USING_SKILL = ROOT / "packages" / "claude-skills" / "using-sybermem" / "SKILL.md"
@@ -78,6 +79,62 @@ def test_using_skill_mirrors_are_byte_identical() -> None:
     assert CANONICAL_USING_SKILL.read_bytes() == MIRROR_USING_SKILL.read_bytes()
 
 
+@pytest.mark.parametrize(
+    "token",
+    [
+        "sybermem project refresh --format json",
+        "not hot-loaded",
+        "skip all CLI calls",
+        "no live host/session identity",
+        "sybermem doctor --runtime --format json",
+        'sybermem project refresh --root "<confirmed-target>" --format json',
+        "confirm the target existing directory",
+        "independent nested project",
+        "Do not execute refresh here",
+        "never downgrade to a no-argument refresh",
+    ],
+)
+def test_using_skill_rejects_missing_journey_or_evidence_boundary(tmp_path: Path, token: str) -> None:
+    mutated = tmp_path / "using-sybermem.md"
+    mutated.write_text(
+        CANONICAL_USING_SKILL.read_text(encoding="utf-8").replace(token, "removed"),
+        encoding="utf-8",
+    )
+    with pytest.raises(AssertionError):
+        validate_using_skill(mutated)
+
+
+def test_using_skill_rejects_runtime_diagnostics_in_default_flow(tmp_path: Path) -> None:
+    mutated = tmp_path / "using-sybermem.md"
+    mutated.write_text(
+        CANONICAL_USING_SKILL.read_text(encoding="utf-8").replace(
+            "### Step 2: Report a compact state summary",
+            "### Step 2: Report a compact state summary\n\nRun doctor --runtime every turn.",
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(AssertionError, match="on demand"):
+        validate_using_skill(mutated)
+
+
+@pytest.mark.parametrize("name", ["README.md", "README.en.md"])
+def test_readme_exposes_journey_and_approved_runtime_command(name: str) -> None:
+    text = (ROOT / name).read_text(encoding="utf-8")
+    for token in (
+        "/sybermem-init-project",
+        "/using-sybermem",
+        "/sybermem-resume",
+        "/sybermem-record",
+        "sybermem next-step --format json",
+        "sybermem project refresh --format json",
+        "sybermem doctor --runtime --format json",
+        'sybermem project refresh --root "<confirmed-target>" --format json',
+        '& $SyberMemCli project refresh --root "<confirmed-target>" --format json',
+        "unknown",
+    ):
+        assert token in text
+
+
 def test_using_skill_rejects_missing_next_step(tmp_path: Path) -> None:
     # Given: the Skill with canonical next-step routing removed
     mutated = tmp_path / "using-sybermem.md"
@@ -93,6 +150,68 @@ def test_using_skill_rejects_missing_next_step(tmp_path: Path) -> None:
         validate_using_skill(mutated)
 
 
+@pytest.mark.parametrize("name", [
+    "using-sybermem", "sybermem-install", "sybermem-init-project", "sybermem-update",
+])
+def test_project_setup_scope_and_mirror_contract(name: str) -> None:
+    source = ROOT / "skills" / name / "SKILL.md"
+    mirror = ROOT / "packages" / "claude-skills" / name / "SKILL.md"
+    validate_refresh_scope(source)
+    validate_refresh_scope(mirror)
+    assert source.read_bytes() == mirror.read_bytes()
+
+
+@pytest.mark.parametrize("token", [
+    'project refresh --root "<confirmed-target>" --format json',
+    "confirm the target existing directory",
+    "independent nested project",
+    "never downgrade to a no-argument refresh",
+    "partial writes",
+    "`root`",
+    "`overall`",
+])
+def test_refresh_scope_rejects_missing_boundary(tmp_path: Path, token: str) -> None:
+    text = (ROOT / "skills/sybermem-install/SKILL.md").read_text(encoding="utf-8")
+    mutated = tmp_path / "install.md"
+    mutated.write_text(text.replace(token, "removed"), encoding="utf-8")
+    with pytest.raises(AssertionError):
+        validate_refresh_scope(mutated)
+
+
+def test_refresh_scope_rejects_missing_powershell_call_operator(tmp_path: Path) -> None:
+    text = (ROOT / "skills/sybermem-install/SKILL.md").read_text(encoding="utf-8")
+    mutated = tmp_path / "install.md"
+    mutated.write_text(text.replace("& $SyberMemCli project refresh", "$SyberMemCli project refresh"), encoding="utf-8")
+    with pytest.raises(AssertionError, match="explicit refresh contract"):
+        validate_refresh_scope(mutated)
+
+
+def test_refresh_scope_rejects_command_before_confirmation(tmp_path: Path) -> None:
+    text = (ROOT / "skills/sybermem-install/SKILL.md").read_text(encoding="utf-8")
+    mutated = tmp_path / "install.md"
+    mutated.write_text(
+        '& $SyberMemCli project refresh --root "<confirmed-target>" --format json\n' + text,
+        encoding="utf-8",
+    )
+    with pytest.raises(AssertionError, match="confirm scope before"):
+        validate_refresh_scope(mutated)
+
+
+@pytest.mark.parametrize("token", [
+    "symlink/reparse points", "ancestor Git worktree", "own independent repository",
+    "unconfirmed Git boundary", "On rejection, stop", "never fall back to no-argument refresh",
+    "nonempty `GIT_*` environment overrides", "fixed locale", "strictly recognize",
+    "static exact-target check", "not an OS sandbox", "VM/OS isolation",
+    "Normalize the user-confirmed target to an absolute path",
+])
+def test_refresh_scope_rejects_missing_filesystem_boundary(tmp_path: Path, token: str) -> None:
+    text = (ROOT / "skills/sybermem-install/SKILL.md").read_text(encoding="utf-8")
+    mutated = tmp_path / "install.md"
+    mutated.write_text(text.replace(token, "removed"), encoding="utf-8")
+    with pytest.raises(AssertionError):
+        validate_refresh_scope(mutated)
+
+
 def test_using_skill_rejects_missing_non_mutation_token(tmp_path: Path) -> None:
     # Given: the Skill with its explicit non-mutation rule removed
     mutated = tmp_path / "using-sybermem.md"
@@ -105,6 +224,17 @@ def test_using_skill_rejects_missing_non_mutation_token(tmp_path: Path) -> None:
 
     # When / Then: the contract fails
     with pytest.raises(AssertionError, match="Do not run downstream actions"):
+        validate_using_skill(mutated)
+
+
+def test_using_skill_rejects_missing_powershell_call_operator(tmp_path: Path) -> None:
+    text = CANONICAL_USING_SKILL.read_text(encoding="utf-8")
+    command = "& $SyberMemCli next-step --format json"
+    assert command in text
+    mutated = tmp_path / "using-sybermem.md"
+    mutated.write_text(text.replace(command, command.removeprefix("& ")), encoding="utf-8")
+
+    with pytest.raises(AssertionError, match=r"& \$SyberMemCli next-step"):
         validate_using_skill(mutated)
 
 
@@ -126,9 +256,9 @@ def test_using_skill_rejects_missing_launcher_guidance(tmp_path: Path) -> None:
 def test_using_skill_rejects_advanced_before_default(tmp_path: Path) -> None:
     # Given: a Skill whose advanced diagnostics precede the default flow
     text = CANONICAL_USING_SKILL.read_text(encoding="utf-8")
-    default_start = text.index("## Default orientation flow")
-    advanced_start = text.index("## Advanced diagnostics")
-    output_start = text.index("## Output Style")
+    default_start = text.index("\n## Default orientation flow\n") + 1
+    advanced_start = text.index("\n## Advanced diagnostics\n") + 1
+    output_start = text.index("\n## Output Style\n") + 1
     mutated = tmp_path / "using-sybermem.md"
     mutated.write_text(
         text[:default_start]

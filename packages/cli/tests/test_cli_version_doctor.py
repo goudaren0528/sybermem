@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 from pathlib import Path
 import sys
 
@@ -70,3 +71,61 @@ def test_cli_doctor_text_current_project(tmp_path: Path, monkeypatch, capsys) ->
     assert exit_code == 0
     assert "current with the installed SyberMem" in captured.out
     assert captured.err == ""
+
+
+def test_doctor_runtime_json_keeps_default_contract_and_ignores_old_logs(tmp_path, monkeypatch, capsys):
+    project = tmp_path / "project"
+    memory = project / ".sybermem"
+    memory.mkdir(parents=True)
+    (memory / "project.yaml").write_text("schema_version: 1\nslug: demo\nsybermem_version: 0.0.1\n", encoding="utf-8")
+    (memory / ".memory-usage.jsonl").write_text('{"session":"past","timestamp":"2099-01-01T00:00:00Z","event":"inject"}\n', encoding="utf-8")
+    before = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in memory.iterdir()}
+    monkeypatch.setattr(main_module, "resolve_project_root", lambda: project)
+    monkeypatch.setattr("sybermem_core.doctor.get_installed_version", lambda: "1.0.0")
+    monkeypatch.setattr(sys, "argv", ["sybermem", "doctor", "--format", "json"])
+    assert main_module.main() == 0
+    baseline = json.loads(capsys.readouterr().out)
+    assert baseline == {"installed": "1.0.0", "project": "0.0.1", "outdated": True, "recommendation": "/sybermem-update"}
+    monkeypatch.setattr(sys, "argv", ["sybermem", "doctor", "--runtime", "--format", "json"])
+    assert main_module.main() == 0
+    payload = json.loads(capsys.readouterr().out)
+    runtime = payload.pop("runtime")
+    assert payload == baseline
+    assert runtime["installation"]["status"] == "available"
+    assert runtime["installation"]["version"] == "1.0.0"
+    assert "package metadata or bundled fallback" in runtime["installation"]["evidence"]
+    assert runtime["project_stamp"]["status"] == "stamped"
+    assert runtime["project_stamp"]["outdated"] is True
+    assert runtime["host_loaded"]["status"] == "unknown"
+    assert runtime["current_turn_delivery"]["status"] == "unknown"
+    assert "No live" in runtime["host_loaded"]["reason"]
+    assert "No live" in runtime["current_turn_delivery"]["reason"]
+    assert {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in memory.iterdir()} == before
+
+
+def test_doctor_runtime_no_project_and_text(monkeypatch, capsys):
+    monkeypatch.setattr(main_module, "resolve_project_root", lambda: None)
+    monkeypatch.setattr("sybermem_core.doctor.get_installed_version", lambda: "1.0.0")
+    monkeypatch.setattr(sys, "argv", ["sybermem", "doctor", "--runtime", "--format", "json"])
+    assert main_module.main() == 0
+    data = json.loads(capsys.readouterr().out)
+    assert data["runtime"]["project_stamp"]["status"] == "not_found"
+    assert data["runtime"]["host_loaded"]["status"] == "unknown"
+    monkeypatch.setattr(sys, "argv", ["sybermem", "doctor", "--runtime"])
+    assert main_module.main() == 0
+    text = capsys.readouterr().out
+    assert "CLI/core available: available" in text
+    assert "Project stamp: not_found" in text
+    assert "Current host loaded: unknown" in text
+    assert "Current turn context delivery: unknown" in text
+    assert "Next check:" in text
+
+
+def test_doctor_rejects_unapproved_identity_flags(monkeypatch, capsys):
+    import pytest
+    for flag in ("--host", "--session", "--turn"):
+        monkeypatch.setattr(sys, "argv", ["sybermem", "doctor", "--runtime", flag, "synthetic"])
+        with pytest.raises(SystemExit) as exc:
+            main_module.main()
+        assert exc.value.code == 2
+        capsys.readouterr()

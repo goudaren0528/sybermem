@@ -43,7 +43,7 @@ has not been restored.
 
 <HARD-GATE>
 Do NOT claim installation succeeded without checking the shared CLI and reporting each host separately; distinguish OpenCode install/hash, loader and functionality.
-Do NOT rely on `/sybermem-init-project` (a skill) for in-session project init: skills just landed on disk are typically NOT hot-loaded in the current session. Use the CLI-first path (`sybermem project refresh --format json`); only offer `/sybermem-init-project` as a NEXT-session fallback.
+Do NOT rely on `/sybermem-init-project` (a skill) for in-session project init: skills just landed on disk are typically NOT hot-loaded in the current session. Use the explicitly scoped CLI-first path (`sybermem project refresh --root "<confirmed-target>" --format json`); only offer `/sybermem-init-project` as a NEXT-session fallback.
 Do NOT report success when the download, venv/pip, or CLI readiness step failed. Report which stage failed and stop honestly.
 Do NOT run any destructive action. This skill only installs; it never deletes user data or project `.sybermem/` records.
 </HARD-GATE>
@@ -161,27 +161,54 @@ fixed launcher (see CLI Resolution) and confirm it runs:
 "%USERPROFILE%\.claude\sybermem\cli\sybermem.cmd" project refresh --help
 ```
 
-Exit code 0 → CLI ready. Nonzero or launcher missing → CLI **error**: the project-init
-step (Step 6) must fall back, and the user should re-run the install command.
+Exit code 0 and help listing `--root` → CLI ready for Step 6. Nonzero or launcher
+missing → CLI **error**: defer project init and report installation recovery.
+If an older CLI rejects `--root`, stop and recommend upgrading or using the skill in
+a new session; never downgrade to a no-argument refresh.
 
 ### Step 6: Initialize the current project (CLI-first)
 
-If the current working directory is a project (has code, or the user asked to set it
-up), initialize it — mirroring `/sybermem-update`'s CLI-first model:
+First confirm the target existing directory with the user; cwd alone is not
+authorization. If a SyberMem ancestor exists, ask whether the user wants an
+independent nested project. Do not silently choose the parent or child.
+Nested-project approval does not bypass CLI safety checks: `--root` rejects target
+or ancestor symlink/reparse points, a target inside an ancestor Git worktree unless
+it has its own independent repository, and an unconfirmed Git boundary. Core may
+otherwise run `git rm --cached` against an ancestor index. On rejection, stop;
+never fall back to no-argument refresh. Not every nested directory is supported.
+The explicit branch rejects nonempty `GIT_*` environment overrides and unavailable
+Git or an unknown boundary; Git probes use a fixed locale (`C`) and strictly recognize
+non-repository results. An independent repository at the target is allowed, an
+ancestor-worktree subdirectory is rejected. `--root` is a static exact-target check,
+not an OS sandbox or a race-safety/full-chain-redaction guarantee. Real refresh
+validation requires VM/OS isolation and has not yet been performed.
+Normalize the user-confirmed target to an absolute path before running the command;
+show that normalized path and reconfirm if it differs from the intended scope.
+Compare returned `root` using that same normalized target. These checks do not prove
+model consumption. Only `doctor --runtime` and `project refresh --root` are
+authorized interface additions in this change.
+Explicit `--root` uses exactly that existing directory: no upward resolution,
+implicit mkdir, or fallback. Legacy `sybermem project refresh --format json` still
+walks physical ancestors for markers and exits 1 if no root resolves; changing HOME
+does not prevent that search. Legacy `sybermem project init` provides identity for
+an existing resolved root, not a full fresh-project initialization.
+Once scope is confirmed and the launcher is verified:
 
 1. **CLI-first (in-session, works immediately):** run
    ```powershell
-   & $SyberMemCli project refresh --format json
+    & $SyberMemCli project refresh --root "<confirmed-target>" --format json
    ```
    ```bash
-   "$SYBERMEM_CLI" project refresh --format json
+    "$SYBERMEM_CLI" project refresh --root "<confirmed-target>" --format json
    ```
    ```cmd
-   "%USERPROFILE%\.claude\sybermem\cli\sybermem.cmd" project refresh --format json
+    "%USERPROFILE%\.claude\sybermem\cli\sybermem.cmd" project refresh --root "<confirmed-target>" --format json
    ```
    The CLI is a child process and is usable the moment the installer finishes, so this
-   is the in-session path. If it exits 0 with valid JSON, summarize the report
-   (`overall`, and any created/refreshed/preserved actions). Project init is complete.
+    is the in-session path. Require exit 0, valid JSON, returned `root` matching the
+    authorized target, and `overall` equal to `fresh` or `updated`. Summarize actual
+    created/refreshed/preserved/skipped actions, not blanket success for every file.
+    Failure may leave partial writes; do not blindly retry.
 
 2. **Fallback — split by cause (do NOT blanket-report success):**
    - **CLI itself not ready** (fixed launcher missing, or `project refresh --help` was
@@ -189,10 +216,10 @@ up), initialize it — mirroring `/sybermem-update`'s CLI-first model:
      CLI runtime is part of "complete install" (PRD G2 / A3). Report CLI-not-ready,
      advise re-running the install command, and defer project init. Do not call the
      global install complete.
-   - **CLI ready but this project's refresh failed** (`project refresh --format json`
-     exited nonzero or emitted non-JSON, while `--help` succeeded): the global install
-     **is** a success; only the in-session project init is deferred. Tell the user to run
-     `/sybermem-init-project` **in a new session**.
+    - **Project refresh failed** (nonzero, invalid JSON, wrong `root`, or failed
+      `overall`): stop and report possible partial project writes. Global installation
+      evidence remains separate. Inspect the target before recovery; offer
+      `/sybermem-init-project` in a new session, not an automatic retry.
 
    In both cases, do NOT try to trigger `/sybermem-init-project` in the current session —
    skills just written to disk by the installer are typically not hot-loaded until the
@@ -223,7 +250,7 @@ and never claim success on partial completion.
 | `python` not found (PowerShell-free Windows path relies on it) | "python not found" | PowerShell users can switch to the `install-remote.ps1` path; provide it. Do not silently fail. |
 | venv creation / `pip install` fails | "CLI install failed" + the pip error | Other global components may already be on disk — report **partial completion**, state that the CLI is NOT ready, and advise re-running the install command. |
 | CLI readiness check fails (launcher present but `--help` nonzero) | "CLI is not ready" | Project init (Step 6) falls back to the next-session `/sybermem-init-project`; advise re-running install. |
-| Step 6 CLI exits nonzero / non-JSON | Not fatal | Fall back to next-session `/sybermem-init-project`; the global install still counts as success. |
+| Step 6 fails or returns wrong root/failed overall | Project setup incomplete; partial writes possible | Stop, inspect authorized scope, then offer next-session recovery; do not blindly retry. |
 | A host base dir missing (user doesn't use that host) | "Host X not present, skipped" | Not a failure; informational only. |
 
 ## Idempotency
@@ -253,7 +280,7 @@ This skill is complete when:
 - the official remote install script ran and reached its completion banner
 - all three hosts were verified and reported as ready / skipped / error
 - the shared CLI was verified ready (or its failure was honestly reported)
-- inside a project: `sybermem project refresh --format json` succeeded, or the CLI-unavailable case was deferred to a next-session `/sybermem-init-project`
+- project setup: explicit `--root` result matched the confirmed target and `overall` was `fresh` or `updated`, or setup was honestly deferred/skipped/failed
 - the user received an install summary with version, per-host readiness, and next steps
 
 ## Safety Rules

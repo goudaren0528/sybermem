@@ -94,7 +94,8 @@ def discover_template_roots() -> tuple[Path, ...]:
     return tuple(path for path in candidates if path.is_dir())
 
 
-def refresh_project(root: Path, template_roots: tuple[Path, ...] | None = None) -> ProjectRefreshReport:
+def refresh_project(root: Path, template_roots: tuple[Path, ...] | None = None,
+                    *, git_env: dict[str, str] | None = None) -> ProjectRefreshReport:
     resolved_root = root.resolve()
     roots = template_roots if template_roots is not None else discover_template_roots()
     templates = _load_templates(roots)
@@ -144,13 +145,13 @@ def refresh_project(root: Path, template_roots: tuple[Path, ...] | None = None) 
     # Ignore machine-local SyberMem runtime/scripts and the locally derived INDEX
     # in the user's .gitignore. Skipped for non-git projects. Records and other
     # canonical memory remain shareable and committable.
-    gitignore_outcome = _ensure_gitignore(resolved_root)
+    gitignore_outcome = _ensure_gitignore(resolved_root, git_env=git_env)
     files[".gitignore"] = gitignore_outcome
     _collect_actions(gitignore_outcome, actions_needed, actions_applied, actions_skipped)
 
     # Migrate an already-tracked derived INDEX after the ignore rule is present,
     # but before the version stamp completion marker is written.
-    index_tracking_outcome = _untrack_derived_index(resolved_root)
+    index_tracking_outcome = _untrack_derived_index(resolved_root, git_env=git_env)
     files[".sybermem/INDEX.md:git-tracking"] = index_tracking_outcome
     _collect_actions(index_tracking_outcome, actions_needed, actions_applied, actions_skipped)
 
@@ -274,7 +275,7 @@ def _stamp_project_version(root: Path) -> FileRefresh:
     return {"status": "updated", "action": "add sybermem_version to .sybermem/project.yaml"}
 
 
-def _ensure_gitignore(root: Path) -> FileRefresh:
+def _ensure_gitignore(root: Path, *, git_env: dict[str, str] | None = None) -> FileRefresh:
     """Add a marker-bounded SyberMem ignore block to the project's .gitignore.
 
     - Non-git project (no `.git`): skip (fresh, no action).
@@ -283,7 +284,7 @@ def _ensure_gitignore(root: Path) -> FileRefresh:
     - Block present and current: leave untouched (fresh).
     Content outside the marker block is always preserved verbatim.
     """
-    if not _git_worktree_available(root):
+    if not _git_worktree_available(root, git_env=git_env):
         return {"status": "fresh"}
 
     target = _guard_project_path(root, ".gitignore")
@@ -307,11 +308,11 @@ def _ensure_gitignore(root: Path) -> FileRefresh:
     return {"status": "updated", "action": "refresh SyberMem ignore block in .gitignore (preserve content outside block)"}
 
 
-def _untrack_derived_index(root: Path) -> FileRefresh:
+def _untrack_derived_index(root: Path, *, git_env: dict[str, str] | None = None) -> FileRefresh:
     """Safely remove a tracked derived INDEX from Git's index, retaining its file."""
     command_prefix = f"git -C {root}"
     try:
-        worktree = _run_git(root, ["rev-parse", "--is-inside-work-tree"])
+        worktree = _run_git(root, ["rev-parse", "--is-inside-work-tree"], git_env=git_env)
     except (OSError, subprocess.SubprocessError):
         return {"status": "failed", "action": f"untrack INDEX failed; run `git -C {root} rev-parse --is-inside-work-tree` manually"}
     if worktree.returncode != 0:
@@ -322,7 +323,7 @@ def _untrack_derived_index(root: Path) -> FileRefresh:
         return {"status": "skipped", "reason": "not a Git work-tree"}
 
     try:
-        tracked = _run_git(root, ["ls-files", "--error-unmatch", "--", ".sybermem/INDEX.md"])
+        tracked = _run_git(root, ["ls-files", "--error-unmatch", "--", ".sybermem/INDEX.md"], git_env=git_env)
     except (OSError, subprocess.SubprocessError):
         return {"status": "failed", "action": "check INDEX tracking failed; run `git ls-files --error-unmatch -- .sybermem/INDEX.md` manually"}
     if tracked.returncode != 0:
@@ -332,7 +333,7 @@ def _untrack_derived_index(root: Path) -> FileRefresh:
 
     manual = "git rm --cached -- .sybermem/INDEX.md"
     try:
-        removed = _run_git(root, ["rm", "--cached", "--", ".sybermem/INDEX.md"])
+        removed = _run_git(root, ["rm", "--cached", "--", ".sybermem/INDEX.md"], git_env=git_env)
     except (OSError, subprocess.SubprocessError) as exc:
         return {"status": "failed", "action": f"untrack INDEX failed; run `{manual}` manually ({exc})"}
     if removed.returncode != 0:
@@ -346,7 +347,8 @@ def _untrack_derived_index(root: Path) -> FileRefresh:
     return {"status": "untracked", "action": "untrack .sybermem/INDEX.md from Git index (working file preserved)"}
 
 
-def _run_git(root: Path, args: list[str]) -> subprocess.CompletedProcess[str]:
+def _run_git(root: Path, args: list[str], *, git_env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
+    options = {"env": git_env} if git_env is not None else {}
     return subprocess.run(
         ["git", "-C", str(root), *args],
         capture_output=True,
@@ -355,6 +357,7 @@ def _run_git(root: Path, args: list[str]) -> subprocess.CompletedProcess[str]:
         encoding="utf-8",
         errors="replace",
         check=False,
+        **options,
     )
 
 
@@ -366,9 +369,9 @@ def _git_worktree_status(root: Path) -> str:
     return result.stdout.strip().lower() if result.returncode == 0 else ""
 
 
-def _git_worktree_available(root: Path) -> bool:
+def _git_worktree_available(root: Path, *, git_env: dict[str, str] | None = None) -> bool:
     try:
-        result = _run_git(root, ["rev-parse", "--is-inside-work-tree"])
+        result = _run_git(root, ["rev-parse", "--is-inside-work-tree"], git_env=git_env)
     except (OSError, subprocess.SubprocessError):
         return False
     return result.returncode == 0 and result.stdout.strip().lower() == "true"

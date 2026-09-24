@@ -6,7 +6,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from sybermem_core.version import compare_versions, is_outdated, get_installed_version, project_needs_update
-from sybermem_core.doctor import version_report
+from sybermem_core.doctor import runtime_report, version_report
 from sybermem_core.project_refresh import refresh_project
 
 
@@ -115,6 +115,30 @@ def test_version_report_unmanaged_project_not_flagged(tmp_path: Path) -> None:
     assert report["recommendation"] == ""
 
 
+def test_runtime_report_has_no_host_identity_or_log_read(tmp_path: Path, monkeypatch) -> None:
+    root = tmp_path / "project"
+    root.mkdir()
+    from pathlib import Path as ActualPath
+
+    original_read_text = ActualPath.read_text
+
+    def deny_read(self, *args, **kwargs):
+        if self.name.endswith(".jsonl"):
+            raise AssertionError("runtime must not read historical journals")
+        return original_read_text(self, *args, **kwargs)
+
+    monkeypatch.setattr(ActualPath, "read_text", deny_read)
+    for project, stamp, outdated in ((root, "0.0.1", True), (None, "", False)):
+        runtime = runtime_report(project, {
+            "installed": "1.0.0", "project": stamp, "outdated": outdated,
+            "recommendation": "/sybermem-update" if outdated else "",
+        })
+        assert runtime["installation"]["status"] == "available"
+        assert runtime["project_stamp"]["outdated"] is outdated
+        assert runtime["host_loaded"]["status"] == "unknown"
+        assert runtime["current_turn_delivery"]["status"] == "unknown"
+
+
 def _seed_minimal(project_root: Path, template_root: Path) -> None:
     (project_root / ".sybermem").mkdir(parents=True, exist_ok=True)
     (project_root / ".claude").mkdir(parents=True, exist_ok=True)
@@ -190,7 +214,7 @@ def test_refresh_does_not_stamp_version_if_migration_step_fails(tmp_path: Path, 
         encoding="utf-8",
     )
 
-    def boom(_root):
+    def boom(_root, *, git_env=None):
         raise RuntimeError("simulated gitignore failure mid-migration")
 
     monkeypatch.setattr(pr, "_ensure_gitignore", boom)

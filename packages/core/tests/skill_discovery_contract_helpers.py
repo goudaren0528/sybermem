@@ -24,6 +24,7 @@ ADVANCED_DIAGNOSTICS_HEADING = "## Advanced diagnostics"
 
 DEFAULT_FLOW_REQUIRED = (
     "sybermem next-step --format json",
+    "& $SyberMemCli next-step --format json",
     "project root",
     "installation status",
     "project status",
@@ -34,6 +35,12 @@ ADVANCED_DIAGNOSTICS_REQUIRED = (
     "hooks",
     "anchors",
     "legacy protocol",
+    "sybermem doctor --runtime --format json",
+    "unknown",
+    "unsupported",
+    "unmatched",
+    "no live host/session identity",
+    "do not run doctor",
 )
 
 WINDOWS_LAUNCHER_FRAGMENT = r"$env:USERPROFILE\.claude\sybermem\cli\sybermem.cmd"
@@ -45,7 +52,58 @@ FILE_REQUIRED = (
     "$SyberMemCli",
     "SYBERMEM_CLI",
     "Do not modify persistent PATH automatically",
+    "sybermem project refresh --format json",
+    "/sybermem-init-project",
+    "/sybermem-resume",
+    "/sybermem-record",
+    "not hot-loaded",
+    "skip all CLI calls",
+    'sybermem project refresh --root "<confirmed-target>" --format json',
+    '& $SyberMemCli project refresh --root "<confirmed-target>" --format json',
+    "confirm the target existing directory",
+    "independent nested project",
+    "Do not execute refresh here",
+    "never downgrade to a no-argument refresh",
 )
+
+REFRESH_SCOPE_REQUIRED = (
+    "Normalize the user-confirmed target to an absolute path",
+    "nonempty `GIT_*` environment overrides",
+    "fixed locale",
+    "strictly recognize",
+    "unavailable Git or an unknown boundary",
+    "static exact-target check",
+    "not an OS sandbox",
+    "VM/OS isolation",
+    "symlink/reparse points",
+    "ancestor Git worktree",
+    "own independent repository",
+    "unconfirmed Git boundary",
+    "On rejection, stop",
+    "never fall back to no-argument refresh",
+    'project refresh --root "<confirmed-target>" --format json',
+    '& $SyberMemCli project refresh --root "<confirmed-target>" --format json',
+    '"$SYBERMEM_CLI" project refresh --root "<confirmed-target>" --format json',
+    "confirm the target existing directory",
+    "independent nested project",
+    "no upward resolution",
+    "implicit mkdir",
+    "never downgrade to a no-argument refresh",
+    "partial writes",
+    "`root`",
+    "`overall`",
+    "`fresh` or `updated`",
+)
+
+
+def validate_refresh_scope(path: Path) -> None:
+    """Check scope and failure boundaries without executing any CLI command."""
+    text = " ".join(_read(path).split())
+    for token in REFRESH_SCOPE_REQUIRED:
+        assert token in text, f"{path}: missing explicit refresh contract {token!r}"
+    assert text.index("confirm the target existing directory") < text.index(
+        '& $SyberMemCli project refresh --root'
+    ), f"{path}: confirm scope before executable refresh example"
 
 # --- Core / Advanced discovery catalog -------------------------------------
 
@@ -174,6 +232,8 @@ def validate_using_skill(path: Path) -> None:
         )
 
     default_section = "\n".join(_section_lines(text, DEFAULT_FLOW_HEADING))
+    if "doctor --runtime" in default_section:
+        raise AssertionError(f"{path}: runtime diagnostics must stay on demand, outside default flow")
     for token in DEFAULT_FLOW_REQUIRED:
         if token not in default_section:
             raise AssertionError(f"{path}: default orientation flow missing {token!r}")
