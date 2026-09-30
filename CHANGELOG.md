@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## 0.9.0 - 2026-09-30
+
+### Added
+- OpenCode V2 plugin now renders TUI toasts through a paced queue: summaries display for 3.5s and advisories for 5s, up to three candidates wait with a 15s TTL, and priority (version > summary > habit > idle) can jump the queue without interrupting the toast currently on screen; route changes and unload clear pending queues and timers, and duplicate or oversized notices are deduplicated or truncated.
+- Remote-version awareness: the OpenCode V2 plugin checks the official VERSION feed behind a 24h cache with single-flight refresh, validates version strings end to end (`isPlausibleVersion`), never reads 403/429/5xx response bodies, and distinguishes "project needs refresh" from "a new SyberMem version is available" advisories.
+
+### Changed
+- The `sybermem-feedback` RPC keeps one id and strict schemas while the status output gains optional `protocolVersion` (2) and `versionStatus` entries; gate restore replays summaries and version hints in ascending sequence order and advances a silent watermark for same-message higher-sequence snapshots, so late or stale live notices never replay old toasts.
+- Lifecycle hardening in the V2 host: setup-epoch globally monotonic feedback sequence (no regression after eviction, deletion, or reconnect), a 256-session LRU cap for version-only state that preserves active session accounting, and unconditional per-session release on `session.deleted` so status-only sessions no longer leak.
+
 ## 0.8.0 - 2026-09-24
 
 ### Added
