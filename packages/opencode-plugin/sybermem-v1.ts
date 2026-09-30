@@ -1376,6 +1376,15 @@ import { dirname, join as join7 } from "path";
 var REMOTE_VERSION_URL = "https://raw.githubusercontent.com/goudaren0528/sybermem/main/VERSION";
 var CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 var FETCH_TIMEOUT_MS = 3000;
+var MAX_VERSION_LENGTH = 32;
+var VERSION_RE = /^v?\d+(?:\.\d+){1,3}(?:-[0-9A-Za-z]+(?:\.[0-9A-Za-z]+)*)?(?:\+[0-9A-Za-z]+(?:\.[0-9A-Za-z]+)*)?$/;
+function isPlausibleVersion(value) {
+  if (typeof value !== "string")
+    return false;
+  if (value.length === 0 || value.length > MAX_VERSION_LENGTH)
+    return false;
+  return VERSION_RE.test(value);
+}
 function userHome3() {
   return process.env.USERPROFILE ?? process.env.HOME ?? null;
 }
@@ -1398,9 +1407,12 @@ function parseRemoteVersionCache(raw) {
     const checked = Reflect.get(data, "checked_at");
     if (typeof remote !== "string" || !remote.trim())
       return null;
+    const remoteVersion = remote.trim();
+    if (!isPlausibleVersion(remoteVersion))
+      return null;
     if (typeof checked !== "string" || !checked.trim())
       return null;
-    return { remote_version: remote.trim(), checked_at: checked.trim() };
+    return { remote_version: remoteVersion, checked_at: checked.trim() };
   } catch {
     return null;
   }
@@ -1434,7 +1446,7 @@ function cacheIsStale(cache, now = Date.now()) {
   return now - checkedAt >= CACHE_TTL_MS;
 }
 function remoteIsNewer(remoteVersion, installedVersion) {
-  if (!remoteVersion || !installedVersion)
+  if (!isPlausibleVersion(remoteVersion) || !isPlausibleVersion(installedVersion))
     return false;
   return compareVersions(remoteVersion, installedVersion) > 0;
 }
@@ -1461,7 +1473,7 @@ async function fetchRemoteVersion() {
       const body = (await response.text()).trim();
       const firstLine = body.split(`
 `)[0]?.trim() ?? "";
-      if (!firstLine || firstLine.length > 32 || !/^[0-9]/.test(firstLine))
+      if (!isPlausibleVersion(firstLine))
         return null;
       return firstLine;
     } finally {
@@ -1471,13 +1483,22 @@ async function fetchRemoteVersion() {
     return null;
   }
 }
-async function refreshRemoteVersionCache(now = Date.now()) {
+var refreshInFlight = null;
+function refreshRemoteVersionCache(now = Date.now()) {
   if (remoteCheckDisabled())
-    return;
-  const remote = await fetchRemoteVersion();
-  if (!remote)
-    return;
-  writeRemoteVersionCache({ remote_version: remote, checked_at: new Date(now).toISOString() });
+    return Promise.resolve();
+  if (refreshInFlight)
+    return refreshInFlight;
+  refreshInFlight = (async () => {
+    try {
+      const remote = await fetchRemoteVersion();
+      if (remote)
+        writeRemoteVersionCache({ remote_version: remote, checked_at: new Date(now).toISOString() });
+    } catch {} finally {
+      refreshInFlight = null;
+    }
+  })();
+  return refreshInFlight;
 }
 function evaluateRemoteVersion() {
   if (remoteCheckDisabled())

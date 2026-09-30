@@ -1,4 +1,5 @@
 import { feedbackRpc, feedbackGate, sameLocation, type FeedbackNotice, type FeedbackStatus } from "./v2_feedback"
+import { createToastQueue, type ToastClock } from "./toast_queue"
 
 interface TuiContext {
   location?: { directory: string }
@@ -10,7 +11,7 @@ interface TuiContext {
   } }
 }
 
-export function setupSyberMemTui(ctx: TuiContext, refreshMs = 2000): () => void {
+export function setupSyberMemTui(ctx: TuiContext, refreshMs = 2000, options?: { clock?: ToastClock }): () => void {
   const directory = ctx.location?.directory
   if (!directory) return () => {}
   const rpc = ctx.client.rpc(feedbackRpc)
@@ -20,16 +21,38 @@ export function setupSyberMemTui(ctx: TuiContext, refreshMs = 2000): () => void 
   let generation = 0
   let pending: { sessionID: string; generation: number; queued: boolean } | undefined
   const active = (sessionID: string) => sameLocation(ctx.location?.directory, directory) && ctx.ui.router.current().type === "session" && ctx.ui.router.current().sessionID === sessionID
+
+  const queue = createToastQueue({
+    clock: options?.clock,
+    isActive: (sessionID) => !stopped && active(sessionID),
+    showToast: (input) => {
+      if (!stopped && active(input.sessionID)) {
+        ctx.ui.toast.show(input)
+      }
+    },
+  })
+
   const gate = feedbackGate(directory, () => ctx.ui.router.current(), (notice) => {
-    if (!stopped && active(notice.sessionID)) ctx.ui.toast.show({ title: "SyberMem", message: notice.message, variant: "info", duration: notice.kind === "summary" ? 3500 : 5000, sessionID: notice.sessionID })
+    if (!stopped && active(notice.sessionID)) {
+      queue.enqueue(notice)
+    }
   })
   const refresh = (force = false) => {
     if (stopped) return
     const route = ctx.ui.router.current()
     const sessionID = sameLocation(ctx.location?.directory, directory) && route.type === "session" ? route.sessionID : undefined
-    if (sessionID !== selected) { selected = sessionID; ++generation; pending = undefined; force = true }
+    if (sessionID !== selected) {
+      selected = sessionID
+      ++generation
+      pending = undefined
+      force = true
+      queue.clear()
+    }
     if (!force) return
-    if (!sessionID) return
+    if (!sessionID) {
+      queue.clear()
+      return
+    }
     if (pending) { pending.queued = true; return }
     const task = { sessionID, generation, queued: false }
     pending = task
@@ -51,10 +74,16 @@ export function setupSyberMemTui(ctx: TuiContext, refreshMs = 2000): () => void 
   })
   const offData = ctx.data?.listen(() => refresh(true))
   refresh()
-  const timer = setInterval(() => { refresh(++ticks % 5 === 0) }, refreshMs)
+  const clock = options?.clock
+  const timer = clock?.setInterval
+    ? clock.setInterval(() => { refresh(++ticks % 5 === 0) }, refreshMs)
+    : setInterval(() => { refresh(++ticks % 5 === 0) }, refreshMs)
   return () => {
     if (stopped) return
-    stopped = true; ++generation; pending = undefined; clearInterval(timer)
+    stopped = true; ++generation; pending = undefined
+    if (clock?.clearInterval) clock.clearInterval(timer)
+    else clearInterval(timer as any)
+    queue.dispose()
     // A faulty disposer must not keep another listener or gate alive.
     try { offData?.() } catch { /* continue cleanup */ }
     try { off() } catch { /* continue cleanup */ }

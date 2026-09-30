@@ -23,6 +23,25 @@ export interface RemoteVersionCache {
   readonly checked_at: string
 }
 
+const MAX_VERSION_LENGTH = 32
+
+// The published VERSION is a short, strict dotted release string, optionally
+// carrying a leading `v` tag and/or a semver prerelease and/or build metadata
+// (e.g. `0.7.0`, `v1.2.3`, `1.2.3-rc.1`, `1.2.3-rc.1+build.5`). Anything else is
+// not a version and must be rejected: HTML, embedded whitespace, control
+// characters, an over-long blob, or "numeric prefix" garbage such as `9<script>`
+// that compareVersions would otherwise truncate to `9` and echo into the
+// user-visible nudge. Shared by the cache parser, the fetch path, and the nudge
+// so a hostile remote/cache value can never reach compareVersions or the toast.
+const VERSION_RE =
+  /^v?\d+(?:\.\d+){1,3}(?:-[0-9A-Za-z]+(?:\.[0-9A-Za-z]+)*)?(?:\+[0-9A-Za-z]+(?:\.[0-9A-Za-z]+)*)?$/
+
+export function isPlausibleVersion(value: unknown): boolean {
+  if (typeof value !== "string") return false
+  if (value.length === 0 || value.length > MAX_VERSION_LENGTH) return false
+  return VERSION_RE.test(value)
+}
+
 function userHome(): string | null {
   return process.env.USERPROFILE ?? process.env.HOME ?? null
 }
@@ -47,8 +66,10 @@ export function parseRemoteVersionCache(raw: string): RemoteVersionCache | null 
     const remote = Reflect.get(data, "remote_version")
     const checked = Reflect.get(data, "checked_at")
     if (typeof remote !== "string" || !remote.trim()) return null
+    const remoteVersion = remote.trim()
+    if (!isPlausibleVersion(remoteVersion)) return null
     if (typeof checked !== "string" || !checked.trim()) return null
-    return { remote_version: remote.trim(), checked_at: checked.trim() }
+    return { remote_version: remoteVersion, checked_at: checked.trim() }
   } catch {
     return null
   }
@@ -84,9 +105,10 @@ export function cacheIsStale(cache: RemoteVersionCache | null, now: number = Dat
 }
 
 // Pure decision: does the cached remote version exceed the installed version?
-// Fail-safe: unknown/empty either side -> false (never nag when we can't judge).
+// Fail-safe: unknown/implausible either side -> false (never nag on a version we
+// cannot trust, and never let a malformed string reach compareVersions).
 export function remoteIsNewer(remoteVersion: string, installedVersion: string): boolean {
-  if (!remoteVersion || !installedVersion) return false
+  if (!isPlausibleVersion(remoteVersion) || !isPlausibleVersion(installedVersion)) return false
   return compareVersions(remoteVersion, installedVersion) > 0
 }
 
@@ -116,9 +138,10 @@ export async function fetchRemoteVersion(): Promise<string | null> {
       if (!response.ok) return null
       const body = (await response.text()).trim()
       // A VERSION file is a short dotted string; reject anything that looks like
-      // an HTML error page or is implausibly long.
+      // an HTML error page, carries whitespace/control characters, is implausibly
+      // long, or is numeric-prefix garbage (e.g. `9<script>`).
       const firstLine = body.split("\n")[0]?.trim() ?? ""
-      if (!firstLine || firstLine.length > 32 || !/^[0-9]/.test(firstLine)) return null
+      if (!isPlausibleVersion(firstLine)) return null
       return firstLine
     } finally {
       clearTimeout(timer)
@@ -131,11 +154,27 @@ export async function fetchRemoteVersion(): Promise<string | null> {
 // Fire-and-forget refresh: when enabled and the cache is stale, fetch the
 // published version and update the cache. The current session never awaits this;
 // the fresh value is only used on the NEXT session-start. Fully fail-open.
-export async function refreshRemoteVersionCache(now: number = Date.now()): Promise<void> {
-  if (remoteCheckDisabled()) return
-  const remote = await fetchRemoteVersion()
-  if (!remote) return
-  writeRemoteVersionCache({ remote_version: remote, checked_at: new Date(now).toISOString() })
+//
+// Single-flight: several setups/locations may observe the same stale cache in the
+// same tick. Share one in-flight refresh so the network is hit at most once per
+// cold window; the promise is cleared as soon as it settles so a later session can
+// retry after a failure.
+let refreshInFlight: Promise<void> | null = null
+
+export function refreshRemoteVersionCache(now: number = Date.now()): Promise<void> {
+  if (remoteCheckDisabled()) return Promise.resolve()
+  if (refreshInFlight) return refreshInFlight
+  refreshInFlight = (async () => {
+    try {
+      const remote = await fetchRemoteVersion()
+      if (remote) writeRemoteVersionCache({ remote_version: remote, checked_at: new Date(now).toISOString() })
+    } catch {
+      // Best-effort background refresh; a failure must never surface.
+    } finally {
+      refreshInFlight = null
+    }
+  })()
+  return refreshInFlight
 }
 
 // Convenience for the plugin: return the nudge message (from cache) and, when

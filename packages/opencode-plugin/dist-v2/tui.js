@@ -9,6 +9,16 @@
 import { resolve } from "path";
 var text = { type: "string" };
 var integer = { type: "integer", minimum: 0 };
+var noticeSchema = { type: "object", additionalProperties: false, required: ["epoch", "sessionID", "sequence", "kind", "message", "messageID", "totalItems", "totalChars"], properties: {
+  epoch: text,
+  sessionID: text,
+  sequence: integer,
+  kind: { type: "string", enum: ["summary", "advisory"] },
+  message: text,
+  messageID: text,
+  totalItems: integer,
+  totalChars: integer
+} };
 var summarySchema = { type: "object", additionalProperties: false, required: ["epoch", "sessionID", "sequence", "messageID", "message", "totalItems", "totalChars"], properties: {
   epoch: text,
   sessionID: text,
@@ -18,22 +28,23 @@ var summarySchema = { type: "object", additionalProperties: false, required: ["e
   totalItems: integer,
   totalChars: integer
 } };
+var versionStatusSchema = { type: "object", additionalProperties: false, required: ["type", "notice"], properties: {
+  type: { type: "string", enum: ["project", "remote"] },
+  notice: noticeSchema
+} };
+var protocolVersionSchema = { type: "integer", enum: [2] };
 var feedbackRpc = {
   id: "sybermem-feedback",
   methods: { status: {
     input: { type: "object", additionalProperties: false, required: ["sessionID"], properties: { sessionID: text } },
-    output: { type: "object", additionalProperties: false, required: ["epoch", "summary"], properties: { epoch: text, summary: { anyOf: [summarySchema, { type: "null" }] } } }
+    output: { type: "object", additionalProperties: false, required: ["epoch", "summary"], properties: {
+      epoch: text,
+      summary: { anyOf: [summarySchema, { type: "null" }] },
+      versionStatus: { type: "array", maxItems: 2, items: versionStatusSchema },
+      protocolVersion: protocolVersionSchema
+    } }
   } },
-  events: { notice: { schema: { type: "object", additionalProperties: false, required: ["epoch", "sessionID", "sequence", "kind", "message", "messageID", "totalItems", "totalChars"], properties: {
-    epoch: text,
-    sessionID: text,
-    sequence: integer,
-    kind: { type: "string", enum: ["summary", "advisory"] },
-    message: text,
-    messageID: text,
-    totalItems: integer,
-    totalChars: integer
-  } } } }
+  events: { notice: { schema: noticeSchema } }
 };
 function sameLocation(left, right) {
   return !!left && !!right && resolve(left).toLowerCase() === resolve(right).toLowerCase();
@@ -41,6 +52,7 @@ function sameLocation(left, right) {
 function feedbackGate(directory, current, show) {
   const seen = new Map;
   const summaries = new Map;
+  const versions = new Map;
   const candidates = new Map;
   let candidateVersion = 0;
   const selected = (sessionID) => {
@@ -57,7 +69,54 @@ function feedbackGate(directory, current, show) {
     if (state)
       next.retired.add(state.epoch);
     seen.set(sessionID, next);
+    versions.delete(sessionID);
     return next;
+  };
+  const versionShown = (sessionID, epoch, type) => {
+    const state = versions.get(sessionID);
+    return state?.epoch === epoch ? state.shown.get(type) : undefined;
+  };
+  const markVersion = (sessionID, epoch, type, notice) => {
+    let state = versions.get(sessionID);
+    if (state?.epoch !== epoch) {
+      state = { epoch, shown: new Map };
+      versions.set(sessionID, state);
+    }
+    state.shown.set(type, { sequence: notice.sequence, message: notice.message });
+  };
+  const versionNotices = (raw, sessionID, epoch) => {
+    if (!Array.isArray(raw))
+      return [];
+    const accepted = [];
+    const seenTypes = new Set;
+    for (const entry of raw) {
+      if (accepted.length >= 2)
+        break;
+      if (!entry || typeof entry !== "object")
+        continue;
+      const type = entry.type;
+      const notice = entry.notice;
+      if (type !== "project" && type !== "remote" || !notice || typeof notice !== "object")
+        continue;
+      if (notice.sessionID !== sessionID || notice.epoch !== epoch || notice.kind !== "advisory")
+        continue;
+      if (typeof notice.message !== "string" || notice.message.length === 0)
+        continue;
+      if (!Number.isSafeInteger(notice.sequence) || notice.sequence < 1)
+        continue;
+      if (seenTypes.has(type))
+        continue;
+      const shown = versionShown(sessionID, epoch, type);
+      if (shown && notice.sequence <= shown.sequence)
+        continue;
+      if (shown && notice.message === shown.message) {
+        accepted.push({ type, notice, display: false });
+        continue;
+      }
+      seenTypes.add(type);
+      accepted.push({ type, notice, display: true });
+    }
+    return accepted;
   };
   return {
     revision(sessionID) {
@@ -103,8 +162,28 @@ function feedbackGate(directory, current, show) {
       if (!state)
         return;
       const candidate = candidates.get(sessionID);
-      if (status.summary && !(candidate?.notice.epoch === status.epoch && candidate.notice.sequence > status.summary.sequence)) {
-        this.accept({ location: { directory }, data: { ...status.summary, kind: "summary" } });
+      const outranks = (sequence) => !!candidate && candidate.notice.epoch === status.epoch && candidate.notice.sequence > sequence;
+      const replay = [];
+      if (status.summary && !outranks(status.summary.sequence))
+        replay.push({ notice: { ...status.summary, kind: "summary" }, display: true });
+      for (const item of versionNotices(status.versionStatus, sessionID, status.epoch)) {
+        if (outranks(item.notice.sequence))
+          continue;
+        replay.push({ notice: item.notice, type: item.type, display: item.display });
+      }
+      replay.sort((left, right) => left.notice.sequence - right.notice.sequence);
+      for (const item of replay) {
+        if (!item.display) {
+          if (item.type && item.notice.sequence > state.sequence) {
+            state.sequence = item.notice.sequence;
+            markVersion(sessionID, status.epoch, item.type, item.notice);
+          }
+          continue;
+        }
+        const previous = state.sequence;
+        this.accept({ location: { directory }, data: item.notice });
+        if (item.type && state.sequence > previous)
+          markVersion(sessionID, status.epoch, item.type, item.notice);
       }
       if (candidate && candidate.notice.epoch === status.epoch) {
         candidates.delete(sessionID);
@@ -117,13 +196,186 @@ function feedbackGate(directory, current, show) {
     clear() {
       seen.clear();
       summaries.clear();
+      versions.clear();
       candidates.clear();
     }
   };
 }
 
+// packages/opencode-plugin/src/toast_queue.ts
+var SUMMARY_DURATION_MS = 3500;
+var ADVISORY_DURATION_MS = 5000;
+var MAX_WAITING_QUEUE = 3;
+var WAITING_TTL_MS = 15000;
+var MAX_MESSAGE_CHARS = 240;
+var defaultClock = {
+  now: () => Date.now(),
+  setTimeout: (callback, ms) => setTimeout(callback, ms),
+  clearTimeout: (handle) => clearTimeout(handle),
+  setInterval: (callback, ms) => setInterval(callback, ms),
+  clearInterval: (handle) => clearInterval(handle)
+};
+function classifyNotice(notice) {
+  const duration = notice.kind === "summary" ? SUMMARY_DURATION_MS : ADVISORY_DURATION_MS;
+  if (notice.kind === "summary") {
+    return { category: "summary", priority: 3, duration };
+  }
+  const message = notice.message ?? "";
+  if (/\/sybermem-update\b|is installed;|remote main is|\u7248\u672C\u843D\u540E|\u6700\u65B0\u7248|\u66F4\u65B0/i.test(message)) {
+    return { category: "version", priority: 4, duration };
+  }
+  if (/injected project startup context|\u9879\u76EE\u542F\u52A8\u4E0A\u4E0B\u6587|\u5DF2\u8F7D\u5165\u9879\u76EE\u542F\u52A8|\u6CE8\u5165\u6458\u8981/i.test(message)) {
+    return { category: "summary", priority: 3, duration };
+  }
+  if (/\/sybermem-habit\b|\u4E60\u60EF|\u504F\u597D\/\u89C4\u8303|\u5F85\u786E\u8BA4\u7684\u4E60\u60EF\u5019\u9009/i.test(message)) {
+    return { category: "habit", priority: 2, duration };
+  }
+  return { category: "idle", priority: 1, duration };
+}
+function createToastQueue(options) {
+  const clock = options.clock ?? defaultClock;
+  let activeItem = null;
+  let activeTimer = null;
+  let waiting = [];
+  let orderCounter = 0;
+  let stopped = false;
+  const clearTimer = () => {
+    if (activeTimer !== null) {
+      clock.clearTimeout(activeTimer);
+      activeTimer = null;
+    }
+  };
+  const clear = () => {
+    clearTimer();
+    activeItem = null;
+    waiting = [];
+  };
+  const purgeExpired = (now) => {
+    if (waiting.length === 0)
+      return;
+    waiting = waiting.filter((item) => now - item.enqueuedAt <= WAITING_TTL_MS);
+  };
+  const sortWaiting = () => {
+    waiting.sort((a, b) => {
+      if (b.priority !== a.priority)
+        return b.priority - a.priority;
+      return a.order - b.order;
+    });
+  };
+  const isDuplicate = (candidate) => {
+    const matches = (existing) => existing.sessionID === candidate.sessionID && existing.kind === candidate.kind && (existing.message === candidate.message || Boolean(existing.messageID) && existing.messageID === candidate.messageID);
+    if (activeItem && matches(activeItem))
+      return true;
+    return waiting.some(matches);
+  };
+  const displayNext = () => {
+    activeTimer = null;
+    activeItem = null;
+    if (stopped)
+      return;
+    purgeExpired(clock.now());
+    if (waiting.length === 0)
+      return;
+    const next = waiting.shift();
+    if (!options.isActive(next.sessionID)) {
+      clear();
+      return;
+    }
+    showNow(next);
+  };
+  const showNow = (item) => {
+    if (stopped || !options.isActive(item.sessionID)) {
+      clear();
+      return;
+    }
+    activeItem = item;
+    try {
+      options.showToast({
+        title: "SyberMem",
+        message: item.message,
+        variant: "info",
+        duration: item.duration,
+        sessionID: item.sessionID
+      });
+    } catch {}
+    activeTimer = clock.setTimeout(displayNext, item.duration);
+  };
+  return {
+    enqueue(notice) {
+      if (stopped || !notice || typeof notice.sessionID !== "string" || !notice.sessionID)
+        return;
+      if (typeof notice.message !== "string")
+        return;
+      const trimmed = notice.message.trim().slice(0, MAX_MESSAGE_CHARS);
+      if (!trimmed)
+        return;
+      if (!options.isActive(notice.sessionID)) {
+        clear();
+        return;
+      }
+      if (activeItem && activeItem.sessionID !== notice.sessionID) {
+        clear();
+      }
+      const now = clock.now();
+      purgeExpired(now);
+      const { category, priority, duration } = classifyNotice({ kind: notice.kind, message: trimmed });
+      const item = {
+        sessionID: notice.sessionID,
+        kind: notice.kind,
+        category,
+        priority,
+        duration,
+        message: trimmed,
+        messageID: typeof notice.messageID === "string" ? notice.messageID : "",
+        enqueuedAt: now,
+        order: ++orderCounter
+      };
+      if (item.kind === "summary") {
+        const existingIndex = waiting.findIndex((w) => w.kind === "summary" && w.sessionID === item.sessionID);
+        if (existingIndex !== -1) {
+          waiting[existingIndex] = item;
+          sortWaiting();
+          return;
+        }
+      }
+      if (isDuplicate(item))
+        return;
+      if (!activeItem) {
+        showNow(item);
+        return;
+      }
+      if (waiting.length >= MAX_WAITING_QUEUE) {
+        const pool = [...waiting, item];
+        let victim = pool[0];
+        for (let i = 1;i < pool.length; i++) {
+          const candidate = pool[i];
+          if (candidate.priority < victim.priority || candidate.priority === victim.priority && (candidate.enqueuedAt < victim.enqueuedAt || candidate.enqueuedAt === victim.enqueuedAt && candidate.order < victim.order)) {
+            victim = candidate;
+          }
+        }
+        if (victim === item)
+          return;
+        waiting = waiting.filter((w) => w !== victim);
+      }
+      waiting.push(item);
+      sortWaiting();
+    },
+    clear,
+    dispose() {
+      stopped = true;
+      clear();
+    },
+    size() {
+      return waiting.length;
+    },
+    isShowing() {
+      return activeItem !== null;
+    }
+  };
+}
+
 // packages/opencode-plugin/src/tui.ts
-function setupSyberMemTui(ctx, refreshMs = 2000) {
+function setupSyberMemTui(ctx, refreshMs = 2000, options) {
   const directory = ctx.location?.directory;
   if (!directory)
     return () => {};
@@ -134,9 +386,19 @@ function setupSyberMemTui(ctx, refreshMs = 2000) {
   let generation = 0;
   let pending;
   const active = (sessionID) => sameLocation(ctx.location?.directory, directory) && ctx.ui.router.current().type === "session" && ctx.ui.router.current().sessionID === sessionID;
+  const queue = createToastQueue({
+    clock: options?.clock,
+    isActive: (sessionID) => !stopped && active(sessionID),
+    showToast: (input) => {
+      if (!stopped && active(input.sessionID)) {
+        ctx.ui.toast.show(input);
+      }
+    }
+  });
   const gate = feedbackGate(directory, () => ctx.ui.router.current(), (notice) => {
-    if (!stopped && active(notice.sessionID))
-      ctx.ui.toast.show({ title: "SyberMem", message: notice.message, variant: "info", duration: notice.kind === "summary" ? 3500 : 5000, sessionID: notice.sessionID });
+    if (!stopped && active(notice.sessionID)) {
+      queue.enqueue(notice);
+    }
   });
   const refresh = (force = false) => {
     if (stopped)
@@ -148,11 +410,14 @@ function setupSyberMemTui(ctx, refreshMs = 2000) {
       ++generation;
       pending = undefined;
       force = true;
+      queue.clear();
     }
     if (!force)
       return;
-    if (!sessionID)
+    if (!sessionID) {
+      queue.clear();
       return;
+    }
     if (pending) {
       pending.queued = true;
       return;
@@ -179,7 +444,10 @@ function setupSyberMemTui(ctx, refreshMs = 2000) {
   });
   const offData = ctx.data?.listen(() => refresh(true));
   refresh();
-  const timer = setInterval(() => {
+  const clock = options?.clock;
+  const timer = clock?.setInterval ? clock.setInterval(() => {
+    refresh(++ticks % 5 === 0);
+  }, refreshMs) : setInterval(() => {
     refresh(++ticks % 5 === 0);
   }, refreshMs);
   return () => {
@@ -188,7 +456,11 @@ function setupSyberMemTui(ctx, refreshMs = 2000) {
     stopped = true;
     ++generation;
     pending = undefined;
-    clearInterval(timer);
+    if (clock?.clearInterval)
+      clock.clearInterval(timer);
+    else
+      clearInterval(timer);
+    queue.dispose();
     try {
       offData?.();
     } catch {}

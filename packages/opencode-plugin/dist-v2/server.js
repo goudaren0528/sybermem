@@ -1376,6 +1376,15 @@ import { dirname, join as join7 } from "path";
 var REMOTE_VERSION_URL = "https://raw.githubusercontent.com/goudaren0528/sybermem/main/VERSION";
 var CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 var FETCH_TIMEOUT_MS = 3000;
+var MAX_VERSION_LENGTH = 32;
+var VERSION_RE = /^v?\d+(?:\.\d+){1,3}(?:-[0-9A-Za-z]+(?:\.[0-9A-Za-z]+)*)?(?:\+[0-9A-Za-z]+(?:\.[0-9A-Za-z]+)*)?$/;
+function isPlausibleVersion(value) {
+  if (typeof value !== "string")
+    return false;
+  if (value.length === 0 || value.length > MAX_VERSION_LENGTH)
+    return false;
+  return VERSION_RE.test(value);
+}
 function userHome3() {
   return process.env.USERPROFILE ?? process.env.HOME ?? null;
 }
@@ -1398,9 +1407,12 @@ function parseRemoteVersionCache(raw) {
     const checked = Reflect.get(data, "checked_at");
     if (typeof remote !== "string" || !remote.trim())
       return null;
+    const remoteVersion = remote.trim();
+    if (!isPlausibleVersion(remoteVersion))
+      return null;
     if (typeof checked !== "string" || !checked.trim())
       return null;
-    return { remote_version: remote.trim(), checked_at: checked.trim() };
+    return { remote_version: remoteVersion, checked_at: checked.trim() };
   } catch {
     return null;
   }
@@ -1434,7 +1446,7 @@ function cacheIsStale(cache, now = Date.now()) {
   return now - checkedAt >= CACHE_TTL_MS;
 }
 function remoteIsNewer(remoteVersion, installedVersion) {
-  if (!remoteVersion || !installedVersion)
+  if (!isPlausibleVersion(remoteVersion) || !isPlausibleVersion(installedVersion))
     return false;
   return compareVersions(remoteVersion, installedVersion) > 0;
 }
@@ -1461,7 +1473,7 @@ async function fetchRemoteVersion() {
       const body = (await response.text()).trim();
       const firstLine = body.split(`
 `)[0]?.trim() ?? "";
-      if (!firstLine || firstLine.length > 32 || !/^[0-9]/.test(firstLine))
+      if (!isPlausibleVersion(firstLine))
         return null;
       return firstLine;
     } finally {
@@ -1471,13 +1483,22 @@ async function fetchRemoteVersion() {
     return null;
   }
 }
-async function refreshRemoteVersionCache(now = Date.now()) {
+var refreshInFlight = null;
+function refreshRemoteVersionCache(now = Date.now()) {
   if (remoteCheckDisabled())
-    return;
-  const remote = await fetchRemoteVersion();
-  if (!remote)
-    return;
-  writeRemoteVersionCache({ remote_version: remote, checked_at: new Date(now).toISOString() });
+    return Promise.resolve();
+  if (refreshInFlight)
+    return refreshInFlight;
+  refreshInFlight = (async () => {
+    try {
+      const remote = await fetchRemoteVersion();
+      if (remote)
+        writeRemoteVersionCache({ remote_version: remote, checked_at: new Date(now).toISOString() });
+    } catch {} finally {
+      refreshInFlight = null;
+    }
+  })();
+  return refreshInFlight;
 }
 function evaluateRemoteVersion() {
   if (remoteCheckDisabled())
@@ -1952,6 +1973,16 @@ import { relative as relative2, resolve as resolve2, win32 } from "path";
 // packages/opencode-plugin/src/v2_feedback.ts
 var text = { type: "string" };
 var integer = { type: "integer", minimum: 0 };
+var noticeSchema = { type: "object", additionalProperties: false, required: ["epoch", "sessionID", "sequence", "kind", "message", "messageID", "totalItems", "totalChars"], properties: {
+  epoch: text,
+  sessionID: text,
+  sequence: integer,
+  kind: { type: "string", enum: ["summary", "advisory"] },
+  message: text,
+  messageID: text,
+  totalItems: integer,
+  totalChars: integer
+} };
 var summarySchema = { type: "object", additionalProperties: false, required: ["epoch", "sessionID", "sequence", "messageID", "message", "totalItems", "totalChars"], properties: {
   epoch: text,
   sessionID: text,
@@ -1961,25 +1992,38 @@ var summarySchema = { type: "object", additionalProperties: false, required: ["e
   totalItems: integer,
   totalChars: integer
 } };
+var versionStatusSchema = { type: "object", additionalProperties: false, required: ["type", "notice"], properties: {
+  type: { type: "string", enum: ["project", "remote"] },
+  notice: noticeSchema
+} };
+var protocolVersionSchema = { type: "integer", enum: [2] };
 var feedbackRpc = {
   id: "sybermem-feedback",
   methods: { status: {
     input: { type: "object", additionalProperties: false, required: ["sessionID"], properties: { sessionID: text } },
-    output: { type: "object", additionalProperties: false, required: ["epoch", "summary"], properties: { epoch: text, summary: { anyOf: [summarySchema, { type: "null" }] } } }
+    output: { type: "object", additionalProperties: false, required: ["epoch", "summary"], properties: {
+      epoch: text,
+      summary: { anyOf: [summarySchema, { type: "null" }] },
+      versionStatus: { type: "array", maxItems: 2, items: versionStatusSchema },
+      protocolVersion: protocolVersionSchema
+    } }
   } },
-  events: { notice: { schema: { type: "object", additionalProperties: false, required: ["epoch", "sessionID", "sequence", "kind", "message", "messageID", "totalItems", "totalChars"], properties: {
-    epoch: text,
-    sessionID: text,
-    sequence: integer,
-    kind: { type: "string", enum: ["summary", "advisory"] },
-    message: text,
-    messageID: text,
-    totalItems: integer,
-    totalChars: integer
-  } } } }
+  events: { notice: { schema: noticeSchema } }
 };
 
 // packages/opencode-plugin/src/v2.ts
+function injectionSummary(startupPresent, dynamic) {
+  if (!startupPresent && !dynamic)
+    return null;
+  const segments = [];
+  if (startupPresent)
+    segments.push("\u5DF2\u5411\u672C\u8F6E\u8BF7\u6C42\u52A0\u5165\u9879\u76EE\u542F\u52A8\u4E0A\u4E0B\u6587");
+  if (dynamic) {
+    const lanes = dynamic.laneCounts.map(({ lane, count }) => `${lane}=${count}`).join(", ");
+    segments.push(`\u672C\u8F6E\u52A0\u5165 ${dynamic.totalItems} \u6761\u4E0A\u4E0B\u6587\uFF08${lanes}\uFF09`);
+  }
+  return { message: `\u2B50 SyberMem: ${segments.join("\uFF1B")}`, totalItems: dynamic?.totalItems ?? 0, totalChars: dynamic?.totalChars ?? 0 };
+}
 async function setupSyberMemV2(ctx, shell = $) {
   const root = resolveRoot(ctx.location.directory);
   if (!root)
@@ -1997,18 +2041,95 @@ async function setupSyberMemV2(ctx, shell = $) {
   const compacted = new WeakSet;
   const admitted = new Map;
   const versionNotified = new Set;
+  const remoteVersionNotified = new Set;
   const summaries = new Map;
-  const sequences = new Map;
+  let feedbackSequence = 0;
+  const MAX_VERSION_SESSIONS = 256;
+  const versionStatus = new Map;
+  const versionTouched = new Map;
+  let versionTick = 0;
   let feedback;
+  const nextNotice = (sessionID, kind, message, messageID, totalItems, totalChars) => {
+    const sequence = ++feedbackSequence;
+    return { epoch, sessionID, sequence, kind, message: message.slice(0, 240), messageID, totalItems, totalChars };
+  };
+  const emitNotice = (data) => {
+    if (feedback)
+      feedback.events.emit("notice", data).catch(() => {});
+  };
   const notice = (sessionID, kind, message, messageID = "", totalItems = 0, totalChars = 0) => {
     if (stopped || !sessionID || !feedback)
       return;
-    const sequence = (sequences.get(sessionID) ?? 0) + 1;
-    sequences.set(sessionID, sequence);
-    const data = { epoch, sessionID, sequence, kind, message: message.slice(0, 240), messageID, totalItems, totalChars };
+    const data = nextNotice(sessionID, kind, message, messageID, totalItems, totalChars);
     if (kind === "summary")
-      summaries.set(sessionID, { epoch, sessionID, sequence, message: data.message, messageID, totalItems, totalChars });
-    feedback.events.emit("notice", data).catch(() => {});
+      summaries.set(sessionID, { epoch, sessionID, sequence: data.sequence, message: data.message, messageID, totalItems, totalChars });
+    emitNotice(data);
+  };
+  const touchVersion = (sessionID) => {
+    versionTouched.delete(sessionID);
+    versionTouched.set(sessionID, ++versionTick);
+  };
+  const releaseVersionSession = (sessionID) => {
+    versionStatus.delete(sessionID);
+    versionTouched.delete(sessionID);
+  };
+  const versionOnly = (sessionID) => !sessions.has(sessionID) && !pendingStates.has(sessionID) && !contextQueues.has(sessionID) && !reported.has(sessionID) && !summaries.has(sessionID) && !admitted.has(sessionID);
+  const pruneVersionSessions = (keep) => {
+    if (versionTouched.size <= MAX_VERSION_SESSIONS)
+      return;
+    for (const id of [...versionTouched.keys()]) {
+      if (versionTouched.size <= MAX_VERSION_SESSIONS)
+        break;
+      if (id === keep)
+        continue;
+      if (!versionOnly(id))
+        continue;
+      releaseVersionSession(id);
+      versionNotified.delete(id);
+      remoteVersionNotified.delete(id);
+    }
+  };
+  const rememberVersion = (sessionID, kind, message) => {
+    const kinds = versionStatus.get(sessionID);
+    if (!message) {
+      kinds?.delete(kind);
+      if (kinds && kinds.size === 0)
+        releaseVersionSession(sessionID);
+      return null;
+    }
+    touchVersion(sessionID);
+    const text2 = message.slice(0, 240);
+    if (kinds) {
+      const existing = kinds.get(kind);
+      if (existing && existing.message === text2)
+        return existing;
+    }
+    const target = kinds ?? new Map;
+    if (!kinds)
+      versionStatus.set(sessionID, target);
+    const data = nextNotice(sessionID, "advisory", text2, "", 0, 0);
+    target.set(kind, data);
+    pruneVersionSessions(sessionID);
+    return data;
+  };
+  const liveVersionNotice = (sessionID, kind, message) => {
+    const data = rememberVersion(sessionID, kind, message);
+    if (data)
+      emitNotice(data);
+  };
+  const currentRemoteNudge = () => remoteUpdateNudgeMessage(readRemoteVersionCache(), readInstalledVersion());
+  const currentVersionStatus = (sessionID) => {
+    const entries = [
+      { type: "project", message: updateNudgeMessage(root) },
+      { type: "remote", message: currentRemoteNudge() }
+    ];
+    const out = [];
+    for (const { type, message } of entries) {
+      const data = rememberVersion(sessionID, type, message);
+      if (data)
+        out.push({ type, notice: data });
+    }
+    return out;
   };
   const diagnostic = (message) => {
     if (!stopped)
@@ -2019,6 +2140,9 @@ async function setupSyberMemV2(ctx, shell = $) {
   const versionNudge = updateNudgeMessage(root);
   if (versionNudge)
     diagnostic(versionNudge);
+  const remoteVersionNudge = evaluateRemoteVersion();
+  if (remoteVersionNudge)
+    diagnostic(remoteVersionNudge);
   const args = { $: shell, directory: root, client };
   const sessionArgs = (sessionID) => ({ ...args, client: { diagnostic: (message) => {
     diagnostic(message);
@@ -2077,6 +2201,25 @@ async function setupSyberMemV2(ctx, shell = $) {
         contextQueues.delete(sessionID);
     }
   }
+  const releaseSession = (sessionID) => {
+    if (!sessionID)
+      return;
+    const known = sessions.has(sessionID) || pendingStates.has(sessionID) || contextQueues.has(sessionID) || admitted.has(sessionID) || reported.has(sessionID) || summaries.has(sessionID) || versionStatus.has(sessionID) || versionNotified.has(sessionID) || remoteVersionNotified.has(sessionID);
+    if (known) {
+      resetSessionActivity(sessionID);
+      resetPendingHabit(sessionID);
+    }
+    sessions.delete(sessionID);
+    reported.delete(sessionID);
+    pendingStates.delete(sessionID);
+    contextQueues.delete(sessionID);
+    admitted.delete(sessionID);
+    versionNotified.delete(sessionID);
+    remoteVersionNotified.delete(sessionID);
+    summaries.delete(sessionID);
+    versionStatus.delete(sessionID);
+    versionTouched.delete(sessionID);
+  };
   const cleanup = async () => {
     stopped = true;
     controller.abort();
@@ -2093,12 +2236,20 @@ async function setupSyberMemV2(ctx, shell = $) {
     contextQueues.clear();
     admitted.clear();
     versionNotified.clear();
+    remoteVersionNotified.clear();
     summaries.clear();
-    sequences.clear();
+    versionStatus.clear();
+    versionTouched.clear();
   };
   try {
     if (ctx.rpc) {
-      feedback = await ctx.rpc.register(feedbackRpc, { status: async ({ sessionID }) => ({ epoch, summary: await belongs(sessionID) ? summaries.get(sessionID) ?? null : null }) });
+      feedback = await ctx.rpc.register(feedbackRpc, { status: async ({ sessionID }) => {
+        if (!await belongs(sessionID))
+          return { epoch, summary: null, protocolVersion: 2 };
+        const summary = summaries.get(sessionID) ?? null;
+        const versions = currentVersionStatus(sessionID);
+        return versions.length ? { epoch, summary, protocolVersion: 2, versionStatus: versions } : { epoch, summary, protocolVersion: 2 };
+      } });
       registrations.push(feedback);
     }
     registrations.push(await ctx.session.hook("prompt", async (event) => {
@@ -2119,7 +2270,12 @@ async function setupSyberMemV2(ctx, shell = $) {
           return;
         if (versionNudge && !versionNotified.has(event.sessionID)) {
           versionNotified.add(event.sessionID);
-          notice(event.sessionID, "advisory", versionNudge);
+          liveVersionNotice(event.sessionID, "project", versionNudge);
+        }
+        const remoteNudge = currentRemoteNudge();
+        if (remoteNudge && !remoteVersionNotified.has(event.sessionID)) {
+          remoteVersionNotified.add(event.sessionID);
+          liveVersionNotice(event.sessionID, "remote", remoteNudge);
         }
         const prompt = [...history].reverse().find((message) => message.type === "user");
         if (prompt?.id === admitted.get(event.sessionID)?.id)
@@ -2168,13 +2324,13 @@ async function setupSyberMemV2(ctx, shell = $) {
           recordInjectedRecords(event.sessionID, packets);
           const usage = appendMemoryUsage(root, { sessionID: event.sessionID, packets, startup });
           recordMemoryUsage(event.sessionID, usage);
-          const summary = buildPromptInjectionToastSummary(classifyPackets(packets), usage);
+          const dynamic = buildPromptInjectionToastSummary(classifyPackets(packets), usage);
+          const summary = injectionSummary(Boolean(startup), dynamic);
           if (summary && reported.get(event.sessionID) !== messageID) {
             reported.set(event.sessionID, messageID);
-            const message = promptInjectionToastMessage(summary);
-            diagnostic(message);
+            diagnostic(summary.message);
             if (summaries.get(event.sessionID)?.messageID !== messageID)
-              notice(event.sessionID, "summary", message, messageID, summary.totalItems, summary.totalChars);
+              notice(event.sessionID, "summary", summary.message, messageID, summary.totalItems, summary.totalChars);
           }
         }
       });
@@ -2219,16 +2375,8 @@ async function setupSyberMemV2(ctx, shell = $) {
       if (stopped)
         break;
       const id = event.data?.sessionID;
-      if (event.type === "session.deleted" && (sessions.has(id) || pendingStates.has(id))) {
-        resetSessionActivity(id);
-        resetPendingHabit(id);
-        sessions.delete(id);
-        pendingStates.delete(id);
-        admitted.delete(id);
-        summaries.delete(id);
-        reported.delete(id);
-        sequences.delete(id);
-        versionNotified.delete(id);
+      if (event.type === "session.deleted") {
+        releaseSession(id);
         continue;
       }
       if (event.type !== "session.idle" || !await belongs(id))
