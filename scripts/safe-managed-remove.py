@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import inspect
 import json
 import os
 from pathlib import Path
@@ -8,6 +9,9 @@ import shutil
 import stat
 import sys
 from uuid import uuid4
+
+
+_RMTREE_HAS_DIR_FD = "dir_fd" in inspect.signature(shutil.rmtree).parameters
 
 
 def _is_link_or_reparse(path: Path) -> bool:
@@ -55,6 +59,51 @@ def _identity(path: Path) -> tuple[int, int]:
     return info.st_dev, info.st_ino
 
 
+def _rmtree_at(parent_fd: int, name: str, expected: os.stat_result | None = None) -> None:
+    # Python 3.10 has no shutil.rmtree(dir_fd=...). Keep the fallback anchored
+    # to open directories rather than reconstructing a path or changing cwd.
+    try:
+        info = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+    except FileNotFoundError:
+        return
+    if expected is not None and not os.path.samestat(expected, info):
+        raise RuntimeError(f"directory changed during removal: {name}")
+    if not stat.S_ISDIR(info.st_mode):
+        raise RuntimeError(f"refusing changed directory during removal: {name}")
+    flags = os.O_RDONLY | os.O_DIRECTORY
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    directory_fd = os.open(name, flags, dir_fd=parent_fd)
+    try:
+        if not os.path.samestat(info, os.fstat(directory_fd)):
+            raise RuntimeError(f"directory changed during removal: {name}")
+        with os.scandir(directory_fd) as entries:
+            for entry in entries:
+                try:
+                    child = os.stat(entry.name, dir_fd=directory_fd, follow_symlinks=False)
+                except FileNotFoundError:
+                    continue
+                if stat.S_ISDIR(child.st_mode):
+                    _rmtree_at(directory_fd, entry.name, child)
+                else:
+                    # Includes dangling links: unlink the entry, never its target.
+                    try:
+                        os.unlink(entry.name, dir_fd=directory_fd)
+                    except FileNotFoundError:
+                        pass
+        # Keep the descriptor open until the final identity check and rmdir.
+        # If a writer replaced this entry, leave the replacement untouched.
+        try:
+            current = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+        except FileNotFoundError:
+            return
+        if not os.path.samestat(os.fstat(directory_fd), current):
+            raise RuntimeError(f"directory changed during removal: {name}")
+        os.rmdir(name, dir_fd=parent_fd)
+    finally:
+        os.close(directory_fd)
+
+
 def remove_child(root: Path, name: str) -> None:
     if Path(name).name != name or name in {"", ".", ".."}:
         raise RuntimeError(f"invalid managed child name: {name}")
@@ -69,14 +118,20 @@ def remove_child(root: Path, name: str) -> None:
         root_fd = os.open(root, flags)
         quarantine_name = f".sybermem-remove-{uuid4().hex}"
         try:
-            info = os.stat(name, dir_fd=root_fd, follow_symlinks=False)
+            try:
+                info = os.stat(name, dir_fd=root_fd, follow_symlinks=False)
+            except FileNotFoundError:
+                return
             if stat.S_ISLNK(info.st_mode):
                 os.unlink(name, dir_fd=root_fd)
                 return
             os.rename(name, quarantine_name, src_dir_fd=root_fd, dst_dir_fd=root_fd)
             moved = os.stat(quarantine_name, dir_fd=root_fd, follow_symlinks=False)
             if stat.S_ISDIR(moved.st_mode):
-                shutil.rmtree(quarantine_name, dir_fd=root_fd)
+                if _RMTREE_HAS_DIR_FD:
+                    shutil.rmtree(quarantine_name, dir_fd=root_fd)
+                else:
+                    _rmtree_at(root_fd, quarantine_name, moved)
             else:
                 os.unlink(quarantine_name, dir_fd=root_fd)
         finally:

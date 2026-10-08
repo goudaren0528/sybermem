@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 from pathlib import Path
+import shutil
 
 import pytest
 
 
 ROOT = Path(__file__).resolve().parents[3]
+POSIX_FD = os.name != "nt" and hasattr(os, "O_DIRECTORY")
 
 
 def _module():
@@ -136,3 +139,144 @@ def test_uninstall_cleans_retired_skill_from_all_roots(tmp_path: Path) -> None:
 
     for root in roots:
         assert not (root / "sybermem-team-summary").exists()
+
+
+def test_remove_missing_child_and_root_are_idempotent(tmp_path: Path) -> None:
+    module = _module()
+    module.remove_child(tmp_path / "missing", "sybermem-test")
+    module.remove_child(tmp_path, "sybermem-test")
+    assert list(tmp_path.iterdir()) == []
+
+
+@pytest.fixture
+def legacy_remover(monkeypatch):
+    if not POSIX_FD:
+        pytest.skip("POSIX descriptor-relative removal required")
+    # Load against the actual old public signature, not just a forced flag.
+    def old_rmtree(path, ignore_errors=False, onerror=None):
+        raise AssertionError("legacy rmtree must not be used for fd removal")
+
+    monkeypatch.setattr(shutil, "rmtree", old_rmtree)
+    module = _module()
+    assert not module._RMTREE_HAS_DIR_FD
+    return module
+
+
+def test_legacy_signature_removes_tree_and_preserves_nested_link_targets(legacy_remover, tmp_path):
+    root = tmp_path / "skills"
+    nested = root / "sybermem-test" / "nested"
+    nested.mkdir(parents=True)
+    (nested / "managed").write_text("remove", encoding="utf-8")
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "sentinel").write_text("preserve", encoding="utf-8")
+    (nested / "dir-link").symlink_to(outside, target_is_directory=True)
+    (nested / "file-link").symlink_to(outside / "sentinel")
+    (nested / "dangling-link").symlink_to(tmp_path / "missing")
+
+    legacy_remover.remove_child(root, "sybermem-test")
+    legacy_remover.remove_child(root, "sybermem-test")
+
+    assert list(root.iterdir()) == []
+    assert (outside / "sentinel").read_text(encoding="utf-8") == "preserve"
+
+
+@pytest.mark.parametrize("replacement", ["directory", "symlink"])
+def test_legacy_removal_refuses_swap_before_open(legacy_remover, tmp_path, monkeypatch, replacement):
+    root = tmp_path / "root"
+    target = root / "managed"
+    target.mkdir(parents=True)
+    saved = root / "saved"
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "sentinel").write_text("preserve", encoding="utf-8")
+    original_open = os.open
+    captured = []
+
+    def swapping_open(path, flags, *args, **kwargs):
+        if path == "managed":
+            target.rename(saved)
+            if replacement == "symlink":
+                target.symlink_to(outside, target_is_directory=True)
+            else:
+                target.mkdir()
+                (target / "sentinel").write_text("preserve", encoding="utf-8")
+        fd = original_open(path, flags, *args, **kwargs)
+        if path == "managed":
+            captured.append(fd)
+        return fd
+
+    parent_fd = original_open(root, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        monkeypatch.setattr(os, "open", swapping_open)
+        with pytest.raises((RuntimeError, OSError)):
+            legacy_remover._rmtree_at(parent_fd, "managed")
+        for fd in captured:
+            with pytest.raises(OSError):
+                os.fstat(fd)
+    finally:
+        os.close(parent_fd)
+    assert saved.is_dir()
+    assert (outside / "sentinel").read_text(encoding="utf-8") == "preserve"
+    if replacement == "directory":
+        assert (target / "sentinel").read_text(encoding="utf-8") == "preserve"
+
+
+def test_legacy_removal_refuses_swap_after_scan(legacy_remover, tmp_path, monkeypatch):
+    root = tmp_path / "root"
+    target = root / "managed"
+    target.mkdir(parents=True)
+    saved = root / "saved"
+    original_scandir = os.scandir
+
+    def swapping_scandir(fd):
+        target.rename(saved)
+        target.mkdir()
+        return original_scandir(fd)
+
+    parent_fd = os.open(root, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        monkeypatch.setattr(os, "scandir", swapping_scandir)
+        with pytest.raises(RuntimeError, match="directory changed"):
+            legacy_remover._rmtree_at(parent_fd, "managed")
+    finally:
+        os.close(parent_fd)
+    assert target.is_dir() and saved.is_dir()
+
+
+def test_legacy_removal_propagates_permission_error_and_closes_fd(legacy_remover, tmp_path, monkeypatch):
+    root = tmp_path / "root"
+    target = root / "managed"
+    target.mkdir(parents=True)
+    (target / "file").write_text("preserve", encoding="utf-8")
+    original_open = os.open
+    captured = []
+
+    def recording_open(*args, **kwargs):
+        fd = original_open(*args, **kwargs)
+        captured.append(fd)
+        return fd
+
+    def denied(*args, **kwargs):
+        raise PermissionError("synthetic denial")
+
+    parent_fd = original_open(root, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        monkeypatch.setattr(os, "open", recording_open)
+        monkeypatch.setattr(os, "unlink", denied)
+        with pytest.raises(PermissionError, match="synthetic denial"):
+            legacy_remover._rmtree_at(parent_fd, "managed")
+        for fd in captured:
+            with pytest.raises(OSError):
+                os.fstat(fd)
+    finally:
+        os.close(parent_fd)
+    assert (target / "file").read_text(encoding="utf-8") == "preserve"
+
+
+def test_legacy_removal_missing_entry(legacy_remover, tmp_path):
+    parent_fd = os.open(tmp_path, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        legacy_remover._rmtree_at(parent_fd, "missing")
+    finally:
+        os.close(parent_fd)
