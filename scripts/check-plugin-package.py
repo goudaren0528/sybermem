@@ -898,7 +898,7 @@ def check_opencode_plugin_source_bundle(root: Path) -> None:
     bun = shutil.which("bun") or shutil.which("bun.cmd")
     if bun is None:
         fail("bun is required to verify packages/opencode-plugin/sybermem.ts freshness")
-    for flags in ((), ("--v1",), ("--package",), ("--package", "--tui")):
+    for flags in ((), ("--v1",), ("--tui",), ("--package",), ("--package", "--tui")):
         result = subprocess.run([bun, "scripts/build-opencode-plugin.mjs", *flags, "--check"], cwd=root, capture_output=True, text=True)
         if result.returncode:
             fail(result.stderr.strip() or f"OpenCode bundle {flags} is stale")
